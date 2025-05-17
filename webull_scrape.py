@@ -47,20 +47,11 @@ def main():
         except Exception as e:
             logging.error(f"Unexpected error processing ticker {ticker}: {e}")
             continue
-        # Check if the process was successful
-        # if result.returncode != 0:
-        #     logging.error(f"Error processing ticker {ticker}: {result.stderr.decode()}")
-        # else:
-        #     logging.info(f"Successfully processed ticker {ticker}")
-        # Log the URL for debugging
-        #logging.debug(f"Generated URL for ticker {ticker}: {url}")
         
-        # Log progress
         # logging.info(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
         logging.info(f"result: {result.stdout}")
         
-
-        time.sleep(2)
+        time.sleep(5)
 
 if __name__ == "__main__":
     main()

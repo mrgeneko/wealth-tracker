@@ -7,9 +7,10 @@ import json
 import argparse
 import subprocess
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+#from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.safari.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+#from selenium.webdriver.chrome.options import Options
 import logging
 
 numbers_file = "retirement plan.numbers"
@@ -26,14 +27,6 @@ def run_applescript(script):
 
 def update_numbers(data):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-#    ticker_rows = list(prices.items())
-#    updates = []
-
-    # Update StockPrices table
-#    for i, (ticker, data) in enumerate(ticker_rows, start=2):
-#        updates.append(f'set value of cell 2 of row {i} to "{data["price"]}"')
-#        updates.append(f'set value of cell 3 of row {i} to "{data["change_percent"]}"')
-#        updates.append(f'set value of cell 4 of row {i} to "{now}"')
 
     script = f'''
     tell application "Numbers"
@@ -115,81 +108,80 @@ def main():
         sys.exit(1) 
 
     #website = 'https://www.webull.com/quote/bond-912797pj0'
-    path = '/Users/gene/bin/chromedriver-mac-arm64/chromedriver'
-    service = Service(executable_path=path)
+    if True:
+        #path = '/Users/gene/bin/chromedriver-mac-arm64/chromedriver'
+        safari_path = '/usr/bin/safaridriver'
+        service = Service(executable_path=safari_path)
+        logging.info(f'Safari Service created')
+        #chrome_options = Options()
+        #chrome_options.add_argument("--headless")  # Run in headless mode
+        driver = webdriver.Safari(service=service)
+    else:
+        chrome_path = '/Users/gene/bin/chromedriver-mac-arm64/chromedriver'
+        service = Service(executable_path=chrome_path)
+        logging.info(f'Chrome Service created')
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")  # Run in headless mode
+        driver = webdriver.Chrome(service=service,options=chrome_options)
 
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.get(website)
 
     if "bond" in website:
         logging.info(f"Process bond quote page: {website}")
-        #description = driver.find_element(By.XPATH, '//*[@id="app"]/section[1]/div[1]/div[1]/div[2]/div[1]/div[1]/h1')
-        #logging.info(f"description by.xpath {description.text}")
 
         description = driver.find_element(By.CLASS_NAME, 'csr124')
-        logging.info(f"description {description.text}")
+        #logging.info(f"description {description.text}")
 
         cusip = driver.find_element(By.CLASS_NAME, 'csr125')
-        logging.info(f"cusip {cusip.text}")
+        #logging.info(f"cusip {cusip.text}")
 
         last_price = driver.find_element(By.CLASS_NAME, 'csr112')
-        logging.info(f"last_price {last_price.text}")
-
-        #price_change_decimal = driver.find_elements(By.CLASS_NAME, 'csr115')
-        #if len(price_change_decimal) >= 2:
-        #    logging.info(f"price change {price_change_decimal[0].text} {price_change_decimal[1].text}")
-        #else:
-        #    logging.warning("Could not find two price change elements on the page.")
+        #logging.info(f"last_price {last_price.text}")
 
         try:
             price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][1]")
         except Exception as e:
             price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][1]")
-        logging.info(f"price_change_decimal {price_change_decimal.text}")
+        #logging.info(f"price_change_decimal {price_change_decimal.text}")
 
         try:
             price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][2]")
         except Exception as e:
             price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][2]")
-        logging.info(f"price_change_percent {price_change_percent.text}")
+        #logging.info(f"price_change_percent {price_change_percent.text}")
 
         price_datetime = driver.find_element(By.CLASS_NAME, 'csr132')
-        logging.info(f"price_datetime {price_datetime.text}")
-
-        #bond_yield = driver.find_element(By.ID, 'server-side-script')
-        #logging.info(f"yield {bond_yield.get_attribute('outerHTML')}")
+        #logging.info(f"price_datetime {price_datetime.text}")
 
         bond_yield = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[1]/DIV[2]')
-        logging.info(f"bond_yield {bond_yield.text}")
+        #logging.info(f"bond_yield {bond_yield.text}")
 
         high_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[2]/DIV[2]')
-        logging.info(f"high_price {high_price.text}")
+        #logging.info(f"high_price {high_price.text}")
 
         low_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[1]/DIV[2]')
-        logging.info(f"low_price {low_price.text}")
+        #logging.info(f"low_price {low_price.text}")
 
         open_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[2]/DIV[2]')
-        logging.info(f"open_price {open_price.text}")
+        #logging.info(f"open_price {open_price.text}")
 
         coupon_rate = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[3]/DIV[1]/DIV[2]')
-        logging.info(f"coupon_rate {coupon_rate.text}")
+        #logging.info(f"coupon_rate {coupon_rate.text}")
 
         maturity = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[3]/DIV[2]/DIV[2]')
-        logging.info(f"maturity {maturity.text}")
+        #logging.info(f"maturity {maturity.text}")
 
         prev_close_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[4]/DIV[1]/DIV[2]')
-        logging.info(f"prev_close_price {prev_close_price.text}")
+        #logging.info(f"prev_close_price {prev_close_price.text}")
 
         coupon_frequency = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[4]/DIV[2]/DIV[2]')
-        logging.info(f"coupon_frequency {coupon_frequency.text}")
+        #logging.info(f"coupon_frequency {coupon_frequency.text}")
 
         next_coupon_date = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[1]/DIV[2]')
-        logging.info(f"next_coupon_date {next_coupon_date.text}")
+        #logging.info(f"next_coupon_date {next_coupon_date.text}")
 
         accrued_interest = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[2]')
-        logging.info(f"accrued_interest {accrued_interest.text}")
+        #logging.info(f"accrued_interest {accrued_interest.text}")
         
         data = {
             "webull_ticker": webull_ticker,
@@ -212,38 +204,33 @@ def main():
             "accrued_interest": accrued_interest.text
         }
 
+        update_numbers(data)
         json_string = json.dumps(data, indent=4)
         print(json_string)
         logging.info(f"Data extracted: {json_string}")
     else:
         logging.info(f"Process stock quote page: {website}")
-        #ticker = driver.find_element(By.XPATH, '//*[@id="app"]/section[1]/div[1]/div[1]/div[2]/div[1]/div[1]/h1')
+        
         ticker = driver.find_element(By.XPATH, '//div[@class="csr109"]/p[1]')
-        logging.info(f"ticker by.xpath {ticker.text}")
+        #logging.info(f"ticker by.xpath {ticker.text}")
 
         description = driver.find_element(By.CLASS_NAME, 'csr127')
-        logging.info(f"description {description.text}")
+        #logging.info(f"description {description.text}")
 
         exchange = driver.find_element(By.CLASS_NAME, 'csr128')
-        logging.info(f"exchange {exchange.text}")
+        #logging.info(f"exchange {exchange.text}")
 
         last_price = driver.find_element(By.CLASS_NAME, 'csr112')
-        logging.info(f"last_price {last_price.text}")
-
-        #price_change_decimal = driver.find_elements(By.CLASS_NAME, 'csr115')
-        #if len(price_change_decimal) >= 2:
-        #    logging.info(f"price change {price_change_decimal[0].text} {price_change_decimal[1].text}")
-        #else:
-        #    logging.warning("Could not find two price change elements on the page.")
+        #logging.info(f"last_price {last_price.text}")
 
         price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][1]")
-        logging.info(f"price_change_decimal {price_change_decimal.text}")
+        #logging.info(f"price_change_decimal {price_change_decimal.text}")
 
         price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][2]")
-        logging.info(f"price_change_percent {price_change_percent.text}")
+        #logging.info(f"price_change_percent {price_change_percent.text}")
 
         price_datetime = driver.find_element(By.CLASS_NAME, 'csr132')
-        logging.info(f"price_datetime {price_datetime.text}")
+        #logging.info(f"price_datetime {price_datetime.text}")
 
         if "After Hours" in price_datetime.text:
             try:
@@ -262,51 +249,49 @@ def main():
             after_hours_price_change_decimal = ""
             after_hours_price_change_percent = ""
         
-    #        after_hours_price = driver.find_element(By.XPATH, "//div[contains(@class, 'csr132')]/div[contains(@class, 'csr132')]/span[2]")
-        logging.info(f"after_hours_price {after_hours_price}")
-        logging.info(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
-        logging.info(f"after_hours_price_change_percent {after_hours_price_change_percent}")    
+        #logging.info(f"after_hours_price {after_hours_price}")
+        #logging.info(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
+        #logging.info(f"after_hours_price_change_percent {after_hours_price_change_percent}")    
 
         open_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[1]/DIV[2]')
-        logging.info(f"open_price {open_price.text}")
+        #logging.info(f"open_price {open_price.text}")
 
         prev_close_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[2]/DIV[2]')
-        logging.info(f"prev_close_price {prev_close_price.text}")
+        #logging.info(f"prev_close_price {prev_close_price.text}")
 
         high_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[1]/DIV[2]')
-        logging.info(f"high_price {high_price.text}")
+        #logging.info(f"high_price {high_price.text}")
 
         low_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[2]/DIV[2]')
-        logging.info(f"low_price {low_price.text}")
+        #logging.info(f"low_price {low_price.text}")
 
         volume = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[3]/DIV[1]/DIV[2]')
-        logging.info(f"volume {volume.text}")
+        #logging.info(f"volume {volume.text}")
 
         turnover = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[3]/DIV[2]/DIV[2]')
-        logging.info(f"turnover {turnover.text}")
+        #logging.info(f"turnover {turnover.text}")
 
         fiftytwo_week_high = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[4]/DIV[1]/DIV[2]')
-        logging.info(f"fiftytwo_week_high {fiftytwo_week_high.text}")
+        #logging.info(f"fiftytwo_week_high {fiftytwo_week_high.text}")
 
         fiftytwo_week_low = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[4]/DIV[2]/DIV[2]')
-        logging.info(f"fiftytwo_week_low {fiftytwo_week_low.text}")
+        #logging.info(f"fiftytwo_week_low {fiftytwo_week_low.text}")
 
         market_cap = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[1]/DIV[2]')
-        logging.info(f"market_cap {market_cap.text}")
+        #logging.info(f"market_cap {market_cap.text}")
 
         label = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[1]')
         #logging.info(f"label {label.text}")
-        #price_to_earnings_ttm = ""
-        #ytd_yield = ""
+        
         if "YTD YIELD" in label.text:
             #logging.info("YTD Yield.")
             ytd_yield = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[2]')
-            logging.info(f"ytd_yield {ytd_yield.text}")
+            #logging.info(f"ytd_yield {ytd_yield.text}")
             price_to_earnings_ttm = ""
         else:
             #logging.info("PE Ratio.")
             price_to_earnings_ttm = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[2]')
-            logging.info(f"price_to_earnings_ttm {price_to_earnings_ttm.text}")
+            #logging.info(f"price_to_earnings_ttm {price_to_earnings_ttm.text}")
             ytd_yield = ""
             
         data = {
@@ -339,9 +324,6 @@ def main():
         json_string = json.dumps(data, indent=4)
         print(json_string)
         logging.info(f"Data extracted: {json_string}")
-
-
-    logging.info("Done.\n")
 
     driver.quit()
     sys.exit(0)
