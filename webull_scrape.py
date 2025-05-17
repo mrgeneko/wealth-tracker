@@ -24,11 +24,9 @@ def read_tickers(file_path, include_type=None):
     logging.info(f"include_type: {include_type}")
     # Apply additional filtering based on `include_type`
     if include_type == "bonds":
-        logging.info(f"check bond type")
         #return [ticker for ticker in tickers if "bond-" in ticker]
         return [ticker for ticker in tickers if ticker.startswith("bond-")]
     elif include_type == "stocks":
-        logging.info(f"check stock type")
         return [ticker for ticker in tickers if "bond-" not in ticker]
     else:
         logging.info(f"allow all type")
@@ -65,7 +63,7 @@ def main():
 
     #tickers_file = "webull_tickers.txt"
     tickers_file = args.tickers_file
-    logging.info(f"file: {tickers_file} type: {args.include_type}")
+    #logging.info(f"file: {tickers_file} type: {args.include_type}")
     tickers = read_tickers(tickers_file, include_type=args.include_type)
     logging.info(tickers)
     time.sleep(5)
