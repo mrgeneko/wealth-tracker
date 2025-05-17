@@ -4,6 +4,7 @@ import urllib.parse
 import time
 import subprocess
 
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -57,6 +58,8 @@ def main():
         # Log progress
         # logging.info(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
         logging.info(f"result: {result.stdout}")
+        
+
         time.sleep(2)
 
 if __name__ == "__main__":

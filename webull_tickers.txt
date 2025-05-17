@@ -1,9 +1,6 @@
-nyse-ibm
-#nasdaq-afmd
-#nysearca-kie
 nysearca-bklc
 nyse-brk-b
-nasdaq-msft
+nasdaq-msty
 nasdaq-gpix
 nasdaq-jepq
 bats-qdte
@@ -11,7 +8,6 @@ nysearca-qld
 nasdaq-qqq
 nasdaq-qqqm
 nysearca-schg
-nysearca-schd
 nysearca-sgov
 nysearca-splg
 nysearca-sso
