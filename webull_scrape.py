@@ -72,14 +72,6 @@ def main():
         url = generate_url(ticker)
         if not url:
             continue
-
-    tickers_file = "webull_tickers.txt"  # Path to your tickers file
-    tickers = read_tickers(tickers_file, include_type="stocks")  # or "stocks"
-    #logging.info(f"Tickers read from file: {tickers}")
-    for i, ticker in enumerate(tickers):
-        url = generate_url(ticker)
-        if not url:
-            continue
      
         # call other script here
         try:
