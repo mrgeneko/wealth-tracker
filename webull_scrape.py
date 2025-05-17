@@ -33,11 +33,31 @@ def main():
             continue
      
         # call other script here
-        subprocess.run(["python3", "webull_quote.py", "--url", url, "--ticker", ticker], check=True)
-        time.sleep(2)
-
+        try:
+            result = subprocess.run(
+                ["python3", "webull_quote.py", "--url", url, "--ticker", ticker],
+                capture_output=True,  # Capture standard output and error streams
+                text=True, # Decode bytes to string using the default encoding
+                check=True # Raise an exception if the subprocess returns a non-zero exit code
+                )
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error processing ticker {ticker}: {e}")
+            continue
+        except Exception as e:
+            logging.error(f"Unexpected error processing ticker {ticker}: {e}")
+            continue
+        # Check if the process was successful
+        # if result.returncode != 0:
+        #     logging.error(f"Error processing ticker {ticker}: {result.stderr.decode()}")
+        # else:
+        #     logging.info(f"Successfully processed ticker {ticker}")
+        # Log the URL for debugging
+        #logging.debug(f"Generated URL for ticker {ticker}: {url}")
+        
         # Log progress
-        logging.info(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
+        # logging.info(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
+        logging.info(f"result: {result.stdout}")
+        time.sleep(2)
 
 if __name__ == "__main__":
     main()
