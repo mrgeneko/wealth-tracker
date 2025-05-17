@@ -1,6 +1,6 @@
 nysearca-bklc
 nyse-brk-b
-nasdaq-msty
+nysearca-msty
 nasdaq-gpix
 nasdaq-jepq
 bats-qdte
