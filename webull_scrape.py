@@ -4,11 +4,19 @@ import logging
 import urllib.parse
 import time
 import subprocess
-
-
-
+import pandas as pd
 
 def read_tickers(file_path, include_type=None):
+
+    # Read the CSV file into a DataFrame
+    df = pd.read_csv('tickers.csv')
+    # Convert the DataFrame to an array of dictionaries (array of data objects)
+    data_objects = df.to_dict(orient='records')
+
+    # Print the array of data objects
+    for obj in data_objects:
+        print(obj)
+
     try:
         with open(file_path, 'r') as file:
             # Filter out empty lines and comments first
@@ -67,7 +75,7 @@ def main():
     tickers = read_tickers(tickers_file, include_type=args.include_type)
     logging.info(tickers)
     time.sleep(5)
-
+    exit(0)
     for i, ticker in enumerate(tickers):
         url = generate_url(ticker)
         if not url:
