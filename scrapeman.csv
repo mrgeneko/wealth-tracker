@@ -1,5 +1,4 @@
 key,type,yahoo_ticker,yahoo_url,webull_url,reuters_ticker,gfinance_ticker,investingcom_url,Fintel_io_url,finance_charts_url
-912797PJ0,bond,,,https://www.webull.com/quote/bond-912797pj0,,,,,
 912797PK7,bond,,,https://www.webull.com/quote/bond-912797PK7,,,,,
 912797LN5,bond,,,https://www.webull.com/quote/bond-912797LN5,,,,,
 912797PZ4,bond,,,https://www.webull.com/quote/bond-912797PZ4,,,,,
@@ -13,7 +12,7 @@ key,type,yahoo_ticker,yahoo_url,webull_url,reuters_ticker,gfinance_ticker,invest
 91282CKS9,bond,,,https://www.webull.com/quote/bond-91282CKS9,,,,,
 91282CET4,bond,,,https://www.webull.com/quote/bond-91282CET4,,,,,
 BKLC,etf,BKLC,,https://www.webull.com/quote/nysearca-bklc,,https://www.google.com/finance/quote/BKLC:NYSEARCA,https://www.investing.com/etfs/bklc-nyse,,
-BRK-B,Stock,BRK-B,,https://www.webull.com/quote/nyse-brk-b,https://www.reuters.com/markets/companies/BRKb/,https://www.google.com/finance/quote/BRK.B:NYSE,https://www.investing.com/equities/berkshire-hathaway,,
+TQQQ,etf,TQQQ,,https://www.webull.com/quote/nysearca-fngb,,https://www.google.com/finance/quote/FNGB:NYSEARCA,https://www.investing.com/etfs/fngb,https://fintel.io/so/us/fngb,https://www.financecharts.com/etfs/FNGB
 GPIX,etf,GPIX,,https://www.webull.com/quote/nasdaq-gpix,https://www.reuters.com/markets/quote/GPIX.O/,https://www.google.com/finance/quote/GPIX:NASDAQ,https://www.investing.com/etfs/gpix,,
 JEPQ,etf,JEPQ,,https://www.webull.com/quote/nasdaq-jepq,https://www.reuters.com/markets/quote/JEPQ.O/,https://www.google.com/finance/quote/JEPQ:NASDAQ,https://www.investing.com/etfs/jepq,https://fintel.io/s/us/jepq,
 MSTY,etf,MSTY,,https://www.webull.com/quote/nysearca-msty,https://www.reuters.com/markets/quote/MSTY.N/,https://www.google.com/finance/quote/MSTY:NYSEARCA,https://www.investing.com/etfs/msty,,
