@@ -3,7 +3,6 @@ import os
 import sys
 import argparse
 import logging
-import urllib.parse
 import json
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -22,7 +21,6 @@ def read_urls(file_path, include_type=None):
     try:
         # Read the CSV file into a DataFrame
         df = pd.read_csv(file_path)
-        #logging.info(df)
 
     except Exception as e:
         logging.error(f"Error opening file {file_path}: {e}")
@@ -44,72 +42,11 @@ def read_urls(file_path, include_type=None):
             print(obj)        
         return stock_data_objects
     
-
     # Print the array of data objects
     for obj in data_objects:
         print(obj)
     return data_objects
     
-#def generate_url(ticker):
-#    base_url = "https://www.webull.com/quote/{}"
-#    encoded_ticker = urllib.parse.quote_plus(ticker)
-##    url = base_url.format(encoded_ticker)
- #   return url
-
-def run_applescript(script):
-    process = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
-    if process.returncode != 0:
-        print("AppleScript error:", process.stderr)
-        return None
-    return process.stdout.strip()
-
-def update_numbers(data):
-    #logging.info(f'begin update_numbers {data} ')
-    numbers_file = "retirement plan.numbers"
-    sheet_investments = "Investments"
-    table_investments = "T"
-
-    script = f'''
-    tell application "Numbers"
-        tell document "{numbers_file}"
-            tell sheet "{sheet_investments}"
-                tell table "{table_investments}"
-                    set price_col to 0
-                    repeat with i from 1 to column count
-                        if value of cell i of row 1 is "Price" then
-                            set price_col to i
-                            exit repeat
-                        end if
-                    end repeat
-                    if price_col is 0 then error "Price column not found."
-
-                    set key_col to 0
-                    repeat with i from 1 to column count
-                        if value of cell i of row 1 is "key" then
-                            set key_col to i
-                            exit repeat
-                        end if
-                    end repeat
-                    if key_col is 0 then error "Key column not found."
-
-                    set rowCount to row count
-                    repeat with r from 2 to rowCount
-                        set tickerVal to value of cell key_col of row r
-                        if tickerVal is not missing value and tickerVal is not "" then
-                            {chr(10).join([
-                                f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{data["last_price"]}"'
-                                #for ticker, data in prices.items()
-                            ])}
-                        end if
-                    end repeat
-                end tell
-            end tell
-        end tell
-    end tell
-    '''
-    #logging.info(f"script: {script}")
-    run_applescript(script)
-
 
 # Function to create log file path
 def create_html_file_path(base_path, url):
@@ -154,7 +91,6 @@ def process_xpaths(website,key):
     #element = wait.until(EC.presence_of_element_located((By.ID, 'example')))
     
     html_content = driver.page_source
-    #logging.info(html_content)
 
     # Base path for logs
     base_path = '/Users/gene/logs'
@@ -441,9 +377,18 @@ def main():
             time.sleep(args.sleep_interval)  # Sleep for the specified interval
             continue
         
-        # logging.info(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
-        #logging.info(f"result: {result}")
-        update_numbers(result)
+        logging.debug(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
+        logging.debug(f"result: {result}")
+
+        # Serialize to JSON and pass via a pipe
+        serialized_data = json.dumps(result)
+        process = subprocess.Popen(
+            ["python", "update_cell_in_numbers.py"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE
+        )
+        output, _ = process.communicate(input=serialized_data.encode())
+        print(f"Output from script_b.py: {output.decode()}")
 
         logging.info(f'sleep {args.sleep_interval} seconds before next item')
         time.sleep(args.sleep_interval)  # Sleep for the specified interval
