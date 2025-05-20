@@ -63,6 +63,8 @@ def create_html_file_path(base_path, url):
     return log_file_path
 
 def process_xpaths(website,key):
+# https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
+# I should reuse the driver across multiple pages
 
     logging.info(f"Website URL: {website}")
     if not website:
@@ -213,6 +215,14 @@ def process_xpaths(website,key):
             price_datetime = driver.find_element(By.CLASS_NAME, 'csr132')
             logging.info(f"price_datetime {price_datetime.text}")
 
+            after_hours_price_string = ""
+            after_hours_price = ""
+            after_hours_price_change_decimal = ""
+            after_hours_price_change_percent = ""
+            pre_market_price_string = ""
+            pre_market_price = ""
+            pre_market_price_change_decimal = ""
+            pre_market_price_change_percent = ""
             if "After Hours" in price_datetime.text:
                 try:
                     after_hours_price_string = driver.find_element(By.XPATH, "//div[contains(@class, 'csr132')]/div[contains(@class, 'csr132')]/span[1]")
@@ -224,11 +234,21 @@ def process_xpaths(website,key):
                     logging.debug(f"after_hours_price_change_percent {after_hours_price_change_percent}")
                 except Exception as e:
                     logging.debug(f"after_hours_price not found: {e}")
+            elif "Pre Market" in price_datetime.text:
+                try:
+                    logging.info(f'looking for pre market prices')
+                    pre_market_price_string = driver.find_element(By.XPATH, "//div[contains(@class, 'csr132')]/div[contains(@class, 'csr132')]/span[1]")
+                    pre_market_price = pre_market_price_string.text.split(" ")[0]
+                    logging.info(f"pre_market_price_string {pre_market_price_string.text}")
+                    pre_market_price_change_decimal = pre_market_price_string.text.split(" ")[1]
+                    logging.info(f"pre_market_price_change_decimal {pre_market_price_change_decimal}")
+                    pre_market_price_change_percent = pre_market_price_string.text.split(" ")[2]
+                    logging.info(f"pre_market_price_change_percent {pre_market_price_change_percent}")
+                except Exception as e:
+                    logging.info(f"pre_market price not found: {e}")
             else:
-                logging.debug(f"After Hours not found")
-                after_hours_price = ""
-                after_hours_price_change_decimal = ""
-                after_hours_price_change_percent = ""
+                logging.debug(f"After Hours/Pre Market not found")
+
             
             logging.debug(f"after_hours_price {after_hours_price}")
             logging.debug(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
@@ -288,6 +308,9 @@ def process_xpaths(website,key):
                 "after_hours_price": after_hours_price,
                 "after_hours_price_change_decimal": after_hours_price_change_decimal,
                 "after_hours_price_change_percent": after_hours_price_change_percent,
+                "pre_market_price": pre_market_price,
+                "pre_market_price_change_decimal": pre_market_price_change_decimal,
+                "pre_market_price_change_percent": pre_market_price_change_percent,
                 "open_price": open_price.text,
                 "prev_close_price": prev_close_price.text,
                 "high_price": high_price.text,
@@ -383,7 +406,7 @@ def main():
         # Serialize to JSON and pass via a pipe
         serialized_data = json.dumps(result)
         process = subprocess.Popen(
-            ["python", "update_cell_in_numbers.py"],
+            ["python3", "update_cell_in_numbers.py"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
