@@ -55,20 +55,26 @@ def update_numbers(data):
 
             # Compare the current time with the target time
             if current_time < market_open_time:
-                print("The current time is before 9:30 AM")
+                print(f"The current time is before {market_open_time}")
                 if "pre_market_price" in data:
                     if data["pre_market_price"] is not None and data["pre_market_price"] != '':
                         print("insert pre market price")
                         price = data["pre_market_price"]
             elif current_time >= market_open_time and current_time < market_close_time:
+                print(f"The current time is between {market_open_time} and {market_close_time}")
                 if data["last_price"] is not None and data["last_price"] !='':
                     print("insert last price")
                     price = data["last_price"]
 
             elif current_time > market_close_time or current_time < pre_market_open_time:
+                print(f"The current time is after {market_close_time} or before {pre_market_open_time}")
                 if data["after_hours_price"] is not None and data["after_hours_price"] != '':
                     print("insert after hours price")
                     price = data["after_hours_price"]
+                else:
+                    print("no after hours price. insert last price")
+                    price = data["last_price"]
+
 
 
     script = f'''
