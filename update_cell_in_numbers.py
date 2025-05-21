@@ -54,12 +54,15 @@ def update_numbers(data):
             # On Saturday and Sunday, should this use the after hours price from Friday?
 
             # Compare the current time with the target time
-            if current_time < market_open_time:
+            if current_time < market_open_time and current_time > pre_market_open_time:
                 print(f"The current time is before {market_open_time}")
                 if "pre_market_price" in data:
                     if data["pre_market_price"] is not None and data["pre_market_price"] != '':
                         print("insert pre market price")
                         price = data["pre_market_price"]
+                    else:
+                        print("no pre market price. insert last price")
+                        price = data["last_price"]
             elif current_time >= market_open_time and current_time < market_close_time:
                 print(f"The current time is between {market_open_time} and {market_close_time}")
                 if data["last_price"] is not None and data["last_price"] !='':
