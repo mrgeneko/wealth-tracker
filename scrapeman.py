@@ -62,7 +62,7 @@ def create_html_file_path(base_path, url):
     
     return log_file_path
 
-def process_xpaths(website,key):
+def process_webull_xpaths(website,key):
 # https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
 # I should reuse the driver across multiple pages
 
@@ -356,8 +356,8 @@ def main():
                         help='Specify "stocks" to exclude bonds or "bonds" to include only bond lines')
     
     parser.add_argument('--sleep-interval', '-s', dest='sleep_interval',
-                    type=int, default=20,
-                    help='Seconds to sleep between processing each ticker (default: 20)')
+                    type=int, default=15,
+                    help='Seconds to sleep between processing each ticker (default: 15)')
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     args = parser.parse_args()
@@ -388,14 +388,14 @@ def main():
 
         logging.info(f'row_key: {row_key} selected url: {url}')
         try:
-            result = process_xpaths(url,row_key)
+            result = process_webull_xpaths(url,row_key)
         except subprocess.CalledProcessError as e:
             logging.error(f"Error processing {row_key}: {e}")
             logging.info(f'sleep {args.sleep_interval} seconds')
             time.sleep(args.sleep_interval)  # Sleep for the specified interval
             continue
         except Exception as e:
-            logging.error(f"Unexpected error process_xpaths {row_key}: {e}")
+            logging.error(f"Unexpected error process_webull_xpaths {row_key}: {e}")
             logging.info(f'sleep {args.sleep_interval} seconds')
             time.sleep(args.sleep_interval)  # Sleep for the specified interval
             continue
