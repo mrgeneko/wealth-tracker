@@ -20,7 +20,7 @@ def run_shell_command(command):
 
 def update_numbers(data):
     #logging.info(f'begin update_numbers {data} ')
-    
+
     numbers_file = "retirement plan.numbers"
     sheet_investments = "Investments"
     table_investments = "T"
@@ -78,7 +78,7 @@ def update_numbers(data):
                     print("no after hours price. insert last price")
                     price = data["last_price"]
 
-
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     script = f'''
     tell application "Numbers"
@@ -103,12 +103,24 @@ def update_numbers(data):
                     end repeat
                     if key_col is 0 then error "Key column not found."
 
+                    set update_time_col to 0
+                    repeat with i from 1 to column count
+                        if value of cell i of row 1 is "Update Time" then
+                            set update_time_col to i
+                            exit repeat
+                        end if
+                    end repeat
+                    if update_time_col is 0 then error "Update time column not found."
+
                     set rowCount to row count
                     repeat with r from 2 to rowCount
                         set tickerVal to value of cell key_col of row r
                         if tickerVal is not missing value and tickerVal is not "" then
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{price}"'
+                            ])}
+                            {chr(10).join([
+                                f'if tickerVal is "{data["key"]}" then set value of cell update_time_col of row r to "{now}"'
                             ])}
                         end if
                     end repeat
