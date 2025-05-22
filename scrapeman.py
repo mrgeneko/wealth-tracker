@@ -5,10 +5,11 @@ import argparse
 import logging
 import json
 from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.safari.service import Service
+#from selenium.webdriver.safari.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+#from selenium.webdriver.chrome.options import Options
 import time
 import subprocess
 import re
@@ -71,19 +72,17 @@ def process_webull_xpaths(website,key):
         logging.error("No URL provided. Exiting.")
         sys.exit(1) 
 
-    if True:
-        safari_path = '/usr/bin/safaridriver'
-        service = Service(executable_path=safari_path)
-        #logging.info(f'Safari Service created')
-        driver = webdriver.Safari(service=service)
-    else:
-        chrome_path = '/Users/gene/bin/chromedriver-mac-arm64/chromedriver'
-        service = Service(executable_path=chrome_path)
-        logging.info(f'Chrome Service created')
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Run in headless mode
-        driver = webdriver.Chrome(service=service,options=chrome_options)
-    
+    #if False: #browser_choice == "safari":
+    #    service = Service(executable_path=safari_path)
+    #    logging.info(f'Safari Service created')
+    #    driver = webdriver.Safari(service=service)
+    #else:
+    logging.info(f'Creating Chrome Service')
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service,options=chrome_options)
+
     driver.get(website)
     logging.info(f'sleep 5 seconds to allow website to load')
     time.sleep(5)
@@ -358,6 +357,11 @@ def main():
     parser.add_argument('--sleep-interval', '-s', dest='sleep_interval',
                     type=int, default=15,
                     help='Seconds to sleep between processing each ticker (default: 15)')
+    
+    parser.add_argument('--browser', '-d', dest='browser',
+                    default='chrome',
+                    help='web browser [chrome|safari] (default: chrome)')
+    
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     args = parser.parse_args()
@@ -365,6 +369,7 @@ def main():
    
     input_file = args.input_file
     tickers = read_urls(input_file, args.include_type)
+    browser = args.browser
     
     # Give the user a chance to review tickers
     logging.info(f'sleep 5 seconds')
