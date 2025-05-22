@@ -11,6 +11,12 @@ key,type,yahoo_ticker,yahoo_url,webull_url,handler,reuters_ticker,gfinance_ticke
 91282CGE5,bond,,,https://www.webull.com/quote/bond-91282CGE5,webull_bond,,,,,
 91282CKS9,bond,,,https://www.webull.com/quote/bond-91282CKS9,webull_bond,,,,,
 91282CET4,bond,,,https://www.webull.com/quote/bond-91282CET4,webull_bond,,,,,
+AAPL,stock,AAPL,,https://www.webull.com/quote/nasdaq-aapl,webull_stock,,,,,
+AMZN,stock,AMZN,,https://www.webull.com/quote/nasdaq-AMZN,webull_stock,,,,,
+NVDA,stock,NVDA,,https://www.webull.com/quote/nasdaq-NVDA,webull_stock,,,,,
+SBUX,stock,SBUX,,https://www.webull.com/quote/nasdaq-SBUX,webull_stock,,,,,
+SHAK,stock,SHAK,,https://www.webull.com/quote/nyse-shak,webull_stock,,,,,
+WMT,stock,WMT,,https://www.webull.com/quote/nyse-wmt,webull_stock,,,,,
 BKLC,etf,BKLC,,https://www.webull.com/quote/nysearca-bklc,webull_stock,,https://www.google.com/finance/quote/BKLC:NYSEARCA,https://www.investing.com/etfs/bklc-nyse,,
 FNGB,etf,FNGB,,https://www.webull.com/quote/nysearca-fngb,webull_stock,,https://www.google.com/finance/quote/FNGB:NYSEARCA,https://www.investing.com/etfs/fngb,https://fintel.io/so/us/fngb,https://www.financecharts.com/etfs/FNGB
 GPIQ,etf,GPIQ,,https://www.webull.com/quote/nasdaq-gpiq,webull_stock,https://www.reuters.com/markets/quote/GPIQ.O/,https://www.google.com/finance/quote/GPIQ:NASDAQ,https://www.investing.com/etfs/gpiq,https://fintel.io/so/us/gpiq,https://www.financecharts.com/etfs/GPIQ
@@ -29,6 +35,7 @@ SSO,etf,SSO,,https://www.webull.com/quote/nysearca-sso,webull_stock,https://www.
 TQQQ,etf,TQQQ,,https://www.webull.com/quote/nasdaq-tqqq,webull_stock,https://www.reuters.com/markets/quote/TQQQ.OQ/,https://www.google.com/finance/quote/TQQQ:NASDAQ,https://www.investing.com/etfs/proshares-trust-ultrapro-qqq,,
 UPRO,etf,UPRO,,https://www.webull.com/quote/nysearca-upro,webull_stock,https://www.reuters.com/markets/quote/UPRO.A/,https://www.google.com/finance/quote/UPRO:NYSEARCA,https://www.investing.com/etfs/proshares-ultrapro-s-p500,,
 VGT,etf,VGT,,https://www.webull.com/quote/nysearca-vgt,webull_stock,https://www.reuters.com/markets/quote/VGT/,https://www.google.com/finance/quote/VGT:NYSEARCA,https://www.investing.com/etfs/vanguard-information-tech,,
+VOO,etf,VOO,,https://www.webull.com/quote/nysearca-voo,webull_stock,,,,,
 VTI,etf,VTI,,https://www.webull.com/quote/nysearca-vti,webull_stock,https://www.reuters.com/markets/quote/VTI/,https://www.google.com/finance/quote/VTI:NYSEARCA,https://www.investing.com/etfs/vanguard-total-stkmkt,,
 XDTE,etf,XDTE,,https://www.webull.com/quote/bats-xdte,webull_stock,https://www.reuters.com/markets/quote/XDTE.N/,https://www.google.com/finance/quote/XDTE:BATS,https://www.investing.com/etfs/xdte,,
 YBTC,etf,YBTC,,https://www.webull.com/quote/bats-ybtc,webull_stock,,https://www.google.com/finance/quote/YBTC:BATS,https://www.investing.com/etfs/ybtc-nyse,https://fintel.io/s/us/ybtc,https://www.financecharts.com/etfs/YBTC
