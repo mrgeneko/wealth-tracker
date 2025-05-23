@@ -64,6 +64,90 @@ def create_html_file_path(base_path, url):
     
     return log_file_path
 
+
+def process_investingcom_xpaths(website,key):
+# https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
+# I should reuse the driver across multiple pages
+
+    logging.info(f"Website URL: {website}")
+    if not website:
+        logging.error("No URL provided. Exiting.")
+        sys.exit(1) 
+
+    logging.info(f'Creating Chrome Service')
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service,options=chrome_options)
+
+    driver.get(website)
+    logging.info(f'sleep 5 seconds to allow website to load')
+    time.sleep(5)
+
+    # Wait for a specific element to be present (e.g., an element with ID 'example')
+    #wait = WebDriverWait(driver, 10)
+    #element = wait.until(EC.presence_of_element_located((By.ID, 'example')))
+    
+    html_content = driver.page_source
+
+    # Base path for logs
+    base_path = '/Users/gene/logs'
+    # Create log file path
+    html_file_path = create_html_file_path(base_path, website)
+    logging.info(f"save html to: {html_file_path}")
+    with open(html_file_path, "w") as f:
+        f.write(html_content)
+
+    try:
+        logging.info(f"Process stock quote page: {website}")
+        comment1='''
+        ticker = driver.find_element(By.XPATH, '//div[@class="csr109"]/p[1]')
+        logging.debug(f"ticker by.xpath {ticker.text}")
+
+        description = driver.find_element(By.CLASS_NAME, 'csr127')
+        logging.debug(f"description {description.text}")
+
+        exchange = driver.find_element(By.CLASS_NAME, 'csr128')
+        logging.debug(f"exchange {exchange.text}")
+'''
+        last_price = driver.find_element(By.XPATH, '//*[@data-test="instrument-price-last"]')
+        logging.info(f"last_price {last_price.text}")
+
+        price_change_decimal = driver.find_element(By.XPATH, '//*[@data-test="instrument-price-change"]')
+        logging.info(f"price_change_decimal {price_change_decimal.text}")
+        try:
+            #price_change_percent = driver.find_element(By.XPATH, '//*/html/body/div/div[2]/div[2]/div[2]/div/div/div[3]/div/div/div[2]/span[2]/text()[2]')
+            #price_change_percent = driver.find_element(By.XPATH, '//*/span[contains(@data-test, "instrument-price-change-percent")]/text()[2]')
+            price_change_percent = driver.find_element(By.XPATH, '//*/span[contains(@data-test, "instrument-price-change-percent")]')
+            logging.info(f"price_change_percent {price_change_percent.text}")
+        except Exception as e:
+            logging.error(f'find element price_change_percent by xpath. {e}')
+
+        price_datetime = driver.find_element(By.XPATH, '//*[@data-test="trading-time-label"]')
+        logging.info(f"price_datetime {price_datetime.text}")
+            
+        data = {
+            "key": "",
+            "url": website,
+            "source":"investing.com",
+            #"ticker": "",#ticker.text,
+            #"description": "",#description.text,
+            #"exchange": "",#exchange.text,
+            "last_price": last_price.text,
+            "price_change_decimal": price_change_decimal.text,
+            "price_change_percent": price_change_percent.text,
+            "price_datetime": price_datetime.text
+        }
+        logging.debug('quit driver')
+        driver.quit()
+    except Exception as e:
+        logging.error('Exception processing xpath. will quit driver')
+        driver.quit()
+    
+    json_string = json.dumps(data, indent=4)
+    logging.info(f"Data extracted: {json_string}")
+    return data
+
 def process_webull_xpaths(website,key):
 # https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
 # I should reuse the driver across multiple pages
@@ -162,7 +246,8 @@ def process_webull_xpaths(website,key):
             
             data = {
                 "key": key,
-                "webull_url": website,
+                "url": website,
+                "source":"webull.com",
                 "description": description.text,
                 "cusip": cusip.text,
                 "last_price": last_price.text,
@@ -297,7 +382,8 @@ def process_webull_xpaths(website,key):
                 
             data = {
                 "key": key,
-                "webull_url": website,
+                "url": website,
+                "source":"webull.com",
                 "ticker": ticker.text,
                 "description": description.text,
                 "exchange": exchange.text,
@@ -355,7 +441,7 @@ def main():
                         choices=['stocks', 'bonds'], default='stocks',
                         help='Specify "stocks" to exclude bonds or "bonds" to include only bond lines')
     
-    parser.add_argument('--sleep-interval', '-s', dest='sleep_interval',
+    parser.add_argument('--sleep-interval', '-z', dest='sleep_interval',
                     type=int, default=15,
                     help='Seconds to sleep between processing each ticker (default: 15)')
     
@@ -365,19 +451,24 @@ def main():
     
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
+    parser.add_argument('--source', '-s', dest='source',
+                    default='investingcom_url',
+                    help='web site source [webull_url|investingcom_url] (default: investingcom_url')
+
     args = parser.parse_args()
     setup_logging(args.log_level)
    
     input_file = args.input_file
     tickers = read_urls(input_file, args.include_type)
     browser = args.browser
-    
+    url_selection=args.source
+
     # Give the user a chance to review tickers
     logging.info(f'sleep 5 seconds')
     time.sleep(5)
 
     for i, ticker in enumerate(tickers):
-        url_selection = 'webull_url'
+        #url_selection = 'webull_url'
         if url_selection in ticker:
             logging.debug(f"Key '{url_selection}' exists with value: {ticker[url_selection]}")
         else:
@@ -394,14 +485,18 @@ def main():
 
         logging.info(f'row_key: {row_key} selected url: {url}')
         try:
-            result = process_webull_xpaths(url,row_key)
+            if url_selection == "webull_url":
+                result = process_webull_xpaths(url,row_key)
+            elif url_selection == "investingcom_url":
+                result = process_investingcom_xpaths(url,row_key)
+
         except subprocess.CalledProcessError as e:
             logging.error(f"Error processing {row_key}: {e}")
             logging.info(f'sleep {args.sleep_interval} seconds')
             time.sleep(args.sleep_interval)  # Sleep for the specified interval
             continue
         except Exception as e:
-            logging.error(f"Unexpected error process_webull_xpaths {row_key}: {e}")
+            logging.error(f"Unexpected error processing {url_selection} {row_key}: {e}")
             logging.info(f'sleep {args.sleep_interval} seconds')
             time.sleep(args.sleep_interval)  # Sleep for the specified interval
             continue
