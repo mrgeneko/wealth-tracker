@@ -25,7 +25,13 @@ def update_numbers(data):
     numbers_file = "retirement plan.numbers"
     sheet_investments = "Investments"
     table_investments = "T"
+
+    if "source" not in data:
+        source = "unknown"
+    else:
+        source = data["source"]
     
+    price_change_decimal=""
     if "pre_market_price" not in data and 'after_hours_price' not in data :
         print("no pre market or after hours price")
         if data["last_price"] is not None and data["last_price"] !='':
@@ -38,10 +44,14 @@ def update_numbers(data):
         print("have pre_market or after_hours price keys in data object")
         today = datetime.today()
         day_of_week = today.weekday()
+        price_change_decimal = ""
         if day_of_week == 5 or day_of_week == 6:
             if data["last_price"] is not None and data["last_price"] !='':
                 print("insert last price")
                 price = data["last_price"]
+            if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
+                print("use price_change_decimal")
+                price_change_decimal = data["price_change_decimal"]
         else:
             # its a week day. Decide if its pre market, during market, or after hours
 
@@ -69,6 +79,9 @@ def update_numbers(data):
                 if data["last_price"] is not None and data["last_price"] !='':
                     print("insert last price")
                     price = data["last_price"]
+                if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
+                    print("use price_change_decimal")
+                    price_change_decimal = data["price_change_decimal"]
 
             elif current_time > market_close_time or current_time < pre_market_open_time:
                 print(f"The current time is after {market_close_time} or before {pre_market_open_time}")
@@ -80,7 +93,8 @@ def update_numbers(data):
                     price = data["last_price"]
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+    # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
+    
     script = f'''
     tell application "Numbers"
         tell document "{numbers_file}"
@@ -94,6 +108,15 @@ def update_numbers(data):
                         end if
                     end repeat
                     if price_col is 0 then error "Price column not found."
+
+                    set price_change_decimal_col to 0
+                    repeat with i from 1 to column count
+                        if value of cell i of row 1 is "Price Change" then
+                            set price_change_decimal_col to i
+                            exit repeat
+                        end if
+                    end repeat
+                    if price_change_decimal_col is 0 then error "Price Change column not found."
 
                     set key_col to 0
                     repeat with i from 1 to column count
@@ -113,6 +136,15 @@ def update_numbers(data):
                     end repeat
                     if update_time_col is 0 then error "Update time column not found."
 
+                    set source_col to 0
+                    repeat with i from 1 to column count
+                        if value of cell i of row 1 is "Update Source" then
+                            set source_col to i
+                            exit repeat
+                        end if
+                    end repeat
+                    if source_col is 0 then error "Source column not found."
+
                     set rowCount to row count
                     repeat with r from 2 to rowCount
                         set tickerVal to value of cell key_col of row r
@@ -121,7 +153,13 @@ def update_numbers(data):
                                 f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{price}"'
                             ])}
                             {chr(10).join([
+                                f'if tickerVal is "{data["key"]}" then set value of cell price_change_decimal_col of row r to "{price_change_decimal}"'
+                            ])}
+                            {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell update_time_col of row r to "{now}"'
+                            ])}
+                            {chr(10).join([
+                                f'if tickerVal is "{data["key"]}" then set value of cell source_col of row r to "{source}"'
                             ])}
                         end if
                     end repeat

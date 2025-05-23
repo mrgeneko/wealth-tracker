@@ -123,17 +123,29 @@ def process_investingcom_xpaths(website,key):
         except Exception as e:
             logging.error(f'find element price_change_percent by xpath. {e}')
 
+        try:
+            after_hours_price = driver.find_element(By.XPATH, "//span[contains(@class, 'text-[#232526]')]")
+            logging.debug(f"after_hours_price {after_hours_price.text}")
+            #after_hours_price_change_decimal = after_hours_price_string.text.split(" ")[1]
+            #logging.debug(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
+            #after_hours_price_change_percent = after_hours_price_string.text.split(" ")[2]
+            #logging.debug(f"after_hours_price_change_percent {after_hours_price_change_percent}")
+        except Exception as e:
+            logging.debug(f"after_hours_price not found: {e}")
+            after_hours_price = ""
+                    
         price_datetime = driver.find_element(By.XPATH, '//*[@data-test="trading-time-label"]')
         logging.info(f"price_datetime {price_datetime.text}")
             
         data = {
             "key": key,
             "url": website,
-            "source":"investing.com",
+            "source": "investing.com",
             #"ticker": "",#ticker.text,
             #"description": "",#description.text,
             #"exchange": "",#exchange.text,
             "last_price": last_price.text,
+            "after_hours_price" : after_hours_price.text,
             "price_change_decimal": price_change_decimal.text,
             "price_change_percent": price_change_percent.text,
             "price_datetime": price_datetime.text
