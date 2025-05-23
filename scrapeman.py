@@ -82,7 +82,7 @@ def process_investingcom_xpaths(website,key):
 
     driver.get(website)
     logging.info(f'sleep 5 seconds to allow website to load')
-    time.sleep(5)
+    #time.sleep(5)
 
     # Wait for a specific element to be present (e.g., an element with ID 'example')
     #wait = WebDriverWait(driver, 10)
@@ -127,7 +127,7 @@ def process_investingcom_xpaths(website,key):
         logging.info(f"price_datetime {price_datetime.text}")
             
         data = {
-            "key": "",
+            "key": key,
             "url": website,
             "source":"investing.com",
             #"ticker": "",#ticker.text,
@@ -170,7 +170,7 @@ def process_webull_xpaths(website,key):
 
     driver.get(website)
     logging.info(f'sleep 5 seconds to allow website to load')
-    time.sleep(5)
+    #time.sleep(5)
 
     # Wait for a specific element to be present (e.g., an element with ID 'example')
     #wait = WebDriverWait(driver, 10)
