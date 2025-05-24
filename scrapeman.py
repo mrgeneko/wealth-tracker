@@ -16,7 +16,7 @@ import subprocess
 import re
 import pandas as pd
 from update_cell_in_numbers import update_numbers
-
+from process_yfinance import process_yfinance
 
 def read_urls(file_path, include_type=None):
     logging.info(f'read_urls: {file_path}')
@@ -519,8 +519,8 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='investingcom_url',
-                    help='web site source [webull_url|investingcom_url] (default: investingcom_url')
+                    default='yfinance',
+                    help='web site source [webull_url|investingcom_url|yfinance] (default: yfinance')
 
     args = parser.parse_args()
     setup_logging(args.log_level)
@@ -541,6 +541,8 @@ def main():
         result = process_webull(tickers,function_handlers,sleep_interval)
     elif url_selection == "investingcom_url":
         result = process_investingcom(tickers,function_handlers,sleep_interval)
+    elif url_selection == "yfinance":
+        result = process_yfinance(tickers,function_handlers,sleep_interval)
 
     exit(0)
 
