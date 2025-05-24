@@ -20,7 +20,7 @@ def process_google_finance(tickers,function_handlers,sleep_interval):
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
     for i, ticker in enumerate(tickers):
-        url_selection = 'gfinance_ticker'
+        url_selection = 'google'
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:

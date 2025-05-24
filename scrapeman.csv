@@ -1,4 +1,4 @@
-key,type,yahoo_ticker,yahoo_url,webull_url,handler,reuters_ticker,gfinance_ticker,investingcom_url,Fintel_io_url,finance_charts_url
+key,type,yahoo_ticker,yahoo_url,webull,handler,reuters,google,investing,fintel,finance_charts
 912797PK7,bond,,,https://www.webull.com/quote/bond-912797PK7,webull_bond,,,,,
 912797LN5,bond,,,https://www.webull.com/quote/bond-912797LN5,webull_bond,,,,,
 912797PZ4,bond,,,https://www.webull.com/quote/bond-912797PZ4,webull_bond,,,,,
@@ -19,8 +19,8 @@ SHAK,stock,SHAK,,https://www.webull.com/quote/nyse-shak,webull_stock,,,,,
 WMT,stock,WMT,,https://www.webull.com/quote/nyse-wmt,webull_stock,,,,,
 BKLC,etf,BKLC,,https://www.webull.com/quote/nysearca-bklc,webull_stock,,https://www.google.com/finance/quote/BKLC:NYSEARCA,https://www.investing.com/etfs/bklc-nyse,,
 FNGB,etf,FNGB,,https://www.webull.com/quote/nysearca-fngb,webull_stock,,https://www.google.com/finance/quote/FNGB:NYSEARCA,https://www.investing.com/etfs/fngb,https://fintel.io/so/us/fngb,https://www.financecharts.com/etfs/FNGB
+SPY250620C00579000,option,SPY250620C00579000,https://finance.yahoo.com/quote/SPY250620C00579000/,,,,,,,
 GPIQ,etf,GPIQ,,https://www.webull.com/quote/nasdaq-gpiq,webull_stock,https://www.reuters.com/markets/quote/GPIQ.O/,https://www.google.com/finance/quote/GPIQ:NASDAQ,https://www.investing.com/etfs/gpiq,https://fintel.io/so/us/gpiq,https://www.financecharts.com/etfs/GPIQ
-GPIX,etf,GPIX,,https://www.webull.com/quote/nasdaq-gpix,webull_stock,https://www.reuters.com/markets/quote/GPIX.O/,https://www.google.com/finance/quote/GPIX:NASDAQ,https://www.investing.com/etfs/gpix,,
 GPIX,etf,GPIX,,https://www.webull.com/quote/nasdaq-gpix,webull_stock,https://www.reuters.com/markets/quote/GPIX.O/,https://www.google.com/finance/quote/GPIX:NASDAQ,https://www.investing.com/etfs/gpix,,
 JEPQ,etf,JEPQ,,https://www.webull.com/quote/nasdaq-jepq,webull_stock,https://www.reuters.com/markets/quote/JEPQ.O/,https://www.google.com/finance/quote/JEPQ:NASDAQ,https://www.investing.com/etfs/jepq,https://fintel.io/s/us/jepq,
 MSTY,etf,MSTY,,https://www.webull.com/quote/nysearca-msty,webull_stock,https://www.reuters.com/markets/quote/MSTY.N/,https://www.google.com/finance/quote/MSTY:NYSEARCA,https://www.investing.com/etfs/msty,,
