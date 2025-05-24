@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 from datetime import datetime
 import os
-import sys
 import argparse
 import logging
 import json
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-#from selenium.webdriver.safari.service import Service
 from selenium.webdriver.common.by import By
-#from selenium.webdriver.chrome.options import Options
 import time
-import subprocess
 import re
 import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
 
-def read_urls(file_path, include_type=None):
-    logging.info(f'read_urls: {file_path}')
+def get_tickers_and_urls_from_csv(file_path, include_type=None):
+    logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
     
     try:
         # Read the CSV file into a DataFrame
@@ -170,18 +166,14 @@ def process_investingcom(tickers,function_handlers,sleep_interval):
         except Exception as e:
             logging.error(f"Error processing xpaths: {e}")
         
-
-        #logging.info(f"Processed ticker {ticker} ({i+1}/{len(tickers)})")
         logging.info(f"result: {data}")
 
         logging.info(f'sleep {sleep_interval} seconds before next item')
-        time.sleep(sleep_interval)  # Sleep for the specified interval
+        time.sleep(sleep_interval)
 
         function_handlers[0](data)
 
     driver.quit()
-    #json_string = json.dumps(data, indent=4)
-    #logging.info(f"Data extracted: {json_string}")
 
     return 0
 
@@ -218,12 +210,6 @@ def process_webull(tickers,function_handlers,sleep_interval):
         if not url:
             logging.error("No URL provided. Exiting.")
             continue
-
-        #if False: #browser_choice == "safari":
-        #    service = Service(executable_path=safari_path)
-        #    logging.info(f'Safari Service created')
-        #    driver = webdriver.Safari(service=service)
-        #else:
     
         driver.get(url)
         logging.info(f'sleep 5 seconds to allow website to load')
@@ -472,20 +458,9 @@ def process_webull(tickers,function_handlers,sleep_interval):
         logging.info(f'sleep {sleep_interval} seconds before next item')
         time.sleep(sleep_interval)  # Sleep for the specified interval
 
-        # Serialize to JSON and pass via a pipe
-        #serialized_data = json.dumps(data)
-        #process = subprocess.Popen(
-        #    ["python3", "update_cell_in_numbers.py"],
-        #    stdin=subprocess.PIPE,
-        #    stdout=subprocess.PIPE
-        #)
-        #output, _ = process.communicate(input=serialized_data.encode())
-        #print(f"Output from script_b.py: {output.decode()}")
         function_handlers[0](data)
 
     driver.quit()
-    #json_string = json.dumps(data, indent=4)
-    #logging.info(f"Data extracted: {json_string}")
 
     return 0
         
@@ -526,14 +501,14 @@ def main():
     setup_logging(args.log_level)
    
     input_file = args.input_file
-    tickers = read_urls(input_file, args.include_type)
+    tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
     browser = args.browser
     url_selection=args.source
     sleep_interval = args.sleep_interval
 
     # Give the user a chance to review tickers
-    #logging.info(f'sleep 5 seconds')
-    #time.sleep(5)
+    logging.info(f'sleep 5 seconds')
+    time.sleep(2)
 
     function_handlers = [update_numbers]
 
