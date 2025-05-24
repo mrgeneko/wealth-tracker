@@ -13,6 +13,7 @@ import re
 import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
+from process_google_finance import process_google_finance
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -62,7 +63,6 @@ def create_html_file_path(base_path, url):
     return log_file_path
 
 
-#def process_investingcom(website,key):
 def process_investingcom(tickers,function_handlers,sleep_interval):
 # https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
 # I should reuse the driver across multiple pages
@@ -167,11 +167,10 @@ def process_investingcom(tickers,function_handlers,sleep_interval):
             logging.error(f"Error processing xpaths: {e}")
         
         logging.info(f"result: {data}")
+        function_handlers[0](data)
 
         logging.info(f'sleep {sleep_interval} seconds before next item')
         time.sleep(sleep_interval)
-
-        function_handlers[0](data)
 
     driver.quit()
 
@@ -455,10 +454,10 @@ def process_webull(tickers,function_handlers,sleep_interval):
             logging.error('Exception processing xpath. will quit driver')
         
         logging.info(f"result: {data}")
+        function_handlers[0](data)
+        
         logging.info(f'sleep {sleep_interval} seconds before next item')
         time.sleep(sleep_interval)  # Sleep for the specified interval
-
-        function_handlers[0](data)
 
     driver.quit()
 
@@ -518,6 +517,8 @@ def main():
         result = process_investingcom(tickers,function_handlers,sleep_interval)
     elif url_selection == "yfinance":
         result = process_yfinance(tickers,function_handlers,sleep_interval)
+    elif url_selection == "gfinance_ticker":
+        result = process_google_finance(tickers,function_handlers,sleep_interval)
 
     exit(0)
 
