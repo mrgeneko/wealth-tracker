@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import logging
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -10,7 +9,7 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException,
 import time
 import pandas as pd
 
-def process_google_finance(tickers,function_handlers,sleep_interval):
+def process_fintel(tickers,function_handlers,sleep_interval):
 # https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
 # I should reuse the driver across multiple pages
 
@@ -21,7 +20,7 @@ def process_google_finance(tickers,function_handlers,sleep_interval):
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
     for i, ticker in enumerate(tickers):
-        url_selection = 'google'
+        url_selection = 'fintel'
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
@@ -38,14 +37,24 @@ def process_google_finance(tickers,function_handlers,sleep_interval):
         logging.info(f'\n\nBegin processing: {ticker['key']} selected url: {url}')
 
         driver.get(url)
-        logging.info(f'sleep 5 seconds to allow website to load')
-        time.sleep(5)
+        logging.info(f'sleep 3 seconds to allow website to load')
+        time.sleep(3)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
         # THIS DOESN"T SEEM TO HELP
-        #wait = WebDriverWait(driver, 10)
-        #element = wait.until(EC.presence_of_element_located((By.TAG_NAME, 'title')))
-        #logging.info("waiting over")
+        try:
+            wait = WebDriverWait(driver, 20)
+            element = wait.until(EC.presence_of_element_located((By.ID, 'latestPrice')))
+            logging.info("waiting over")
+            last_price = element.get_attribute('data-value')
+            logging.info(f"last_price {last_price}")
+        except TimeoutException:
+            logging.error("Title element not found within the specified time frame")
+        except WebDriverException as e:
+            logging.error(f"WebDriver error: {e}")
+
+        return 0
+    
         #html_content = driver.page_source
 
         # Base path for logs
@@ -68,12 +77,16 @@ def process_google_finance(tickers,function_handlers,sleep_interval):
             exchange = driver.find_element(By.CLASS_NAME, 'csr128')
             logging.debug(f"exchange {exchange.text}")
     '''
-            last_price = driver.find_element(By.XPATH, '//*/div[@class="YMlKec fxKbKc"]')
-
-            logging.debug(f"last_price {last_price.text}")
-
+            #'//*/span[contains(@data-test, "instrument-price-change-percent")]'
+            #//*[@id="latestPrice"]
+            last_price = driver.find_elements(By.XPATH, '//*[@id="latestPrice"]')
+            logging.info(f"last price list count: {last_price}")
+            last_price.__getattribute__()
+            logging.info(f"last_price {last_price}")
+            return 0
             element = driver.find_element(By.XPATH, '//*/span[@class="P2Luy Ebnabc ZYVHBb"]')
             price_change_decimal_str = element.text
+            return 0
             parts = price_change_decimal_str.split()
             price_change_decimal = parts[0]
             logging.debug(f"price_change_decimal {price_change_decimal}") 
