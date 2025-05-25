@@ -14,6 +14,8 @@ import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
 from process_google_finance import process_google_finance
+#from process_fintel import process_fintel
+from process_stock_analysis import process_stock_analysis
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -74,7 +76,7 @@ def process_investingcom(tickers,function_handlers,sleep_interval):
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
     for i, ticker in enumerate(tickers):
-        url_selection = 'investingcom_url'
+        url_selection = 'investing'
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
@@ -185,7 +187,7 @@ def process_webull(tickers,function_handlers,sleep_interval):
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
     for i, ticker in enumerate(tickers):
-        url_selection = 'webull_url'
+        url_selection = 'webull'
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
@@ -493,8 +495,8 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='yfinance',
-                    help='web site source [webull_url|investingcom_url|yfinance] (default: yfinance')
+                    default='yahoo',
+                    help='web site source [google|investing|stock_analysis|webull|yahoo] (default: yahoo')
 
     args = parser.parse_args()
     setup_logging(args.log_level)
@@ -511,15 +513,18 @@ def main():
 
     function_handlers = [update_numbers]
 
-    if url_selection == "webull_url":
+    if url_selection == "webull":
         result = process_webull(tickers,function_handlers,sleep_interval)
-    elif url_selection == "investingcom_url":
+    elif url_selection == "investing":
         result = process_investingcom(tickers,function_handlers,sleep_interval)
-    elif url_selection == "yfinance":
+    elif url_selection == "yahoo":
         result = process_yfinance(tickers,function_handlers,sleep_interval)
-    elif url_selection == "gfinance_ticker":
+    elif url_selection == "google":
         result = process_google_finance(tickers,function_handlers,sleep_interval)
-
+    #elif url_selection == "fintel":
+    #    result = process_fintel(tickers,function_handlers,sleep_interval)
+    elif url_selection == "stock_analysis":
+        result = process_stock_analysis(tickers,function_handlers,sleep_interval)
     exit(0)
 
 if __name__ == "__main__":
