@@ -37,6 +37,7 @@ def update_numbers(data):
         if data["last_price"] is not None and data["last_price"] !='':
             print("insert last price")
             price = data["last_price"]
+            price_change_decimal = data["price_change_decimal"]
         else:
             return
     else:
@@ -91,6 +92,8 @@ def update_numbers(data):
                 else:
                     print("no after hours price. insert last price")
                     price = data["last_price"]
+                    price_change_decimal = data["price_change_decimal"]
+
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
