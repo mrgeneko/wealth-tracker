@@ -1,3 +1,4 @@
+
 import logging
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -6,21 +7,19 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
+
+from helium import *
+from bs4 import BeautifulSoup
+from create_html_file_path import create_html_file_path
+
 import time
 import pandas as pd
 
-def process_fintel(tickers,function_handlers,sleep_interval):
-# https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
-# I should reuse the driver across multiple pages
 
-    logging.info(f'Creating Chrome Service')
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service,options=chrome_options)
+def process_fintel(driver,tickers,function_handlers,sleep_interval):
 
+    url_selection = 'fintel'
     for i, ticker in enumerate(tickers):
-        url_selection = 'fintel'
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
@@ -34,11 +33,33 @@ def process_fintel(tickers,function_handlers,sleep_interval):
 
         url = ticker[url_selection]
         ticker['key']
-        logging.info(f'\n\nBegin processing: {ticker['key']} selected url: {url}')
+        logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
 
         driver.get(url)
         logging.info(f'sleep 3 seconds to allow website to load')
         time.sleep(3)
+
+
+        #ticker['key']
+        logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
+
+        browser = start_chrome(url, headless=True)
+        html_content = browser.page_source
+        soup = BeautifulSoup(browser.page_source,'html.parser')
+
+        # Base path for logs
+        base_path = '/Users/gene/logs'
+        # Create log file path
+        html_file_path = create_html_file_path(base_path, url)
+        logging.info(f"save html to: {html_file_path}")
+        with open(html_file_path, "w") as f:
+            f.write(html_content)
+
+        last_price = soup.find('span', {'id': 'latestPrice'})
+        logging.info(f"last_price: {last_price}")
+        driver.quit()
+        return 0
+
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
         # THIS DOESN"T SEEM TO HELP
@@ -126,10 +147,5 @@ def process_fintel(tickers,function_handlers,sleep_interval):
         
         logging.info(f"result: {data}")
         function_handlers[0](data)
-
-        logging.info(f'sleep {sleep_interval} seconds before next item')
-        time.sleep(sleep_interval)
-
-    driver.quit()
 
     return 0

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from datetime import datetime
+
 import os
 import argparse
 import logging
@@ -14,8 +14,9 @@ import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
 from process_google_finance import process_google_finance
-#from process_fintel import process_fintel
-from process_stock_analysis import process_stock_analysis
+from process_fintel import process_fintel
+from process_finance_charts import process_finance_charts
+from create_html_file_path import create_html_file_path
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -34,49 +35,27 @@ def get_tickers_and_urls_from_csv(file_path, include_type=None):
         # change this to compare against include_type instead of hardcoded 'bond'
         bond_data_objects = [obj for obj in data_objects if obj.get('type') == 'bond'] 
         # Print the array of data objects
-        for obj in bond_data_objects:
-            print(obj)        
+        #for obj in bond_data_objects:
+        #    print(obj)        
         return bond_data_objects
     if include_type == "stocks":
         stock_data_objects = [obj for obj in data_objects if obj.get('type') != 'bond']
         # Print the array of data objects
-        for obj in stock_data_objects:
-            print(obj)        
+        #or obj in stock_data_objects:
+        #    print(obj)        
         return stock_data_objects
     
     # Print the array of data objects
-    for obj in data_objects:
-        print(obj)
+    #for obj in data_objects:
+    #    print(obj)
     return data_objects
-    
-
-# Function to create log file path
-def create_html_file_path(base_path, url):
-    # Extract relevant parts from the URL
-    parsed_url = re.sub(r'https?://', '', url)  # Remove http/https and slashes
-    cleaned_url = re.sub(r'[:/]+', '_', parsed_url)  # Replace colons and slashes with underscores
-
-    # Generate timestamp
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-
-    # Construct log file path
-    log_file_path = os.path.join(base_path, f'{cleaned_url}_{timestamp}.html')
-    
-    return log_file_path
 
 
-def process_investingcom(tickers,function_handlers,sleep_interval):
-# https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
-# I should reuse the driver across multiple pages
+def process_investing(driver,tickers,function_handlers,sleep_interval):
 
-    logging.info(f'Creating Chrome Service')
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service,options=chrome_options)
+    url_selection = 'investing'
 
     for i, ticker in enumerate(tickers):
-        url_selection = 'investing'
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
@@ -90,10 +69,10 @@ def process_investingcom(tickers,function_handlers,sleep_interval):
 
         url = ticker[url_selection]
         ticker['key']
-        logging.info(f'\n\nBegin processing: {ticker['key']} selected url: {url}')
+        logging.info(f'Investing - begin processing: {ticker['key']} selected url: {url}')
 
         driver.get(url)
-        logging.info(f'sleep 5 seconds to allow website to load')
+        logging.info(f'wait 5 seconds to allow website to load')
         time.sleep(5)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
@@ -171,21 +150,10 @@ def process_investingcom(tickers,function_handlers,sleep_interval):
         logging.info(f"result: {data}")
         function_handlers[0](data)
 
-        logging.info(f'sleep {sleep_interval} seconds before next item')
-        time.sleep(sleep_interval)
-
-    driver.quit()
-
     return 0
 
-def process_webull(tickers,function_handlers,sleep_interval):
-
-    logging.info(f'Creating Chrome Service')
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service,options=chrome_options)
-
+def process_webull(driver,tickers,function_handlers,sleep_interval):
+    logging.info(f"process_webull for {tickers[0]}")
     for i, ticker in enumerate(tickers):
         url_selection = 'webull'
         if url_selection in ticker:
@@ -201,17 +169,8 @@ def process_webull(tickers,function_handlers,sleep_interval):
 
         url = ticker[url_selection]
         key = ticker['key']
-        logging.info(f'\n\nBegin processing: {key} selected url: {url}')
+        logging.info(f'Webull - begin processing: {key} selected url: {url}')
         
-        driver.get(url)
-        logging.info(f'sleep 5 seconds to allow website to load')
-        time.sleep(5)
-
-        logging.info(f"Website URL: {url}")
-        if not url:
-            logging.error("No URL provided. Exiting.")
-            continue
-    
         driver.get(url)
         logging.info(f'sleep 5 seconds to allow website to load')
         time.sleep(5)
@@ -236,46 +195,76 @@ def process_webull(tickers,function_handlers,sleep_interval):
                 logging.info(f"Process bond quote page: {url}")
 
                 description = driver.find_element(By.CLASS_NAME, 'csr124')
-                #logging.info(f"description {description.text}")
+                logging.info(f"description {description.text}")
 
                 cusip = driver.find_element(By.CLASS_NAME, 'csr125')
-                #logging.info(f"cusip {cusip.text}")
+                logging.info(f"cusip {cusip.text}")
 
                 last_price = driver.find_element(By.CLASS_NAME, 'csr112')
-                #logging.info(f"last_price {last_price.text}")
+                logging.info(f"last_price {last_price.text}")
 
+                price_change_decimal = ""
                 try:
                     price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][1]")
                 except Exception as e:
-                    price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][1]")
-                #logging.info(f"price_change_decimal {price_change_decimal.text}")
+                    logging.info("price_change_decimal not found in csr115")
 
+                if price_change_decimal == "":
+                    try:
+                        price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][1]")
+                        logging.info(f"price_change_decimal {price_change_decimal.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr116")
+
+                if price_change_decimal == "":
+                    try:
+                        price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr117')][1]")
+                        logging.info(f"price_change_decimal {price_change_decimal.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr117")  
+
+                price_change_percent = ""
                 try:
                     price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][2]")
                 except Exception as e:
-                    price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][2]")
-                #logging.info(f"price_change_percent {price_change_percent.text}")
+                    logging.info("price_change_decimal not found in csr115") 
+
+                if price_change_percent == "":
+                    try:
+                        price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][2]")
+                        logging.info(f"price_change_percent {price_change_percent.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr116")
+
+                if price_change_percent == "":
+                    try:
+                        price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr117')][2]")
+                        logging.info(f"price_change_percent {price_change_percent.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr116")
+
+                
 
                 price_datetime = driver.find_element(By.CLASS_NAME, 'csr132')
-                #logging.info(f"price_datetime {price_datetime.text}")
+                logging.info(f"price_datetime {price_datetime.text}")
 
                 bond_yield = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[1]/DIV[2]')
-                #logging.info(f"bond_yield {bond_yield.text}")
+                logging.info(f"bond_yield {bond_yield.text}")
 
                 high_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[2]/DIV[2]')
-                #logging.info(f"high_price {high_price.text}")
+                logging.info(f"high_price {high_price.text}")
 
                 low_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[1]/DIV[2]')
-                #logging.info(f"low_price {low_price.text}")
+                logging.info(f"low_price {low_price.text}")
 
                 open_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[2]/DIV[2]')
-                #logging.info(f"open_price {open_price.text}")
+                logging.info(f"open_price {open_price.text}")
 
                 coupon_rate = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[3]/DIV[1]/DIV[2]')
-                #logging.info(f"coupon_rate {coupon_rate.text}")
+                logging.info(f"coupon_rate {coupon_rate.text}")
 
                 maturity = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[3]/DIV[2]/DIV[2]')
-                #logging.info(f"maturity {maturity.text}")
+                logging.info(f"maturity {maturity.text}")
 
                 prev_close_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[4]/DIV[1]/DIV[2]')
                 #logging.info(f"prev_close_price {prev_close_price.text}")
@@ -453,15 +442,10 @@ def process_webull(tickers,function_handlers,sleep_interval):
                     "price_to_earnings_ttm": price_to_earnings_ttm.text if price_to_earnings_ttm else "" 
                 }
         except Exception as e:
-            logging.error('Exception processing xpath. will quit driver')
+            logging.error('Exception processing xpath')
         
         logging.info(f"result: {data}")
         function_handlers[0](data)
-        
-        logging.info(f'sleep {sleep_interval} seconds before next item')
-        time.sleep(sleep_interval)  # Sleep for the specified interval
-
-    driver.quit()
 
     return 0
         
@@ -470,6 +454,48 @@ def setup_logging(log_level):
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % log_level)
     logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def process_round_robin(driver, tickers, sources, function_handlers, sleep_interval):
+    logging.info(f"process round-robin")
+    num_sources=len(sources)
+    current = 0
+    for i, ticker in enumerate(tickers):
+        logging.info("\n\n")
+        logging.info(f"KEY: {ticker['key']}")
+        selected = -1
+        first_checked = current
+        while selected == -1:   
+            if sources[current]['name'] in ticker and not pd.isna(ticker[sources[current]['name']]):
+                logging.info(f"has source {current} {ticker[sources[current]['name']]}")
+                selected = current
+            else:
+                logging.info(f"does not have source {current} {sources[current]['name']}")
+                current = current + 1
+                if current == num_sources:
+                    current = 0
+                if current == first_checked:
+                    logging.info(f"no sources found")
+                    break
+
+        if selected != -1:
+            logging.debug(f"process single ticker")
+            single_ticker = [ None ]
+            single_ticker[0] = ticker
+            # Call the 'process_source' function to scrape website for a single ticker
+            sources[selected]['process'](driver,single_ticker,function_handlers,sleep_interval)
+
+            sources[current]['hits'] = sources[current]['hits'] + 1
+            current = current + 1
+            if current == num_sources:
+                current = 0
+            first_checked = current
+            selected = -1
+            time.sleep(sleep_interval)
+        else:
+            logging.info(f"nothing to work on")
+
+
+    logging.info(f"usage: {sources}")
 
 def main():
 
@@ -495,12 +521,16 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='yahoo',
-                    help='web site source [google|investing|stock_analysis|webull|yahoo] (default: yahoo')
+                    default='fintel',
+                    help='web site source [finance_charts|google|investing|webull|yahoo] (default: finance_charts')
+    
+    parser.add_argument('--roundrobbin', '-r', dest='round_robin', type=bool, default=False,
+                        help='rotate websites round robbin')
 
     args = parser.parse_args()
     setup_logging(args.log_level)
-   
+
+    round_robin = args.round_robin
     input_file = args.input_file
     tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
     browser = args.browser
@@ -508,23 +538,44 @@ def main():
     sleep_interval = args.sleep_interval
 
     # Give the user a chance to review tickers
-    logging.info(f'sleep 5 seconds')
     time.sleep(2)
 
     function_handlers = [update_numbers]
 
+    logging.info(f'Creating Chrome Service')
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service,options=chrome_options)
+
+    sources = [
+        { 'name' : 'yahoo', 'process' : process_yfinance, 'hits' : 0 },
+        { 'name' : 'webull', 'process' : process_webull, 'hits' : 0  },
+        { 'name' : 'investing', 'process' : process_investing, 'hits' : 0  }#,
+        #{ 'name' : 'google', 'process' : process_google_finance, 'hits' : 0  },
+        #{ 'name' : 'finance_charts', 'process' : process_finance_charts, 'hits' : 0  }
+    ]
+
+    if round_robin:
+        process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
+        driver.quit()
+        exit(0)
+
+    logging.info(f"url_selection: {url_selection}")
     if url_selection == "webull":
-        result = process_webull(tickers,function_handlers,sleep_interval)
+        result = process_webull(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "investing":
-        result = process_investingcom(tickers,function_handlers,sleep_interval)
+        result = process_investing(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "yahoo":
-        result = process_yfinance(tickers,function_handlers,sleep_interval)
+        result = process_yfinance(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "google":
-        result = process_google_finance(tickers,function_handlers,sleep_interval)
-    #elif url_selection == "fintel":
-    #    result = process_fintel(tickers,function_handlers,sleep_interval)
-    elif url_selection == "stock_analysis":
-        result = process_stock_analysis(tickers,function_handlers,sleep_interval)
+        result = process_google_finance(driver,tickers,function_handlers,sleep_interval)
+    elif url_selection == "fintel":
+        result = process_fintel(driver,tickers,function_handlers,sleep_interval)
+    elif url_selection == "finance_charts":
+        result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
+
+    driver.quit()
     exit(0)
 
 if __name__ == "__main__":

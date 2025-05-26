@@ -211,7 +211,7 @@ def update_numbers(prices):
     '''
     run_applescript(script)
 
-def process_yfinance(tickers,function_handlers,sleep_interval):
+def process_yfinance(driver,tickers,function_handlers,sleep_interval):
     tickers_from_numbers = get_tickers_from_numbers()
     prices = fetch_prices(tickers_from_numbers)
     update_numbers(prices)
