@@ -10,18 +10,11 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException,
 import time
 import pandas as pd
 
-def process_google_finance(tickers,function_handlers,sleep_interval):
-# https://www.repeato.app/reusing-browser-sessions-in-selenium-webdriver/
-# I should reuse the driver across multiple pages
+def process_google_finance(driver,tickers,function_handlers,sleep_interval):
 
-    logging.info(f'Creating Chrome Service')
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service,options=chrome_options)
-
+    url_selection = 'google'
     for i, ticker in enumerate(tickers):
-        url_selection = 'google'
+
         if url_selection in ticker:
             logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
@@ -113,10 +106,5 @@ def process_google_finance(tickers,function_handlers,sleep_interval):
         
         logging.info(f"result: {data}")
         function_handlers[0](data)
-
-        logging.info(f'sleep {sleep_interval} seconds before next item')
-        time.sleep(sleep_interval)
-
-    driver.quit()
 
     return 0
