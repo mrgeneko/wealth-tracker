@@ -561,7 +561,7 @@ def main():
         driver.quit()
         exit(0)
 
-    logging.info(f"url_selection: {url_selection}")
+    logging.info(f"source: {url_selection}")
     if url_selection == "webull":
         result = process_webull(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "investing":

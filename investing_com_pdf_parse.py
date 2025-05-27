@@ -21,6 +21,7 @@ def is_number(value):
             return False
         
 def process_investing_com_pdf(file_path):
+    print(f"file_path: {file_path}")
     if not os.path.exists(file_path):
         print(f"File does not exist: {file_path}")
         return
@@ -41,8 +42,16 @@ def process_investing_com_pdf(file_path):
                 for row in table:
                     print(f"check row: {row}")
                     if found:
-                        # check to see if we have gone beyond the table rows holding ticker data
+                        
                         if row[0] != None:
+                            # check to see if the entire table is held in row[0]
+                            if "My Watchlists" in row[0] and "Watchlist News" in row[0] and "Last" in row[0] and "Chg." in row[0]:
+                                start_index = row[0].find(" Time\n" + len("Time\n"))
+                                end_index = row[0].find("Watchlist News\n")
+                                table_text = row[0][start_index:end_index]
+                                print(table_text)
+                                break
+                            # check to see if we have gone beyond the table rows holding ticker data
                             if "\n" in row[0]:
                                 print("detected end of table \\n")
                                 break
@@ -112,6 +121,7 @@ def process_investing_com_pdf(file_path):
                         if "Symbol" in row[0] and "Last" in row[0]:
                             print(f"found header row {row}")
                             found=True
+                            
 
 #    pp.pprint(data)
 

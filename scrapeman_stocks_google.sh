@@ -3,4 +3,4 @@ open /Users/gene/Library/Mobile\ Documents/com\~apple\~Numbers/Documents/Shared\
 sleep 5
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-/Users/gene/venv/bin/python3 scrapeman.py -s yahoo  -t stocks > /Users/gene/logs/scrapeman_stocks_yahoo.${TIMESTAMP}.log 2>&1
+/Users/gene/venv/bin/python3 scrapeman.py -s google  > /Users/gene/logs/scrapeman_google_stocks.${TIMESTAMP}.log 2>&1
