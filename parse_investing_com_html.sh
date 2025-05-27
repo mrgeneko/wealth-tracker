@@ -15,8 +15,8 @@ if [ ${#file_array[@]} -gt 0 ]; then
     echo "will process" "$newest_file"
 
     # Run the script with the newest file
-    /Users/gene/venv/bin/python3 investing_com_pdf_parse.py --file_path "$newest_file" > output.txt
-    #mv "${newest_file}" "${newest_file}.old"
+    /Users/gene/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" > output.txt
+    mv "${newest_file}" "${newest_file}.old"
 
     # Move all other files except the newest one to the same filename with .old appended
     for ((i=1; i<${#file_array[@]}; i++)); do
