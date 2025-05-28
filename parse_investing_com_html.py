@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 import logging
+import time
 import os
 from bs4 import BeautifulSoup
 import argparse
 from datetime import datetime
 from update_cell_in_numbers import update_numbers
+
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 
 # use monitor at investing.com 
 # investing.com hsupports multiple watchlists. THe exported html will contain only the first/left watchlist on first load
@@ -24,16 +30,8 @@ def is_number(value):
         except ValueError:
             return False
         
-def parse_watchlist_table(file_path):
+def parse_watchlist_table(html_content):
     logging.info("parse_html_for_specific_columns")
-
-    if not os.path.exists(file_path):
-        print(f"File does not exist: {file_path}")
-        return
-
-    # Step 1: Read the HTML content from the file
-    with open(file_path, 'r', encoding='utf-8') as file:
-        html_content = file.read()
 
     #logging.info(f"html_content: {html_content}")
 
@@ -106,7 +104,6 @@ def parse_watchlist_table(file_path):
     return specific_rows_json
 
 
-
 def setup_logging(log_level):
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
@@ -120,7 +117,47 @@ def main():
     args = parser.parse_args()
     setup_logging(args.log_level)
     
-    specific_data = parse_watchlist_table(args.file_path)
+    if True:
+        if not os.path.exists(args.file_path):
+            print(f"File does not exist: {args.file_path}")
+            return
+
+        # Step 1: Read the HTML content from the file
+        with open(args.file_path, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+    else:   
+        logging.info(f'Creating Chrome Service')
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_experimental_option("debuggerAddress", "localhost:9222")
+        #chrome_options.add_argument("--headless")  # Run in headless mode
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service,options=chrome_options)
+        print(driver.title)
+
+        #save_url = driver.command_executor
+        #session_id = driver.session_id
+        #url = "https://www.investing.com/portfolio/?portfolioID=MzAzZDRgNGE3Z2lkM2UwOw%3D%3D"
+        #logging.info("connect to remote webdriver")
+        #driver = webdriver.Remote(command_executor=url)
+        #logging.info("connect to remote webdriver done")
+        #driver.close() # this prevents the dummy browser
+        #driver.session_id = session_id
+        #driver.get("https://www.investing.com/portfolio/?portfolioID=MzAzZDRgNGE3Z2lkM2UwOw%3D%3D")
+        #time.sleep(7)
+        #driver.find_element(By.NAME,"loginFormUser_email").send_keys(username)
+        #time.sleep(3)
+        #driver.find_element(By.ID, "loginForm_password").send_keys(password)
+        #time.sleep(5)
+        #driver.find_element(By.XPATH,'//*[@id="signup"]/a').click()
+
+        #time.sleep(15)
+        #print("logged in!")
+        driver.get("https://www.investing.com/portfolio/?portfolioID=MzAzZDRgNGE3Z2lkM2UwOw%3D%3D")
+        html_content = driver.page_source
+        logging.info(f"{html_content}")
+        driver.quit()
+
+    specific_data = parse_watchlist_table(html_content)
     #print(json.dumps(specific_data, indent=4))
 
 if __name__ == "__main__":
