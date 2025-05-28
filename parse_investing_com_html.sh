@@ -1,5 +1,6 @@
 #!/bin/bash
-
+log="/Users/gene/logs/parse_investing_com_html.log"
+date >> "$log"
 # Define the directory containing the files
 log_dir="/Users/gene/investing_com_html"
 
@@ -12,10 +13,10 @@ file_array=($files)
 # Get the newest file
 if [ ${#file_array[@]} -gt 0 ]; then
     newest_file="${file_array[0]}"
-    echo "will process" "$newest_file"
+    echo "will process" "$newest_file" >> "$log"
 
     # Run the script with the newest file
-    /Users/gene/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" > output.txt
+    /Users/gene/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" >> "$log"
     mv "${newest_file}" "${newest_file}.old"
 
     # Move all other files except the newest one to the same filename with .old appended
@@ -31,7 +32,7 @@ if [ ${#file_array[@]} -gt 0 ]; then
         mv "${old_file}" "${new_filename}"
     done
     
-    echo "Newest file: $newest_file has been processed and older files have been moved with .old suffix."
+    echo "Newest file: $newest_file has been processed and older files have been moved with .old suffix." >> "$log"
 else
-    echo "No matching files found in $log_dir"
+    echo "No matching files found in $log_dir" >> "$log"
 fi
