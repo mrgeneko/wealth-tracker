@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the directory containing the files
-log_dir="/Volumes/gene/investing_com_html"
+log_dir="/Users/gene/investing_com_html"
 
 # Find all matching files and sort them by modification time (newest last)
 files=$(find "$log_dir" -type f -name "investing.202*.html" | xargs ls -t)
