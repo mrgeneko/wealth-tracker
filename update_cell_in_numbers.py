@@ -121,6 +121,15 @@ def update_numbers(data):
                     end repeat
                     if price_change_decimal_col is 0 then error "Price Change column not found."
 
+                    set previous_close_price_col to 0
+                    repeat with i from 1 to column count
+                        if value of cell i of row 1 is "Previous Close" then
+                            set previous_close_price_col to i
+                            exit repeat
+                        end if
+                    end repeat
+                    if previous_close_price_col is 0 then error "Previous Close Price column not found."     
+
                     set key_col to 0
                     repeat with i from 1 to column count
                         if value of cell i of row 1 is "key" then
@@ -156,7 +165,8 @@ def update_numbers(data):
                                 f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{price}"'
                             ])}
                             {chr(10).join([
-                                f'if tickerVal is "{data["key"]}" then set value of cell price_change_decimal_col of row r to "{price_change_decimal}"'
+                                f'if tickerVal is "{ticker}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'
+                                for ticker, data in prices.items()
                             ])}
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell update_time_col of row r to "{now}"'
@@ -171,6 +181,9 @@ def update_numbers(data):
         end tell
     end tell
     '''
+#    {chr(10).join([
+#    f'if tickerVal is "{data["key"]}" then set value of cell price_change_decimal_col of row r to "{price_change_decimal}"'
+#])}
 
                                     #for ticker, data in prices.items()
 

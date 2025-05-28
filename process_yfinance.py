@@ -96,19 +96,13 @@ def fetch_prices(tickers):
             '''
 
             price = info.get("regularMarketPrice")
-            #if price is not None:
-             #   prices[ticker] = {
-            #        "price": price
-            #    }
             price_change_decimal = info.get("regularMarketChange")
-            #if price_change_decimal is not None:
-            #    prices[ticker] = {
-            #        "price": price
-            #    }
+            previous_close_price = info.get("regularMarketPreviousClose")
 
             prices[ticker] = {
                 "price": price,
-                "price_change_decimal": round(price_change_decimal,4) if price_change_decimal is not None else "N/A"
+                "price_change_decimal": round(price_change_decimal,4) if price_change_decimal is not None else "N/A",
+                "previous_close_price": round(previous_close_price,4) if previous_close_price is not None else "N/A"
             }
             
             print(f"Fetched price for {ticker} {prices[ticker]}")
@@ -171,7 +165,16 @@ def update_numbers(prices):
                             exit repeat
                         end if
                     end repeat
-                    if price_change_col is 0 then error "Price change column not found."                    
+                    if price_change_col is 0 then error "Price change column not found."   
+
+                    set previous_close_price_col to 0
+                    repeat with i from 1 to column count
+                        if value of cell i of row 1 is "Previous Close" then
+                            set previous_close_price_col to i
+                            exit repeat
+                        end if
+                    end repeat
+                    if previous_close_price_col is 0 then error "Previous Close Price column not found."                      
 
                     set source_col to 0
                     repeat with i from 1 to column count
@@ -191,7 +194,7 @@ def update_numbers(prices):
                                 for ticker, data in prices.items()
                             ])}
                             {chr(10).join([
-                                f'if tickerVal is "{ticker}" then set value of cell price_change_col of row r to "{data["price_change_decimal"]}"'
+                                f'if tickerVal is "{ticker}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'
                                 for ticker, data in prices.items()
                             ])}
                             {chr(10).join([
@@ -209,6 +212,11 @@ def update_numbers(prices):
         end tell
     end tell
     '''
+
+#        {chr(10).join([
+#        f'if tickerVal is "{ticker}" then set value of cell price_change_col of row r to "{data["price_change_decimal"]}"'
+#        for ticker, data in prices.items()
+#    ])}
     run_applescript(script)
 
 def process_yfinance(driver,tickers,function_handlers,sleep_interval):
