@@ -14,6 +14,7 @@ from process_google_finance import process_google_finance
 from process_fintel import process_fintel
 from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
+from process_ycharts import process_ycharts
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -502,8 +503,8 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='google',
-                    help='web site source [finance_charts|google|investing|trading_view|webull|yahoo] (default: google')
+                    default='yahoo',
+                    help='web site source [finance_charts|google|investing|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robin')
@@ -535,14 +536,16 @@ def main():
 #   webull       |     X      |      X      |     X     |         |      X      |
 #   trading view |     X      | only til 8p |     X     |         |             |
 #   investing    |     X      |      X      |     X     |         |             |
-#   google       |     ?      |      ?      |     X     |    X    |             |            |      X
+#   google       |     ?      |      ?      |     X     |         |             |            |      X
+#   ycharts      |     ?      |      ?      |     X     |         |             |            |      X     |     X
 
     sources = [
         { 'name' : 'yahoo', 'process' : process_yfinance, 'hits' : 0 },
         { 'name' : 'webull', 'process' : process_webull, 'hits' : 0  },
         { 'name' : 'investing', 'process' : process_investing, 'hits' : 0  },
         { 'name' : 'trading_view', 'process' : process_trading_view, 'hits' : 0  },
-        { 'name' : 'google', 'process' : process_google_finance, 'hits' : 0  }#,
+        { 'name' : 'google', 'process' : process_google_finance, 'hits' : 0  },
+        { 'name' : 'ycharts', 'process' : process_ycharts, 'hits' : 0  }
         #{ 'name' : 'finance_charts', 'process' : process_finance_charts, 'hits' : 0  }
     ]
 
@@ -567,6 +570,8 @@ def main():
         result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "trading_view":
         result = process_trading_view(driver,tickers,function_handlers,sleep_interval)
+    elif url_selection == "ycharts":
+        result = process_ycharts(driver,tickers,function_handlers,sleep_interval)
 
     driver.quit()
     exit(0)
