@@ -31,7 +31,7 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
     for i, ticker in enumerate(tickers):
         url_selection = 'trading_view'
         if url_selection in ticker:
-            logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
+            logging.info(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
             logging.debug(f"Key {url_selection} does not exist in this object.")
 
@@ -146,7 +146,7 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
             data["after_hours_price"] = after_hours_price
         
         logging.info(data)
-        update_numbers(data)
+        function_handlers[0](data)
 
     return 0
 
