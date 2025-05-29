@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
-#import os
 import argparse
 import logging
-import json
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 import time
-#import re
 import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
@@ -17,7 +14,6 @@ from process_google_finance import process_google_finance
 from process_fintel import process_fintel
 from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
-#from create_html_file_path import create_html_file_path
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -81,14 +77,6 @@ def process_investing(driver,tickers,function_handlers,sleep_interval):
         #element = wait.until(EC.presence_of_element_located((By.ID, 'example')))
         
         #html_content = driver.page_source
-
-        # Base path for logs
-        #base_path = '/Users/gene/logs'
-        # Create log file path
-        #html_file_path = create_html_file_path(base_path, url)
-        #logging.info(f"save html to: {html_file_path}")
-        #with open(html_file_path, "w") as f:
-        #    f.write(html_content)
 
         try:
             logging.info(f"Process xpaths for {url}")
@@ -181,14 +169,6 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
         #element = wait.until(EC.presence_of_element_located((By.ID, 'example')))
         
         #html_content = driver.page_source
-
-        # Base path for logs
-        #base_path = '/Users/gene/logs'
-        # Create log file path
-        ##html_file_path = create_html_file_path(base_path, website)
-        #logging.info(f"save html to: {html_file_path}")
-        #with open(html_file_path, "w") as f:
-        #    f.write(html_content)
 
         try:
             logging.info(f"Process xpaths for {url}")
@@ -580,8 +560,9 @@ def main():
         result = process_yfinance(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "google":
         result = process_google_finance(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "fintel":
-        result = process_fintel(driver,tickers,function_handlers,sleep_interval)
+    #elif url_selection == "fintel":
+    #    FINTEL BLOCKS SCRAPERS
+    #    result = process_fintel(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "finance_charts":
         result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "trading_view":

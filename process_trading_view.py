@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from update_cell_in_numbers import update_numbers
 import pandas as pd
-from create_html_file_path import create_html_file_path
+from save_html_to_file import save_html_to_file
 
 # use monitor at investing.com 
 # investing.com hsupports multiple watchlists. THe exported html will contain only the first/left watchlist on first load
@@ -56,14 +56,6 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
         html_content = driver.page_source
     
         #logging.info(f"html_content: {html_content}")
-
-        # Base path for logs
-        #base_path = '/Users/gene/logs'
-        # Create log file path
-        #html_file_path = create_html_file_path(base_path, url)
-        #logging.info(f"save html to: {html_file_path}")
-        #with open(html_file_path, "w") as f:
-        #    f.write(html_content)
 
         soup = BeautifulSoup(html_content, 'html.parser')
 

@@ -107,14 +107,6 @@ def fetch_prices(tickers):
             
             print(f"Fetched price for {ticker} {prices[ticker]}")
             time.sleep(3)
-            #live_data = data.history(period="1d", interval="1m")
-            #if not live_data.empty:
-                # Get the most recent closing price from the date
-            #    live_price = live_data["Close"].iloc[-1]
-            #    print("Real Time Price:", live_price)
-            #    print("live_data:",live_data)
-            #else:
-            #    print("No live data available")
         except Exception as e:
             print(f"Error fetching {ticker}: {e}")
     return prices
