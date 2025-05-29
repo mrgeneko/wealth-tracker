@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 #from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 #from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
-from create_html_file_path import create_html_file_path
+from save_html_to_file import save_html_to_file
 
 #from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -21,8 +21,6 @@ import time
 from datetime import datetime
 import re
 import pandas as pd
-
-
 
 def process_finance_charts(driver,tickers,function_handlers,sleep_interval):
     logging.info(f"process_finance_charts")
@@ -50,13 +48,7 @@ def process_finance_charts(driver,tickers,function_handlers,sleep_interval):
         html_content = browser.page_source
         soup = BeautifulSoup(browser.page_source,'html.parser')
 
-        # Base path for logs
-        base_path = '/Users/gene/logs'
-        # Create log file path
-        html_file_path = create_html_file_path(base_path, url)
-        logging.info(f"save html to: {html_file_path}")
-        with open(html_file_path, "w") as f:
-            f.write(html_content)
+        save_html_to_file(url,html_content)
 
         last_price = soup.find('td', {'class': 'pt-2 pr-2'})
         print(last_price)
@@ -68,14 +60,6 @@ def process_finance_charts(driver,tickers,function_handlers,sleep_interval):
         time.sleep(3)
         
         html_content = driver.page_source
-
-        # Base path for logs
-        base_path = '/Users/gene/logs'
-        # Create log file path
-        html_file_path = create_html_file_path(base_path, url)
-        logging.info(f"save html to: {html_file_path}")
-        with open(html_file_path, "w") as f:
-            f.write(html_content)
 
         logging.info(f"Process xpaths for {url}")
         last_price = ""

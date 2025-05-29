@@ -1,1 +1,7 @@
 .DS_Store
+process_finance_charts.py
+__pycache__/process_finance_charts.cpython-313.pyc
+__pycache__/process_fintel.cpython-313.pyc
+__pycache__/process_google_finance.cpython-313.pyc
+__pycache__/process_trading_view.cpython-313.pyc
+__pycache__/update_cell_in_numbers.cpython-313.pyc

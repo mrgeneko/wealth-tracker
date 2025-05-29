@@ -39,14 +39,6 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
     
         #logging.info(f"html_content: {html_content}")
 
-        # Base path for logs
-        #base_path = '/Users/gene/logs'
-        # Create log file path
-        #html_file_path = create_html_file_path(base_path, url)
-        #logging.info(f"save html to: {html_file_path}")
-        #with open(html_file_path, "w") as f:
-        #    f.write(html_content)
-
         soup = BeautifulSoup(html_content, 'html.parser')
         main_element = element = soup.select_one('[class="Gfxi4"]')
         main_element.select_one('[class="YMlKec fxKbKc"]')
