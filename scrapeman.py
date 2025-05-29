@@ -464,9 +464,11 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
             single_ticker = [ None ]
             single_ticker[0] = ticker
             # Call the 'process_source' function to scrape website for a single ticker
-            sources[selected]['process'](driver,single_ticker,function_handlers,sleep_interval)
-
-            sources[current]['hits'] = sources[current]['hits'] + 1
+            try:
+                sources[current]['hits'] = sources[current]['hits'] + 1
+                sources[selected]['process'](driver,single_ticker,function_handlers,sleep_interval)
+            except Exception as e:
+                logging.error(f"process source error {e}")
             current = current + 1
             if current == num_sources:
                 current = 0
