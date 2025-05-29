@@ -523,10 +523,10 @@ def main():
 
     parser.add_argument('--source', '-s', dest='source',
                     default='google',
-                    help='web site source [finance_charts|google|investing|webull|yahoo] (default: google')
+                    help='web site source [finance_charts|google|investing|trading_view|webull|yahoo] (default: google')
     
-    parser.add_argument('--roundrobbin', '-r', dest='round_robin', type=bool, default=False,
-                        help='rotate websites round robbin')
+    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
+                        help='rotate websites round robin')
 
     args = parser.parse_args()
     setup_logging(args.log_level)

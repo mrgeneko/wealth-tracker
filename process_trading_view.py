@@ -98,7 +98,7 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
         element = soup.select_one('[class="last-zoF9r75I last-NYvR1HH2 js-symbol-ext-hrs-close"]')
         if element != None:
             pre_post_market_element = soup.select_one('[class="marketStatusPre-NYvR1HH2"]')
-            if pre_post_market_element.text == "Pre-market":
+            if pre_post_market_element != None and pre_post_market_element.text == "Pre-market":
                 pre_market_price = element.text
                 logging.info(f"pre_market_price: {pre_market_price}")
 
