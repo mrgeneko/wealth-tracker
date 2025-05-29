@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os
+#import os
 import argparse
 import logging
 import json
@@ -9,14 +9,15 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 import time
-import re
+#import re
 import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
 from process_google_finance import process_google_finance
 from process_fintel import process_fintel
 from process_finance_charts import process_finance_charts
-from create_html_file_path import create_html_file_path
+from process_trading_view import process_trading_view
+#from create_html_file_path import create_html_file_path
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -511,8 +512,8 @@ def main():
                         help='Specify "stocks" to exclude bonds or "bonds" to include only bond lines')
     
     parser.add_argument('--sleep-interval', '-z', dest='sleep_interval',
-                    type=int, default=15,
-                    help='Seconds to sleep between processing each ticker (default: 15)')
+                    type=int, default=10,
+                    help='Seconds to sleep between processing each ticker (default: 10)')
     
     parser.add_argument('--browser', '-d', dest='browser',
                     default='chrome',
@@ -521,8 +522,8 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='fintel',
-                    help='web site source [finance_charts|google|investing|webull|yahoo] (default: finance_charts')
+                    default='trading_view',
+                    help='web site source [finance_charts|google|investing|webull|yahoo] (default: trading_view')
     
     parser.add_argument('--roundrobbin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robbin')
@@ -561,6 +562,15 @@ def main():
         driver.quit()
         exit(0)
 
+
+#   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close
+#   yahoo        |            |             |     X     |         |             |     X
+#   webull       |     X      |      X      |     X     |         |      X      |
+#   trading view |     ?      | only til 8p |     X     |         |             |
+#   investing    |     X      |      X      |     X     |         |             |
+#   google       |            |             |           |    X    |             |
+
+
     logging.info(f"source: {url_selection}")
     if url_selection == "webull":
         result = process_webull(driver,tickers,function_handlers,sleep_interval)
@@ -574,6 +584,8 @@ def main():
         result = process_fintel(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "finance_charts":
         result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
+    elif url_selection == "trading_view":
+        result = process_trading_view(driver,tickers,function_handlers,sleep_interval)
 
     driver.quit()
     exit(0)

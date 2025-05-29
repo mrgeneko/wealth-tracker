@@ -31,7 +31,7 @@ def is_number(value):
             return False
         
 def parse_watchlist_table(html_content):
-    logging.info("parse_html_for_specific_columns")
+    logging.info("parse_watchlist_table")
 
     #logging.info(f"html_content: {html_content}")
 
