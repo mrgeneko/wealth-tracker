@@ -94,6 +94,11 @@ def update_numbers(data):
                     price = data["last_price"]
                     price_change_decimal = data["price_change_decimal"]
 
+           # if data["previous_close_price"] is not None and data["previous_close_price"] != '':
+           #     previous_close_price = data["previous_close_price"]
+           # else:
+           #     previous_close_price = ""
+            
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
@@ -163,10 +168,6 @@ def update_numbers(data):
                         if tickerVal is not missing value and tickerVal is not "" then
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{price}"'
-                            ])}
-                            {chr(10).join([
-                                f'if tickerVal is "{ticker}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'
-                                for ticker, data in prices.items()
                             ])}
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell update_time_col of row r to "{now}"'
