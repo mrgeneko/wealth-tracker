@@ -102,20 +102,44 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
         logging.debug(f"last_price_datetime: {last_price_datetime}")
 
         element = soup.select_one('[class="last-zoF9r75I last-NYvR1HH2 js-symbol-ext-hrs-close"]')
-        after_hours_price = element.text
-        logging.debug(f"after_hours_price: {after_hours_price}")
+        if element != None:
+            pre_post_market_element = soup.select_one('[class="marketStatusPre-NYvR1HH2"]')
+            if pre_post_market_element.text == "Pre-market":
+                pre_market_price = element.text
+                logging.info(f"pre_market_price: {pre_market_price}")
+
+                element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
+                pre_market_price_change_decimal = element.text
+                logging.info(f"pre_market_price_change_decimal: {pre_market_price_change_decimal}")
+
+                element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
+                pre_market_price_change_percent = element.text
+                logging.info(f"pre_market_price_change_percent: {pre_market_price_change_percent}")
+
+                element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
+                pre_market_price_datetime = element.text
+                logging.info(f"pre_market_price_datetime: {pre_market_price_datetime}")
+            else:
+                after_hours_price = element.text
+                logging.info(f"after_hours_price: {after_hours_price}")
+
+                element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
+                after_hours_price_change_decimal = element.text
+                logging.info(f"after_hours_price_change_decimal: {after_hours_price_change_decimal}")
+
+                element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
+                after_hours_price_change_percent = element.text
+                logging.info(f"after_hours_price_change_decimal: {after_hours_price_change_percent}")
+
+                element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
+                after_hours_price_datetime = element.text
+                logging.info(f"after_hours_price_datetime: {after_hours_price_datetime}")
+        else:
+            after_hours_price = ""
         
-        element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
-        after_hours_price_change_decimal = element.text
-        logging.debug(f"after_hours_price_change_decimal: {after_hours_price_change_decimal}")
+        
 
-        element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
-        after_hours_price_change_percent = element.text
-        logging.debug(f"after_hours_price_change_decimal: {after_hours_price_change_percent}")
-
-        element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
-        after_hours_price_datetime = element.text
-        logging.debug(f"after_hours_price_datetime: {after_hours_price_datetime}")
+        
 
         # transfer data to object that udpate_cell_in_numbers.py expects
         # Get the current time   ---- THESE SHOULD BE WRAPPED UP IN FUNCTIONS!!!
@@ -130,9 +154,9 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
         data["price_change_decimal"] = price_change_decimal
         data["price_change_percent"] = price_change_percent
         data["source"] = "trading view"
-        if current_time < market_open_time and current_time > pre_market_open_time and is_number(after_hours_price):
-            data["pre_market_price"] = after_hours_price # need to test/change this !!!
-        elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price) != '--':
+        if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
+            data["pre_market_price"] = pre_market_price
+        elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price):
             data["after_hours_price"] = after_hours_price
         
         logging.info(data)
