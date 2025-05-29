@@ -33,16 +33,16 @@ def update_numbers(data):
     
     price_change_decimal=""
     if "pre_market_price" not in data and 'after_hours_price' not in data :
-        print("no pre market or after hours price")
+        #print("no pre market or after hours price")
         if data["last_price"] is not None and data["last_price"] !='':
-            print("insert last price")
+            #print("insert last price")
             price = data["last_price"]
             price_change_decimal = data["price_change_decimal"]
         else:
             return
     else:
         # must be a stock. We should use something more appropriate to determine this
-        print("have pre_market or after_hours price keys in data object")
+        #print("have pre_market or after_hours price keys in data object")
         today = datetime.today()
         day_of_week = today.weekday()
         price_change_decimal = ""
