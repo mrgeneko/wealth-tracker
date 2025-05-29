@@ -522,8 +522,8 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='trading_view',
-                    help='web site source [finance_charts|google|investing|webull|yahoo] (default: trading_view')
+                    default='google',
+                    help='web site source [finance_charts|google|investing|webull|yahoo] (default: google')
     
     parser.add_argument('--roundrobbin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robbin')
@@ -550,18 +550,19 @@ def main():
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
 
-#   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close
-#   yahoo        |            |             |     X     |         |             |     X
+#   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
+#   yahoo        |            |             |     X     |         |             |     X      |      X     |
 #   webull       |     X      |      X      |     X     |         |      X      |
 #   trading view |     X      | only til 8p |     X     |         |             |
 #   investing    |     X      |      X      |     X     |         |             |
-#   google       |            |             |           |    X    |             |
+#   google       |     ?      |      ?      |     X     |    X    |             |            |      X
 
     sources = [
         { 'name' : 'yahoo', 'process' : process_yfinance, 'hits' : 0 },
         { 'name' : 'webull', 'process' : process_webull, 'hits' : 0  },
-        { 'name' : 'investing', 'process' : process_investing, 'hits' : 0  }#,
-        #{ 'name' : 'google', 'process' : process_google_finance, 'hits' : 0  },
+        { 'name' : 'investing', 'process' : process_investing, 'hits' : 0  },
+        { 'name' : 'trading_view', 'process' : process_trading_view, 'hits' : 0  },
+        { 'name' : 'google', 'process' : process_google_finance, 'hits' : 0  }#,
         #{ 'name' : 'finance_charts', 'process' : process_finance_charts, 'hits' : 0  }
     ]
 

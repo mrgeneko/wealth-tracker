@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 import logging
 import time
-import os
 from bs4 import BeautifulSoup
-import argparse
 from datetime import datetime
 from update_cell_in_numbers import update_numbers
 import pandas as pd
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from create_html_file_path import create_html_file_path
 
 # use monitor at investing.com 
