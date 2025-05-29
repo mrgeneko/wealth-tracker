@@ -549,6 +549,14 @@ def main():
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
+
+#   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close
+#   yahoo        |            |             |     X     |         |             |     X
+#   webull       |     X      |      X      |     X     |         |      X      |
+#   trading view |     X      | only til 8p |     X     |         |             |
+#   investing    |     X      |      X      |     X     |         |             |
+#   google       |            |             |           |    X    |             |
+
     sources = [
         { 'name' : 'yahoo', 'process' : process_yfinance, 'hits' : 0 },
         { 'name' : 'webull', 'process' : process_webull, 'hits' : 0  },
@@ -561,15 +569,6 @@ def main():
         process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
         driver.quit()
         exit(0)
-
-
-#   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close
-#   yahoo        |            |             |     X     |         |             |     X
-#   webull       |     X      |      X      |     X     |         |      X      |
-#   trading view |     ?      | only til 8p |     X     |         |             |
-#   investing    |     X      |      X      |     X     |         |             |
-#   google       |            |             |           |    X    |             |
-
 
     logging.info(f"source: {url_selection}")
     if url_selection == "webull":
