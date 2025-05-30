@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import time
 from datetime import datetime
 import pandas as pd
+from is_number import is_number
+
 #from selenium.webdriver.support.wait import WebDriverWait
 #from selenium.webdriver.support import expected_conditions as EC
 
@@ -25,10 +27,11 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
 
         url = ticker[url_selection]
         key = ticker['key']
-        logging.info(f'\n\nBegin processing: {ticker['key']} selected url: {url}')
+        logging.info("\n")
+        logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
 
         driver.get(url)
-        logging.info(f'sleep 3 seconds to allow website to load')
+        #logging.info(f'sleep 3 seconds to allow website to load')
         time.sleep(3)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
@@ -40,7 +43,7 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
         #logging.info(f"html_content: {html_content}")
 
         soup = BeautifulSoup(html_content, 'html.parser')
-        main_element = element = soup.select_one('[class="Gfxi4"]')
+        main_element = soup.select_one('[class="Gfxi4"]')
         main_element.select_one('[class="YMlKec fxKbKc"]')
         element = main_element.select_one('[class="YMlKec fxKbKc"]')
         #logging.info(f'last price element: {element}')
@@ -49,8 +52,14 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
             last_price = last_price[1:]
         logging.info(f"last_price: {last_price}")
 
-        element = main_element.select_one('[class="P2Luy Ez2Ioe ZYVHBb"]')
-        logging.debug(f'price change element: {element}')
+        element = soup.select_one('[class="P2Luy Ez2Ioe ZYVHBb"]')
+        if element == None:
+            logging.info(f"first change element not found")
+            element = soup.select_one('[class="P2Luy Ebnabc ZYVHBb"]')
+            if element == None:
+                logging.info(f"second change element not found")
+        
+        #logging.info(f'price change element: {element}')
         if element != None:
             if element.text.startswith("+"):
                 price_change_sign = "+"
@@ -67,7 +76,7 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
             price_change_sign = ""
         if price_change_sign != "":
             element = main_element.select_one('[class="JwB6zf"]')
-            logging.debug(f"price_change element: {element.text}")
+            #logging.info(f"price_change element: {element.text}")
             price_change_percent = price_change_sign + element.text
             logging.debug(f"price_change_percent: {price_change_percent}")
 
@@ -76,45 +85,22 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
         last_price_datetime = element.text.split()[:5]
         logging.debug(f"last_price_datetime: {last_price_datetime}")
 
-        comment='''
-        element = soup.select_one('[class="last-zoF9r75I last-NYvR1HH2 js-symbol-ext-hrs-close"]')
-        if element != None:
-            pre_post_market_element = soup.select_one('[class="marketStatusPre-NYvR1HH2"]')
-            if pre_post_market_element.text == "Pre-market":
-                pre_market_price = element.text
-                logging.info(f"pre_market_price: {pre_market_price}")
-
-                element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
-                pre_market_price_change_decimal = element.text
-                logging.info(f"pre_market_price_change_decimal: {pre_market_price_change_decimal}")
-
-                element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
-                pre_market_price_change_percent = element.text
-                logging.info(f"pre_market_price_change_percent: {pre_market_price_change_percent}")
-
-                element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
-                pre_market_price_datetime = element.text
-                logging.info(f"pre_market_price_datetime: {pre_market_price_datetime}")
-            else:
-                after_hours_price = element.text
-                logging.info(f"after_hours_price: {after_hours_price}")
-
-                element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
-                after_hours_price_change_decimal = element.text
-                logging.info(f"after_hours_price_change_decimal: {after_hours_price_change_decimal}")
-
-                element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
-                after_hours_price_change_percent = element.text
-                logging.info(f"after_hours_price_change_decimal: {after_hours_price_change_percent}")
-
-                element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
-                after_hours_price_datetime = element.text
-                logging.info(f"after_hours_price_datetime: {after_hours_price_datetime}")
-        else:
-            after_hours_price = ""
+        after_hours_price = ""
+        pre_market_price = ""
         
-        '''
-
+        #ext_hours_section = soup.select_one('[class="ivZBbf ygUjEc"]')
+        ext_hours_section = soup.select_one('[jsname="QRHKC"]')
+        if ext_hours_section != None:
+            #logging.info(f"ext_hours_section: {ext_hours_section.text}")
+            element = ext_hours_section.select_one('[class="YMlKec fxKbKc"]')
+            if element != None:
+                #logging.info(f"after hours segment:{element.text}")
+                if ext_hours_section.text.startswith("After Hours"):
+                    after_hours_price = element.text[1:]
+                elif ext_hours_section.text.startswith("Pre Market"):
+                    pre_market_price = element.text[1:]
+        logging.info(f"premarket price: {pre_market_price}")    
+        logging.info(f"after hours price: {after_hours_price}")
         
 
         # transfer data to object that udpate_cell_in_numbers.py expects
@@ -129,6 +115,8 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
         data["last_price"] = last_price
         data["price_change_decimal"] = price_change_decimal
         data["price_change_percent"] = price_change_percent
+        data["after_hours_price"] = after_hours_price
+        data["pre_market_price"] = pre_market_price
         data["source"] = "google finance"
         #if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
         #    data["pre_market_price"] = pre_market_price
