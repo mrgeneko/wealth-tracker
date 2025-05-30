@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-from helium import *
 from bs4 import BeautifulSoup
-
 import logging
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-#from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-#from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 from save_html_to_file import save_html_to_file
 
 #from bs4 import BeautifulSoup
@@ -29,28 +22,55 @@ def process_finance_charts(driver,tickers,function_handlers,sleep_interval):
     for i, ticker in enumerate(tickers):
         
         if url_selection in ticker:
-            logging.debug(f"Key {ticker['key']} has url: {ticker[url_selection]}")
+            logging.info(f"Key {ticker['key']} has url: {ticker[url_selection]}")
         else:
-            logging.debug(f"Key {url_selection} does not exist in this object.")
+            logging.info(f"Key {url_selection} does not exist in this object.")
 
         if not pd.isna(ticker[url_selection]):
-            logging.debug(f"Key {ticker['key']} has value: {ticker[url_selection]}")
+            logging.info(f"Key {ticker['key']} has value: {ticker[url_selection]}")
         else:
-            logging.debug(f"Key {url_selection} does not have a value or has NaN.")
+            logging.info(f"Key {url_selection} does not have a value or has NaN.")
             continue
 
         url = ticker[url_selection]
-    
-        #ticker['key']
+        key = ticker['key']
         logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
 
-        browser = start_chrome(url, headless=True)
-        html_content = browser.page_source
-        soup = BeautifulSoup(browser.page_source,'html.parser')
+        driver.get(url)
+        html_content = driver.page_source
+        soup = BeautifulSoup(html_content,'html.parser')
 
-        save_html_to_file(url,html_content)
+        #save_html_to_file(url,html_content)
 
-        last_price = soup.find('td', {'class': 'pt-2 pr-2'})
+        element = soup.select_one('[class="highlight"]')
+        if element != None:
+            last_price = element.text
+        else:
+            logging.info(f"last price element not found")
+            last_price = ""
+        logging.info(f"last_price: {last_price}")
+        
+        element = soup.select_one('[class="cb-change cb-change-d"]')
+        if element != None:
+            parts = element.text.split()
+            price_change_decimal = parts[0]
+            logging.info(f"price_change_decimal: {price_change_decimal}")
+            price_change_percent = parts[1]
+            logging.info(f"price_change_percent: {price_change_percent}")
+
+        return 0
+        # Extract the stock price 
+        table_element = quote_section.select_one('[style="margin-top:-6px"]')
+        logging.info(f"table_element : {table_element}")
+
+        stock_price = soup.select_one('td:contains("(*)")').get_text().strip()
+        logging.info(f"stock price  {stock_price}")
+        # Extract the percentage change "-0.47 (0.23%)"
+        percentage_change = soup.select_one('.cb-change').get_text().strip()
+
+        quote_td = quote_section.select('td')
+        logging.info(f"quote_td: {quote_td.text}")
+        last_price = quote_td.text
         print(last_price)
 
         return 0

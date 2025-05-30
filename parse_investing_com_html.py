@@ -11,24 +11,12 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from is_number import is_number
 
 # use monitor at investing.com 
 # investing.com hsupports multiple watchlists. THe exported html will contain only the first/left watchlist on first load
 # but reloading the web page after selecting another watchlist seems to load the correct html
 # iCloudDrive/Script Editor/investing_com_export_html.scpt  -> saves html 
-
-def is_number(value):
-    try:
-        # Attempt to convert to an integer
-        int(value)
-        return True
-    except ValueError:
-        try:
-            # If integer conversion fails, attempt to convert to a float
-            float(value)
-            return True
-        except ValueError:
-            return False
         
 def parse_watchlist_table(html_content):
     logging.info("parse_watchlist_table")

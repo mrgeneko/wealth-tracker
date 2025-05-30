@@ -11,8 +11,7 @@ import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yfinance import process_yfinance
 from process_google_finance import process_google_finance
-from process_fintel import process_fintel
-from process_finance_charts import process_finance_charts
+#from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
 from process_ycharts import process_ycharts
 
@@ -31,13 +30,13 @@ def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f"include_type: {include_type}")
     if include_type == "bonds":
         # change this to compare against include_type instead of hardcoded 'bond'
-        bond_data_objects = [obj for obj in data_objects if obj.get('type') == 'bond'] 
+        bond_data_objects = [obj for obj in data_objects if obj.get('type') == 'bond' and not obj.get('key').startswith("#")] 
         # Print the array of data objects
         #for obj in bond_data_objects:
         #    print(obj)        
         return bond_data_objects
     if include_type == "stocks":
-        stock_data_objects = [obj for obj in data_objects if obj.get('type') != 'bond']
+        stock_data_objects = [obj for obj in data_objects if obj.get('type') != 'bond' and not obj.get('key').startswith("#")]
         # Print the array of data objects
         #or obj in stock_data_objects:
         #    print(obj)        
@@ -505,8 +504,8 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='yahoo',
-                    help='web site source [finance_charts|google|investing|trading_view|webull|yahoo|ycharts] (default: yahoo')
+                    default='finance_charts',
+                    help='web site source [finance_charts|google|investing|trading_view|webull|yahoo|ycharts] (default: finance_charts')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robin')
@@ -538,7 +537,7 @@ def main():
 #   webull       |     X      |      X      |     X     |         |      X      |
 #   trading view |     X      | only til 8p |     X     |         |             |
 #   investing    |     X      |      X      |     X     |         |             |
-#   google       |     ?      |      ?      |     X     |         |             |            |      X
+#   google       | needs work | needs work  |     X     |         |             |            |      X
 #   ycharts      |     ?      |      ?      |     X     |         |             |            |      X     |     X
 
     sources = [
@@ -565,11 +564,8 @@ def main():
         result = process_yfinance(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "google":
         result = process_google_finance(driver,tickers,function_handlers,sleep_interval)
-    #elif url_selection == "fintel":
-    #    FINTEL BLOCKS SCRAPERS
-    #    result = process_fintel(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "finance_charts":
-        result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
+    #elif url_selection == "finance_charts": # FinanceCharts may be usiung javascript
+    #    result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "trading_view":
         result = process_trading_view(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "ycharts":
