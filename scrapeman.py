@@ -14,6 +14,7 @@ from process_google_finance import process_google_finance
 #from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
 from process_ycharts import process_ycharts
+import random
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
     logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
@@ -439,7 +440,8 @@ def setup_logging(log_level):
 def process_round_robin(driver, tickers, sources, function_handlers, sleep_interval):
     logging.info(f"process round-robin")
     num_sources=len(sources)
-    current = 0
+    current = random.randint(0, (num_sources-1))
+
     for i, ticker in enumerate(tickers):
         logging.info("\n\n")
         logging.info(f"KEY: {ticker['key']}")
