@@ -537,8 +537,8 @@ def main():
 #   webull       |     X      |      X      |     X     |         |      X      |
 #   trading view |     X      | only til 8p |     X     |         |             |
 #   investing    |     X      |      X      |     X     |         |             |
-#   google       | needs work | needs work  |     X     |         |             |            |      X
-#   ycharts      |     ?      |      ?      |     X     |         |             |            |      X     |     X
+#   google       |     X      |      X      |     X     |         |             |            |      X
+#   ycharts      |     X      |  needs test |     X     |         |             |            |      X     |     X
 
     sources = [
         { 'name' : 'yahoo', 'process' : process_yfinance, 'hits' : 0 },
