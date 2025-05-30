@@ -9,8 +9,8 @@ from selenium.webdriver.common.by import By
 import time
 import pandas as pd
 from update_cell_in_numbers import update_numbers
-from process_yfinance import process_yahoo
-from process_yfinance import process_yahoo_with_tickers_from_numbers
+from process_yahoo import process_yahoo
+from process_yahoo import process_yahoo_with_tickers_from_numbers
 from process_google_finance import process_google_finance
 #from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
