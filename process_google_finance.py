@@ -97,7 +97,7 @@ def process_google_finance(driver,tickers,function_handlers,sleep_interval):
                 #logging.info(f"after hours segment:{element.text}")
                 if ext_hours_section.text.startswith("After Hours"):
                     after_hours_price = element.text[1:]
-                elif ext_hours_section.text.startswith("Pre Market"):
+                elif ext_hours_section.text.startswith("Pre-market"):
                     pre_market_price = element.text[1:]
         logging.info(f"premarket price: {pre_market_price}")    
         logging.info(f"after hours price: {after_hours_price}")
