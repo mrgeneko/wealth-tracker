@@ -3,6 +3,8 @@ import time
 import subprocess
 import yfinance as yf
 from datetime import datetime
+import logging
+import pandas as pd
 
 numbers_file = "retirement plan.numbers"
 #sheet_stock_prices = "StockPrices"
@@ -20,7 +22,7 @@ def run_applescript(script):
 # Assumes Numbers file is already open.
 # Yahoo finance ticker list must be in column 'A' and
 # begins with 'Stocks' header and a row below for 'Cash' which is ignored.
-def get_tickers_from_numbers():
+def get_stock_tickers_from_numbers():
     script = f'''
     tell application "Numbers"
         tell document "{numbers_file}"
@@ -211,7 +213,34 @@ def update_numbers(prices):
 #    ])}
     run_applescript(script)
 
-def process_yfinance(driver,tickers,function_handlers,sleep_interval):
-    tickers_from_numbers = get_tickers_from_numbers()
+def process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval):
+    # the "tickers" and "function_handleres" parameter is ignored
+
+    tickers_from_numbers = get_stock_tickers_from_numbers()
     prices = fetch_prices(tickers_from_numbers)
     update_numbers(prices)
+
+def process_yahoo(driver,tickers,function_handlers,sleep_interval):
+    # driver is not needed
+    logging.info(f"process_yfinance")
+
+    #tickers_from_numbers = get_stock_tickers_from_numbers()
+    column_selection = 'yahoo_ticker'
+    for i, ticker in enumerate(tickers):
+        if column_selection in ticker:
+            logging.debug(f"Key {ticker['key']} has url: {ticker[column_selection]}")
+        else:
+            logging.debug(f"Key {column_selection} does not exist in this object.")
+
+        if not pd.isna(ticker[column_selection]):
+            logging.debug(f"Key {ticker['key']} has value: {ticker[column_selection]}")
+        else:
+            logging.debug(f"Key {column_selection} does not have a value or has NaN.")
+            continue
+
+        #url = ticker[column_selection]
+        #key = ticker['key']
+        single_ticker = [ticker[column_selection]]
+        logging.info(f"fetch_prices for {ticker[column_selection]}")
+        prices = fetch_prices(single_ticker)
+        update_numbers(prices) # update_numbers is different than update_cel_in_numbers()
