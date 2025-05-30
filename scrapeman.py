@@ -9,7 +9,8 @@ from selenium.webdriver.common.by import By
 import time
 import pandas as pd
 from update_cell_in_numbers import update_numbers
-from process_yfinance import process_yfinance
+from process_yfinance import process_yahoo
+from process_yfinance import process_yahoo_with_tickers_from_numbers
 from process_google_finance import process_google_finance
 #from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
@@ -131,6 +132,9 @@ def main():
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robin')
+    
+    parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
+                    help='retrieve stock tickers from numbers, use yfinance for prices')
 
     args = parser.parse_args()
     setup_logging(args.log_level)
@@ -139,6 +143,7 @@ def main():
     input_file = args.input_file
     tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
     browser = args.browser
+    yahoo_batch = args.yahoo_batch
     url_selection=args.source
     sleep_interval = args.sleep_interval
 
@@ -163,7 +168,7 @@ def main():
 #   ycharts      |     X      |  needs test |     X     |         |             |            |      X     |     X
 
     sources = [
-        { 'name' : 'yahoo', 'process' : process_yfinance, 'hits' : 0 },
+        { 'name' : 'yahoo', 'process' : process_yahoo, 'hits' : 0 },
         { 'name' : 'webull', 'process' : process_webull, 'hits' : 0  },
         #{ 'name' : 'investing', 'process' : process_investing, 'hits' : 0  },
         { 'name' : 'trading_view', 'process' : process_trading_view, 'hits' : 0  },
@@ -177,13 +182,19 @@ def main():
         driver.quit()
         exit(0)
 
+    if yahoo_batch:
+        # the main reason to use this version is to pull tickers from the numbers spreadsheet
+        # instead of the .csv file
+        process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
+        exit(0)
+
     logging.info(f"source: {url_selection}")
     if url_selection == "webull":
         result = process_webull(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "investing":
         result = process_investing(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "yahoo":
-        result = process_yfinance(driver,tickers,function_handlers,sleep_interval)
+        result = process_yahoo(driver,tickers,function_handlers,sleep_interval)
     elif url_selection == "google":
         result = process_google_finance(driver,tickers,function_handlers,sleep_interval)
     #elif url_selection == "finance_charts": # FinanceCharts may be usiung javascript
