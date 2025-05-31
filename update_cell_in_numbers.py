@@ -35,6 +35,7 @@ def update_numbers(data):
         source = data["source"]
     
     price_change_decimal=""
+    previous_close_string = ""
     if "pre_market_price" not in data and 'after_hours_price' not in data :
         #print("no pre market or after hours price")
         if data["last_price"] is not None and data["last_price"] !='':
@@ -47,7 +48,8 @@ def update_numbers(data):
         # must be a stock. We should use something more appropriate to determine this
         #print("have pre_market or after_hours price keys in data object")
         price_change_decimal = ""
-        if is_weekday():
+        
+        if not is_weekday():
             if data["last_price"] is not None and data["last_price"] !='':
                 print("insert last price")
                 price = data["last_price"]
@@ -85,10 +87,13 @@ def update_numbers(data):
                     price = data["last_price"]
                     #price_change_decimal = data["price_change_decimal"]
 
+    try:
+        if "previous_close_price" in data:
             if data["previous_close_price"] is not None and data["previous_close_price"] != '':
                 previous_close_string = f'if tickerVal is "{data["key"]}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'
-            else:
-                previous_close_string = ""
+    except Exception as e:
+        logging.error(f"error handling previous_close_price {e}")
+                    
             
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
