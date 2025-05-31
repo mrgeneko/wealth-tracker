@@ -11,12 +11,18 @@ import pandas as pd
 from update_cell_in_numbers import update_numbers
 from process_yahoo import process_yahoo
 from process_yahoo import process_yahoo_with_tickers_from_numbers
-from process_google_finance import process_google_finance
+from process_yahoo import get_yahoo_attributes
+from process_google import process_google
+from process_google import get_google_attributes
 #from process_finance_charts import process_finance_charts
 from process_trading_view import process_trading_view
+from process_trading_view import get_trading_view_attributes
 from process_ycharts import process_ycharts
+from process_ycharts import get_ycharts_attributes
 from process_investing import process_investing
 from process_webull import process_webull
+from process_webull import get_webull_attributes
+from session_times import *
 import random
 
 def get_tickers_and_urls_from_csv(file_path, include_type=None):
@@ -68,8 +74,14 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
         logging.info(f"KEY: {ticker['key']}")
         selected = -1
         first_checked = current
-        while selected == -1:   
-            if sources[current]['name'] in ticker and not pd.isna(ticker[sources[current]['name']]):
+        while selected == -1:
+            logging.info(f"is_weekday: {is_weekday()} is_pre_market: {is_pre_market_session()} is_regular_trading:{is_regular_trading_session()} is_after_hours:{is_after_hours_session()}")
+            logging.info(f"{sources[current]['name']} pre:{sources[current]['has_pre_market']} ah:{sources[current]['has_after_hours']}")
+
+            if sources[current]['name'] in ticker and not pd.isna(ticker[sources[current]['name']]) \
+                and ((is_pre_market_session() and sources[current]['has_pre_market']) or \
+                (is_after_hours_session() and sources[current]['has_after_hours']) or \
+                (is_regular_trading_session() or not is_weekday() )):
                 logging.info(f"has source {current} {ticker[sources[current]['name']]}")
                 selected = current
             else:
@@ -127,7 +139,7 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='finance_charts',
+                    default='google',
                     help='web site source [finance_charts|google|investing|trading_view|webull|yahoo|ycharts] (default: finance_charts')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
@@ -147,9 +159,6 @@ def main():
     url_selection=args.source
     sleep_interval = args.sleep_interval
 
-    # Give the user a chance to review tickers
-    time.sleep(2)
-
     function_handlers = [update_numbers]
 
     logging.info(f'Creating Chrome Service')
@@ -160,23 +169,20 @@ def main():
 
 
 #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
-#   yahoo        |            |             |     X     |         |             |     X      |      X     |
+#   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
 #   webull       |     X      |      X      |     X     |         |      X      |
 #   trading view |     X      | only til 8p |     X     |         |             |
 #   investing    |     X      |      X      |     X     |         |             |
 #   google       |     X      |      X      |     X     |         |             |            |      X
-#   ycharts      |     X      |  needs test |     X     |         |             |            |      X     |     X
+#   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
 
-    sources = [
-        { 'name' : 'yahoo', 'process' : process_yahoo, 'hits' : 0 },
-        { 'name' : 'webull', 'process' : process_webull, 'hits' : 0  },
-        #{ 'name' : 'investing', 'process' : process_investing, 'hits' : 0  },
-        { 'name' : 'trading_view', 'process' : process_trading_view, 'hits' : 0  },
-        { 'name' : 'google', 'process' : process_google_finance, 'hits' : 0  },
-        { 'name' : 'ycharts', 'process' : process_ycharts, 'hits' : 0  }
-        #{ 'name' : 'finance_charts', 'process' : process_finance_charts, 'hits' : 0  }
-    ]
-
+    yahoo = get_yahoo_attributes()
+    webull = get_webull_attributes()
+    ycharts = get_ycharts_attributes()
+    trading_view = get_trading_view_attributes()
+    google_finance = get_google_attributes()
+    sources = [ yahoo, webull, ycharts, trading_view, google_finance ]
+    
     if round_robin:
         process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
         driver.quit()
@@ -189,20 +195,11 @@ def main():
         exit(0)
 
     logging.info(f"source: {url_selection}")
-    if url_selection == "webull":
-        result = process_webull(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "investing":
-        result = process_investing(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "yahoo":
-        result = process_yahoo(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "google":
-        result = process_google_finance(driver,tickers,function_handlers,sleep_interval)
-    #elif url_selection == "finance_charts": # FinanceCharts may be usiung javascript
-    #    result = process_finance_charts(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "trading_view":
-        result = process_trading_view(driver,tickers,function_handlers,sleep_interval)
-    elif url_selection == "ycharts":
-        result = process_ycharts(driver,tickers,function_handlers,sleep_interval)
+
+    for source in sources:
+        if url_selection == source['name']:
+            result = source['process'](driver,tickers,function_handlers,sleep_interval)
+            break
 
     driver.quit()
     exit(0)

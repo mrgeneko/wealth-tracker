@@ -8,11 +8,19 @@ import pandas as pd
 from save_html_to_file import save_html_to_file
 from is_number import is_number
 
-# use monitor at investing.com 
-# investing.com hsupports multiple watchlists. THe exported html will contain only the first/left watchlist on first load
-# but reloading the web page after selecting another watchlist seems to load the correct html
-# iCloudDrive/Script Editor/investing_com_export_html.scpt  -> saves html 
-
+def get_trading_view_attributes():
+    attributes = {
+        "name" : "trading_view",
+        "process" : process_trading_view,
+        "has_realtime" : True,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
+        "has_bond_prices" : False,
+        "has_stock_prices" : True,
+        "has_previous_close" : False,
+        "hits" : 0
+    }
+    return attributes
 
 def process_trading_view(driver,tickers,function_handlers,sleep_interval):
     logging.info("process_trading_view")

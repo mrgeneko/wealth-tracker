@@ -2,6 +2,7 @@
 import json
 import sys
 import subprocess
+from session_times import *
 from datetime import datetime
 
 def run_applescript(script):
@@ -43,10 +44,8 @@ def update_numbers(data):
     else:
         # must be a stock. We should use something more appropriate to determine this
         #print("have pre_market or after_hours price keys in data object")
-        today = datetime.today()
-        day_of_week = today.weekday()
         price_change_decimal = ""
-        if day_of_week == 5 or day_of_week == 6:
+        if is_weekday():
             if data["last_price"] is not None and data["last_price"] !='':
                 print("insert last price")
                 price = data["last_price"]
@@ -55,18 +54,10 @@ def update_numbers(data):
                 price_change_decimal = data["price_change_decimal"]
         else:
             # its a week day. Decide if its pre market, during market, or after hours
-
-            # Get the current time
-            current_time = datetime.now().time()
-            pre_market_open_time = datetime.strptime("04:00", "%H:%M").time()
-            market_open_time = datetime.strptime("09:30", "%H:%M").time()
-            market_close_time = datetime.strptime("16:00", "%H:%M").time()
-            #after_hours_close_time = datetime.strptime("04:00", "%H:%M").time()
-
             # On Saturday and Sunday, should this use the after hours price from Friday?
 
             # Compare the current time with the target time
-            if current_time < market_open_time and current_time > pre_market_open_time:
+            if is_pre_market_session():
                 print(f"The current time is before {market_open_time}")
                 if "pre_market_price" in data:
                     if data["pre_market_price"] is not None and data["pre_market_price"] != '':
@@ -75,7 +66,7 @@ def update_numbers(data):
                     else:
                         print("no pre market price. insert last price")
                         price = data["last_price"]
-            elif current_time >= market_open_time and current_time < market_close_time:
+            elif is_regular_trading_session():
                 print(f"The current time is between {market_open_time} and {market_close_time}")
                 if data["last_price"] is not None and data["last_price"] !='':
                     print("insert last price")
@@ -84,7 +75,7 @@ def update_numbers(data):
                     print("use price_change_decimal")
                     price_change_decimal = data["price_change_decimal"]
 
-            elif current_time > market_close_time or current_time < pre_market_open_time:
+            elif is_after_hours_session():
                 print(f"The current time is after {market_close_time} or before {pre_market_open_time}")
                 if data["after_hours_price"] is not None and data["after_hours_price"] != '':
                     print("insert after hours price")

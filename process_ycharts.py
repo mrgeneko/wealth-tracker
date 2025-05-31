@@ -7,7 +7,21 @@ from update_cell_in_numbers import update_numbers
 import pandas as pd
 from save_html_to_file import save_html_to_file
 from is_number import is_number
-        
+
+def get_ycharts_attributes():
+    attributes = {
+        "name" : "ycharts",
+        "process" : process_ycharts,
+        "has_realtime" : True,
+        "has_pre_market" : False,
+        "has_after_hours" : False,
+        "has_bond_prices" : False,
+        "has_stock_prices" : True,
+        "has_previous_close" : False,
+        "hits" : 0
+    }
+    return attributes
+
 def process_ycharts(driver,tickers,function_handlers,sleep_interval):
     logging.info("process_ycharts")
 
