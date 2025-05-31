@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import logging
 import sys
 import subprocess
 from session_times import *
@@ -20,6 +21,7 @@ def run_shell_command(command):
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while running the shell command: {e}")
 
+# update_numbers accepts a dict holding pricing for a single ticker
 def update_numbers(data):
     #logging.info(f'begin update_numbers {data} ')
 
@@ -49,14 +51,12 @@ def update_numbers(data):
             if data["last_price"] is not None and data["last_price"] !='':
                 print("insert last price")
                 price = data["last_price"]
-            if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
-                print("use price_change_decimal")
-                price_change_decimal = data["price_change_decimal"]
-        else:
-            # its a week day. Decide if its pre market, during market, or after hours
-            # On Saturday and Sunday, should this use the after hours price from Friday?
+            #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
+            #    print("use price_change_decimal")
+            #    price_change_decimal = data["price_change_decimal"]
 
-            # Compare the current time with the target time
+        else:
+            # should this use the after hours price from Friday?
             if is_pre_market_session():
                 print(f"The current time is before {market_open_time}")
                 if "pre_market_price" in data:
@@ -73,7 +73,7 @@ def update_numbers(data):
                     price = data["last_price"]
                 if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
                     print("use price_change_decimal")
-                    price_change_decimal = data["price_change_decimal"]
+                    #price_change_decimal = data["price_change_decimal"]
 
             elif is_after_hours_session():
                 print(f"The current time is after {market_close_time} or before {pre_market_open_time}")
@@ -83,7 +83,7 @@ def update_numbers(data):
                 else:
                     print("no after hours price. insert last price")
                     price = data["last_price"]
-                    price_change_decimal = data["price_change_decimal"]
+                    #price_change_decimal = data["price_change_decimal"]
 
             if data["previous_close_price"] is not None and data["previous_close_price"] != '':
                 previous_close_string = f'if tickerVal is "{data["key"]}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'

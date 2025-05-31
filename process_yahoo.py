@@ -73,12 +73,13 @@ def get_stock_tickers_from_numbers():
 def fetch_prices(tickers):
     # it may be possible to change this loop to retrieve all tickers in a single request
     prices = {}
+    price_data = []
     for ticker in tickers:
         try:
             
             data = yf.Ticker(ticker)
             info = data.info
-            logging.info(f'info object:',info)
+            logging.info(f'fetch_prices info object:',info)
             example='''
             info object: {'longBusinessSummary': 'Under normal market conditions, the fund generally invests substantially all, but at least 80%, of its total assets in the securities comprising the index. The index is designed to measure the performance of the large-capitalization segment of the U.S. equity market.',
               'companyOfficers': [], 'executiveTeam': [], 'maxAge': 86400, 'priceHint': 2, 'previousClose': 68.57,
@@ -111,7 +112,7 @@ def fetch_prices(tickers):
             price_change_decimal = info.get("regularMarketChange")
             previous_close_price = info.get("regularMarketPreviousClose")
             after_hours_price = info.get("postMarketPrice")
-
+            comment='''
             prices[ticker] = {
                 "key": ticker,
                 "last_price": price,
@@ -121,18 +122,28 @@ def fetch_prices(tickers):
                 "after_hours_price": round(after_hours_price,4) if after_hours_price is not None else "N/A",
                 "source" : "yahoo"
             }
-            
-            print(f"Fetched price for {ticker} {prices[ticker]}")
+            '''
+            single_ticker = {
+                "key": ticker,
+                "last_price": price,
+                "price_change_decimal": round(price_change_decimal,4) if price_change_decimal is not None else "N/A",
+                "previous_close_price": round(previous_close_price,4) if previous_close_price is not None else "N/A",
+                "pre_market_price": "",
+                "after_hours_price": round(after_hours_price,4) if after_hours_price is not None else "N/A",
+                "source" : "yahoo"
+            }
+            price_data.append(single_ticker)
+            #print(f"Fetched price for {ticker} {prices[ticker]}")
+            print(f"Fetched price for {ticker} {single_ticker}")
             time.sleep(3)
         except Exception as e:
             print(f"Error fetching {ticker}: {e}")
-    return prices
+    return price_data
 
-def update_numbers(prices):
+# this function is no longer used. leaving here as an example on how to handle multiple tickers
+# passed in
+def update_numbers_batch(prices):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    #ticker_rows = list(prices.items())
-    
-    #updates = []
 
     script = f'''
     tell application "Numbers"
@@ -212,24 +223,19 @@ def update_numbers(prices):
         end tell
     end tell
     '''
-
-#        {chr(10).join([
-#        f'if tickerVal is "{ticker}" then set value of cell price_change_col of row r to "{data["price_change_decimal"]}"'
-#        for ticker, data in prices.items()
-#    ])}
     run_applescript(script)
 
 def process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval):
     # the "tickers" and "function_handleres" parameter is ignored
 
     tickers_from_numbers = get_stock_tickers_from_numbers()
-    prices = fetch_prices(tickers_from_numbers)
+    data = fetch_prices(tickers_from_numbers)
 
     #data = prices[ticker['key']]
     #logging.info(f"send to numbers data:{data}")
-    #function_handlers[0](data)
+    for ticker in data:
+        function_handlers[0](ticker)
     
-    update_numbers(prices)
 
 def process_yahoo(driver,tickers,function_handlers,sleep_interval):
     # driver is not needed
@@ -251,9 +257,11 @@ def process_yahoo(driver,tickers,function_handlers,sleep_interval):
 
         single_ticker = [ticker[column_selection]]
         logging.info(f"fetch_prices for {ticker[column_selection]}")
-        prices = fetch_prices(single_ticker) # <- This could be simplified by changing the object returned by fetch_prices
-        data = prices[ticker['key']]
-        logging.info(f"send to numbers data:{data}")
+        #prices = fetch_prices(single_ticker) # <- This could be simplified by changing the object returned by fetch_prices
+        #data = prices[ticker['key']]
+        #logging.info(f"send to numbers data:{data}")
+
+        data = fetch_prices(single_ticker)
         function_handlers[0](data)
 
 
