@@ -141,8 +141,9 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
             data["pre_market_price"] = pre_market_price
         elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price):
             data["after_hours_price"] = after_hours_price
-        
-        logging.info(data)
+        #data["previous_close_price"] = ""
+
+        logging.info(f"process_trading_view sending : {data}")
         function_handlers[0](data)
 
     return 0
