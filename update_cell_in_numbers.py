@@ -85,10 +85,10 @@ def update_numbers(data):
                     price = data["last_price"]
                     price_change_decimal = data["price_change_decimal"]
 
-           # if data["previous_close_price"] is not None and data["previous_close_price"] != '':
-           #     previous_close_price = data["previous_close_price"]
-           # else:
-           #     previous_close_price = ""
+            if data["previous_close_price"] is not None and data["previous_close_price"] != '':
+                previous_close_string = f'if tickerVal is "{data["key"]}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'
+            else:
+                previous_close_string = ""
             
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -107,15 +107,6 @@ def update_numbers(data):
                         end if
                     end repeat
                     if price_col is 0 then error "Price column not found."
-
-                    set price_change_decimal_col to 0
-                    repeat with i from 1 to column count
-                        if value of cell i of row 1 is "Price Change" then
-                            set price_change_decimal_col to i
-                            exit repeat
-                        end if
-                    end repeat
-                    if price_change_decimal_col is 0 then error "Price Change column not found."
 
                     set previous_close_price_col to 0
                     repeat with i from 1 to column count
@@ -166,7 +157,9 @@ def update_numbers(data):
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell source_col of row r to "{source}"'
                             ])}
+                            {chr(10).join({previous_close_string})}
                         end if
+
                     end repeat
                 end tell
             end tell
