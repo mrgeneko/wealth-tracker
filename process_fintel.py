@@ -10,6 +10,19 @@ from helium import *
 from bs4 import BeautifulSoup
 from save_html_to_file import save_html_to_file
 
+def get_fintel_attributes():
+    attributes = {
+        "name" : "fintel",
+        "process" : process_fintel,
+        "has_realtime" : True,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
+        "has_bond_prices" : False,
+        "has_stock_prices" : True,
+        "has_previous_close" : False,
+        "hits" : 0
+    }
+    return attributes
 
 def process_fintel(driver,tickers,function_handlers,sleep_interval):
 

@@ -8,6 +8,20 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 
+def get_investing_attributes():
+    attributes = {
+        "name" : "investing",
+        "process" : process_investing,
+        "has_realtime" : True,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
+        "has_bond_prices" : False,
+        "has_stock_prices" : True,
+        "has_previous_close" : False,
+        "hits" : 0
+    }
+    return attributes
+
 def process_investing(driver,tickers,function_handlers,sleep_interval):
 
     url_selection = 'investing'

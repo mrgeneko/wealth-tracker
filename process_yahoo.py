@@ -7,10 +7,22 @@ import logging
 import pandas as pd
 
 numbers_file = "retirement plan.numbers"
-#sheet_stock_prices = "StockPrices"
-#table_stock_prices = "Table 1"
 sheet_investments = "Investments"
 table_investments = "T"
+
+def get_yahoo_attributes():
+    attributes = {
+        "name" : "yahoo",
+        "process" : process_yahoo,
+        "has_realtime" : True,
+        "has_pre_market" : False,
+        "has_after_hours" : False,
+        "has_bond_prices" : False,
+        "has_stock_prices" : True,
+        "has_previous_close" : True,
+        "hits" : 0
+    }
+    return attributes
 
 def run_applescript(script):
     process = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
@@ -58,8 +70,6 @@ def get_stock_tickers_from_numbers():
     print("Tickers fetched:", tickers)
     return tickers
 
-
-
 def fetch_prices(tickers):
     # it may be possible to change this loop to retrieve all tickers in a single request
     prices = {}
@@ -68,7 +78,7 @@ def fetch_prices(tickers):
             
             data = yf.Ticker(ticker)
             info = data.info
-            #print(f'info object:',info)
+            logging.info(f'info object:',info)
             example='''
             info object: {'longBusinessSummary': 'Under normal market conditions, the fund generally invests substantially all, but at least 80%, of its total assets in the securities comprising the index. The index is designed to measure the performance of the large-capitalization segment of the U.S. equity market.',
               'companyOfficers': [], 'executiveTeam': [], 'maxAge': 86400, 'priceHint': 2, 'previousClose': 68.57,
@@ -100,11 +110,13 @@ def fetch_prices(tickers):
             price = info.get("regularMarketPrice")
             price_change_decimal = info.get("regularMarketChange")
             previous_close_price = info.get("regularMarketPreviousClose")
+            after_hours_price = info.get("postMarketPrice")
 
             prices[ticker] = {
                 "price": price,
                 "price_change_decimal": round(price_change_decimal,4) if price_change_decimal is not None else "N/A",
-                "previous_close_price": round(previous_close_price,4) if previous_close_price is not None else "N/A"
+                "previous_close_price": round(previous_close_price,4) if previous_close_price is not None else "N/A",
+                "after_hours_price": round(after_hours_price,4) if after_hours_price is not None else "N/A"
             }
             
             print(f"Fetched price for {ticker} {prices[ticker]}")
@@ -244,3 +256,4 @@ def process_yahoo(driver,tickers,function_handlers,sleep_interval):
         logging.info(f"fetch_prices for {ticker[column_selection]}")
         prices = fetch_prices(single_ticker)
         update_numbers(prices) # update_numbers is different than update_cel_in_numbers()
+

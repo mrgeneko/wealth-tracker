@@ -15,6 +15,20 @@ from datetime import datetime
 import re
 import pandas as pd
 
+def get_finance_charts_attributes():
+    attributes = {
+        "name" : "finance_charts",
+        "process" : process_finance_charts,
+        "has_realtime" : True,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
+        "has_bond_prices" : False,
+        "has_stock_prices" : True,
+        "has_previous_close" : False,
+        "hits" : 0
+    }
+    return attributes
+
 def process_finance_charts(driver,tickers,function_handlers,sleep_interval):
     logging.info(f"process_finance_charts")
     url_selection = 'finance_charts'

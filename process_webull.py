@@ -5,6 +5,20 @@ import time
 import pandas as pd
 from selenium.webdriver.common.by import By
 
+def get_webull_attributes():
+    attributes = {
+        "name" : "webull",
+        "process" : process_webull,
+        "has_realtime" : True,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
+        "has_bond_prices" : True,
+        "has_stock_prices" : True,
+        "has_previous_close" : False,
+        "hits" : 0
+    }
+    return attributes
+
 def process_webull(driver,tickers,function_handlers,sleep_interval):
     logging.info(f"process_webull for {tickers[0]}")
     for i, ticker in enumerate(tickers):
@@ -293,3 +307,4 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
         function_handlers[0](data)
 
     return 0
+
