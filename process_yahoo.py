@@ -113,10 +113,13 @@ def fetch_prices(tickers):
             after_hours_price = info.get("postMarketPrice")
 
             prices[ticker] = {
-                "price": price,
+                "key": ticker,
+                "last_price": price,
                 "price_change_decimal": round(price_change_decimal,4) if price_change_decimal is not None else "N/A",
                 "previous_close_price": round(previous_close_price,4) if previous_close_price is not None else "N/A",
-                "after_hours_price": round(after_hours_price,4) if after_hours_price is not None else "N/A"
+                "pre_market_price": "",
+                "after_hours_price": round(after_hours_price,4) if after_hours_price is not None else "N/A",
+                "source" : "yahoo"
             }
             
             print(f"Fetched price for {ticker} {prices[ticker]}")
@@ -127,9 +130,9 @@ def fetch_prices(tickers):
 
 def update_numbers(prices):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    ticker_rows = list(prices.items())
+    #ticker_rows = list(prices.items())
     
-    updates = []
+    #updates = []
 
     script = f'''
     tell application "Numbers"
@@ -164,15 +167,6 @@ def update_numbers(prices):
                     end repeat
                     if stock_row is 0 then error "Stock row not found."
 
-                    set price_change_col to 0
-                    repeat with i from 1 to column count
-                        if value of cell i of row 1 is "Price Change" then
-                            set price_change_col to i
-                            exit repeat
-                        end if
-                    end repeat
-                    if price_change_col is 0 then error "Price change column not found."   
-
                     set previous_close_price_col to 0
                     repeat with i from 1 to column count
                         if value of cell i of row 1 is "Previous Close" then
@@ -196,7 +190,7 @@ def update_numbers(prices):
                         set tickerVal to value of cell 1 of row r
                         if tickerVal is not missing value and tickerVal is not "" then
                             {chr(10).join([
-                                f'if tickerVal is "{ticker}" then set value of cell price_col of row r to "{data["price"]}"'
+                                f'if tickerVal is "{ticker}" then set value of cell price_col of row r to "{data["last_price"]}"'
                                 for ticker, data in prices.items()
                             ])}
                             {chr(10).join([
@@ -230,6 +224,11 @@ def process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sle
 
     tickers_from_numbers = get_stock_tickers_from_numbers()
     prices = fetch_prices(tickers_from_numbers)
+
+    #data = prices[ticker['key']]
+    #logging.info(f"send to numbers data:{data}")
+    #function_handlers[0](data)
+    
     update_numbers(prices)
 
 def process_yahoo(driver,tickers,function_handlers,sleep_interval):
@@ -250,10 +249,11 @@ def process_yahoo(driver,tickers,function_handlers,sleep_interval):
             logging.debug(f"Key {column_selection} does not have a value or has NaN.")
             continue
 
-        #url = ticker[column_selection]
-        #key = ticker['key']
         single_ticker = [ticker[column_selection]]
         logging.info(f"fetch_prices for {ticker[column_selection]}")
-        prices = fetch_prices(single_ticker)
-        update_numbers(prices) # update_numbers is different than update_cel_in_numbers()
+        prices = fetch_prices(single_ticker) # <- This could be simplified by changing the object returned by fetch_prices
+        data = prices[ticker['key']]
+        logging.info(f"send to numbers data:{data}")
+        function_handlers[0](data)
+
 
