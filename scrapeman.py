@@ -167,6 +167,7 @@ def main():
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")  # Run in headless mode
     chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
