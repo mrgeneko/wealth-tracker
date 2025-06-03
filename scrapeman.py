@@ -144,7 +144,7 @@ def main():
                     default='yahoo',
                     help='web site source [finance_charts|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
-    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=True,
+    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robin')
     
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
