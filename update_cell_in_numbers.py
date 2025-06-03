@@ -51,8 +51,8 @@ def update_numbers(data):
         
         if not is_weekday():
             if data["last_price"] is not None and data["last_price"] !='':
-                print("insert last price")
                 price = data["last_price"]
+                print(f"{data["key"]} - insert last price {price}")
             #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
             #    print("use price_change_decimal")
             #    price_change_decimal = data["price_change_decimal"]
@@ -63,16 +63,16 @@ def update_numbers(data):
                 print(f"The current time is before {market_open_time}")
                 if "pre_market_price" in data:
                     if data["pre_market_price"] is not None and data["pre_market_price"] != '':
-                        print("insert pre market price")
                         price = data["pre_market_price"]
+                        print(f"{data["key"]} - insert pre_market_price {price}")
                     else:
-                        print("no pre market price. insert last price")
                         price = data["last_price"]
+                        print(f"{data["key"]} - insert last price {price}")
             elif is_regular_trading_session():
                 print(f"The current time is between {market_open_time} and {market_close_time}")
                 if data["last_price"] is not None and data["last_price"] !='':
-                    print("insert last price")
                     price = data["last_price"]
+                    print(f"{data["key"]} - insert last price {price}")
                 if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
                     print("use price_change_decimal")
                     #price_change_decimal = data["price_change_decimal"]
@@ -80,11 +80,11 @@ def update_numbers(data):
             elif is_after_hours_session():
                 print(f"The current time is after {market_close_time} or before {pre_market_open_time}")
                 if data["after_hours_price"] is not None and data["after_hours_price"] != '':
-                    print("insert after hours price")
                     price = data["after_hours_price"]
+                    print(f"{data["key"]} - insert after hours price {price}")
                 else:
-                    print("no after hours price. insert last price")
                     price = data["last_price"]
+                    print(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
 
     try:

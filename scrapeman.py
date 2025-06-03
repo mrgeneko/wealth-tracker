@@ -22,6 +22,8 @@ from process_ycharts import get_ycharts_attributes
 from process_investing import process_investing
 from process_webull import process_webull
 from process_webull import get_webull_attributes
+from process_nasdaq import process_nasdaq
+from process_nasdaq import get_nasdaq_attributes
 from session_times import *
 import random
 
@@ -139,10 +141,10 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='google',
-                    help='web site source [finance_charts|google|investing|trading_view|webull|yahoo|ycharts] (default: finance_charts')
+                    default='yahoo',
+                    help='web site source [finance_charts|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
-    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
+    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=True,
                         help='rotate websites round robin')
     
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
@@ -156,12 +158,12 @@ def main():
     tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
     browser = args.browser
     yahoo_batch = args.yahoo_batch
-    url_selection=args.source
+    selected_source=args.source
     sleep_interval = args.sleep_interval
 
     function_handlers = [update_numbers]
 
-    logging.info(f'Creating Chrome Service')
+    #logging.info(f'Creating Chrome Service')
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")  # Run in headless mode
     service = Service(ChromeDriverManager().install())
@@ -175,12 +177,13 @@ def main():
 #   investing    |     X      |      X      |     X     |         |             |
 #   google       |     X      |      X      |     X     |         |             |            |      X
 #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
-
+#   nasdaq       |            |      X      |     X     | 
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
     ycharts = get_ycharts_attributes()
     trading_view = get_trading_view_attributes()
     google_finance = get_google_attributes()
+    #nasdaq = get_nasdaq_attributes()
     sources = [ yahoo, webull, ycharts, trading_view, google_finance ]
     
     if round_robin:
@@ -194,13 +197,15 @@ def main():
         process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
         exit(0)
 
-    logging.info(f"source: {url_selection}")
+    #logging.info(f"source: {selected_source}")
 
     for source in sources:
-        if url_selection == source['name']:
+        #logging.info(f"compare source: {source}")
+        if selected_source == source['name']:
+            #logging.info(f"call process : {selected_source}")
             result = source['process'](driver,tickers,function_handlers,sleep_interval)
             break
-
+    #logging.info("driver.quit()")
     driver.quit()
     exit(0)
 

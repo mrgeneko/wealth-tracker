@@ -93,11 +93,11 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
 
                 element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
                 pre_market_price_change_decimal = element.text
-                logging.info(f"pre_market_price_change_decimal: {pre_market_price_change_decimal}")
+                logging.debug(f"pre_market_price_change_decimal: {pre_market_price_change_decimal}")
 
                 element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
                 pre_market_price_change_percent = element.text
-                logging.info(f"pre_market_price_change_percent: {pre_market_price_change_percent}")
+                logging.debug(f"pre_market_price_change_percent: {pre_market_price_change_percent}")
 
                 element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
                 pre_market_price_datetime = element.text
@@ -108,15 +108,15 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
 
                 element = soup.select_one('[class="js-symbol-ext-hrs-change"]')
                 after_hours_price_change_decimal = element.text
-                logging.info(f"after_hours_price_change_decimal: {after_hours_price_change_decimal}")
+                logging.debug(f"after_hours_price_change_decimal: {after_hours_price_change_decimal}")
 
                 element = soup.select_one('[class="js-symbol-ext-hrs-change-pt"]')
                 after_hours_price_change_percent = element.text
-                logging.info(f"after_hours_price_change_decimal: {after_hours_price_change_percent}")
+                logging.debug(f"after_hours_price_change_decimal: {after_hours_price_change_percent}")
 
                 element = soup.select_one('[class="js-symbol-rtc-time textDimmed-zoF9r75I"]')
                 after_hours_price_datetime = element.text
-                logging.info(f"after_hours_price_datetime: {after_hours_price_datetime}")
+                logging.debug(f"after_hours_price_datetime: {after_hours_price_datetime}")
         else:
             after_hours_price = ""
         
