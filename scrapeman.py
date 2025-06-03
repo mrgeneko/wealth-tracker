@@ -166,6 +166,7 @@ def main():
     #logging.info(f'Creating Chrome Service')
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--no-sandbox")
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
