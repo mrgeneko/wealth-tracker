@@ -1,6 +1,6 @@
 #!/bin/bash
-open /Users/gene/Library/Mobile\ Documents/com\~apple\~Numbers/Documents/Shared\ with\ Sharon/retirement\ plan.numbers
+open ~/Library/Mobile\ Documents/com\~apple\~Numbers/Documents/Shared\ with\ Sharon/retirement\ plan.numbers
 sleep 5
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-/Users/gene/venv/bin/python3 scrapeman.py -s trading_view  -t stocks > /Users/gene/logs/scrapeman_trading_view_stocks.${TIMESTAMP}.log 2>&1
+~/venv/bin/python3 scrapeman.py -s trading_view  -t stocks > ~/logs/scrapeman_trading_view_stocks.${TIMESTAMP}.log 2>&1

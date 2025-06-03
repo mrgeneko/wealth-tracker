@@ -1,8 +1,8 @@
 #!/bin/bash
-log="/Users/gene/logs/parse_investing_com_html.log"
+log="~/logs/parse_investing_com_html.log"
 date >> "$log"
 # Define the directory containing the files
-log_dir="/Users/gene/investing_com_html"
+log_dir="~/investing_com_html"
 
 # Find all matching files and sort them by modification time (newest last)
 files=$(find "$log_dir" -type f -name "investing.202*.html" | xargs ls -t)
@@ -16,7 +16,7 @@ if [ ${#file_array[@]} -gt 0 ]; then
     echo "will process" "$newest_file" >> "$log"
 
     # Run the script with the newest file
-    /Users/gene/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" >> "$log"
+    ~/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" >> "$log"
     mv "${newest_file}" "${newest_file}.old"
 
     # Move all other files except the newest one to the same filename with .old appended
