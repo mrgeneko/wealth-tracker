@@ -43,8 +43,8 @@ def process_trading_view(driver,tickers,function_handlers,sleep_interval):
         logging.info(f'{url_selection} - begin processing: {key} selected url: {url}')
         
         driver.get(url)
-        logging.info(f'sleep {sleep_interval} seconds to allow website to load')
-        time.sleep(sleep_interval)
+        logging.info(f'sleep {3} seconds to allow website to load')
+        time.sleep(3)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
         #wait = WebDriverWait(driver, 10)
