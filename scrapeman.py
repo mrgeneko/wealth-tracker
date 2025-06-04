@@ -27,6 +27,7 @@ from process_nasdaq import get_nasdaq_attributes
 from process_marketbeat import get_marketbeat_attributes
 from process_marketbeat import process_marketbeat
 from process_moomoo import *
+from process_cnbc import *
 from session_times import *
 import random
 
@@ -145,7 +146,7 @@ def main():
 
     parser.add_argument('--source', '-s', dest='source',
                     default='yahoo',
-                    help='web site source [finance_charts|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
+                    help='web site source [finance_c|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robin')
@@ -170,7 +171,7 @@ def main():
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")  # Run in headless mode
     chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
+    #chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service,options=chrome_options)
 
@@ -185,6 +186,7 @@ def main():
 #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
 #   marketbeat   |            |             |           |    X    |
 #   nasdaq       |            |      X      |     X     | 
+#   cnbc         |     ?      |      X      |     X     |         |             |
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
     ycharts = get_ycharts_attributes()
@@ -192,8 +194,9 @@ def main():
     google_finance = get_google_attributes()
     #wsj = get_marketbeat_attributes()
     moomoo = get_moomoo_attributes()
+    cnbc = get_cnbc_attributes()
     #nasdaq = get_nasdaq_attributes()
-    sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo ]
+    sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo, cnbc ]
     
     if round_robin:
         process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
