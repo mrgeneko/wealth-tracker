@@ -11,7 +11,7 @@ from is_number import is_number
 
 def get_marketbeat_attributes():
     attributes = {
-        "name" : "wsj",
+        "name" : "marketbeat",
         "process" : process_marketbeat,
         "has_realtime" : False,
         "has_pre_market" : False,
@@ -43,7 +43,6 @@ def process_marketbeat(driver,tickers,function_handlers,sleep_interval):
         key = ticker['key']
         logging.info("\n")
         logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
-        #url = "https://www.marketbeat.com/stocks/NASDAQ/NVDA/"
         driver.get(url)
         #logging.info(f'sleep 3 seconds to allow website to load')
         time.sleep(3)
@@ -79,7 +78,7 @@ def process_marketbeat(driver,tickers,function_handlers,sleep_interval):
         data["price_change_percent"] = price_change_percent
         #data["after_hours_price"] = after_hours_price
         #data["pre_market_price"] = pre_market_price
-        data["source"] = "wsj"
+        data["source"] = "marketbeat"
         #if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
         #    data["pre_market_price"] = pre_market_price
         #elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price):
