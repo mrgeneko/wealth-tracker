@@ -144,7 +144,7 @@ def main():
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
-                    default='wsj',
+                    default='yahoo',
                     help='web site source [finance_charts|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
@@ -189,7 +189,7 @@ def main():
     ycharts = get_ycharts_attributes()
     trading_view = get_trading_view_attributes()
     google_finance = get_google_attributes()
-    wsj = get_marketbeat_attributes()
+    #wsj = get_marketbeat_attributes()
     moomoo = get_moomoo_attributes()
     #nasdaq = get_nasdaq_attributes()
     sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo ]
