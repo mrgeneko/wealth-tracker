@@ -44,7 +44,7 @@ def process_investing(driver,tickers,function_handlers,sleep_interval):
 
         driver.get(url)
         logging.info(f'wait 6 seconds to allow website to load')
-        time.sleep(6)
+        time.sleep(3)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
         #wait = WebDriverWait(driver, 10)
