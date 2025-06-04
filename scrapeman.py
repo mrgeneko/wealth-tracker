@@ -181,6 +181,8 @@ def main():
 #   investing    |     X      |      X      |     X     |         |             |
 #   google       |     X      |      X      |     X     |         |             |            |      X
 #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
+#   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
+#   marketbeat   |            |             |           |    X    |
 #   nasdaq       |            |      X      |     X     | 
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
