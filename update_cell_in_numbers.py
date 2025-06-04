@@ -35,7 +35,6 @@ def update_numbers(data):
         source = data["source"]
     
     price_change_decimal=""
-    previous_close_string = ""
     if "pre_market_price" not in data and 'after_hours_price' not in data :
         #print("no pre market or after hours price")
         if data["last_price"] is not None and data["last_price"] !='':
@@ -86,15 +85,7 @@ def update_numbers(data):
                     price = data["last_price"]
                     print(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
-
-    try:
-        if "previous_close_price" in data:
-            if data["previous_close_price"] is not None and data["previous_close_price"] != '':
-                previous_close_string = f'if tickerVal is "{data["key"]}" then set value of cell previous_close_price_col of row r to "{data["previous_close_price"]}"'
-    except Exception as e:
-        logging.error(f"error handling previous_close_price {e}")
                     
-            
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
@@ -162,7 +153,6 @@ def update_numbers(data):
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell source_col of row r to "{source}"'
                             ])}
-                            {chr(10).join({previous_close_string})}
                         end if
 
                     end repeat
@@ -171,11 +161,6 @@ def update_numbers(data):
         end tell
     end tell
     '''
-#    {chr(10).join([
-#    f'if tickerVal is "{data["key"]}" then set value of cell price_change_decimal_col of row r to "{price_change_decimal}"'
-#])}
-
-                                    #for ticker, data in prices.items()
 
     #logging.info(f"script: {script}")
     run_applescript(script)

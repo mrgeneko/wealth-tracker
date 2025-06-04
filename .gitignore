@@ -28,3 +28,8 @@ __pycache__/update_cell_in_numbers.cpython-313.pyc
 __pycache__/process_google_finance.cpython-313.pyc
 __pycache__/process_yfinance.cpython-313.pyc
 __pycache__/update_cell_in_numbers.cpython-313.pyc
+process_moomoo.py
+__pycache__/process_marketbeat.cpython-313.pyc
+.gitignore
+__pycache__/process_moomoo.cpython-313.pyc
+__pycache__/update_cell_in_numbers.cpython-313.pyc

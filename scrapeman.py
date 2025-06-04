@@ -24,6 +24,9 @@ from process_webull import process_webull
 from process_webull import get_webull_attributes
 from process_nasdaq import process_nasdaq
 from process_nasdaq import get_nasdaq_attributes
+from process_marketbeat import get_marketbeat_attributes
+from process_marketbeat import process_marketbeat
+from process_moomoo import *
 from session_times import *
 import random
 
@@ -179,14 +182,18 @@ def main():
 #   investing    |     X      |      X      |     X     |         |             |
 #   google       |     X      |      X      |     X     |         |             |            |      X
 #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
+#   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
+#   marketbeat   |            |             |           |    X    |
 #   nasdaq       |            |      X      |     X     | 
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
     ycharts = get_ycharts_attributes()
     trading_view = get_trading_view_attributes()
     google_finance = get_google_attributes()
+    #wsj = get_marketbeat_attributes()
+    moomoo = get_moomoo_attributes()
     #nasdaq = get_nasdaq_attributes()
-    sources = [ yahoo, webull, ycharts, trading_view, google_finance ]
+    sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo ]
     
     if round_robin:
         process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
