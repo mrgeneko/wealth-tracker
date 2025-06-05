@@ -49,7 +49,7 @@ def update_numbers(data):
         price_change_decimal = ""
         
         if not is_weekday():
-            if data["last_price"] is not None and data["last_price"] !='' and data["last_price"] != "--":
+            if data["last_price"] is not None and data["last_price"] !='' and "--" not in data["last_price"]:
                 price = data["last_price"]
                 logging.info(f"{data["key"]} - insert last price {price}")
             #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
@@ -86,6 +86,11 @@ def update_numbers(data):
                     logging.info(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
                     
+    if "--" in price:
+        # this happens when a bond matures. webull shows the price as "--"
+        logging.info(f"{data['key']} - no price to update")
+        price = ""
+        return
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
