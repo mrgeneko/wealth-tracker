@@ -6,6 +6,10 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
+
 import time
 import pandas as pd
 from update_cell_in_numbers import update_numbers
@@ -27,6 +31,7 @@ from process_nasdaq import get_nasdaq_attributes
 from process_marketbeat import get_marketbeat_attributes
 from process_marketbeat import process_marketbeat
 from process_moomoo import *
+from process_cnbc import *
 from session_times import *
 import random
 
@@ -80,17 +85,17 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
         selected = -1
         first_checked = current
         while selected == -1:
-            logging.info(f"is_weekday: {is_weekday()} is_pre_market: {is_pre_market_session()} is_regular_trading:{is_regular_trading_session()} is_after_hours:{is_after_hours_session()}")
-            logging.info(f"{sources[current]['name']} pre:{sources[current]['has_pre_market']} ah:{sources[current]['has_after_hours']}")
+            logging.debug(f"is_weekday: {is_weekday()} is_pre_market: {is_pre_market_session()} is_regular_trading:{is_regular_trading_session()} is_after_hours:{is_after_hours_session()}")
+            logging.debug(f"{sources[current]['name']} pre:{sources[current]['has_pre_market']} ah:{sources[current]['has_after_hours']}")
 
             if sources[current]['name'] in ticker and not pd.isna(ticker[sources[current]['name']]) \
                 and ((is_pre_market_session() and sources[current]['has_pre_market']) or \
                 (is_after_hours_session() and sources[current]['has_after_hours']) or \
                 (is_regular_trading_session() or not is_weekday() )):
-                logging.info(f"has source {current} {ticker[sources[current]['name']]}")
+                logging.debug(f"has source {current} {ticker[sources[current]['name']]}")
                 selected = current
             else:
-                logging.info(f"does not have source {current} {sources[current]['name']}")
+                logging.debug(f"does not have source {current} {sources[current]['name']}")
                 current = current + 1
                 if current == num_sources:
                     current = 0
@@ -117,8 +122,9 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
         else:
             logging.info(f"nothing to work on")
 
-
-    logging.info(f"usage: {sources}")
+    for source in sources:
+        logging.info(f"{source['name']} : {source['hits']}")
+    #logging.info(f"usage: {sources}")
 
 def main():
 
@@ -138,20 +144,21 @@ def main():
                     help='Seconds to sleep between processing each ticker (default: 10)')
     
     parser.add_argument('--browser', '-d', dest='browser',
-                    default='chrome',
-                    help='web browser [chrome|safari] (default: chrome)')
+                    default='firefox',
+                    help='web browser [chrome|safari] (default: firefox)')
     
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
     parser.add_argument('--source', '-s', dest='source',
                     default='yahoo',
-                    help='web site source [finance_charts|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
+                    help='web site source [finance_c|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
                         help='rotate websites round robin')
     
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
                     help='retrieve stock tickers from numbers, use yfinance for prices')
+
 
     args = parser.parse_args()
     setup_logging(args.log_level)
@@ -165,15 +172,23 @@ def main():
     sleep_interval = args.sleep_interval
 
     function_handlers = [update_numbers]
+    if browser == 'chrome':
+        logging.info(f"USE CHROMEs DRIVER")
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--headless")  # Run in headless mode
+        chrome_options.add_argument("--no-sandbox")
+        #chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service,options=chrome_options)
+    elif browser == "firefox":
 
-    #logging.info(f'Creating Chrome Service')
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service,options=chrome_options)
-
+        logging.info(f"USE FIREFOX DRIVER")
+        #service = FirefoxService(executable_path="firefox.geckodriver")
+        options = FirefoxOptions()
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--headless')
+        driver = webdriver.Firefox(options=options)
 
 #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
 #   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
@@ -185,6 +200,7 @@ def main():
 #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
 #   marketbeat   |            |             |           |    X    |
 #   nasdaq       |            |      X      |     X     | 
+#   cnbc         |     ?      |      X      |     X     |         |             |
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
     ycharts = get_ycharts_attributes()
@@ -192,8 +208,9 @@ def main():
     google_finance = get_google_attributes()
     #wsj = get_marketbeat_attributes()
     moomoo = get_moomoo_attributes()
+    cnbc = get_cnbc_attributes()
     #nasdaq = get_nasdaq_attributes()
-    sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo ]
+    sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo, cnbc ]
     
     if round_robin:
         process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
