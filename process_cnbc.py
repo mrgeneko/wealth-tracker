@@ -79,7 +79,6 @@ def process_cnbc(driver,tickers,function_handlers,sleep_interval):
                 if after_hours_price_element != None:
                     after_hours_price = after_hours_price_element.text.strip()
                     logging.info(f'after hours price: {after_hours_price}')
-
         else:
             logging.info(f"no found regular_trading_price_element")
             regular_trading_price_element = soup.select_one('[class="QuoteStrip-lastPriceStripContainer"]')
@@ -88,18 +87,14 @@ def process_cnbc(driver,tickers,function_handlers,sleep_interval):
                 last_price = last_price_element.text
                 logging.info(f'last price: {last_price}')
 
-
+        
+        #logging.info(f"after_hours_price: {after_hours_price}")
 
         data = {}
         data["key"] = key
         data["last_price"] = last_price
         data["after_hours_price"] = after_hours_price
-        #data["pre_market_price"] = pre_market_price
         data["source"] = "cnbc"
-        #if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
-        #    data["pre_market_price"] = pre_market_price
-        #elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price):
-        #    data["after_hours_price"] = after_hours_price
         
         logging.info(data)
         function_handlers[0](data)
