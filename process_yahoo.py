@@ -256,13 +256,13 @@ def process_yahoo(driver,tickers,function_handlers,sleep_interval):
             continue
 
         single_ticker = [ticker[column_selection]]
-        logging.info(f"fetch_prices for {ticker[column_selection]}")
+        logging.info(f"yahoo fetch_prices for {ticker[column_selection]}")
         #prices = fetch_prices(single_ticker) # <- This could be simplified by changing the object returned by fetch_prices
         #data = prices[ticker['key']]
         
 
         data = fetch_prices(single_ticker)
-        logging.info(f"send to numbers data:{data}")
+        logging.info(f"yahoo send to numbers data:{data}\n")
         function_handlers[0](data[0])
 
 

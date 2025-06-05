@@ -24,7 +24,7 @@ def get_cnbc_attributes():
     return attributes
 
 def process_cnbc(driver,tickers,function_handlers,sleep_interval):
-    logging.info(f"process cnbc")
+    logging.debug(f"process cnbc")
     url_selection = 'cnbc'
     for i, ticker in enumerate(tickers):
 

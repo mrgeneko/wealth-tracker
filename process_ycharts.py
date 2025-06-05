@@ -13,8 +13,8 @@ def get_ycharts_attributes():
         "name" : "ycharts",
         "process" : process_ycharts,
         "has_realtime" : True,
-        "has_pre_market" : False,
-        "has_after_hours" : False,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
         "has_bond_prices" : False,
         "has_stock_prices" : True,
         "has_previous_close" : False,
@@ -41,7 +41,6 @@ def process_ycharts(driver,tickers,function_handlers,sleep_interval):
         url = ticker[url_selection]
         key = ticker['key']
         logging.info(f'{url_selection} - begin processing: {key} selected url: {url}')
-        #url = "https://ycharts.com/companies/SGOV"
         driver.get(url)
         logging.info(f'sleep {3} seconds to allow website to load')
         time.sleep(3)
