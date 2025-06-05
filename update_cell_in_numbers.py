@@ -49,7 +49,7 @@ def update_numbers(data):
         price_change_decimal = ""
         
         if not is_weekday():
-            if data["last_price"] is not None and data["last_price"] !='':
+            if data["last_price"] is not None and data["last_price"] !='' and data["last_price"] != "--":
                 price = data["last_price"]
                 logging.info(f"{data["key"]} - insert last price {price}")
             #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
