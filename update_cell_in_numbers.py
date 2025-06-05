@@ -102,16 +102,7 @@ def update_numbers(data):
                             exit repeat
                         end if
                     end repeat
-                    if price_col is 0 then error "Price column not found."
-
-                    set previous_close_price_col to 0
-                    repeat with i from 1 to column count
-                        if value of cell i of row 1 is "Previous Close" then
-                            set previous_close_price_col to i
-                            exit repeat
-                        end if
-                    end repeat
-                    if previous_close_price_col is 0 then error "Previous Close Price column not found."     
+                    if price_col is 0 then error "Price column not found."  
 
                     set key_col to 0
                     repeat with i from 1 to column count
