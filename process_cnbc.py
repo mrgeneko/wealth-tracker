@@ -77,8 +77,8 @@ def process_cnbc(driver,tickers,function_handlers,sleep_interval):
                     if after_hours_label.text.startswith("After Hours"):
                         logging.info(f"we found after hours label")
                 if after_hours_price_element != None:
-                    after_hours_price_price = after_hours_price_element.text.strip()
-                    logging.info(f'after hours price: {after_hours_price_price}')
+                    after_hours_price = after_hours_price_element.text.strip()
+                    logging.info(f'after hours price: {after_hours_price}')
 
         else:
             logging.info(f"no found regular_trading_price_element")
