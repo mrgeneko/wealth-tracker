@@ -9,7 +9,7 @@ from datetime import datetime
 def run_applescript(script):
     process = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
     if process.returncode != 0:
-        print("AppleScript error:", process.stderr)
+        logging.error("AppleScript error:", process.stderr)
         return None
     return process.stdout.strip()
 
@@ -19,7 +19,7 @@ def run_shell_command(command):
         result = subprocess.run(command, check=True)
         # If you need to capture output or handle errors more finely, you can do so here.
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred while running the shell command: {e}")
+        logging.error(f"An error occurred while running the shell command: {e}")
 
 # update_numbers accepts a dict holding pricing for a single ticker
 def update_numbers(data):
@@ -51,7 +51,7 @@ def update_numbers(data):
         if not is_weekday():
             if data["last_price"] is not None and data["last_price"] !='':
                 price = data["last_price"]
-                print(f"{data["key"]} - insert last price {price}")
+                logging.info(f"{data["key"]} - insert last price {price}")
             #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
             #    print("use price_change_decimal")
             #    price_change_decimal = data["price_change_decimal"]
@@ -59,31 +59,31 @@ def update_numbers(data):
         else:
             # should this use the after hours price from Friday?
             if is_pre_market_session():
-                print(f"The current time is before {market_open_time}")
+                logging.info(f"The current time is before {market_open_time}")
                 if "pre_market_price" in data:
                     if data["pre_market_price"] is not None and data["pre_market_price"] != '':
                         price = data["pre_market_price"]
-                        print(f"{data["key"]} - insert pre_market_price {price}")
+                        logging.info(f"{data["key"]} - insert pre_market_price {price}")
                     else:
                         price = data["last_price"]
-                        print(f"{data["key"]} - insert last price {price}")
+                        logging.info(f"{data["key"]} - insert last price {price}")
             elif is_regular_trading_session():
-                print(f"The current time is between {market_open_time} and {market_close_time}")
+                logging.info(f"The current time is between {market_open_time} and {market_close_time}")
                 if data["last_price"] is not None and data["last_price"] !='':
                     price = data["last_price"]
-                    print(f"{data["key"]} - insert last price {price}")
+                    logging.info(f"{data["key"]} - insert last price {price}")
                 if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
-                    print("use price_change_decimal")
+                    logging.info("use price_change_decimal")
                     #price_change_decimal = data["price_change_decimal"]
 
             elif is_after_hours_session():
-                print(f"The current time is after {market_close_time} or before {pre_market_open_time}")
+                logging.info(f"The current time is after {market_close_time} or before {pre_market_open_time}")
                 if data["after_hours_price"] is not None and data["after_hours_price"] != '':
                     price = data["after_hours_price"]
-                    print(f"{data["key"]} - insert after hours price {price}")
+                    logging.info(f"{data["key"]} - insert after hours price {price}")
                 else:
                     price = data["last_price"]
-                    print(f"{data["key"]} - no after hours price. insert last price {price}")
+                    logging.info(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
                     
 
@@ -173,7 +173,7 @@ def main():
     # Deserialize back to a Python object
     my_object = json.loads(serialized_data)
 
-    print(f"Received object: {my_object}")
+    logging.info(f"Received object: {my_object}")
     update_numbers(my_object)   
 
 if __name__ == "__main__":
