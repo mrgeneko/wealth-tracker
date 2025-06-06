@@ -35,6 +35,7 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
             continue
 
         url = ticker[url_selection]
+
         key = ticker['key']
         logging.info(f'Webull - begin processing: {key} selected url: {url}')
         
@@ -172,24 +173,46 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
                 logging.debug(f"exchange {exchange.text}")
 
                 last_price = driver.find_element(By.CLASS_NAME, 'csr112')
-                logging.debug(f"last_price {last_price.text}")
+                logging.info(f"last_price {last_price.text}")
 
+                price_change_decimal = ""
+                comment='''
                 try:
                     price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][1]")
-                    logging.debug(f"price_change_decimal {price_change_decimal.text}")
+                    logging.info(f"price_change_decimal {price_change_decimal.text}")
                 except Exception as e:
-                    price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][1]")
-                    logging.debug(f"price_change_decimal {price_change_decimal.text}")
+                    logging.info("price_change_decimal not found in csr115[1]")
 
-                try:
-                    price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][2]")
-                    logging.debug(f"price_change_percent {price_change_percent.text}")
-                except Exception as e:
-                    price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][2]")
-                    logging.debug(f"price_change_percent {price_change_percent.text}")
+                if price_change_decimal == "":
+                    try:
+                        price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr116')][1]")
+                        logging.info(f"price_change_decimal {price_change_decimal.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr116[1]")
 
+                if price_change_decimal == "":
+                    try:
+                        price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr115')][2]")
+                        logging.info(f"price_change_percent {price_change_percent.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr115[2]")
+
+                if price_change_percent == "":
+                    try:
+                        price_change_percent = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr117')]")
+                        logging.info(f"price_change_percent {price_change_percent.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr117")
+
+                if price_change_decimal == "":
+                    try:
+                        price_change_decimal = driver.find_element(By.XPATH, "//div[contains(@class, 'csr111')]/div[contains(@class, 'csr131')]/div[contains(@class, 'csr117')][2]")
+                        logging.info(f"price_change_decimal {price_change_decimal.text}")
+                    except Exception as e:
+                        logging.info("price_change_decimal not found in csr117[1]")
+'''
                 price_datetime = driver.find_element(By.CLASS_NAME, 'csr132')
-                logging.debug(f"price_datetime {price_datetime.text}")
+                logging.info(f"price_datetime {price_datetime.text}")
 
                 after_hours_price_string = ""
                 after_hours_price = ""
@@ -226,18 +249,18 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
                     logging.debug(f"After Hours/Pre Market not found")
 
                 
-                logging.debug(f"after_hours_price {after_hours_price}")
-                logging.debug(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
-                logging.debug(f"after_hours_price_change_percent {after_hours_price_change_percent}")    
+                logging.info(f"after_hours_price {after_hours_price}")
+                logging.info(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
+                logging.info(f"after_hours_price_change_percent {after_hours_price_change_percent}")    
 
                 open_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[1]/DIV[2]')
-                logging.debug(f"open_price {open_price.text}")
+                logging.info(f"open_price {open_price.text}")
 
                 prev_close_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[1]/DIV[2]/DIV[2]')
-                logging.debug(f"prev_close_price {prev_close_price.text}")
+                logging.info(f"prev_close_price {prev_close_price.text}")
 
                 high_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[1]/DIV[2]')
-                logging.debug(f"high_price {high_price.text}")
+                logging.info(f"high_price {high_price.text}")
 
                 low_price = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[2]/DIV[2]/DIV[2]')
                 logging.debug(f"low_price {low_price.text}")
@@ -258,17 +281,17 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
                 logging.debug(f"market_cap {market_cap.text}")
 
                 label = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[1]')
-                logging.debug(f"label {label.text}")
+                logging.info(f"label {label.text}")
                 
                 if "YTD YIELD" in label.text:
-                    logging.debug("YTD Yield.")
+                    logging.info("YTD Yield.")
                     ytd_yield = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[2]')
-                    logging.debug(f"ytd_yield {ytd_yield.text}")
+                    logging.info(f"ytd_yield {ytd_yield.text}")
                     price_to_earnings_ttm = ""
                 else:
-                    logging.debug("PE Ratio.")
+                    logging.info("PE Ratio.")
                     price_to_earnings_ttm = driver.find_element(By.XPATH, '//*[@id="app"]/SECTION[1]/DIV[1]/DIV[1]/DIV[2]/DIV[2]/DIV[1]/DIV[5]/DIV[2]/DIV[2]')
-                    logging.debug(f"price_to_earnings_ttm {price_to_earnings_ttm.text}")
+                    logging.info(f"price_to_earnings_ttm {price_to_earnings_ttm.text}")
                     ytd_yield = ""
                     
                 data = {
@@ -279,15 +302,15 @@ def process_webull(driver,tickers,function_handlers,sleep_interval):
                     "description": description.text,
                     "exchange": exchange.text,
                     "last_price": last_price.text,
-                    "price_change_decimal": price_change_decimal.text,
-                    "price_change_percent": price_change_percent.text,
+                    #"price_change_decimal": price_change_decimal.text,
+                    #"price_change_percent": price_change_percent.text,
                     "price_datetime": price_datetime.text,
                     "after_hours_price": after_hours_price,
-                    "after_hours_price_change_decimal": after_hours_price_change_decimal,
-                    "after_hours_price_change_percent": after_hours_price_change_percent,
+                    #"after_hours_price_change_decimal": after_hours_price_change_decimal,
+                    #"after_hours_price_change_percent": after_hours_price_change_percent,
                     "pre_market_price": pre_market_price,
-                    "pre_market_price_change_decimal": pre_market_price_change_decimal,
-                    "pre_market_price_change_percent": pre_market_price_change_percent,
+                    #"pre_market_price_change_decimal": pre_market_price_change_decimal,
+                    #"pre_market_price_change_percent": pre_market_price_change_percent,
                     "open_price": open_price.text,
                     "prev_close_price": prev_close_price.text,
                     "high_price": high_price.text,

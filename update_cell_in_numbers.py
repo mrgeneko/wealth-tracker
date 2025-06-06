@@ -86,11 +86,11 @@ def update_numbers(data):
                     logging.info(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
                     
-    if "--" in price:
-        # this happens when a bond matures. webull shows the price as "--"
-        logging.info(f"{data['key']} - no price to update")
-        price = ""
-        return
+    #if "--" in price:
+    #    # this happens when a bond matures. webull shows the price as "--"
+    #    logging.info(f"{data['key']} - no price to update")
+    #    price = ""
+    #    return
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
