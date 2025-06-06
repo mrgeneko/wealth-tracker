@@ -135,7 +135,7 @@ def fetch_prices(tickers):
             price_data.append(single_ticker)
             #print(f"Fetched price for {ticker} {prices[ticker]}")
             print(f"Fetched price for {ticker} {single_ticker}")
-            time.sleep(3)
+            time.sleep(2)
         except Exception as e:
             print(f"Error fetching {ticker}: {e}")
     return price_data
@@ -264,5 +264,5 @@ def process_yahoo(driver,tickers,function_handlers,sleep_interval):
         data = fetch_prices(single_ticker)
         logging.info(f"yahoo send to numbers data:{data}\n")
         function_handlers[0](data[0])
-
+        time.sleep(sleep_interval)
 
