@@ -34,13 +34,13 @@ def update_numbers(data):
     else:
         source = data["source"]
     
-    price_change_decimal=""
+    #price_change_decimal=""
     if "pre_market_price" not in data and 'after_hours_price' not in data :
         #print("no pre market or after hours price")
         if data["last_price"] is not None and data["last_price"] !='':
             #print("insert last price")
             price = data["last_price"]
-            price_change_decimal = data["price_change_decimal"]
+            #price_change_decimal = data["price_change_decimal"]
         else:
             return
     else:
@@ -72,8 +72,8 @@ def update_numbers(data):
                 if data["last_price"] is not None and data["last_price"] !='':
                     price = data["last_price"]
                     logging.info(f"{data["key"]} - insert last price {price}")
-                if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
-                    logging.info("use price_change_decimal")
+                #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
+                #    logging.info("use price_change_decimal")
                     #price_change_decimal = data["price_change_decimal"]
 
             elif is_after_hours_session():

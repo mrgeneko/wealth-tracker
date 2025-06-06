@@ -40,7 +40,7 @@ def process_moomoo(driver,tickers,function_handlers,sleep_interval):
             continue
 
         url = ticker[url_selection]
-        #url = "https://www.moomoo.com/stock/NVDA-US?chain_id=x3VbNhUm22aqzR.1k419s6&global_content=%7B%22promote_id%22%3A13764,%22sub_promote_id%22%3A9,%22f%22%3A%22mm%2Fquote%22%7D"
+        #url = "https://www.moomoo.com/stock/NVDA-US"
         key = ticker['key']
         logging.info("\n")
         logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
@@ -67,27 +67,37 @@ def process_moomoo(driver,tickers,function_handlers,sleep_interval):
             last_price = last_price_element.text.strip()
             logging.info(f'last price element: {last_price}')
 
+        logging.info(f"check for after_hours_price")   
         after_hours_price = ""
         after_hours_section = quote_element.select_one('[class="disc-info"]')
-        after_hours_price_element = after_hours_section.select_one('[class="mg-r-8 disc-price direct-down"]')
-        if after_hours_price_element == None:
+        if after_hours_section == None:
+            logging.info(f"could not find after hours section")
+        
+        after_hours_price_element = None
+        if after_hours_section != None:
             logging.info(f"look for after hours up")
             after_hours_price_element = after_hours_section.select_one('[class="mg-r-8 disc-price direct-up"]')
+            if after_hours_price_element == None:
+                logging.info(f"look for after hours up")
+                after_hours_price_element = after_hours_section.select_one('[class="mg-r-8 disc-price direct-down"]')
+
+        after_hours_datetime = ""
         if after_hours_price_element != None:
             after_hours_price = after_hours_price_element.text.strip()
+            after_hours_datetime_element = after_hours_section.select_one('[class="status"]')
+            logging.info(f"after_hours_datetime_element: {after_hours_datetime_element.text}")
+            parts = after_hours_datetime_element.text.split()
+
+            if parts[0] == "Post":
+                logging.info(f"Found post session price")
+            else:
+                logging.info(f"Found pre market session price??")
+
         else:
             logging.info(f"could not find after hours price")
         logging.info(f"after_hours_price: {after_hours_price}")
 
-        after_hours_datetime = ""
-        after_hours_datetime_element = after_hours_section.select_one('[class="status"]')
-        logging.info(f"after_hours_datetime_element: {after_hours_datetime_element.text}")
-        parts = after_hours_datetime_element.text.split()
 
-        if parts[0] == "Post":
-            logging.info(f"Found post session price")
-        else:
-            logging.info(f"Found pre market session price??")
 
 
         data = {}
