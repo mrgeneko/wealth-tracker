@@ -140,8 +140,8 @@ def main():
                         help='Specify "stocks" to exclude bonds or "bonds" to include only bond lines')
     
     parser.add_argument('--sleep-interval', '-z', dest='sleep_interval',
-                    type=int, default=10,
-                    help='Seconds to sleep between processing each ticker (default: 10)')
+                    type=int, default=3,
+                    help='Seconds to sleep between processing each ticker (default: 3)')
     
     parser.add_argument('--browser', '-d', dest='browser',
                     default='firefox',
