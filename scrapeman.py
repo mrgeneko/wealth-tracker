@@ -7,6 +7,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
+from selenium.webdriver.safari.service import Service as SafariService
+
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 #from selenium.webdriver.firefox.service import Service as FirefoxService
 
@@ -143,9 +145,9 @@ def main():
                     type=int, default=3,
                     help='Seconds to sleep between processing each ticker (default: 3)')
     
-    parser.add_argument('--browser', '-d', dest='browser',
-                    default='firefox',
-                    help='web browser [chrome|safari] (default: firefox)')
+    parser.add_argument('--driver', '-d', dest='browser',
+                    default='safari',
+                    help='web browser [chrome|firefox|safari] (default: safari)')
     
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
@@ -189,6 +191,11 @@ def main():
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--headless')
         driver = webdriver.Firefox(options=options)
+    elif browser == "safari":
+        logging.info(f"USE SAFARI DRIVER")
+        safari_path = '/usr/bin/safaridriver'
+        service = SafariService(executable_path=safari_path)
+        driver = webdriver.Safari(service=service)
 
 #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
 #   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
