@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 import pandas as pd
 from is_number import is_number
+from session_times import *
+
 
 #from selenium.webdriver.support.wait import WebDriverWait
 #from selenium.webdriver.support import expected_conditions as EC
@@ -46,7 +48,7 @@ def process_cnbc(driver,tickers,function_handlers,sleep_interval):
         
         driver.get(url)
         #logging.info(f'sleep 3 seconds to allow website to load')
-        time.sleep(3)
+        time.sleep(2)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
         #wait = WebDriverWait(driver, 10)
@@ -93,7 +95,14 @@ def process_cnbc(driver,tickers,function_handlers,sleep_interval):
         data = {}
         data["key"] = key
         data["last_price"] = last_price
-        data["after_hours_price"] = after_hours_price
+        if after_hours_price != "":
+            if is_pre_market_session():
+                data["pre_market_price"] = after_hours_price
+            elif is_after_hours_session():
+                data["after_hours_price"] = after_hours_price
+        else:
+            data["pre_market_price"] = ""
+            data["after_hours_price"] = ""
         data["source"] = "cnbc"
         
         logging.info(data)
