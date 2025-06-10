@@ -46,7 +46,7 @@ def process_google(driver,tickers,function_handlers,sleep_interval):
 
         driver.get(url)
         #logging.info(f'sleep 3 seconds to allow website to load')
-        time.sleep(3)
+        time.sleep(2)
 
         # Wait for a specific element to be present (e.g., an element with ID 'example')
         #wait = WebDriverWait(driver, 10)
