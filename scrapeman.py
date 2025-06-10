@@ -195,51 +195,95 @@ def main():
         logging.info(f"USE SAFARI DRIVER")
         safari_path = '/usr/bin/safaridriver'
         service = SafariService(executable_path=safari_path)
-        driver = webdriver.Safari(service=service)
 
-#   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
-#   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
-#   webull       |     X      |      X      |     X     |         |      X      |
-#   trading view |     X      | only til 8p |     X     |         |             |
-#   investing    |     X      |      X      |     X     |         |             |
-#   google       |     X      |      X      |     X     |         |             |            |      X
-#   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
-#   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
-#   marketbeat   |            |             |           |    X    |
-#   nasdaq       |            |      X      |     X     | 
-#   cnbc         |     ?      |      X      |     X     |         |             |
-    yahoo = get_yahoo_attributes()
-    webull = get_webull_attributes()
-    ycharts = get_ycharts_attributes()
-    trading_view = get_trading_view_attributes()
-    google_finance = get_google_attributes()
-    #wsj = get_marketbeat_attributes()
-    moomoo = get_moomoo_attributes()
-    cnbc = get_cnbc_attributes()
-    #nasdaq = get_nasdaq_attributes()
-    sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo, cnbc ]
-    
-    if round_robin:
-        process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
-        driver.quit()
-        exit(0)
 
-    if yahoo_batch:
-        # the main reason to use this version is to pull tickers from the numbers spreadsheet
-        # instead of the .csv file
-        process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
-        exit(0)
+#            driver = webdriver.Safari(service=service)
+    max_attempts = 5
+    attempt_count = 0
 
-    #logging.info(f"source: {selected_source}")
-
-    for source in sources:
-        #logging.info(f"compare source: {source}")
-        if selected_source == source['name']:
-            #logging.info(f"call process : {selected_source}")
-            result = source['process'](driver,tickers,function_handlers,sleep_interval)
+    while attempt_count < max_attempts:
+        try:
+            # Attempt to start the driver
+            driver = webdriver.Safari(service=service)
+            
+            # If successful, break out of the loop
+            print(f"Safari driver started successfully on attempt {attempt_count + 1}")
             break
-    #logging.info("driver.quit()")
-    driver.quit()
+        
+        except WebDriverException as e:
+            # Handle the exception
+            print(f"Attempt {attempt_count + 1} failed: {str(e)}")
+            
+            # Check if the error is about the driver exiting unexpectedly
+            if "unexpectedly exited" in str(e).lower():
+                print("Safari driver failed to start. Waiting 5 seconds before retry...")
+            else:
+                # If it's a different error, raise after giving up
+                if attempt_count == max_attempts - 1:
+                    print("Giving up after maximum attempts.")
+                    raise
+                else:
+                    # Wait before retrying (add delay to avoid overwhelming system)
+                    time.sleep(5)
+                    
+        attempt_count += 1
+
+    # Continue with your Selenium tests
+    if 'driver' in locals():
+        try:
+            # Your test code here
+
+        #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
+        #   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
+        #   webull       |     X      |      X      |     X     |         |      X      |
+        #   trading view |     X      | only til 8p |     X     |         |             |
+        #   investing    |     X      |      X      |     X     |         |             |
+        #   google       |     X      |      X      |     X     |         |             |            |      X
+        #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
+        #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
+        #   marketbeat   |            |             |           |    X    |
+        #   nasdaq       |            |      X      |     X     | 
+        #   cnbc         |     ?      |      X      |     X     |         |             |
+            yahoo = get_yahoo_attributes()
+            webull = get_webull_attributes()
+            ycharts = get_ycharts_attributes()
+            trading_view = get_trading_view_attributes()
+            google_finance = get_google_attributes()
+            #wsj = get_marketbeat_attributes()
+            moomoo = get_moomoo_attributes()
+            cnbc = get_cnbc_attributes()
+            #nasdaq = get_nasdaq_attributes()
+            sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo, cnbc ]
+            
+            if round_robin:
+                process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
+                driver.quit()
+                exit(0)
+
+            if yahoo_batch:
+                # the main reason to use this version is to pull tickers from the numbers spreadsheet
+                # instead of the .csv file
+                process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
+                exit(0)
+
+            #logging.info(f"source: {selected_source}")
+
+            for source in sources:
+                #logging.info(f"compare source: {source}")
+                if selected_source == source['name']:
+                    #logging.info(f"call process : {selected_source}")
+                    result = source['process'](driver,tickers,function_handlers,sleep_interval)
+                    break
+
+
+            # When finished
+            driver.quit()
+        except Exception as e:
+            print(f"Error during test execution: {str(e)}")
+    else:
+        # Driver couldn't be started
+        print("Safari driver could not be initialized after maximum attempts")
+
     exit(0)
 
 if __name__ == "__main__":
