@@ -97,8 +97,10 @@ def process_cnbc(driver,tickers,function_handlers,sleep_interval):
         data["last_price"] = last_price
         if after_hours_price != "":
             if is_pre_market_session():
+                logging.info(f"currently in pre market session")
                 data["pre_market_price"] = after_hours_price
             elif is_after_hours_session():
+                logging.info(f"currently in after hours session")
                 data["after_hours_price"] = after_hours_price
         else:
             data["pre_market_price"] = ""
