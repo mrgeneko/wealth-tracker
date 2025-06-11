@@ -224,6 +224,13 @@ def main():
                 try:
                     subprocess.run(['pkill', 'Safari'],)
                     print("Closed all Safari instances.")
+
+                    process = subprocess.run(["osascript", "-e", 'quit app "Safari"'], capture_output=True, text=True)
+                    if process.returncode != 0:
+                        logging.error("AppleScript error:", process.stderr)
+                        return None
+                    return process.stdout.strip()
+
                 except Exception as e2:
                     print(f"Error closing Safari: {e2}")
 
