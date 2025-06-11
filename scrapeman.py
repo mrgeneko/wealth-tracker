@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import subprocess
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
@@ -217,7 +218,29 @@ def main():
             
             # Check if the error is about the driver exiting unexpectedly
             if "unexpectedly exited" in str(e).lower():
-                print("Safari driver failed to start. Waiting 5 seconds before retry...")
+                print("Safari driver failed to start. Restarting Safari...")
+
+                # Close any running instances of Safari
+                try:
+                    #subprocess.run(['pkill', 'Safari'],)
+                    #print("Closed all Safari instances.")
+
+                    process = subprocess.run(["osascript", "-e", 'quit app "Safari"'], capture_output=True, text=True)
+                    if process.returncode != 0:
+                        logging.error("AppleScript error:", process.stderr)
+
+                except Exception as e2:
+                    print(f"Error closing Safari: {e2}")
+
+                time.sleep(1)
+
+                # Restart Safari
+                try:
+                    subprocess.run(['/Applications/Safari.app/Contents/MacOS/Safari'], start_new_session=True)
+                    print("Safari restarted. Waiting 5 seconds before retry...")
+                except Exception as e3:
+                    print(f"Error restarting Safari: {e3}")
+
             else:
                 # If it's a different error, raise after giving up
                 if attempt_count == max_attempts - 1:
