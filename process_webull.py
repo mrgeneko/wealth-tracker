@@ -4,11 +4,13 @@ import logging
 import time
 import pandas as pd
 from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
 
 def get_webull_attributes():
     attributes = {
         "name" : "webull",
         "process" : process_webull,
+        "extract" : extract_webull,
         "has_realtime" : True,
         "has_pre_market" : True,
         "has_after_hours" : True,
@@ -18,6 +20,24 @@ def get_webull_attributes():
         "hits" : 0
     }
     return attributes
+
+def extract_webull(ticker,html_content):
+    logging.info(f"extract webull")
+
+    #logging.info(f"html_content: {html_content}")
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    quote_element = soup.select_one('[class="flex-end stock-data"]')
+    price_normal_element = quote_element.select_one('[class="price-normal"]')
+    last_price_element = price_normal_element.select_one('[class="mg-r-8 price direct-up"]')
+    if last_price_element == None:
+        last_price_element = price_normal_element.select_one('[class="mg-r-8 price direct-down"]')
+    if last_price_element != None:
+        last_price = last_price_element.text.strip()
+        logging.info(f'last price element: {last_price}')
+    newline_index = last_price.find('\n')
+    if newline_index != -1:
+        last_price = last_price[:newline_index]
 
 def process_webull(driver,tickers,function_handlers,sleep_interval):
     logging.info(f"process_webull for {tickers[0]}")
