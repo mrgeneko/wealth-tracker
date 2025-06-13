@@ -204,7 +204,9 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                         # fallback to yahoo. Hits are slightly off if this happens
                         logging.error(f"NO SELENIUM DRIVER. FALLING BACK TO YAHOO")
                         html_content=""
-                        data = sources["yahoo"]['extract'](ticker['key'],html_content)
+                        for s in sources:
+                            if s['name'] == "yahoo":
+                                data = s['extract'](ticker['key'],html_content)
                 elif download == "yfinance":
                     # yahoo uses the yfinance API and does not need html retrieval
                     html_content=""
@@ -300,8 +302,8 @@ def main():
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes()
-    sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
-    #sources = [ investing ]
+    #sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
+    sources = [ yahoo ]
     
     driver = None
     if browser == 'chrome':
