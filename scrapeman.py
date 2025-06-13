@@ -118,7 +118,8 @@ def get_html_for_url(mode, driver,tickers, source):
 
             # Define the command and its arguments
             #command = ["docker", "run", "--rm", "singlefile"]
-            command = ["/Users/gene/bin/html_to_singlefile.sh"]
+            command = ["/Users/chewie/bin/html_to_singlefile.sh"]
+            #command = ["html_to_singlefile.sh"]
             args = [url, filename]
 
             
