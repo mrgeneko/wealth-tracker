@@ -200,7 +200,7 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                         html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
                         data = sources[selected]['extract'](ticker['key'],html_content)
                     else:
-                        # fallback to yahoo
+                        # fallback to yahoo. Hits are slightly off if this happens
                         logging.error(f"NO SELENIUM DRIVER. FALLING BACK TO YAHOO")
                         html_content=""
                         data = sources["yahoo"]['extract'](ticker['key'],html_content)
