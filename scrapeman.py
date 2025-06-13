@@ -275,14 +275,14 @@ def main():
     if mode == "singlefile":
         #yahoo = get_yahoo_attributes()
         webull = get_webull_attributes()
-        #ycharts = get_ycharts_attributes()
+        ycharts = get_ycharts_attributes()
         #trading_view = get_trading_view_attributes()
         #google_finance = get_google_attributes()
         #wsj = get_marketbeat_attributes()
         moomoo = get_moomoo_attributes()
         #cnbc = get_cnbc_attributes()
         #nasdaq = get_nasdaq_attributes()
-        sources = [ webull ]
+        sources = [ ycharts ]
         
         if round_robin:
             driver = None
