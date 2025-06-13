@@ -122,6 +122,7 @@ def extract_moomoo(ticker,html_content):
 
     logging.info(f"check for after_hours_price")   
     after_hours_price = ""
+    pre_market_price = ""
     after_hours_section = quote_element.select_one('[class="disc-info"]')
     if after_hours_section == None:
         logging.info(f"could not find after hours section")
@@ -131,7 +132,7 @@ def extract_moomoo(ticker,html_content):
         logging.info(f"look for after hours up")
         after_hours_price_element = after_hours_section.select_one('[class="mg-r-8 disc-price direct-up"]')
         if after_hours_price_element == None:
-            logging.info(f"look for after hours up")
+            logging.info(f"look for after hours down")
             after_hours_price_element = after_hours_section.select_one('[class="mg-r-8 disc-price direct-down"]')
 
     after_hours_datetime = ""
@@ -155,6 +156,8 @@ def extract_moomoo(ticker,html_content):
             logging.info(f"Found post session price")
         else:
             logging.info(f"Found pre market session price??")
+            pre_market_price = after_hours_price
+            after_hours_price = ""
 
     else:
         logging.info(f"could not find after hours price")
@@ -165,7 +168,7 @@ def extract_moomoo(ticker,html_content):
     data["key"] = ticker
     data["last_price"] = last_price
     data["after_hours_price"] = after_hours_price
-    #data["pre_market_price"] = pre_market_price
+    data["pre_market_price"] = pre_market_price
     data["source"] = "moomoo"
     #if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
     #    data["pre_market_price"] = pre_market_price
@@ -173,7 +176,4 @@ def extract_moomoo(ticker,html_content):
     #    data["after_hours_price"] = after_hours_price
     
     logging.info(data)
-    
-        
-
     return data

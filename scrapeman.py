@@ -91,21 +91,31 @@ def get_html_for_url(mode, driver,tickers, source):
         #logging.info("\n")
         logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
         
-        if driver != None or mode == "selenium":
+        # Generate timestamp in YYYYMMDD_HHMMSS format
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Get the full path to your directory (this is the key fix)
+        directory = os.path.expanduser('~/singlefile_html')  # Expands ~ to full path
+        if not os.path.exists(directory):
+            os.makedirs(directory)  # Create directory if it doesn't exist
+
+        if driver != None and mode == "selenium":
+            logging.info(f"mode SELENIUM")
             driver.get(url)
             #logging.info(f'sleep 3 seconds to allow website to load')
             time.sleep(2)
             html_content = driver.page_source
+
+            try:
+                html_file = os.path.join(directory, f"{ticker['key']}.{source}.{timestamp}.html")
+                with open(html_file, 'w', encoding='utf-8') as file:
+                    file.write(html_content)
+            except FileNotFoundError:
+                logging.error(f"Error: cannot write {html_file}")
+                return 1
         else:
             logging.info(f"mode SINGLEFILE")
             # let's use singlefile command to retrieve html
-            # Generate timestamp in YYYYMMDD_HHMMSS format
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-            # Get the full path to your directory (this is the key fix)
-            directory = os.path.expanduser('~/singlefile_html')  # Expands ~ to full path
-            if not os.path.exists(directory):
-                os.makedirs(directory)  # Create directory if it doesn't exist
 
             #output_file = f"~/investing_com_html/{ticker['key']}_{url_selection}.{timestamp}.html"
             logfile = os.path.join(directory, f"{ticker['key']}.{source}.{timestamp}.log")
@@ -150,7 +160,7 @@ def setup_logging(log_level):
         raise ValueError('Invalid log level: %s' % log_level)
     logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def process_round_robin(mode, driver, tickers, sources, function_handlers, sleep_interval):
+def process_round_robin(driver, tickers, sources, function_handlers, sleep_interval):
     logging.info(f"process round-robin")
     num_sources=len(sources)
     current = random.randint(0, (num_sources-1))
@@ -184,34 +194,33 @@ def process_round_robin(mode, driver, tickers, sources, function_handlers, sleep
             single_ticker = [ None ]
             single_ticker[0] = ticker
             selected_source = sources[current]['name']
-            # Call the 'process_source' function to scrape website for a single ticker
-            if mode == "selenium":
-                try:
-                    sources[current]['hits'] = sources[current]['hits'] + 1
-                    html_content = get_html_for_url(mode,driver,single_ticker, selected_source)
-                    sources[selected]['process'](driver,single_ticker,function_handlers,sleep_interval)
-                except Exception as e:
-                    logging.error(f"process round robin source error {e}")
-                current = current + 1
-                if current == num_sources:
-                    current = 0
-                first_checked = current
-                selected = -1
-                time.sleep(sleep_interval)
-            elif mode == "singlefile":
-                try:
-                    sources[current]['hits'] = sources[current]['hits'] + 1
+
+            
+            # Call the 'extract' function to scrape website for a single ticker
+            try:
+                if selected_source == "cnbc":
+                    mode="selenium"
                     html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
                     data = sources[selected]['extract'](ticker['key'],html_content)
-                    function_handlers[0](data)
-                except Exception as e:
-                    logging.error(f"process round robin source error {e}")
-                current = current + 1
-                if current == num_sources:
-                    current = 0
-                first_checked = current
-                selected = -1
-                time.sleep(sleep_interval)
+                elif selected_source == "yahoo":
+                    # yahoo uses the yfinance API and does not need html retrieval
+                    html_content=""
+                    data = sources[selected]['extract'](ticker['key'],html_content)
+                else:
+                    mode="singlefile"
+                    html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
+                    data = sources[selected]['extract'](ticker['key'],html_content)
+
+                sources[current]['hits'] = sources[current]['hits'] + 1
+                function_handlers[0](data)
+            except Exception as e:
+                logging.error(f"process round robin source error {e}")
+            current = current + 1
+            if current == num_sources:
+                current = 0
+            first_checked = current
+            selected = -1
+            time.sleep(sleep_interval)
         else:
             logging.info(f"nothing to work on")
 
@@ -237,20 +246,16 @@ def main():
                     help='Seconds to sleep between processing each ticker (default: 3)')
     
     parser.add_argument('--driver', '-d', dest='browser',
-                    default='safari',
-                    help='web browser [chrome|firefox|safari] (default: safari)')
+                    default='chrome',
+                    help='web browser [chrome|firefox|safari] (default: chrome)')
     
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
-    parser.add_argument('--mode', '-m', dest='mode',
-                        default="singlefile",
-                        help='[singlefile|selenium] to retrieve html')
-
     parser.add_argument('--source', '-s', dest='source',
                     default='yahoo',
-                    help='web site source [finance_c|google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
+                    help='web site source [google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
-    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=False,
+    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=True,
                         help='rotate websites round robin')
     
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
@@ -267,173 +272,84 @@ def main():
     yahoo_batch = args.yahoo_batch
     selected_source=args.source
     sleep_interval = args.sleep_interval
-    mode = args.mode
+    #mode = args.mode
 
     function_handlers = [update_numbers]
 
+    #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
+    #   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
+    #   webull       |     X      |      X      |     X     |         |      X      |
+    #   trading view |     X      | only til 8p |     X     |         |             |
+    #   investing    |     X      |      X      |     X     |         |             |
+    #   google       |     X      |      X      |     X     |         |             |            |      X
+    #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
+    #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
+    #   marketbeat   |            |             |           |    X    |
+    #   nasdaq       |            |      X      |     X     | 
+    #   cnbc         |     ?      |      X      |     X     |         |             |
 
-    if mode == "singlefile":
-        #yahoo = get_yahoo_attributes()
-        webull = get_webull_attributes()
-        ycharts = get_ycharts_attributes()
-        #trading_view = get_trading_view_attributes()
-        #google_finance = get_google_attributes()
-        #wsj = get_marketbeat_attributes()
-        moomoo = get_moomoo_attributes()
-        #cnbc = get_cnbc_attributes()
-        #nasdaq = get_nasdaq_attributes()
-        sources = [ ycharts ]
-        
-        if round_robin:
-            driver = None
-            process_round_robin(mode,driver,tickers, sources, function_handlers, sleep_interval)
-            exit(0)
-
-        #if yahoo_batch:
-            # the main reason to use this version is to pull tickers from the numbers spreadsheet
-            # instead of the .csv file
-        #    process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
-        #    exit(0)
-
-        #logging.info(f"source: {selected_source}")
-
-        for source in sources:
-            #logging.info(f"compare source: {source}")
-            if selected_source == source['name']:
-                #logging.info(f"call process : {selected_source}")
-                result = source['process'](driver,tickers,function_handlers,sleep_interval)
-                break
-    else:
-        if browser == 'chrome':
-            logging.info(f"USE CHROMEs DRIVER")
-            chrome_options = webdriver.ChromeOptions()
-            chrome_options.add_argument("--headless")  # Run in headless mode
-            chrome_options.add_argument("--no-sandbox")
-            #chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
-            service = Service(ChromeDriverManager().install())
+    yahoo = get_yahoo_attributes()
+    webull = get_webull_attributes()
+    ycharts = get_ycharts_attributes()
+    trading_view = get_trading_view_attributes()
+    google = get_google_attributes()
+    #wsj = get_marketbeat_attributes()
+    moomoo = get_moomoo_attributes()
+    cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com!!
+    #nasdaq = get_nasdaq_attributes()
+    sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
+    #sources = [ cnbc ]
+    
+    driver = None
+    if browser == 'chrome':
+        logging.info(f"USE CHROMEs DRIVER")
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--headless")  # Run in headless mode
+        chrome_options.add_argument("--no-sandbox")
+        #chrome_options.add_argument("--user-data-dir=/Users/chewie/Library/Application Support/Google/Chrome/Profile 1")  # Overcome limited resource problems
+        service = Service(ChromeDriverManager().install())
+        try:
             driver = webdriver.Chrome(service=service,options=chrome_options)
-        elif browser == "firefox":
-
-            logging.info(f"USE FIREFOX DRIVER")
-            #service = FirefoxService(executable_path="firefox.geckodriver")
-            options = FirefoxOptions()
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--headless')
+        except Exception as e:
+            logging.error(f"unable to create chrome driver {e}")
+    elif browser == "firefox":
+        logging.info(f"USE FIREFOX DRIVER")
+        #service = FirefoxService(executable_path="firefox.geckodriver")
+        options = FirefoxOptions()
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--headless')
+        try:
             driver = webdriver.Firefox(options=options)
-        elif browser == "safari":
-            logging.info(f"USE SAFARI DRIVER")
-            safari_path = '/usr/bin/safaridriver'
-            service = SafariService(executable_path=safari_path)
+        except Exception as e:
+            logging.error(f"unable to create firefox driver {e}")
+    elif browser == "safari":
+        logging.info(f"USE SAFARI DRIVER")
+        safari_path = '/usr/bin/safaridriver'
+        service = SafariService(executable_path=safari_path)
+        try:
+            driver = webdriver.Safari(service=service)
+        except Exception as e:
+            logging.error(f"unable to create safari driver {e}")
+    if round_robin:
+        #driver = None
+        process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
+        exit(0)
 
-#            driver = webdriver.Safari(service=service)
-        max_attempts = 5
-        attempt_count = 0
+    if yahoo_batch:
+        # the main reason to use this version is to pull tickers from the numbers spreadsheet
+        # instead of the .csv file
+        process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
+        exit(0)
 
-        while attempt_count < max_attempts:
-            try:
-                # Attempt to start the driver
-                driver = webdriver.Safari(service=service)
-                
-                # If successful, break out of the loop
-                print(f"Safari driver started successfully on attempt {attempt_count + 1}")
-                break
-            
-            except WebDriverException as e:
-                # Handle the exception
-                print(f"Attempt {attempt_count + 1} failed: {str(e)}")
-                
-                # Check if the error is about the driver exiting unexpectedly
-                if "unexpectedly exited" in str(e).lower():
-                    print("Safari driver failed to start. Restarting Safari...")
+    #logging.info(f"source: {selected_source}")
 
-                    # Close any running instances of Safari
-                    try:
-                        #subprocess.run(['pkill', 'Safari'],)
-                        #print("Closed all Safari instances.")
-
-                        process = subprocess.run(["osascript", "-e", 'quit app "Safari"'], capture_output=True, text=True)
-                        if process.returncode != 0:
-                            logging.error("AppleScript error:", process.stderr)
-
-                    except Exception as e2:
-                        print(f"Error closing Safari: {e2}")
-
-                    time.sleep(1)
-
-                    # Restart Safari
-                    try:
-                        subprocess.run(['/Applications/Safari.app/Contents/MacOS/Safari'], start_new_session=True)
-                        print("Safari restarted. Waiting 5 seconds before retry...")
-                    except Exception as e3:
-                        print(f"Error restarting Safari: {e3}")
-
-                else:
-                    # If it's a different error, raise after giving up
-                    if attempt_count == max_attempts - 1:
-                        print("Giving up after maximum attempts.")
-                        raise
-                    else:
-                        # Wait before retrying (add delay to avoid overwhelming system)
-                        time.sleep(5)
-                        
-            attempt_count += 1
-
-        # Continue with your Selenium tests
-        if 'driver' in locals():
-            try:
-                # Your test code here
-
-            #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
-            #   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
-            #   webull       |     X      |      X      |     X     |         |      X      |
-            #   trading view |     X      | only til 8p |     X     |         |             |
-            #   investing    |     X      |      X      |     X     |         |             |
-            #   google       |     X      |      X      |     X     |         |             |            |      X
-            #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
-            #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
-            #   marketbeat   |            |             |           |    X    |
-            #   nasdaq       |            |      X      |     X     | 
-            #   cnbc         |     ?      |      X      |     X     |         |             |
-                yahoo = get_yahoo_attributes()
-                webull = get_webull_attributes()
-                ycharts = get_ycharts_attributes()
-                trading_view = get_trading_view_attributes()
-                google_finance = get_google_attributes()
-                #wsj = get_marketbeat_attributes()
-                moomoo = get_moomoo_attributes()
-                cnbc = get_cnbc_attributes()
-                #nasdaq = get_nasdaq_attributes()
-                sources = [ yahoo, webull, ycharts, trading_view, google_finance, moomoo, cnbc ]
-                
-                if round_robin:
-                    process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
-                    driver.quit()
-                    exit(0)
-
-                if yahoo_batch:
-                    # the main reason to use this version is to pull tickers from the numbers spreadsheet
-                    # instead of the .csv file
-                    process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
-                    exit(0)
-
-                #logging.info(f"source: {selected_source}")
-
-                for source in sources:
-                    #logging.info(f"compare source: {source}")
-                    if selected_source == source['name']:
-                        #logging.info(f"call process : {selected_source}")
-                        result = source['process'](driver,tickers,function_handlers,sleep_interval)
-                        break
-
-
-                # When finished
-                driver.quit()
-            except Exception as e:
-                print(f"Error during test execution: {str(e)}")
-        else:
-            # Driver couldn't be started
-            print("Safari driver could not be initialized after maximum attempts")
+    for source in sources:
+        #logging.info(f"compare source: {source}")
+        if selected_source == source['name']:
+            #logging.info(f"call process : {selected_source}")
+            result = source['process'](driver,tickers,function_handlers,sleep_interval)
+            break
 
     exit(0)
 
