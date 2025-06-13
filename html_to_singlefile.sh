@@ -26,7 +26,7 @@ mkdir -p ~/singlefile_html/
 
 # Run docker command and save output to file
 #docker run --rm -v "/Users/gene/singlefile_html:/usr/src/app/out" singlefile "$url" > ~/singlefile_html/${ticker}.${source}.${timestamp}.html
-docker run --rm -v "/Users/gene/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename"
+docker run --rm -v "/Users/gene/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename" --block-images true --block-fonts true
 
 
 # Optional: Check if docker command succeeded

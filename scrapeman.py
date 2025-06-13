@@ -88,7 +88,7 @@ def get_html_for_url(mode, driver,tickers, source):
 
         url = ticker[source]
         key = ticker['key']
-        logging.info("\n")
+        #logging.info("\n")
         logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
         
         if driver != None or mode == "selenium":
@@ -282,7 +282,7 @@ def main():
         moomoo = get_moomoo_attributes()
         #cnbc = get_cnbc_attributes()
         #nasdaq = get_nasdaq_attributes()
-        sources = [ moomoo ]
+        sources = [ webull ]
         
         if round_robin:
             driver = None
