@@ -1,7 +1,7 @@
 #!/bin/bash
 open ~/Library/Mobile\ Documents/com\~apple\~Numbers/Documents/Shared\ with\ Sharon/retirement\ plan.numbers
-open -a safari
-sleep 5
+#open -a safari
+sleep 10
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-~/venv/bin/python3 scrapeman.py -s investing  -t stocks > ~/logs/scrapeman_investing_stocks.${TIMESTAMP}.log 2>&1
+~/venv/bin/python3 scrapeman.py -r T -t stocks > ~/logs/scrapeman_stocks.${TIMESTAMP}.log 2>&1

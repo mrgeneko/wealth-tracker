@@ -3,15 +3,15 @@
 import logging
 import time
 import pandas as pd
+from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
 
 def get_investing_attributes():
     attributes = {
         "name" : "investing",
+        "download" : "singlefile",
         "process" : process_investing,
+        "extract" : extract_investing,
         "has_realtime" : True,
         "has_pre_market" : True,
         "has_after_hours" : True,
@@ -21,6 +21,70 @@ def get_investing_attributes():
         "hits" : 0
     }
     return attributes
+
+
+def extract_investing(ticker,html_content):
+    logging.info(f"extract investing")
+
+    #logging.info(f"html_content: {html_content}")
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # class name is misleading?
+    last_price = ""
+    after_hours_price = ""
+    last_price_element = soup.select_one('[data-test="instrument-price-last"]') 
+    logging.info(f"last_price {last_price_element}")
+
+    return 0
+    
+    if regular_trading_price_element != None:
+        logging.info(f"found regular_trading_price_element")
+        #price_normal_element = regular_trading_price_element.select_one('[class="price-normal"]')
+        last_price_element = regular_trading_price_element.select_one('[class="QuoteStrip-lastPrice"]')
+        if last_price_element != None:
+            last_price = last_price_element.text.strip()
+            logging.info(f'last price: {last_price}')
+
+            after_hours_price_section = soup.select_one('[class="QuoteStrip-extendedDataContainer QuoteStrip-dataContainer"]') 
+            #price_normal_element = regular_trading_price_element.select_one('[class="price-normal"]')
+            after_hours_price_element = after_hours_price_section.select_one('[class="QuoteStrip-lastPrice"]')
+            after_hours_label = after_hours_price_section.select_one('[class="QuoteStrip-extendedLabel"]')
+            if after_hours_label != None:
+                if after_hours_label.text.startswith("After Hours"):
+                    logging.info(f"we found after hours label")
+            if after_hours_price_element != None:
+                after_hours_price = after_hours_price_element.text.strip()
+                logging.info(f'after hours price: {after_hours_price}')
+    else:
+        logging.info(f"no found regular_trading_price_element")
+        regular_trading_price_element = soup.select_one('[class="QuoteStrip-lastPriceStripContainer"]')
+        if regular_trading_price_element != None:
+            last_price_element = regular_trading_price_element.select_one('[class="QuoteStrip-lastPrice"]')
+            last_price = last_price_element.text
+            logging.info(f'last price: {last_price}')
+
+    
+    #logging.info(f"after_hours_price: {after_hours_price}")
+
+    data = {}
+    data["key"] = ticker
+    data["last_price"] = last_price
+    if after_hours_price != "":
+        if is_pre_market_session():
+            logging.info(f"currently in pre market session")
+            data["pre_market_price"] = after_hours_price
+        elif is_after_hours_session():
+            logging.info(f"currently in after hours session")
+            data["after_hours_price"] = after_hours_price
+    else:
+        data["pre_market_price"] = ""
+        data["after_hours_price"] = ""
+    data["source"] = "cnbc"
+    
+    logging.info(data)
+    return data
+
 
 def process_investing(driver,tickers,function_handlers,sleep_interval):
 

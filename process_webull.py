@@ -4,11 +4,14 @@ import logging
 import time
 import pandas as pd
 from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
 
 def get_webull_attributes():
     attributes = {
         "name" : "webull",
+        "download" : "singlefile",
         "process" : process_webull,
+        "extract" : extract_webull,
         "has_realtime" : True,
         "has_pre_market" : True,
         "has_after_hours" : True,
@@ -18,6 +21,78 @@ def get_webull_attributes():
         "hits" : 0
     }
     return attributes
+
+def extract_webull(ticker,html_content):
+    logging.info(f"extract webull")
+
+    #logging.info(f"html_content: {html_content}")
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    last_price = ""
+    after_hours_price = ""
+    pre_market_price = ""
+
+    last_price_element = soup.select_one('[class="csr115 csr112"]')
+    #price_normal_element = quote_element.select_one('[class="price-normal"]')
+    #last_price_element = price_normal_element.select_one('[class="mg-r-8 price direct-up"]')
+    if last_price_element != None:
+        last_price = last_price_element.text
+        logging.info(f'last price element: {last_price}')
+    else:
+        logging.info(f'last price element not found in fcsr115 csr112')
+        last_price_element = soup.select_one('[class="csr116 csr112"]')
+        if last_price_element != None:
+            last_price = last_price_element.text
+            logging.info(f'last price element: {last_price}')
+            
+    if "YIELD" in html_content and "MATURITY" in html_content:
+        logging.info(f"detected BOND")
+    else:
+        logging.info(f"detected STOCK")
+        price_datetime_outer_element = soup.select_one('[class="csr132"]')
+        if price_datetime_outer_element != None:
+            price_datetime_inner_element = price_datetime_outer_element.select_one('[class="csr132"]')
+            if price_datetime_inner_element != None:
+                logging.info(f"inner element {price_datetime_inner_element.text}")
+                if "After Hours" in price_datetime_inner_element.text:
+                    try:
+                        after_hours_price = price_datetime_inner_element.text.split(" ")[2]
+                        #logging.debug(f"after_hours_price_string {after_hours_price_string.text}")
+                        #after_hours_price_change_decimal = after_hours_price_string.text.split(" ")[1]
+                        #logging.debug(f"after_hours_price_change_decimal {after_hours_price_change_decimal}")
+                        #after_hours_price_change_percent = after_hours_price_string.text.split(" ")[2]
+                        #logging.debug(f"after_hours_price_change_percent {after_hours_price_change_percent}")
+                    except Exception as e:
+                        logging.info(f"after hours price not found: {e}")
+                elif "Pre Market" in price_datetime_inner_element.text:
+                    try:
+                        logging.info(f'looking for pre market prices')
+                        #pre_market_price_string = driver.find_element(By.XPATH, "//div[contains(@class, 'csr132')]/div[contains(@class, 'csr132')]/span[1]")
+                        pre_market_price = price_datetime_inner_element.text.split(" ")[2]
+                        #logging.info(f"pre_market_price_string {pre_market_price_string.text}")
+                        #pre_market_price_change_decimal = pre_market_price_string.text.split(" ")[1]
+                        #logging.info(f"pre_market_price_change_decimal {pre_market_price_change_decimal}")
+                        #pre_market_price_change_percent = pre_market_price_string.text.split(" ")[2]
+                        #logging.info(f"pre_market_price_change_percent {pre_market_price_change_percent}")
+                    except Exception as e:
+                        logging.info(f"pre_market price not found: {e}")
+                else:
+                    logging.debug(f"After Hours/Pre Market not found")
+
+
+    data = {}
+    data["key"] = ticker
+    data["last_price"] = last_price
+    data["after_hours_price"] = after_hours_price
+    data["pre_market_price"] = pre_market_price
+    data["source"] = "webull"
+    #if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
+    #    data["pre_market_price"] = pre_market_price
+    #elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price):
+    #    data["after_hours_price"] = after_hours_price
+    
+    logging.info(data)
+    return data
 
 def process_webull(driver,tickers,function_handlers,sleep_interval):
     logging.info(f"process_webull for {tickers[0]}")
