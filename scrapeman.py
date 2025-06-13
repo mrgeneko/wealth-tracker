@@ -302,8 +302,8 @@ def main():
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes()
-    #sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
-    sources = [ yahoo ]
+    sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
+    #sources = [ yahoo ]
     
     driver = None
     if browser == 'chrome':
