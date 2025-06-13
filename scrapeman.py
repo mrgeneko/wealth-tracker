@@ -333,8 +333,8 @@ def main():
             driver = webdriver.Safari(service=service)
         except Exception as e:
             logging.error(f"unable to create safari driver {e}")
+            
     if round_robin:
-        #driver = None
         process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
         exit(0)
 
