@@ -11,6 +11,7 @@ from is_number import is_number
 def get_trading_view_attributes():
     attributes = {
         "name" : "trading_view",
+        "download" : "singlefile",
         "process" : process_trading_view,
         "extract" : extract_trading_view,
         "has_realtime" : True,

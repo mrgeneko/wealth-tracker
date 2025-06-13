@@ -4,12 +4,10 @@ import argparse
 import logging
 import subprocess
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.safari.service import Service as SafariService
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
-#from selenium.webdriver.firefox.service import Service as FirefoxService
 
 import time
 import datetime
@@ -21,17 +19,14 @@ from process_yahoo import get_yahoo_attributes
 from process_google import process_google
 from process_google import get_google_attributes
 #from process_finance_charts import process_finance_charts
-from process_trading_view import process_trading_view
 from process_trading_view import get_trading_view_attributes
-from process_ycharts import process_ycharts
 from process_ycharts import get_ycharts_attributes
-from process_investing import process_investing
-from process_webull import process_webull
+#from process_investing import get_investing_attributes
 from process_webull import get_webull_attributes
-from process_nasdaq import process_nasdaq
-from process_nasdaq import get_nasdaq_attributes
-from process_marketbeat import get_marketbeat_attributes
-from process_marketbeat import process_marketbeat
+#from process_nasdaq import process_nasdaq
+#from process_nasdaq import get_nasdaq_attributes
+#from process_marketbeat import get_marketbeat_attributes
+#from process_marketbeat import process_marketbeat
 from process_moomoo import *
 from process_cnbc import *
 from session_times import *
@@ -193,25 +188,32 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
             logging.debug(f"process single ticker")
             single_ticker = [ None ]
             single_ticker[0] = ticker
-            selected_source = sources[current]['name']
-
+            selected_source = sources[selected]['name']
+            #logging.info(f"selected: {sources[selected]}")
+            download = sources[selected]['download']
             
             # Call the 'extract' function to scrape website for a single ticker
             try:
-                if selected_source == "cnbc":
-                    mode="selenium"
-                    html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
-                    data = sources[selected]['extract'](ticker['key'],html_content)
-                elif selected_source == "yahoo":
+                if download == "selenium":
+                    if driver != None:
+                        mode="selenium"
+                        html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
+                        data = sources[selected]['extract'](ticker['key'],html_content)
+                    else:
+                        # fallback to yahoo
+                        logging.error(f"NO SELENIUM DRIVER. FALLING BACK TO YAHOO")
+                        html_content=""
+                        data = sources["yahoo"]['extract'](ticker['key'],html_content)
+                elif download == "yfinance":
                     # yahoo uses the yfinance API and does not need html retrieval
                     html_content=""
                     data = sources[selected]['extract'](ticker['key'],html_content)
-                else:
+                elif download == "singlefile":
                     mode="singlefile"
                     html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
                     data = sources[selected]['extract'](ticker['key'],html_content)
 
-                sources[current]['hits'] = sources[current]['hits'] + 1
+                sources[selected]['hits'] = sources[selected]['hits'] + 1
                 function_handlers[0](data)
             except Exception as e:
                 logging.error(f"process round robin source error {e}")
@@ -272,7 +274,6 @@ def main():
     yahoo_batch = args.yahoo_batch
     selected_source=args.source
     sleep_interval = args.sleep_interval
-    #mode = args.mode
 
     function_handlers = [update_numbers]
 
@@ -295,10 +296,11 @@ def main():
     google = get_google_attributes()
     #wsj = get_marketbeat_attributes()
     moomoo = get_moomoo_attributes()
-    cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com!!
+    cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
+    #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes()
     sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
-    #sources = [ cnbc ]
+    #sources = [ investing ]
     
     driver = None
     if browser == 'chrome':

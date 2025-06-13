@@ -12,6 +12,7 @@ from is_number import is_number
 def get_google_attributes():
     attributes = {
         "name" : "google",
+        "download" : "singlefile",
         "process" : process_google,
         "extract" : extract_google,
         "has_realtime" : True,

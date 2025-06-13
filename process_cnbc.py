@@ -2,18 +2,13 @@
 import logging
 from bs4 import BeautifulSoup
 import time
-from datetime import datetime
 import pandas as pd
-from is_number import is_number
 from session_times import *
-
-
-#from selenium.webdriver.support.wait import WebDriverWait
-#from selenium.webdriver.support import expected_conditions as EC
 
 def get_cnbc_attributes():
     attributes = {
         "name" : "cnbc",
+        "download" : "selenium",
         "process" : process_cnbc,
         "extract" : extract_cnbc,
         "has_realtime" : True, 

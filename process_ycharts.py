@@ -11,6 +11,7 @@ from is_number import is_number
 def get_ycharts_attributes():
     attributes = {
         "name" : "ycharts",
+        "download" : "singlefile",
         "process" : process_ycharts,
         "extract" : extract_ycharts,
         "has_realtime" : True,

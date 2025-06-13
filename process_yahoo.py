@@ -13,6 +13,7 @@ table_investments = "T"
 def get_yahoo_attributes():
     attributes = {
         "name" : "yahoo",
+        "download" : "yfinance",
         "process" : process_yahoo,
         "extract" : extract_yahoo,
         "has_realtime" : True,

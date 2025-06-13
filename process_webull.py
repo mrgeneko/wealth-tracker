@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 def get_webull_attributes():
     attributes = {
         "name" : "webull",
+        "download" : "singlefile",
         "process" : process_webull,
         "extract" : extract_webull,
         "has_realtime" : True,

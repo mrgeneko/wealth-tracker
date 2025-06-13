@@ -14,6 +14,7 @@ from is_number import is_number
 def get_moomoo_attributes():
     attributes = {
         "name" : "moomoo",
+        "download" : "selenium",
         "process" : process_moomoo,
         "extract" : extract_moomoo,
         "has_realtime" : True, 
