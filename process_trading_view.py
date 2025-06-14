@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import time
+from session_times import *
 from bs4 import BeautifulSoup
 from datetime import datetime
 from update_cell_in_numbers import update_numbers
@@ -109,6 +110,10 @@ def extract_trading_view(ticker,html_content):
     data["price_change_decimal"] = price_change_decimal
     data["price_change_percent"] = price_change_percent
     data["source"] = "trading view"
+    
+    if not is_weekday():
+        # trading view actually does not display after hours price on weekends so this isn't really needed
+        data["after_hours_price"] = after_hours_price
     if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
         data["pre_market_price"] = pre_market_price
     elif (current_time > market_close_time or current_time < pre_market_open_time) and is_number(after_hours_price):
