@@ -7,6 +7,7 @@ from session_times import *
 from datetime import datetime
 
 def run_applescript(script):
+    #logging.info(f"run_applescript")
     process = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
     if process.returncode != 0:
         logging.error("AppleScript error:", process.stderr)
@@ -23,7 +24,7 @@ def run_shell_command(command):
 
 # update_numbers accepts a dict holding pricing for a single ticker
 def update_numbers(data):
-    #logging.info(f'begin update_numbers {data} ')
+    logging.info(f'begin update_numbers {data} ')
 
     numbers_file = "retirement plan.numbers"
     sheet_investments = "Investments"
@@ -36,27 +37,26 @@ def update_numbers(data):
     
     #price_change_decimal=""
     if "pre_market_price" not in data and 'after_hours_price' not in data :
-        #print("no pre market or after hours price")
+        logging.info("no pre market or after hours price")
         if data["last_price"] is not None and data["last_price"] !='':
-            #print("insert last price")
             price = data["last_price"]
-            #price_change_decimal = data["price_change_decimal"]
         else:
             return
     else:
-        # must be a stock. We should use something more appropriate to determine this
         #print("have pre_market or after_hours price keys in data object")
         price_change_decimal = ""
-        
         if not is_weekday():
-            if data["last_price"] is not None and data["last_price"] !='' and "--" not in data["last_price"]:
-                price = data["last_price"]
-                logging.info(f"{data["key"]} - insert last price {price}")
-            #if data["price_change_decimal"] is not None and data["price_change_decimal"] !='':
-            #    print("use price_change_decimal")
-            #    price_change_decimal = data["price_change_decimal"]
-
+            #logging.info(f"not a weekday")
+            if data["after_hours_price"] is not None and data["after_hours_price"] != '':
+                price = data["after_hours_price"]
+                logging.info(f"{data["key"]} - insert after hours price {price}")
+            else:
+                if data["last_price"] is not None and data["last_price"] !='':
+                    price = data["last_price"]
+                    logging.info(f"{data["key"]} - no after hours price. insert last price {price}")
+                    #price_change_decimal = data["price_change_decimal"]
         else:
+            logging.info(f"is a weekday")
             # should this use the after hours price from Friday?
             if is_pre_market_session():
                 logging.info(f"The current time is before {market_open_time}")
@@ -85,16 +85,10 @@ def update_numbers(data):
                     price = data["last_price"]
                     logging.info(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
-                    
-    #if "--" in price:
-    #    # this happens when a bond matures. webull shows the price as "--"
-    #    logging.info(f"{data['key']} - no price to update")
-    #    price = ""
-    #    return
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
-    
+    #logging.info(f"create applescript {price} {now} {source}")
     script = f'''
     tell application "Numbers"
         tell document "{numbers_file}"

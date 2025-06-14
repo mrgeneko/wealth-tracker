@@ -97,14 +97,15 @@ def get_html_for_url(mode, driver,tickers, source):
         if driver != None and mode == "selenium":
             logging.info(f"mode SELENIUM")
             driver.get(url)
-            #logging.info(f'sleep 3 seconds to allow website to load')
+            logging.info(f'sleep 2 seconds to allow website to load')
             time.sleep(2)
             html_content = driver.page_source
-
+            logging.info(f"html: {html_content[:20]}")
             try:
                 html_file = os.path.join(directory, f"{ticker['key']}.{source}.{timestamp}.html")
                 with open(html_file, 'w', encoding='utf-8') as file:
                     file.write(html_content)
+                logging.info(f"html file written")
             except FileNotFoundError:
                 logging.error(f"Error: cannot write {html_file}")
                 return 1
@@ -146,7 +147,7 @@ def get_html_for_url(mode, driver,tickers, source):
             except UnicodeDecodeError:
                 logging.error(f"Error: Could not decode the {html_file} file with UTF-8 encoding")
                 return 1
-
+        logging.info(f"get_html_for_url returning html")
         return html_content
 
         
@@ -169,12 +170,13 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
         while selected == -1:
             logging.debug(f"is_weekday: {is_weekday()} is_pre_market: {is_pre_market_session()} is_regular_trading:{is_regular_trading_session()} is_after_hours:{is_after_hours_session()}")
             logging.debug(f"{sources[current]['name']} pre:{sources[current]['has_pre_market']} ah:{sources[current]['has_after_hours']}")
-
+            #logging.info(f"sources[current]['name']: {sources[current]['name']}")
+            #logging.info(f"ticker[sources[current]['name']]: {ticker[sources[current]['name']]}")
             if sources[current]['name'] in ticker and not pd.isna(ticker[sources[current]['name']]) \
                 and ((is_pre_market_session() and sources[current]['has_pre_market']) or \
                 (is_after_hours_session() and sources[current]['has_after_hours']) or \
                 (is_regular_trading_session() or not is_weekday() )):
-                logging.info(f"has source {current} {ticker[sources[current]['name']]}")
+                logging.info(f"has source {sources[current]['name']} for {ticker[sources[current]['name']]}")
                 selected = current
             else:
                 logging.info(f"does not have source {current} {sources[current]['name']}")
@@ -186,7 +188,7 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                     break
 
         if selected != -1:
-            logging.debug(f"process single ticker")
+            logging.info(f"process single ticker")
             single_ticker = [ None ]
             single_ticker[0] = ticker
             selected_source = sources[selected]['name']
@@ -198,8 +200,15 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                 if download == "selenium":
                     if driver != None:
                         mode="selenium"
-                        html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
-                        data = sources[selected]['extract'](ticker['key'],html_content)
+                        try:
+                            html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
+                            data = sources[selected]['extract'](ticker['key'],html_content)
+                        except Exception as e:
+                            logging.error(f"get_html_for_url with selenium error {e}. FALL BACK TO YAHOO")
+                            html_content=""
+                            for s in sources:
+                                if s['name'] == "yahoo":
+                                    data = s['extract'](ticker['key'],html_content)
                     else:
                         # fallback to yahoo. Hits are slightly off if this happens
                         logging.error(f"NO SELENIUM DRIVER. FALLING BACK TO YAHOO")
@@ -217,7 +226,9 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                     data = sources[selected]['extract'](ticker['key'],html_content)
 
                 sources[selected]['hits'] = sources[selected]['hits'] + 1
+                #logging.info(f"call function handlers[0]")
                 function_handlers[0](data)
+                #logging.info(f"done function handlers[0]")
             except Exception as e:
                 logging.error(f"process round robin source error {e}")
             current = current + 1

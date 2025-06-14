@@ -68,7 +68,7 @@ def extract_cnbc(ticker,html_content):
         if is_pre_market_session():
             logging.info(f"currently in pre market session")
             data["pre_market_price"] = after_hours_price
-        elif is_after_hours_session():
+        elif is_after_hours_session() or not is_weekday():
             logging.info(f"currently in after hours session")
             data["after_hours_price"] = after_hours_price
     else:
@@ -110,7 +110,7 @@ def process_cnbc(driver,tickers):
         
         html_content = driver.page_source
     
-        #logging.info(f"html_content: {html_content}")
+        logging.info(f"html_content: {html_content[:20]}")
 
         soup = BeautifulSoup(html_content, 'html.parser')
         # class name is misleading?
