@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 import pandas as pd
 from is_number import is_number
+from session_times import *
 
 #from selenium.webdriver.support.wait import WebDriverWait
 #from selenium.webdriver.support import expected_conditions as EC
@@ -12,16 +13,65 @@ from is_number import is_number
 def get_marketbeat_attributes():
     attributes = {
         "name" : "marketbeat",
+        "download" : "chrome_dom_dump",
         "process" : process_marketbeat,
-        "has_realtime" : False,
-        "has_pre_market" : False,
-        "has_after_hours" : False,
+        "extract" : extract_marketbeat,
+        "has_realtime" : True,
+        "has_pre_market" : True,
+        "has_after_hours" : True,
         "has_bond_prices" : False,
         "has_stock_prices" : True,
         "has_previous_close" : False,
         "hits" : 0
     }
     return attributes
+
+def extract_marketbeat(ticker,html_content):
+    logging.info(f"extract marketbeat")
+
+    #logging.info(f"html_content: {html_content}")
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+   
+    last_price_element = soup.select_one('[class="d-inline-block mb-2 mr-4"]')
+    logging.info(f'last price element: {last_price_element.text}')
+    parts = last_price_element.text.split()
+    last_price = parts[0]
+    if last_price.startswith("$"):
+        last_price = last_price[1:]
+    logging.info(f"last_price: {last_price}")
+
+    price_change_decimal = parts[1]
+    logging.info(f"price_change_decimal: {price_change_decimal}")
+    price_change_percent = parts[2]
+    logging.info(f"price_change_percent: {price_change_percent}")
+    last_price_datetime = parts[5] + ' ' + parts[6] + ' ' + parts[7]
+    logging.info(f"last_price_datetime: {last_price_datetime}")   
+
+    extended_trading_price = ""
+    try:
+        extended_trading_element = soup.select_one('[class="d-inline-block extended-hours mb-2"]')
+        logging.info(f"ext hours price {extended_trading_element.text}")
+        extended_trading_price = extended_trading_element.text.split('$')[1].split()[0]
+        logging.info(f"ext price: {extended_trading_price}")
+    except:
+        logging.info(f"unable to find extended hours price")
+
+    data = {}
+    data["key"] = ticker
+    data["last_price"] = last_price
+    data["price_change_decimal"] = price_change_decimal
+    data["price_change_percent"] = price_change_percent
+    if not is_weekday():
+        data["after_hours_price"] = extended_trading_price
+    elif is_pre_market_session():
+        data["pre_market_price"] = extended_trading_price
+    elif is_after_hours_session():
+        data["after_hours_price"] = extended_trading_price
+    data["source"] = "marketbeat"
+    
+    logging.info(data)
+    return data
 
 def process_marketbeat(driver,tickers,function_handlers,sleep_interval):
 

@@ -25,7 +25,7 @@ from process_ycharts import get_ycharts_attributes
 from process_webull import get_webull_attributes
 #from process_nasdaq import process_nasdaq
 #from process_nasdaq import get_nasdaq_attributes
-#from process_marketbeat import get_marketbeat_attributes
+from process_marketbeat import get_marketbeat_attributes
 #from process_marketbeat import process_marketbeat
 from process_moomoo import *
 from process_cnbc import *
@@ -94,7 +94,34 @@ def get_html_for_url(mode, driver,tickers, source):
         if not os.path.exists(directory):
             os.makedirs(directory)  # Create directory if it doesn't exist
 
-        if driver != None and mode == "selenium":
+        if mode == "chrome_dump_dom":
+            '''https://peter.sh/experiments/chromium-command-line-switches/'''
+            '''"~/Library/Application Support/Google/Chrome/Default"'''
+            '''chewie@Mac ~ % /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \ --headless --dump-dom https://www.marketbeat.com/stocks/NASDAQ/AAPL/#google_vignette > aapltest.html'''
+            command = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+            args = [ "--headless", "--dump-dom", url]
+            try:
+                # Execute the command and redirect output to the file
+                logging.info(f"run chrome dump for {url}")
+                html_file = os.path.join(directory, f"{ticker['key']}.{source}.{timestamp}.html")
+                result = run(
+                    [*command, *args],
+                    stdout=open(html_file, "w", encoding="utf-8"),
+                    check=True
+                )
+                logging.info(f"done chrome dump command {result}")
+                try:
+                    html_file = os.path.join(directory, f"{ticker['key']}.{source}.{timestamp}.html")
+                    with open(html_file, 'r', encoding='utf-8') as file:
+                        html_content = file.read()
+                except FileNotFoundError:
+                    logging.error(f"Error: File not found {html_file}")
+                    return 1
+
+            except CalledProcessError as e:
+                print(f"Error occurred while running the command: {e}")
+
+        elif driver != None and mode == "selenium":
             logging.info(f"mode SELENIUM")
             driver.get(url)
             logging.info(f'sleep 2 seconds to allow website to load')
@@ -188,7 +215,7 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                     break
 
         if selected != -1:
-            logging.info(f"process single ticker")
+            logging.info(f"process_round_robin selected source {sources[selected]['name']}")
             single_ticker = [ None ]
             single_ticker[0] = ticker
             selected_source = sources[selected]['name']
@@ -197,7 +224,18 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
             
             # Call the 'extract' function to scrape website for a single ticker
             try:
-                if download == "selenium":
+                if download == "chrome_dom_dump":
+                    try:
+                        mode = "chrome_dom_dump"
+                        html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
+                        data = sources[selected]['extract'](ticker['key'],html_content)
+                    except Exception as e:
+                        logging.error(f"get_html_for_url with chrome_dom_dump error {e}. FALL BACK TO YAHOO")
+                        html_content=""
+                        for s in sources:
+                            if s['name'] == "yahoo":
+                                data = s['extract'](ticker['key'],html_content)
+                elif download == "selenium":
                     if driver != None:
                         mode="selenium"
                         try:
@@ -299,7 +337,7 @@ def main():
     #   google       |     X      |      X      |     X     |         |             |            |      X
     #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
     #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
-    #   marketbeat   |            |             |           |    X    |
+    #   marketbeat   |     ?      |    some?    |           |    X    |
     #   nasdaq       |            |      X      |     X     | 
     #   cnbc         |     ?      |      X      |     X     |         |             |
 
@@ -310,11 +348,13 @@ def main():
     google = get_google_attributes()
     #wsj = get_marketbeat_attributes()
     moomoo = get_moomoo_attributes()
+    marketbeat = get_marketbeat_attributes()
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes()
     sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
-    #sources = [ yahoo ]
+    delayed_sources = [ marketbeat ]
+    #sources = [ marketbeat ]
     
     driver = None
     if browser == 'chrome':
