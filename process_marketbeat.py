@@ -13,7 +13,7 @@ from session_times import *
 def get_marketbeat_attributes():
     attributes = {
         "name" : "marketbeat",
-        "download" : "chrome_dom_dump",
+        "download" : "chrome_dump_dom",
         "process" : process_marketbeat,
         "extract" : extract_marketbeat,
         "has_realtime" : True,

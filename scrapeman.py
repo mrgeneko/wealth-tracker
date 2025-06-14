@@ -24,7 +24,7 @@ from process_ycharts import get_ycharts_attributes
 #from process_investing import get_investing_attributes
 from process_webull import get_webull_attributes
 #from process_nasdaq import process_nasdaq
-#from process_nasdaq import get_nasdaq_attributes
+from process_nasdaq import get_nasdaq_attributes
 from process_marketbeat import get_marketbeat_attributes
 #from process_marketbeat import process_marketbeat
 from process_moomoo import *
@@ -66,7 +66,7 @@ def get_tickers_and_urls_from_csv(file_path, include_type=None):
 
 
 def get_html_for_url(mode, driver,tickers, source):
-    logging.info(f"get_html_for_url")
+    logging.info(f"get_html_for_url with mode {mode}")
 
     for i, ticker in enumerate(tickers):
 
@@ -100,6 +100,7 @@ def get_html_for_url(mode, driver,tickers, source):
             '''chewie@Mac ~ % /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \ --headless --dump-dom https://www.marketbeat.com/stocks/NASDAQ/AAPL/#google_vignette > aapltest.html'''
             command = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
             args = [ "--headless", "--dump-dom", url]
+            #args = [ "--dump-dom", url]
             try:
                 # Execute the command and redirect output to the file
                 logging.info(f"run chrome dump for {url}")
@@ -224,9 +225,9 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
             
             # Call the 'extract' function to scrape website for a single ticker
             try:
-                if download == "chrome_dom_dump":
+                if download == "chrome_dump_dom":
                     try:
-                        mode = "chrome_dom_dump"
+                        mode = "chrome_dump_dom" # THIS could just use the download variable instead!!
                         html_content = get_html_for_url(mode,driver,single_ticker, selected_source )
                         data = sources[selected]['extract'](ticker['key'],html_content)
                     except Exception as e:
@@ -307,7 +308,7 @@ def main():
 
     parser.add_argument('--source', '-s', dest='source',
                     default='yahoo',
-                    help='web site source [google|investing|nasdaq|trading_view|webull|yahoo|ycharts] (default: yahoo')
+                    help='web site source [google|investing|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
     parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=True,
                         help='rotate websites round robin')
@@ -351,10 +352,10 @@ def main():
     marketbeat = get_marketbeat_attributes()
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
-    #nasdaq = get_nasdaq_attributes()
+    #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
     sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
     delayed_sources = [ marketbeat ]
-    #sources = [ marketbeat ]
+    #sources = [ nasdaq ]
     
     driver = None
     if browser == 'chrome':
