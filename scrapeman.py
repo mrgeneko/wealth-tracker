@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import subprocess
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
@@ -13,20 +12,13 @@ import time
 import datetime
 import pandas as pd
 from update_cell_in_numbers import update_numbers
-from process_yahoo import process_yahoo
 from process_yahoo import process_yahoo_with_tickers_from_numbers
 from process_yahoo import get_yahoo_attributes
-from process_google import process_google
 from process_google import get_google_attributes
-#from process_finance_charts import process_finance_charts
 from process_trading_view import get_trading_view_attributes
 from process_ycharts import get_ycharts_attributes
-#from process_investing import get_investing_attributes
 from process_webull import get_webull_attributes
-#from process_nasdaq import process_nasdaq
-from process_nasdaq import get_nasdaq_attributes
 from process_marketbeat import get_marketbeat_attributes
-#from process_marketbeat import process_marketbeat
 from process_moomoo import *
 from process_cnbc import *
 from session_times import *
@@ -84,7 +76,7 @@ def get_html_for_url(mode, driver,tickers, source):
         url = ticker[source]
         key = ticker['key']
         #logging.info("\n")
-        logging.info(f'Begin processing: {ticker['key']} selected url: {url}')
+        logging.info(f'get html ticker: {ticker['key']} selected url: {url}')
         
         # Generate timestamp in YYYYMMDD_HHMMSS format
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -96,9 +88,7 @@ def get_html_for_url(mode, driver,tickers, source):
             os.makedirs(directory)  # Create directory if it doesn't exist
 
         if mode == "chrome_dump_dom":
-            '''https://peter.sh/experiments/chromium-command-line-switches/'''
-            '''"~/Library/Application Support/Google/Chrome/Default"'''
-            '''chewie@Mac ~ % /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \ --headless --dump-dom https://www.marketbeat.com/stocks/NASDAQ/AAPL/#google_vignette > aapltest.html'''
+            
             command = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
             args = [ "--headless", "--dump-dom", url]
             #args = [ "--dump-dom", url]
@@ -278,7 +268,6 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
 
     for source in sources:
         logging.info(f"{source['name']} : {source['hits']}")
-    #logging.info(f"usage: {sources}")
 
 def main():
 
@@ -293,37 +282,33 @@ def main():
                         choices=['stocks', 'bonds'], default='stocks',
                         help='Specify "stocks" to exclude bonds or "bonds" to include only bond lines')
     
-    parser.add_argument('--sleep-interval', '-z', dest='sleep_interval',
-                    type=int, default=3,
-                    help='Seconds to sleep between processing each ticker (default: 3)')
-    
     parser.add_argument('--driver', '-d', dest='browser',
                     default='chrome',
                     help='web browser [chrome|firefox|safari] (default: chrome)')
     
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
 
-    parser.add_argument('--source', '-s', dest='source',
-                    default='yahoo',
-                    help='web site source [google|investing|trading_view|webull|yahoo|ycharts] (default: yahoo')
     
-    parser.add_argument('--roundrobin', '-r', dest='round_robin', type=bool, default=True,
-                        help='rotate websites round robin')
+    # the 'sources' argument which accepts multiple strings
+    parser.add_argument(
+        '--sources', '-s',
+        nargs='+',  # This allows one or more arguments to be passed
+        type=str,
+        required=False,
+        help='pricing sources [google|investing|trading_view|webull|yahoo|ycharts] (default: yahoo'
+    )
     
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
                     help='retrieve stock tickers from numbers, use yfinance for prices')
 
-
     args = parser.parse_args()
     setup_logging(args.log_level)
 
-    round_robin = args.round_robin
     input_file = args.input_file
     tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
     browser = args.browser
     yahoo_batch = args.yahoo_batch
-    selected_source=args.source
-    sleep_interval = args.sleep_interval
+    sleep_interval = 1 #args.sleep_interval
 
     function_handlers = [update_numbers]
 
@@ -350,9 +335,21 @@ def main():
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
-    sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
+    available_sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
     delayed_sources = [ marketbeat ]
-    #sources = [ nasdaq ]
+
+    logging.info(f"args.sources: {args.sources}")
+    selected_sources = []
+    if args.sources != None:
+        for s in args.sources:
+            for asource in available_sources:
+                if s == asource['name']:
+                    selected_sources.append(asource)
+    else:
+        logging.info(f"no sources arguement provided")
+        selected_sources = available_sources
+
+    logging.info(f"selected_sources: {selected_sources}")
     
     driver = None
     if browser == 'chrome':
@@ -385,10 +382,6 @@ def main():
             driver = webdriver.Safari(service=service)
         except Exception as e:
             logging.error(f"unable to create safari driver {e}")
-            
-    if round_robin:
-        process_round_robin(driver,tickers, sources, function_handlers, sleep_interval)
-        exit(0)
 
     if yahoo_batch:
         # the main reason to use this version is to pull tickers from the numbers spreadsheet
@@ -396,15 +389,7 @@ def main():
         process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
         exit(0)
 
-    #logging.info(f"source: {selected_source}")
-
-    for source in sources:
-        #logging.info(f"compare source: {source}")
-        if selected_source == source['name']:
-            #logging.info(f"call process : {selected_source}")
-            result = source['process'](driver,tickers,function_handlers,sleep_interval)
-            break
-
+    process_round_robin(driver,tickers, selected_sources, function_handlers, sleep_interval)
     exit(0)
 
 if __name__ == "__main__":

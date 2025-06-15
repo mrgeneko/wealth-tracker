@@ -2,6 +2,9 @@
 
 # https://deepwiki.com/gildas-lormeau/single-file-cli/5.3-docker-deployment
 
+# https://peter.sh/experiments/chromium-command-line-switches/
+# "~/Library/Application Support/Google/Chrome/Default"
+
 # Check if exactly two arguments are provided
 if [ $# -ne 2 ]; then
     echo "Usage: $0 <ticker> <source>"
