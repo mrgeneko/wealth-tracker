@@ -18,15 +18,8 @@ echo filename: "$filename"
 # Create target directory if it doesn't exist
 mkdir -p ~/singlefile_html/
 
-# Validate timestamp format (alphanumeric with dots, hyphens or underscores)
-#if [[ ! $timestamp =~ ^[a-zA-Z0-9_.:-]+$ ]]; then
-#    echo "Error: Timestamp contains invalid characters. Use alphanumeric and these symbols: . - _ :"
-#    exit 1
-#fi
-
 # Run docker command and save output to file
-#docker run --rm -v "/Users/gene/singlefile_html:/usr/src/app/out" singlefile "$url" > ~/singlefile_html/${ticker}.${source}.${timestamp}.html
-docker run --rm -v "/Users/chewie/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true
+docker run --rm -v "$HOME/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true
 
 
 # Optional: Check if docker command succeeded
