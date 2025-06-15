@@ -9,6 +9,8 @@ from selenium.webdriver.safari.service import Service as SafariService
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 
 import time
+import os
+from subprocess import run, CalledProcessError, CompletedProcess
 import datetime
 import pandas as pd
 from update_cell_in_numbers import update_numbers
@@ -301,6 +303,7 @@ def main():
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
                     help='retrieve stock tickers from numbers, use yfinance for prices')
 
+
     args = parser.parse_args()
     setup_logging(args.log_level)
 
@@ -335,7 +338,7 @@ def main():
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
-    available_sources = [ cnbc, moomoo, trading_view, webull, yahoo, ycharts ]
+    available_sources = [ cnbc, google, moomoo, trading_view, webull, yahoo, ycharts ]
     delayed_sources = [ marketbeat ]
 
     logging.info(f"args.sources: {args.sources}")
