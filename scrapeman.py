@@ -146,7 +146,7 @@ def get_html_for_url(mode, driver,tickers, source):
                 logging.info(f"run html_to_singlefile.sh for {url}")
                 result = run(
                     [*command, *args],
-                    stdout=open(logfile, "w", encoding="utf-8"),
+                    #stdout=open(logfile, "w", encoding="utf-8"), # uncomment this line to create a log of command
                     check=True
                 )
                 logging.info(f"done singlefile command")
