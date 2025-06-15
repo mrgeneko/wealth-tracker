@@ -91,6 +91,7 @@ def get_html_for_url(mode, driver,tickers, source):
 
         # Get the full path to your directory (this is the key fix)
         directory = os.path.expanduser('~/singlefile_html')  # Expands ~ to full path
+        bin_directory = os.path.expanduser('~/bin')  # Expands ~ to full path
         if not os.path.exists(directory):
             os.makedirs(directory)  # Create directory if it doesn't exist
 
@@ -140,18 +141,14 @@ def get_html_for_url(mode, driver,tickers, source):
         else:
             logging.info(f"mode SINGLEFILE")
             # let's use singlefile command to retrieve html
-
-            #output_file = f"~/investing_com_html/{ticker['key']}_{url_selection}.{timestamp}.html"
+            singlefile_script = os.path.join(bin_directory,"html_to_singlefile.sh")
             logfile = os.path.join(directory, f"{ticker['key']}.{source}.{timestamp}.log")
             filename = f"{ticker['key']}.{source}.{timestamp}.html"
 
             # Define the command and its arguments
-            #command = ["docker", "run", "--rm", "singlefile"]
-            command = ["/Users/chewie/bin/html_to_singlefile.sh"]
-            #command = ["html_to_singlefile.sh"]
+            command = [ singlefile_script ]
             args = [url, filename]
 
-            
             try:
                 # Execute the command and redirect output to the file
                 logging.info(f"run html_to_singlefile.sh for {url}")
