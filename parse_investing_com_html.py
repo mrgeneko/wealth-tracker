@@ -65,7 +65,7 @@ def parse_watchlist_table(html_content):
         
         # Check if the row contains all required columns
         if set(row_data.keys()) == required_columns:
-            logging.info(f"row_data {row_data}")
+            logging.info(f"\n\nrow_data {row_data}")
             specific_rows_json.append(row_data)
             # transfer data to object that udpate_cell_in_numbers.py expects
             # Get the current time
@@ -77,9 +77,9 @@ def parse_watchlist_table(html_content):
             data = {}
             data["key"] = row_data["symbol"]
             data["last_price"] = row_data["last"]
-            data["price_change_decimal"] = row_data["chg"]
-            data["price_change_percent"] = row_data["chgpercent"]
-            data["source"] = "investing.com mon"
+            #data["price_change_decimal"] = row_data["chg"]
+            #data["price_change_percent"] = row_data["chgpercent"]
+            data["source"] = "investing mon"
             if current_time < market_open_time and current_time > pre_market_open_time and is_number(row_data["extended_hours"]):
                 data["pre_market_price"] = row_data["extended_hours"]
             elif (current_time > market_close_time or current_time < pre_market_open_time) and row_data["extended_hours"] != '--':

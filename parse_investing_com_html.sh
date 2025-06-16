@@ -1,11 +1,23 @@
 #!/bin/bash
-log="~/logs/parse_investing_com_html.log"
+
+# instal Google Chrome browser
+# install 'SingleFile chrome extension'
+# set File name template to: portfoliowatchlist{year-locale}{month-locale}{day-locale}{hours-locale}{minutes-locale}{seconds-locale}.{filename-extension}
+# deselect Images -> save deferred images
+# set destination to file system
+# set HTML content -> compress HTML content to off. Setting to true removes </tr> tags which makes parsing difficult
+# set Autosave -> 'auto=save after page load' to on
+# set auto-save waiting delay after page load(s) to 2
+# set auto-save periodically to on with period(s) to 120
+
+
+log="$HOME/logs/parse_investing_com_html.log"
 date >> "$log"
 # Define the directory containing the files
-log_dir="~/investing_com_html"
+html_dir="$HOME/Downloads"
 
 # Find all matching files and sort them by modification time (newest last)
-files=$(find "$log_dir" -type f -name "investing.202*.html" | xargs ls -t)
+files=$(find "$html_dir" -type f -name "portfoliowatchlist202*.html" | xargs ls -t)
 
 # Convert the list of files into an array
 file_array=($files)
@@ -34,5 +46,5 @@ if [ ${#file_array[@]} -gt 0 ]; then
     
     echo "Newest file: $newest_file has been processed and older files have been moved with .old suffix." >> "$log"
 else
-    echo "No matching files found in $log_dir" >> "$log"
+    echo "No matching files found in $html_dir" >> "$log"
 fi

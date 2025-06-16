@@ -21,6 +21,7 @@ from process_trading_view import get_trading_view_attributes
 from process_ycharts import get_ycharts_attributes
 from process_webull import get_webull_attributes
 from process_marketbeat import get_marketbeat_attributes
+from process_wsj import get_wsj_attributes
 from process_moomoo import *
 from process_cnbc import *
 from session_times import *
@@ -266,7 +267,7 @@ def process_round_robin(driver, tickers, sources, function_handlers):
             selected = -1
             #time.sleep(sleep_interval)
         else:
-            logging.info(f"nothing to work on")
+            logging.info(f"no source found for this ticker")
 
     for source in sources:
         logging.info(f"{source['name']} : {source['hits']}")
@@ -332,13 +333,14 @@ def main():
     ycharts = get_ycharts_attributes()
     trading_view = get_trading_view_attributes()
     google = get_google_attributes()
-    #wsj = get_marketbeat_attributes()
+    #wsj = get_wsj_attributes() # does not work with singlefile due to bot detection
     moomoo = get_moomoo_attributes()
     marketbeat = get_marketbeat_attributes()
     cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
-    available_sources = [ cnbc, google, moomoo, trading_view, webull, yahoo, ycharts ]
+    #available_sources = [ cnbc, google, moomoo, trading_view, webull, yahoo, ycharts ]
+    available_sources = [ wsj ]
     delayed_sources = [ marketbeat ]
 
     logging.info(f"args.sources: {args.sources}")
