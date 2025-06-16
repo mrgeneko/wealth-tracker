@@ -25,6 +25,9 @@ def run_shell_command(command):
 # update_numbers accepts a dict holding pricing for a single ticker
 def update_numbers(data):
     logging.info(f'begin update_numbers {data} ')
+    if data == None:
+        logging.error("update_numbers was passed data as None")
+        return
 
     numbers_file = "retirement plan.numbers"
     sheet_investments = "Investments"
