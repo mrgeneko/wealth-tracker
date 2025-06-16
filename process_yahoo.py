@@ -80,7 +80,7 @@ def extract_yahoo(ticker,html_content):
     try:    
         yfdata = yf.Ticker(ticker)
         info = yfdata.info
-        #pprint.pprint(info)
+        pprint.pprint(info)
         example='''
         info object: {'longBusinessSummary': 'Under normal market conditions, the fund generally invests substantially all, but at least 80%, of its total assets in the securities comprising the index. The index is designed to measure the performance of the large-capitalization segment of the U.S. equity market.',
             'companyOfficers': [], 'executiveTeam': [], 'maxAge': 86400, 'priceHint': 2, 'previousClose': 68.57,
@@ -117,7 +117,7 @@ def extract_yahoo(ticker,html_content):
         if not is_weekday():
             after_hours_price = info.get("postMarketPrice")
         elif is_pre_market_session():
-            pre_market_price = info.get("postMarketPrice")
+            pre_market_price = info.get("preMarketPrice")
         elif is_after_hours_session():
             after_hours_price = info.get("postMarketPrice")
         comment='''
