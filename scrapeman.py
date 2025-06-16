@@ -174,7 +174,7 @@ def setup_logging(log_level):
         raise ValueError('Invalid log level: %s' % log_level)
     logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def process_round_robin(driver, tickers, sources, function_handlers, sleep_interval):
+def process_round_robin(driver, tickers, sources, function_handlers):
     logging.info(f"process round-robin")
     num_sources=len(sources)
     current = random.randint(0, (num_sources-1))
@@ -264,7 +264,7 @@ def process_round_robin(driver, tickers, sources, function_handlers, sleep_inter
                 current = 0
             first_checked = current
             selected = -1
-            time.sleep(sleep_interval)
+            #time.sleep(sleep_interval)
         else:
             logging.info(f"nothing to work on")
 
@@ -311,7 +311,7 @@ def main():
     tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
     browser = args.browser
     yahoo_batch = args.yahoo_batch
-    sleep_interval = 1 #args.sleep_interval
+    sleep_interval = 1
 
     function_handlers = [update_numbers]
 
@@ -392,7 +392,7 @@ def main():
         process_yahoo_with_tickers_from_numbers(driver,tickers,function_handlers,sleep_interval)
         exit(0)
 
-    process_round_robin(driver,tickers, selected_sources, function_handlers, sleep_interval)
+    process_round_robin(driver,tickers, selected_sources, function_handlers)
     exit(0)
 
 if __name__ == "__main__":
