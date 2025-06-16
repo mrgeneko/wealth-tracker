@@ -11,8 +11,8 @@ def get_moomoo_attributes():
         "download" : "selenium",
         "extract" : extract_moomoo,
         "has_realtime" : True, 
-        "has_pre_market" : True,
-        "has_after_hours" : True, # True only for stocks, not for ETFs
+        "has_pre_market" : False, # True only for stocks, not for ETFs
+        "has_after_hours" : False, # True only for stocks, not for ETFs
         "has_bond_prices" : False,
         "has_stock_prices" : True,
         "has_previous_close" : False,
