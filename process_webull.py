@@ -32,23 +32,52 @@ def extract_webull(ticker,html_content):
     after_hours_price = ""
     pre_market_price = ""
 
-    last_price_element = soup.select_one('[class="csr115 csr112"]')
-    #price_normal_element = quote_element.select_one('[class="price-normal"]')
-    #last_price_element = price_normal_element.select_one('[class="mg-r-8 price direct-up"]')
-    if last_price_element != None:
-        last_price = last_price_element.text
-        logging.info(f'last price element: {last_price}')
-    else:
-        logging.info(f'last price element not found in fcsr115 csr112')
-        last_price_element = soup.select_one('[class="csr116 csr112"]')
-        if last_price_element != None:
-            last_price = last_price_element.text
-            logging.info(f'last price element: {last_price}')
+
             
     if "YIELD" in html_content and "MATURITY" in html_content:
         logging.info(f"detected BOND")
+        last_price_element = soup.select_one('[class="csr114 csr111"]')
+        if last_price_element != None:
+            last_price = last_price_element.text
+            logging.info(f'last price element: {last_price}')
+        else:
+            logging.info(f'last price element not found in csr114 csr111')
+            last_price_element = soup.select_one('[class="csr115 csr111"]')
+            if last_price_element != None:
+                last_price = last_price_element.text
+                logging.info(f'last price element: {last_price}')
+            else:
+                logging.info(f'last price element not found in csr115 csr111')
+                last_price_element = soup.select_one('[class="csr116 csr111"]')
+                if last_price_element != None:
+                    last_price = last_price_element.text
+                    logging.info(f'last price element: {last_price}')
+
+
     else:
         logging.info(f"detected STOCK")
+
+        last_price_element = soup.select_one('[class="csr115 csr112"]')
+        #price_normal_element = quote_element.select_one('[class="price-normal"]')
+        #last_price_element = price_normal_element.select_one('[class="mg-r-8 price direct-up"]')
+        if last_price_element != None:
+            last_price = last_price_element.text
+            logging.info(f'last price element: {last_price}')
+        else:
+            logging.info(f'last price element not found in csr115 csr112')
+            last_price_element = soup.select_one('[class="csr116 csr112"]')
+            if last_price_element != None:
+                last_price = last_price_element.text
+                logging.info(f'last price element: {last_price}')
+            else:
+                logging.info(f'last price element not found in csr116 csr112')
+                last_price_element = soup.select_one('[class="csr114 csr112"]')
+                if last_price_element != None:
+                    last_price = last_price_element.text
+                    logging.info(f'last price element: {last_price}')
+
+
+
         price_datetime_outer_element = soup.select_one('[class="csr132"]')
         if price_datetime_outer_element != None:
             price_datetime_inner_element = price_datetime_outer_element.select_one('[class="csr132"]')
