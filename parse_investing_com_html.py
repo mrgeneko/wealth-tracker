@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import logging
-import time
 import os
 from bs4 import BeautifulSoup
 import argparse
@@ -12,6 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from is_number import is_number
+import json
 
 # use monitor at investing.com 
 # investing.com hsupports multiple watchlists. THe exported html will contain only the first/left watchlist on first load
@@ -147,7 +147,8 @@ def parse_watchlist_table(html_content):
             logging.info(data)
             update_numbers(data)
 
-
+    #logging.info(f"specific_rows_json: {specific_rows_json}")
+    #logging.info(f"specific_rows_json: {json.dumps(specific_rows_json, indent=4)}")
     return specific_rows_json
 
 
@@ -160,6 +161,7 @@ def setup_logging(log_level):
 def main():
     parser = argparse.ArgumentParser(description="Process investing.com .html file to extract stock data")
     parser.add_argument("--file_path", '-f', type=str, help="Path to the invesing.com .html file")
+    parser.add_argument("--output_file_path", '-o', type=str, help="Path to the json output file")
     parser.add_argument('--log-level', '-l', default='INFO', help='Set the logging level')
     args = parser.parse_args()
     setup_logging(args.log_level)
@@ -204,8 +206,17 @@ def main():
         logging.info(f"{html_content}")
         driver.quit()
 
-    specific_data = parse_watchlist_table(html_content)
-    #print(json.dumps(specific_data, indent=4))
+    price_data = parse_watchlist_table(html_content)
+
+    #if not os.path.exists(args.file_path):
+    #    print(f"File does not exist: {args.file_path}")
+    #    return
+
+    # Step 1: Read the HTML content from the file
+    with open(args.output_file_path, 'w', encoding='utf-8') as file:
+        file.write(json.dumps(price_data, indent=4))
+
+    #print(json.dumps(price_data, indent=4))
 
 if __name__ == "__main__":
     main()
