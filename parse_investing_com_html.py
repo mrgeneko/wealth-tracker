@@ -48,7 +48,49 @@ def parse_watchlist_table(html_content):
                         "chgpercent", "vol", "next_earning",
                         "time"
                         }
-    
+
+    pre_market_open_time = datetime.strptime("04:00", "%H:%M").time()
+    market_open_time = datetime.strptime("09:30", "%H:%M").time()
+    market_close_time = datetime.strptime("16:00", "%H:%M").time()
+
+    # tickers such as BKLC do not get priced correctly on investing.com in extended hours
+    # price change in BKLC should closely follow VOO, so we'll calculate an estimated price
+    # for BKLC
+    model_tickers = [{"target":"BKLC", "source":"VOO", "percent_change": None}]
+    for row in table.find_all('tr'):
+        #logging.info(f"row: {row}")
+        cols = row.find_all('td')
+        
+        # Create a dictionary to hold the data of this row
+        row_data = {}
+
+        for col in cols:
+            column_name = col.get('data-column-name')
+            #logging.info(f"column name: {column_name}")
+            if column_name in required_columns:
+                #logging.info(f"req col found {column_name}")
+                row_data[column_name] = col.get_text(strip=True)
+
+        # Check if the row contains all required columns
+        if set(row_data.keys()) == required_columns:
+            source_ticker = None
+            for model_ticker in model_tickers:
+                if row_data["symbol"] == model_ticker["source"]:
+                    source_ticker = model_ticker
+                    break
+
+            if source_ticker != None:
+                logging.info(f"\n\nSOURCE_TICKER FOUND for {model_ticker["target"]} -> row_data {row_data}")
+                if row_data["extended_hours_percent"] == "--":
+                    model_ticker["percent_change"] = "0.00"
+                else:
+                   logging.info(f"ext_hours_percent: {row_data["extended_hours_percent"]}")
+                   model_ticker["percent_change"] = row_data["extended_hours_percent"].rstrip('%')
+            
+                #logging.info(f"extended_hours_percent: {model_ticker["percent_change"]}")
+                logging.info(f"model_ticker: {model_ticker}")
+
+
     for row in table.find_all('tr'):
         #logging.info(f"row: {row}")
         cols = row.find_all('td')
@@ -70,9 +112,6 @@ def parse_watchlist_table(html_content):
             # transfer data to object that udpate_cell_in_numbers.py expects
             # Get the current time
             current_time = datetime.now().time()
-            pre_market_open_time = datetime.strptime("04:00", "%H:%M").time()
-            market_open_time = datetime.strptime("09:30", "%H:%M").time()
-            market_close_time = datetime.strptime("16:00", "%H:%M").time()
 
             data = {}
             data["key"] = row_data["symbol"]
@@ -80,11 +119,31 @@ def parse_watchlist_table(html_content):
             #data["price_change_decimal"] = row_data["chg"]
             #data["price_change_percent"] = row_data["chgpercent"]
             data["source"] = "investing mon"
+            
+            # check if this row_data has a ticker that needs to have price modeled after another ticker
+            source_ticker = None
+            for model_ticker in model_tickers:
+                if row_data["symbol"] == model_ticker["target"]:
+                    source_ticker = model_ticker
+                    logging.info(f"This ticker modeled after {model_ticker}")
+                    break
+
             if current_time < market_open_time and current_time > pre_market_open_time and is_number(row_data["extended_hours"]):
-                data["pre_market_price"] = row_data["extended_hours"]
+                if source_ticker == None:
+                    data["pre_market_price"] = row_data["extended_hours"]
+                else:
+                    data["pre_market_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
+                    data["source"] = "modeled"
             elif (current_time > market_close_time or current_time < pre_market_open_time) and row_data["extended_hours"] != '--':
-                data["after_hours_price"] = row_data["extended_hours"]
-            # html dodes not appear to have extended hours fields populated although it is diasplayed
+                if source_ticker == None:
+                    data["after_hours_price"] = row_data["extended_hours"]
+                else:
+                    data["after_hours_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
+                    data["source"] = "modeled"
+            #FOR TESTING elif source_ticker != None:
+            #    data["pre_market_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
+            #    data["source"] = "modeled"
+
             logging.info(data)
             update_numbers(data)
 
