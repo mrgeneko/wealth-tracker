@@ -27,7 +27,6 @@ if [ ${#file_array[@]} -gt 0 ]; then
     newest_file="${file_array[0]}"
     echo "will process" "$newest_file" >> "$log"
 
-    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     OUTPUT_FILE="$HOME/logs/price_data.${TIMESTAMP}.log"
 
     # Run the script with the newest file
