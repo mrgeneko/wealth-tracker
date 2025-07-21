@@ -10,8 +10,8 @@
 # set auto-save waiting delay after page load(s) to 2
 # set auto-save periodically to on with period(s) to 120
 
-
-log="$HOME/logs/parse_investing_com_html.log"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+log="$HOME/logs/parse_investing_com_html.${TIMESTAMP}.log"
 date >> "$log"
 # Define the directory containing the files
 html_dir="$HOME/Downloads"
