@@ -129,16 +129,18 @@ def parse_watchlist_table(html_content):
                     logging.info(f"This ticker modeled after {model_ticker}")
                     break
 
-            if current_time < market_open_time and current_time > pre_market_open_time and is_number(row_data["extended_hours"]):
-                if source_ticker == None:
+            if current_time < market_open_time and current_time > pre_market_open_time:
+                if source_ticker == None and is_number(row_data["extended_hours"]):
                     data["pre_market_price"] = row_data["extended_hours"]
-                else:
+                elif source_ticker != None:
+                    logging.info(f"calculate modeled price {source_ticker["percent_change"]} {row_data["last"]}")
                     data["pre_market_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
                     data["source"] = "modeled"
-            elif (current_time > market_close_time or current_time < pre_market_open_time) and row_data["extended_hours"] != '--':
-                if source_ticker == None:
+            elif (current_time > market_close_time or current_time < pre_market_open_time):
+                if source_ticker == None and is_number(row_data["extended_hours"]):
                     data["after_hours_price"] = row_data["extended_hours"]
-                else:
+                elif source_ticker != None:
+                    logging.info(f"calculate modeled price {source_ticker["percent_change"]} {row_data["last"]}")
                     data["after_hours_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
                     data["source"] = "modeled"
             #FOR TESTING elif source_ticker != None:
@@ -213,9 +215,10 @@ def main():
     #    print(f"File does not exist: {args.file_path}")
     #    return
 
-    # Step 1: Read the HTML content from the file
-    with open(args.output_file_path, 'w', encoding='utf-8') as file:
-        file.write(json.dumps(price_data, indent=4))
+    # write prices to an output file
+    if args.output_file_path != None:
+        with open(args.output_file_path, 'w', encoding='utf-8') as file:
+            file.write(json.dumps(price_data, indent=4))
 
     #print(json.dumps(price_data, indent=4))
 
