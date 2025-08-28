@@ -52,6 +52,12 @@ def extract_webull(ticker,html_content):
                 if last_price_element != None:
                     last_price = last_price_element.text
                     logging.info(f'last price element: {last_price}')
+                else:
+                    logging.info(f'last price element not found in csr116 csr111')
+                    last_price_element = soup.select_one('[class="csr116 csr113"]')
+                    if last_price_element != None:
+                        last_price = last_price_element.text
+                        logging.info(f'last price element: {last_price}')
 
 
     else:
