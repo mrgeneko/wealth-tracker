@@ -58,6 +58,7 @@ def parse_watchlist_table(html_content):
     # for BKLC
     model_tickers = [{"target":"BKLC", "source":"VOO", "percent_change": None},
                       {"target":"QQUP", "source":"QLD", "percent_change": None}]
+    
     for row in table.find_all('tr'):
         #logging.info(f"row: {row}")
         cols = row.find_all('td')
