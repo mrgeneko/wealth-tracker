@@ -89,6 +89,12 @@ def update_numbers(data):
                     logging.info(f"{data["key"]} - no after hours price. insert last price {price}")
                     #price_change_decimal = data["price_change_decimal"]
 
+    if "previous_price" not in data:
+        logging.info("no previous price")
+        previous_price = "-1"
+    else:
+        previous_price = data["previous_price"]
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # THIS SHOULD BE REPLACED BY THE LAST TRADE TIME STAMP!
     #logging.info(f"create applescript {price} {now} {source}")
@@ -105,6 +111,14 @@ def update_numbers(data):
                         end if
                     end repeat
                     if price_col is 0 then error "Price column not found."  
+
+                    repeat with i from 1 to column count
+                        if value of cell i of row 1 is "Previous Price" then
+                            set prev_price_col to i
+                            exit repeat
+                        end if
+                    end repeat
+                    if prev_price_col is 0 then error "Previous Price column not found."  
 
                     set key_col to 0
                     repeat with i from 1 to column count
@@ -139,6 +153,9 @@ def update_numbers(data):
                         if tickerVal is not missing value and tickerVal is not "" then
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{price}"'
+                            ])}
+                            {chr(10).join([
+                                f'if tickerVal is "{data["key"]}" then set value of cell prev_price_col of row r to "{previous_price}"'
                             ])}
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell update_time_col of row r to "{now}"'

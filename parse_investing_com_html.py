@@ -121,7 +121,8 @@ def parse_watchlist_table(html_content):
             #data["price_change_decimal"] = row_data["chg"]
             #data["price_change_percent"] = row_data["chgpercent"]
             data["source"] = "investing mon"
-            
+            data["previous_price"] = row_data["prev"]
+            logging.info(f"PREVIOUS_PRICE SET TO {data["previous_price"]}")
             # check if this row_data has a ticker that needs to have price modeled after another ticker
             source_ticker = None
             for model_ticker in model_tickers:
