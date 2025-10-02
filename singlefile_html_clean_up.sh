@@ -33,4 +33,18 @@ find "$TARGET_DIR" \
     fi
 done
 
+
+
+PATTERN="*.*.202*.log"
+find "$TARGET_DIR" \
+     -type f \
+     -name "$PATTERN" \
+     -mmin +"$AGE_MINUTES" \
+  -print0 | while IFS= read -r -d '' file; do
+    if [ "$DRY_RUN" = true ]; then
+      echo "Would delete: $file"
+    else
+      rm -- "$file" && echo "Deleted:  $file"
+    fi
+done
 echo "Done."
