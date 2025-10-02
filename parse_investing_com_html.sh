@@ -18,7 +18,8 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 log="$HOME/logs/parse_investing_com_html.${TIMESTAMP}.log"
 date >> "$log"
 # Define the directory containing the files
-html_dir="${HOME}/Downloads"
+#html_dir="${HOME}/Downloads"
+html_dir="${HOME}/singlefile_html"
 
 
 # Find all matching files and sort them by modification time (newest last), robust to spaces/newlines
