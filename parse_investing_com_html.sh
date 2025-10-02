@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
 
 # instal Google Chrome browser
 # install 'SingleFile chrome extension'
@@ -10,17 +12,20 @@
 # set auto-save waiting delay after page load(s) to 2
 # set auto-save periodically to on with period(s) to 120
 
+
+mkdir -p "$HOME/logs"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 log="$HOME/logs/parse_investing_com_html.${TIMESTAMP}.log"
 date >> "$log"
 # Define the directory containing the files
-html_dir="$HOME/Downloads"
+html_dir="${HOME}/Downloads"
 
-# Find all matching files and sort them by modification time (newest last)
-files=$(find "$html_dir" -type f -name "portfoliowatchlist202*.html" | xargs ls -t)
 
-# Convert the list of files into an array
-file_array=($files)
+# Find all matching files and sort them by modification time (newest last), robust to spaces/newlines
+file_array=()
+while IFS= read -r file; do
+    file_array+=("$file")
+done < <(find "$html_dir" -type f -name "portfoliowatchlist202*.html" -print0 | xargs -0 stat -f "%m %N" | sort -rn | cut -d' ' -f2-)
 
 # Get the newest file
 if [ ${#file_array[@]} -gt 0 ]; then
@@ -31,21 +36,19 @@ if [ ${#file_array[@]} -gt 0 ]; then
 
     # Run the script with the newest file
     ~/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
-    mv "${newest_file}" "${newest_file}.old"
+    mv -- "$newest_file" "$newest_file.old"
 
     # Move all other files except the newest one to the same filename with .old appended
     for ((i=1; i<${#file_array[@]}; i++)); do
         old_file="${file_array[i]}"
         new_filename="${old_file}.old"
-        
         # Check if a file with the .old extension already exists and increment the suffix
         while [ -f "$new_filename" ]; do
             new_filename="${new_filename%.old}_1.old"
         done
-        
-        mv "${old_file}" "${new_filename}"
+        mv -- "$old_file" "$new_filename"
     done
-    
+
     echo "Newest file: $newest_file has been processed and older files have been moved with .old suffix." >> "$log"
 else
     echo "No matching files found in $html_dir" >> "$log"
