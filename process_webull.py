@@ -31,7 +31,7 @@ def extract_webull(ticker,html_content):
     last_price = ""
     after_hours_price = ""
     pre_market_price = ""
-
+    previous_price = ""
 
             
     if "YIELD" in html_content and "MATURITY" in html_content:
@@ -59,6 +59,12 @@ def extract_webull(ticker,html_content):
                         last_price = last_price_element.text
                         logging.info(f'last price element: {last_price}')
 
+        label = soup.find("div", string="PREV CLOSE")
+        if label:
+            value = label.find_next_sibling("div")
+            if value:
+                print(value.text.strip())
+                previous_price = value
 
     else:
         logging.info(f"detected STOCK")
@@ -120,6 +126,7 @@ def extract_webull(ticker,html_content):
     data["last_price"] = last_price
     data["after_hours_price"] = after_hours_price
     data["pre_market_price"] = pre_market_price
+    data["previous_price"] = previous_price
     data["source"] = "webull"
     #if current_time < market_open_time and current_time > pre_market_open_time and is_number(pre_market_price):
     #    data["pre_market_price"] = pre_market_price
