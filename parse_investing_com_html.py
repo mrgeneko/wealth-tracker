@@ -122,7 +122,21 @@ def parse_watchlist_table(html_content):
             #data["price_change_percent"] = row_data["chgpercent"]
             data["source"] = "investing mon"
             data["previous_price"] = row_data["prev"]
-            logging.info(f"PREVIOUS_PRICE SET TO {data["previous_price"]}")
+            logging.info(f"PREVIOUS_PRICE SET TO {data['previous_price']}")
+            # Convert time to full datetime if in hh:mm:ss format
+            qt = row_data["time"]
+            try:
+                # If qt matches hh:mm:ss and not already a full datetime
+                if qt and len(qt) == 8 and qt.count(":") == 2:
+                    today = datetime.now().strftime("%Y-%m-%d")
+                    qt_full = f"{today} {qt}"
+                    data["quote_time"] = qt_full
+                else:
+                    data["quote_time"] = qt
+            except Exception as e:
+                logging.error(f"Error parsing quote_time: {e}")
+                data["quote_time"] = qt
+            data["capture_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             # check if this row_data has a ticker that needs to have price modeled after another ticker
             source_ticker = None
             for model_ticker in model_tickers:
