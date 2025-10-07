@@ -7,7 +7,7 @@
 
 # Check if exactly two arguments are provided
 if [ $# -ne 2 ]; then
-    echo "Usage: $0 <ticker> <source>"
+    echo "Usage: $0 <url> <filename>"
     exit 1
 fi
 
