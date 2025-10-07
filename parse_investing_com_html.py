@@ -128,7 +128,16 @@ def parse_watchlist_table(html_content):
             try:
                 # If qt matches hh:mm:ss and not already a full datetime
                 if qt and len(qt) == 8 and qt.count(":") == 2:
-                    today = datetime.now().strftime("%Y-%m-%d")
+                    now = datetime.now()
+                    # If today is Saturday (5) or Sunday (6), use the most recent Friday
+                    if now.weekday() == 5:  # Saturday
+                        friday = now.replace(day=now.day - 1)
+                        today = friday.strftime("%Y-%m-%d")
+                    elif now.weekday() == 6:  # Sunday
+                        friday = now.replace(day=now.day - 2)
+                        today = friday.strftime("%Y-%m-%d")
+                    else:
+                        today = now.strftime("%Y-%m-%d")
                     qt_full = f"{today} {qt}"
                     data["quote_time"] = qt_full
                 else:
