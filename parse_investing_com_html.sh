@@ -4,8 +4,12 @@ set -euo pipefail
 
 # ---- kafka env (project-local) ----
 # Option A: export directly
-export KAFKA_BOOTSTRAP_SERVERS='kafka1:9092,kafka2:9092'
+#export KAFKA_BOOTSTRAP_SERVERS='kafka1:9092,kafka2:9092'
+#export KAFKA_TOPIC='price_data'
+export KAFKA_BOOTSTRAP_SERVERS='localhost:9092'
 export KAFKA_TOPIC='price_data'
+export KAFKA_CONSUMER_GROUP='price_data_consumer_group'
+export KAFKA_ENABLE_AUTO_COMMIT='false'  # optional
 
 # Option B (preferred if you don't want to store in repo): source a .env file
 # Create a .env in the repo (add it to .gitignore), then uncomment the line below
