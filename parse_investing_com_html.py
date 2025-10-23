@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import argparse
 from datetime import datetime
 from update_cell_in_numbers import update_numbers
+from publish_to_kafka import publish_to_kafka
 
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -174,6 +175,10 @@ def parse_watchlist_table(html_content):
 
             logging.info(data)
             update_numbers(data)
+            try:
+                publish_to_kafka(data)
+            except Exception as e:
+                logging.error(f"publish_to_kafka error: {e}")
 
     #logging.info(f"specific_rows_json: {specific_rows_json}")
     #logging.info(f"specific_rows_json: {json.dumps(specific_rows_json, indent=4)}")
