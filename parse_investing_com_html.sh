@@ -2,6 +2,17 @@
 set -euo pipefail
 
 
+# ---- kafka env (project-local) ----
+# Option A: export directly
+export KAFKA_BOOTSTRAP_SERVERS='kafka1:9092,kafka2:9092'
+export KAFKA_TOPIC='price_data'
+
+# Option B (preferred if you don't want to store in repo): source a .env file
+# Create a .env in the repo (add it to .gitignore), then uncomment the line below
+# [ -f "$(pwd)/.env" ] && source "$(pwd)/.env"
+# -----------------------------------
+
+
 # instal Google Chrome browser
 # install 'SingleFile chrome extension'
 # set File name template to: portfoliowatchlist{year-locale}{month-locale}{day-locale}{hours-locale}{minutes-locale}{seconds-locale}.{filename-extension}
