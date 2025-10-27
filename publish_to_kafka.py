@@ -2,8 +2,15 @@ import json
 import logging
 import os
 import time
-from kafka import KafkaProducer
-from kafka.errors import KafkaError
+try:
+    from kafka import KafkaProducer
+    from kafka.errors import KafkaError
+except Exception as e:
+    raise ImportError(
+        "Missing dependency 'kafka-python'. Install it into the Python interpreter you run with:\n"
+        "python -m pip install kafka-python\n"
+        "Or install all project deps: python -m pip install -r requirements.txt"
+    ) from e
 
 
 def publish_to_kafka(data, bootstrap_servers=None, topic=None, retries=3, retry_delay=2):

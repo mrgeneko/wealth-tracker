@@ -1,0 +1,12 @@
+# Core dependencies for scrapeman project
+# Unpinned so `pip install -r requirements.txt` installs latest compatible releases
+kafka-python
+confluent-kafka
+mysql-connector-python
+beautifulsoup4
+lxml
+selenium
+webdriver-manager
+pandas
+python-dotenv
+requests

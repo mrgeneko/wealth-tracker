@@ -9,7 +9,19 @@ log_file="$HOME/singlefile_html/singlefile_wrap.$timestamp.log"
 
 # Log the date at the start of the log file for this run
 echo "$(date)" >> "$log_file"
-/usr/bin/osascript /Users/chewie/Library/Mobile\ Documents/com\~apple\~ScriptEditor2/Documents/chrome_singlefile.scpt
+
+/usr/bin/osascript $HOME/Library/Mobile\ Documents/com\~apple\~ScriptEditor2/Documents/chrome_singlefile.scpt
+
+# Prefer the canonical saved script location, but fall back to the current working directory
+#SCPT_PRIMARY="$HOME/Library/Mobile Documents/com~apple~ScriptEditor2/Documents/chrome_singlefile.scpt"
+#SCPT_CWD="$(pwd)/chrome_singlefile.scpt"
+#if [ -f "$SCPT_PRIMARY" ]; then
+#	/usr/bin/osascript "$SCPT_PRIMARY"
+#elif [ -f "$SCPT_CWD" ]; then
+#	/usr/bin/osascript "$SCPT_CWD"
+#else
+#	echo "Warning: chrome_singlefile.scpt not found at $SCPT_PRIMARY or $SCPT_CWD" >> "$log_file"
+#fi
 sleep 7
 
 # Move generated files to singlefile_html directory
@@ -27,6 +39,8 @@ for f in "$src_dir"/portfoliowatchlist202*.html; do
 	dest_file="$dest_dir/$base_name"
 	if [ -e "$dest_file" ]; then
 		echo "Skipped $f: $dest_file already exists" >> "$log_file"
+		echo "Deleting $f"
+		rm $f
 		continue
 	fi
 	mv -- "$f" "$dest_dir/"
