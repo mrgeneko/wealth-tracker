@@ -51,7 +51,10 @@ if [ ${#file_array[@]} -gt 0 ]; then
     OUTPUT_FILE="$HOME/logs/price_data.${TIMESTAMP}.log"
 
     # Run the script with the newest file
-    ~/venv/bin/python3 parse_investing_com_html.py --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
+    # Use the pyenv python that has project dependencies installed
+    PYTHON_EXEC="/Users/gene/.pyenv/versions/3.13.3/bin/python"
+    echo "Using python: $($PYTHON_EXEC -c 'import sys; print(sys.executable)')" >> "$log"
+    "$PYTHON_EXEC" parse_investing_com_html.py --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
     mv -- "$newest_file" "$newest_file.old"
 
     # Move all other files except the newest one to the same filename with .old appended
