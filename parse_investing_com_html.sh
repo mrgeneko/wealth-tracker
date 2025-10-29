@@ -54,7 +54,29 @@ if [ ${#file_array[@]} -gt 0 ]; then
     # Use the pyenv python that has project dependencies installed
     PYTHON_EXEC="/Users/gene/.pyenv/versions/3.13.3/bin/python"
     echo "Using python: $($PYTHON_EXEC -c 'import sys; print(sys.executable)')" >> "$log"
-    "$PYTHON_EXEC" parse_investing_com_html.py --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
+    # Quick health check for Kafka (the parser will try to publish messages). If Kafka is unavailable
+    # we still allow parsing to continue but we warn early (exit code 2 indicates unreachable broker).
+    "$PYTHON_EXEC" - <<'PY' || echo "Kafka health check failed (parser will continue but publishes may fail)" >> "$log"
+import os, socket, sys
+bs = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+hostport = bs.split(',')[0]
+if ':' in hostport:
+    host, port = hostport.split(':', 1)
+else:
+    host, port = hostport, '9092'
+try:
+    s = socket.socket()
+    s.settimeout(2)
+    s.connect((host, int(port)))
+    s.close()
+    print('KAFKA_OK')
+except Exception as e:
+    print('KAFKA_UNREACHABLE', e)
+    sys.exit(2)
+PY
+
+    # Run the package entrypoint
+    "$PYTHON_EXEC" -m scrapeman.parse_investing_com_html --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
     mv -- "$newest_file" "$newest_file.old"
 
     # Move all other files except the newest one to the same filename with .old appended
