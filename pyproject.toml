@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrapeman"
+version = "0.0.0"
+description = "Scrapeman — market data scraping utilities (development package)."
+authors = [ { name = "Gene" } ]
+readme = "README.md"
+requires-python = ">=3.11, <4.0"
+dependencies = []
+
+[tool.setuptools]
+# No dynamic fields required for this simple local package
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scrapeman*"]

@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 """
-kafka-python consumer for the `price_data` topic.
+Package entrypoint: kafka-python consumer for price_data topic.
 
 Usage:
-  pip install kafka-python
-  export KAFKA_BOOTSTRAP_SERVERS='localhost:9092'
-  export KAFKA_TOPIC='price_data'
-  export KAFKA_CONSUMER_GROUP='price_data_consumer_group'
-  python3 scripts/consume_kafka_kp.py
-
-This script polls in batches, decodes JSON messages, processes them via `process_message`, and commits offsets.
+  python -m scrapeman.scripts.consume_kafka_kp
 """
-
 import os
 import json
 import logging
@@ -40,9 +33,7 @@ signal.signal(signal.SIGTERM, handle_signal)
 
 
 def process_message(data: dict):
-    """Process a single message payload (dict). Replace with your real logic."""
     logging.info(f"Processing message: {data}")
-    # TODO: insert into DB, call services, etc.
 
 
 def main():
@@ -73,7 +64,6 @@ def main():
                         process_message(data)
                     except Exception:
                         logging.exception('Error processing message')
-                # commit after processing this partition's batch if manual commits
                 if not ENABLE_AUTO_COMMIT:
                     try:
                         consumer.commit()

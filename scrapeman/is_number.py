@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 def is_number(value):
     try:
         # Attempt to convert to an integer
@@ -12,4 +10,3 @@ def is_number(value):
             return True
         except ValueError:
             return False
-        
