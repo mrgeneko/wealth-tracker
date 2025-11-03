@@ -86,17 +86,32 @@ def parse_watchlist_table(html_content):
                     break
 
             if current_time < market_open_time and current_time > pre_market_open_time:
-                if source_ticker == None and is_number(row_data["extended_hours"]):
+                if source_ticker is None and is_number(row_data["extended_hours"]):
                     data["pre_market_price"] = row_data["extended_hours"]
-                elif source_ticker != None:
-                    data["pre_market_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
-                    data["source"] = "modeled"
+                elif source_ticker is not None:
+                    # percent_change may be None or non-numeric; guard against that
+                    pct = source_ticker.get("percent_change")
+                    try:
+                        if pct is not None and is_number(pct) and is_number(row_data.get("last")):
+                            data["pre_market_price"] = (1.0 + (0.01 * float(pct))) * float(row_data["last"])
+                            data["source"] = "modeled"
+                        else:
+                            logging.warning("Cannot model pre_market_price for %s: percent_change=%s last=%s", row_data.get("symbol"), pct, row_data.get("last"))
+                    except Exception as e:
+                        logging.error(f"Error modeling pre_market_price for {row_data.get('symbol')}: {e}")
             elif (current_time > market_close_time or current_time < pre_market_open_time):
-                if source_ticker == None and is_number(row_data["extended_hours"]):
+                if source_ticker is None and is_number(row_data["extended_hours"]):
                     data["after_hours_price"] = row_data["extended_hours"]
-                elif source_ticker != None:
-                    data["after_hours_price"] = (float(1.00) + (float(.01) * float(source_ticker["percent_change"]))) * float(row_data["last"])
-                    data["source"] = "modeled"
+                elif source_ticker is not None:
+                    pct = source_ticker.get("percent_change")
+                    try:
+                        if pct is not None and is_number(pct) and is_number(row_data.get("last")):
+                            data["after_hours_price"] = (1.0 + (0.01 * float(pct))) * float(row_data["last"])
+                            data["source"] = "modeled"
+                        else:
+                            logging.warning("Cannot model after_hours_price for %s: percent_change=%s last=%s", row_data.get("symbol"), pct, row_data.get("last"))
+                    except Exception as e:
+                        logging.error(f"Error modeling after_hours_price for {row_data.get('symbol')}: {e}")
 
             logging.info(data)
             update_numbers(data)
