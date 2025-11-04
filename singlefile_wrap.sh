@@ -11,7 +11,8 @@ log_file="$HOME/singlefile_html/singlefile_wrap.$timestamp.log"
 echo "$(date)" >> "$log_file"
 
 #/usr/bin/osascript $HOME/Library/Mobile\ Documents/com\~apple\~ScriptEditor2/Documents/chrome_singlefile.scpt
-/usr/bin/osascript "$HOME/Library/Mobile Documents/com~apple~ScriptEditor2/Documents/chrome_singlefile.scpt" >> "$log_file" 2>&1
+#/usr/bin/osascript "$HOME/Library/Mobile Documents/com~apple~ScriptEditor2/Documents/chrome_singlefile.scpt" >> "$log_file" 2>&1
+/usr/bin/osascript "$HOME/bin/chrome_singlefile.scpt" >> "$log_file" 2>&1
 echo "$(date)" >> "$log_file"
 echo "chrome_singlefile.scpt done" >> "$log_file"
 
