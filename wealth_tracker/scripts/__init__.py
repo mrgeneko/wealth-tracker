@@ -1,6 +1,6 @@
-"""Package entry points for scrapeman scripts.
+"""Package entry points for wealth_tracker scripts.
 
-Run these with: python -m scrapeman.scripts.publish_test_message
+Run these with: python -m wealth_tracker.scripts.publish_test_message
 """
 
 __all__ = [

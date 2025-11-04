@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 
 def test_write_price_data_to_mysql_inserts_and_closes():
-    from scrapeman.write_price_data_to_mysql import write_price_data_to_mysql
+    from wealth_tracker.write_price_data_to_mysql import write_price_data_to_mysql
 
     # Prepare mock cursor and connection
     mock_cursor = Mock()
@@ -10,7 +10,7 @@ def test_write_price_data_to_mysql_inserts_and_closes():
     mock_conn.cursor.return_value = mock_cursor
     mock_conn.is_connected.return_value = True
 
-    with patch("scrapeman.write_price_data_to_mysql.mysql.connector.connect", return_value=mock_conn):
+    with patch("wealth_tracker.write_price_data_to_mysql.mysql.connector.connect", return_value=mock_conn):
         rows = [{"k": "MYSQL-TEST-1", "last_price": "10.01", "source": "e2e-test"}]
         write_price_data_to_mysql(rows, "host", "user", "pw", "db", "price_data_test2")
 

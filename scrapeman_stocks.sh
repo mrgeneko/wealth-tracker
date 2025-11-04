@@ -5,4 +5,4 @@ sleep 10
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 # Use package entrypoint
-~/venv/bin/python3 -m scrapeman.scrapeman -t stocks > ~/logs/scrapeman_stocks.${TIMESTAMP}.log 2>&1
+~/venv/bin/python3 -m wealth_tracker.wealth_tracker -t stocks > ~/logs/wealth_tracker_stocks.${TIMESTAMP}.log 2>&1

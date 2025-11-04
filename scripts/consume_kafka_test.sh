@@ -25,4 +25,4 @@ if [ $? -ne 0 ]; then
 	exit 2
 fi
 
-"$PYTHON_EXEC" -m scrapeman.scripts.consume_kafka_test "$@"
+"$PYTHON_EXEC" -m wealth_tracker.scripts.consume_kafka_test "$@"

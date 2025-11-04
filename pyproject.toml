@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "scrapeman"
+name = "wealth_tracker"
 version = "0.0.0"
-description = "Scrapeman — market data scraping utilities (development package)."
+description = "Wealth Tracker — market data scraping utilities (development package)."
 authors = [ { name = "Gene" } ]
 readme = "README.md"
 requires-python = ">=3.11, <4.0"
@@ -15,4 +15,4 @@ dependencies = []
 # No dynamic fields required for this simple local package
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["scrapeman*"]
+include = ["wealth_tracker*"]

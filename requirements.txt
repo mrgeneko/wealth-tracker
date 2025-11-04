@@ -1,4 +1,4 @@
-# Core dependencies for scrapeman project
+# Core dependencies for wealth_tracker project
 # Unpinned so `pip install -r requirements.txt` installs latest compatible releases
 kafka-python
 confluent-kafka
