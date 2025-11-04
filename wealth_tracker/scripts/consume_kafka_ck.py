@@ -3,7 +3,7 @@
 Package entrypoint: confluent-kafka consumer for price_data topic.
 
 Usage:
-  python -m scrapeman.scripts.consume_kafka_ck
+  python -m wealth_tracker.scripts.consume_kafka_ck
 """
 import os
 import json

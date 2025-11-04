@@ -3,7 +3,7 @@
 Package entrypoint that publishes a sample message using the package publisher.
 
 Usage:
-  python -m scrapeman.scripts.publish_test_message
+  python -m wealth_tracker.scripts.publish_test_message
 """
 import os
 import logging
@@ -11,7 +11,7 @@ from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
-from scrapeman.publish_to_kafka import publish_to_kafka
+from wealth_tracker.publish_to_kafka import publish_to_kafka
 
 
 def main():

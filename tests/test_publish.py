@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 def test_publish_to_kafka_success():
     # import inside test so patches resolve correctly
-    from scrapeman.publish_to_kafka import publish_to_kafka
+    from wealth_tracker.publish_to_kafka import publish_to_kafka
 
     data = {"test": "hello"}
 
@@ -16,7 +16,7 @@ def test_publish_to_kafka_success():
     mock_producer = Mock()
     mock_producer.send.return_value = mock_future
 
-    with patch("scrapeman.publish_to_kafka.KafkaProducer", return_value=mock_producer):
+    with patch("wealth_tracker.publish_to_kafka.KafkaProducer", return_value=mock_producer):
         res = publish_to_kafka(data, bootstrap_servers="localhost:9092", topic="test_topic", retries=1)
 
     assert res is True

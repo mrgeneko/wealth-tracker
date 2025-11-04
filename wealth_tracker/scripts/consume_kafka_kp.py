@@ -3,7 +3,7 @@
 Package entrypoint: kafka-python consumer for price_data topic.
 
 Usage:
-  python -m scrapeman.scripts.consume_kafka_kp
+  python -m wealth_tracker.scripts.consume_kafka_kp
 """
 import os
 import json

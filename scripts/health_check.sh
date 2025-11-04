@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Health check for scrapeman: verifies python interpreter, required imports, and Kafka connectivity.
+# Health check for wealth_tracker: verifies python interpreter, required imports, and Kafka connectivity.
 PYTHON_EXEC="${PYTHON_EXEC:-/Users/gene/.pyenv/versions/3.13.3/bin/python}"
 
 echo "Using python: $PYTHON_EXEC"

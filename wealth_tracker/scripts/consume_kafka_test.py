@@ -3,7 +3,7 @@
 Package entrypoint: consume fixed number of messages from Kafka then exit.
 
 Usage:
-  python -m scrapeman.scripts.consume_kafka_test --num 5
+  python -m wealth_tracker.scripts.consume_kafka_test --num 5
 """
 import os
 import json

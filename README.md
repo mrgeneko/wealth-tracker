@@ -1,11 +1,11 @@
-scrapeman
+wealth_tracker
 =========
 
 Developer README — minimal run instructions and notes.
 
 What changed
 ------------
-- The repository was refactored into a package: all canonical implementations live under the `scrapeman/` package.
+- The repository was refactored into a package: all canonical implementations live under the `wealth_tracker/` package.
 - Top-level Python shim files and top-level script `.py` files were removed to avoid duplication. Use the package entrypoints instead.
 
 Quick setup (developer, editable install)
@@ -20,7 +20,7 @@ Quick setup (developer, editable install)
 2) Run a smoke-import check (this verifies the package imports):
 
 ```bash
-/Users/gene/.pyenv/versions/3.13.3/bin/python -c "import importlib,sys; mods=['scrapeman','scrapeman.publish_to_kafka','scrapeman.write_price_data_to_mysql','scrapeman.parse_investing_com_html'];
+/Users/gene/.pyenv/versions/3.13.3/bin/python -c "import importlib,sys; mods=['wealth_tracker','wealth_tracker.publish_to_kafka','wealth_tracker.write_price_data_to_mysql','wealth_tracker.parse_investing_com_html'];
 ok=True
 for m in mods:
     try:
@@ -43,16 +43,16 @@ docker compose -f docker-compose.kafka.yml up -d
 - For MySQL dev, you can run a MySQL container (example):
 
 ```bash
-docker run -d --name scrapeman-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
+docker run -d --name wealth_tracker-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
 ```
 
 Scripts / entrypoints
 ---------------------
-- Scripts are now packaged under `scrapeman.scripts` and should be executed with the `-m` flag, for example:
+- Scripts are now packaged under `wealth_tracker.scripts` and should be executed with the `-m` flag, for example:
 
 ```bash
-python -m scrapeman.scripts.publish_test_message
-python -m scrapeman.scripts.consume_kafka_test --from-beginning --num 1
+python -m wealth_tracker.scripts.publish_test_message
+python -m wealth_tracker.scripts.consume_kafka_test --from-beginning --num 1
 ```
 
 Notes & troubleshooting

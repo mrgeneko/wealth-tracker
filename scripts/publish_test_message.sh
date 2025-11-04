@@ -28,4 +28,4 @@ if [ $? -ne 0 ]; then
 fi
 
 # Run the package entrypoint
-PYTHONPATH="$REPO_ROOT" "$PYTHON_EXEC" -m scrapeman.scripts.publish_test_message
+PYTHONPATH="$REPO_ROOT" "$PYTHON_EXEC" -m wealth_tracker.scripts.publish_test_message

@@ -1,4 +1,4 @@
-"""scrapeman package init
+"""wealth_tracker package init
 
 Expose commonly used functions at package level.
 """
