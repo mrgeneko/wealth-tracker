@@ -14,6 +14,7 @@ except Exception as e:
 
 
 def publish_to_kafka(data, bootstrap_servers=None, topic=None, retries=3, retry_delay=2):
+    logging.info(f"publish_to_kafka called")
     """
     Publish a Python dict 'data' to a Kafka topic as JSON.
 
@@ -48,6 +49,7 @@ def publish_to_kafka(data, bootstrap_servers=None, topic=None, retries=3, retry_
             future = producer.send(topic, data)
             result = future.get(timeout=10)
             logging.info(f"Published message to Kafka topic {topic}: {result}")
+            print(f"Published message to Kafka topic {topic}: {result}")
             producer.flush()
             producer.close()
             return True

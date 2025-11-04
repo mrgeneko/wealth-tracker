@@ -8,7 +8,9 @@ services:
     ports:
       - "2181:2181"
 
+
   kafka:
+    container_name: wealth-tracker-kafka
     image: confluentinc/cp-kafka:7.4.0
     restart: unless-stopped
     depends_on:
@@ -27,3 +29,4 @@ services:
       interval: 10s
       retries: 10
       start_period: 10s
+      

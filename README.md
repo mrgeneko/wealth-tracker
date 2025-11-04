@@ -43,7 +43,7 @@ docker compose -f docker-compose.kafka.yml up -d
 - For MySQL dev, you can run a MySQL container (example):
 
 ```bash
-docker run -d --name wealth_tracker-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
+docker run -d --name wealth-tracker-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
 ```
 
 Scripts / entrypoints
