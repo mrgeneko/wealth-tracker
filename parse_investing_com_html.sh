@@ -76,7 +76,7 @@ except Exception as e:
 PY
 
     # Run the package entrypoint
-    "$PYTHON_EXEC" -m scrapeman.parse_investing_com_html --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
+    "$PYTHON_EXEC" -m wealth_tracker.parse_investing_com_html --file_path "$newest_file" --output_file_path "$OUTPUT_FILE" >> "$log" 2>&1
     mv -- "$newest_file" "$newest_file.old"
 
     # Move all other files except the newest one to the same filename with .old appended
