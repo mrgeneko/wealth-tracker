@@ -1,0 +1,7 @@
+FROM python:3.13
+WORKDIR /app
+COPY requirements.txt /app/
+RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY . /app
+RUN pip install -e .
+CMD ["python", "-m", "wealth_tracker.scripts.consume_kafka_ck"]

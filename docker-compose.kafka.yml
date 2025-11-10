@@ -34,7 +34,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -45,4 +45,17 @@ services:
       interval: 10s
       retries: 10
       start_period: 10s
+
+  kafka-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    container_name: wealth-tracker-kafka-consumer
+    depends_on:
+      - kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: price_data
+    # command can be omitted if set in Dockerfile
       
