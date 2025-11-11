@@ -22,7 +22,7 @@ echo filename: "$filename"
 mkdir -p ~/singlefile_html/
 
 # Run docker command and save output to file
-docker run --rm -v "$HOME/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true
+    gtimeout -k 5s 20s docker run --rm -v "$HOME/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true
 
 
 # Optional: Check if docker command succeeded

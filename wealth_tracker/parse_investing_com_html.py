@@ -57,7 +57,7 @@ def parse_watchlist_table(html_content):
             data["key"] = row_data["symbol"]
             data["last_price"] = row_data["last"]
             data["source"] = "investing"
-            data["previous_price"] = row_data["prev"]
+            data["previous_close_price"] = row_data["prev"]
             data["capture_time"] = capture_time
 
             qt = row_data["time"]

@@ -23,7 +23,6 @@ def get_google_attributes():
 
 def extract_google(ticker,html_content):
     logging.info(f"extract google")
-    soup = BeautifulSoup(html_content, 'html.parser')
     last_price = ""
     after_hours_price = ""
     pre_market_price = ""
@@ -90,6 +89,6 @@ def extract_google(ticker,html_content):
     data["price_change_percent"] = price_change_percent
     data["after_hours_price"] = after_hours_price
     data["pre_market_price"] = pre_market_price
-    data["source"] = "google finance"
+    data["source"] = "google_finance"
     logging.info(data)
     return data

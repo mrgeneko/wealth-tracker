@@ -86,7 +86,7 @@ def get_html_for_url(mode, driver,tickers, source):
 
         # Get the full path to your directory (this is the key fix)
         directory = os.path.expanduser('~/singlefile_html')  # Expands ~ to full path
-        bin_directory = os.path.expanduser('~/bin')  # Expands ~ to full path
+        bin_directory = os.getcwd()  # Use current working directory
         if not os.path.exists(directory):
             os.makedirs(directory)  # Create directory if it doesn't exist
 
@@ -148,11 +148,18 @@ def get_html_for_url(mode, driver,tickers, source):
                 result = run(
                     [*command, *args],
                     #stdout=open(logfile, "w", encoding="utf-8"), # uncomment this line to create a log of command
-                    check=True
+                    check=True,
+                    timeout=15
                 )
                 logging.info(f"done singlefile command")
             except CalledProcessError as e:
                 print(f"Error occurred while running the command: {e}")
+            except TimeoutError:
+                logging.error(f"Timeout: html_to_singlefile.sh took longer than 15 seconds for {url}")
+                return 1
+            except Exception as e:
+                logging.error(f"Unexpected error running html_to_singlefile.sh: {e}")
+                return 1
 
             time.sleep(3)
             try:
