@@ -82,6 +82,8 @@ def update_numbers(data):
         previous_price = data["previous_price"]
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # If previous_price is -1, set prev_price_col to 0 in the AppleScript
+    prev_price_col_override = "set prev_price_col to 0" if str(previous_price) == "-1" else ""
     script = f'''
     tell application "Numbers"
         tell document "{numbers_file}"
@@ -96,13 +98,15 @@ def update_numbers(data):
                     end repeat
                     if price_col is 0 then error "Price column not found."  
 
+                    
                     repeat with i from 1 to column count
                         if value of cell i of row 1 is "Previous Price" then
                             set prev_price_col to i
                             exit repeat
                         end if
                     end repeat
-                    if prev_price_col is 0 then error "Previous Price column not found."  
+                    {prev_price_col_override}
+                    if prev_price_col is 0 then error "Previous Price column not found."
 
                     set key_col to 0
                     repeat with i from 1 to column count

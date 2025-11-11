@@ -127,6 +127,7 @@ def fetch_prices(tickers):
                 "last_price": price,
                 "price_change_decimal": round(price_change_decimal,4) if price_change_decimal is not None else "N/A",
                 "previous_close_price": round(previous_close_price,4) if previous_close_price is not None else "N/A",
+                "previous_price": round(previous_close_price,4) if previous_close_price is not None else "N/A",
                 "pre_market_price": "",
                 "after_hours_price": round(after_hours_price,4) if after_hours_price is not None else "N/A",
                 "source" : "yahoo"
