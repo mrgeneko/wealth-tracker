@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This scrip assumes that the codecapsule/singlefile image is already installed in docker
+
 # https://deepwiki.com/gildas-lormeau/single-file-cli/5.3-docker-deployment
 
 # https://peter.sh/experiments/chromium-command-line-switches/
