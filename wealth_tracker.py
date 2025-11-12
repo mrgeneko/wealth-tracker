@@ -348,7 +348,7 @@ def main():
     #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
 
     available_sources = [  cnbc, google, trading_view, webull, yahoo, ycharts ]
-    #available_sources = [ google ]
+    #available_sources = [ trading_view ]
     delayed_sources = [ marketbeat ]
 
     logging.info(f"args.sources: {args.sources}")
