@@ -17,21 +17,27 @@ fi
 url=$1
 filename=$2
 
-echo url: "$url"
-echo filename: "$filename"
+echo url: "$url" >&2
+echo filename: "$filename" >&2
 
 # Create target directory if it doesn't exist
 mkdir -p ~/singlefile_html/
 
-# Run docker command and save output to file
-    gtimeout -k 5s 20s docker run --rm -v "$HOME/singlefile_html:/usr/src/app/out" singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true
 
 
-# Optional: Check if docker command succeeded
-if [ $? -eq 0 ]; then
-    echo "Successfully ran singlefile. HTML to ${filename}"
+# Run docker command with timeout and capture container ID
+container_id=$(docker-compose run -d --rm -T singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true)
+
+# Wait for the container to finish with timeout
+gtimeout -k 5s 20s docker wait "$container_id"
+status=$?
+
+# If timeout or error, kill the container
+if [ $status -eq 0 ]; then
+    echo "Successfully ran singlefile. HTML to ${filename}" >&2
     exit 0
 else
-    echo "Error: Failed to execute docker command. Ensure 'singlefile' image is available."
+    echo "Error or timeout occurred. Killing container $container_id..." >&2
+    docker kill "$container_id"
     exit 1
 fi

@@ -143,21 +143,30 @@ def get_html_for_url(mode, driver,tickers, source):
             args = [url, filename]
 
             try:
-                # Execute the command and redirect output to the file
+                import subprocess
                 logging.info(f"run html_to_singlefile.sh for {url}")
                 result = run(
                     [*command, *args],
-                    #stdout=open(logfile, "w", encoding="utf-8"), # uncomment this line to create a log of command
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                     check=True,
-                    timeout=15
+                    timeout=15,
+                    text=True
                 )
                 logging.info(f"done singlefile command")
+                logging.info(f"stdout: {result.stdout}")
+                logging.info(f"stderr: {result.stderr}")
             except CalledProcessError as e:
-                print(f"Error occurred while running the command: {e}")
-            except TimeoutError:
+                logging.error(f"Error occurred while running the command: {e}")
+                logging.error(f"stdout: {e.stdout}")
+                logging.error(f"stderr: {e.stderr}")
+            except subprocess.TimeoutExpired as e:
                 logging.error(f"Timeout: html_to_singlefile.sh took longer than 15 seconds for {url}")
+                logging.error(f"stdout: {e.stdout}")
+                logging.error(f"stderr: {e.stderr}")
                 return 1
             except Exception as e:
+                logging.error(f"Unexpected error: {e}")
                 logging.error(f"Unexpected error running html_to_singlefile.sh: {e}")
                 return 1
 

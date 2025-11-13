@@ -107,7 +107,7 @@ def extract_yahoo(ticker,html_content):
         "source" : "yahoo"
     }
 
-    print(f"Fetched price for {ticker} {data}")
+    logging.info(f"Fetched price for {ticker} {data}")
     return data
 
 
@@ -135,7 +135,7 @@ def fetch_prices(tickers):
                 "source" : "yahoo"
             }
             price_data.append(single_ticker)
-            print(f"Fetched price for {ticker} {single_ticker}")
+            logging.info(f"Fetched price for {ticker} {single_ticker}")
             time.sleep(2)
         except Exception as e:
             print(f"Error fetching {ticker}: {e}")

@@ -81,7 +81,30 @@ def extract_trading_view(ticker, html_content):
             previous_close_price = str(round(float(lp) - float(pcd), 6))
     except Exception as e:
         logging.warning(f"Could not calculate previous_close_price: {e}")
+    # Extract after-hours price (Post-market)
     after_hours_price = ""
+    after_hours_selectors = [
+        ('span', 'last-NYvR1HH2 js-symbol-ext-hrs-close'),
+        ('span', 'last-NYvR1HH2'),
+    ]
+    for tag, cls in after_hours_selectors:
+        el = soup.find(tag, class_=cls)
+        if el and el.get_text(strip=True):
+            after_hours_price = el.get_text(strip=True)
+            break
+    # If after_hours_price equals last_price, try to find next occurrence
+    if after_hours_price == last_price:
+        found = False
+        for tag, cls in after_hours_selectors:
+            els = soup.find_all(tag, class_=cls)
+            for el in els:
+                val = el.get_text(strip=True)
+                if val != last_price and is_number(val):
+                    after_hours_price = val
+                    found = True
+                    break
+            if found:
+                break
     pre_market_price = ""
     data["key"] = ticker
     data["last_price"] = last_price
