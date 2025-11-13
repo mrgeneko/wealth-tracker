@@ -332,17 +332,17 @@ def main():
 
     function_handlers = [update_numbers]
 
-    #   Source       | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
-    #   yahoo        |    ???     |      X      |     X     |         |             |     X      |      X     |
-    #   webull       |     X      |      X      |     X     |         |      X      |
-    #   trading view |     X      | only til 8p |     X     |         |             |
-    #   investing    |     X      |      X      |     X     |         |             |
-    #   google       |     X      |      X      |     X     |         |             |            |      X
-    #   ycharts      |     X      |      X      |     X     |         |             |            |      X     |     X
-    #   moomoo       |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
-    #   marketbeat   |     ?      |    some?    |           |    X    |
-    #   nasdaq       |            |      X      |     X     | 
-    #   cnbc         |     ?      |      X      |     X     |         |             |
+    #   Source           | Pre Market | After Hours | Real Time | Delayed | Bond Prices | Prev Close | Change Dec | Change PC
+    #   yahoo            |    ???     |      X      |     X     |         |             |     X      |      X     |
+    #   webull           |     X      |      X      |     X     |         |      X      |
+    #   trading view     |     X      | only til 8p |     X     |         |             |
+    #   investing        |     X      |      X      |     X     |         |             |
+    #   google           |     X      |      X      |     X     |         |             |            |      X
+    #   ycharts          |     X      |      X      |     X     |         |             |            |      X     |     X
+    #   moomoo           |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
+    #   marketbeat       |     ?      |    some?    |           |    X    |
+    #   nasdaq           |            |      X      |     X     | 
+    #   cnbc (times out) |     ?      |      X      |     X     |         |             |
 
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
@@ -352,11 +352,11 @@ def main():
     #wsj = get_wsj_attributes() # does not work with singlefile due to bot detection
     #moomoo = get_moomoo_attributes()
     marketbeat = get_marketbeat_attributes()
-    cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
+    #cnbc = get_cnbc_attributes() # SINGLEFILE gets stuck on cnbc.com so use selenium!!
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
 
-    available_sources = [  cnbc, google, trading_view, webull, yahoo, ycharts ]
+    available_sources = [ google, trading_view, webull, yahoo, ycharts ]
     #available_sources = [ trading_view ]
     delayed_sources = [ marketbeat ]
 

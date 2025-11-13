@@ -27,6 +27,8 @@ mkdir -p ~/singlefile_html/
 
 # Run docker command with timeout and capture container ID
 container_id=$(docker-compose run -d --rm -T singlefile "$url" "$filename" --load-deferred-images false --browser-wait-until InteractiveTime --block-images true --block-fonts true)
+#container_id=$(docker-compose run -d --rm -T singlefile "$url" "$filename" --load-deferred-images false --block-images true --block-fonts true)
+
 
 # Wait for the container to finish with timeout
 gtimeout -k 5s 20s docker wait "$container_id"
