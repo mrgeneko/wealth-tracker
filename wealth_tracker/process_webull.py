@@ -27,6 +27,11 @@ def extract_webull(ticker, html_content):
 
     if "YIELD" in html_content and "MATURITY" in html_content:
         logging.info(f"detected BOND")
+        # Always define these to avoid local variable errors
+        pre_market_price = ""
+        pre_market_price_change = ""
+        pre_market_price_change_percent = ""
+
         # Extract last price: try csr121 csr117, then csr120 csr117
         last_price_tag = soup.find('div', class_='csr121 csr117')
         last_price = last_price_tag.get_text(strip=True) if last_price_tag else ""
