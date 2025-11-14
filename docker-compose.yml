@@ -1,4 +1,14 @@
 services:
+  chrome-singlefile:
+      build:
+        context: .
+        dockerfile: Dockerfile.chrome_singlefile
+      platform: linux/amd64
+      container_name: wealth-tracker-chrome-singlefile
+      volumes:
+        - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
+      ports:
+        - "5901:5900"
   mysql:
     image: mysql:8.0
     container_name: wealth-tracker-mysql
@@ -62,7 +72,21 @@ services:
   singlefile:
     image: capsulecode/singlefile:latest
     container_name: wealth-tracker-singlefile
-    restart: unless-stopped
     volumes:
-      - ~/singlefile_html:/usr/src/app/out
+      - /Users/gene/wealth_tracker_logs:/usr/src/app/out
+
+  parse-investing:
+    build:
+      context: .
+      dockerfile: Dockerfile.parse_investing
+    container_name: wealth-tracker-parse-investing
+    volumes:
+      - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
+    depends_on:
+      - kafka
+      - mysql
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Add other needed env vars here
+    command: ["bash", "parse_investing_com_html.sh"]
       

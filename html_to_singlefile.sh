@@ -21,8 +21,7 @@ echo url: "$url" >&2
 echo filename: "$filename" >&2
 
 # Create target directory if it doesn't exist
-mkdir -p ~/singlefile_html/
-
+mkdir -p /usr/src/app/wealth_tracker_logs/
 
 
 # Run docker command with timeout and capture container ID

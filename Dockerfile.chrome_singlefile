@@ -1,0 +1,51 @@
+FROM browserless/chrome:1.52-chrome-stable
+
+USER root
+# Install Node.js 18 and xdotool
+RUN apt-get update && \
+    apt-get install -y curl x11vnc fluxbox xterm xdotool && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+USER blessuser
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+COPY SingleFile-MV3 /opt/singlefile-extension
+
+
+
+
+WORKDIR /usr/src/app
+COPY package*.json ./
+RUN npm install
+COPY . .
+
+
+
+
+
+
+
+EXPOSE 5900
+CMD bash -c "\
+    rm -f /tmp/.X99-lock; \
+    Xvfb :99 -screen 0 1920x1080x24 & \
+    sleep 5; \
+    export DISPLAY=:99; \
+    fluxbox & \
+    x11vnc -forever -display :99 -shared -rfbport 5900 & \
+    xterm & \
+    sleep infinity"

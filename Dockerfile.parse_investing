@@ -1,0 +1,8 @@
+FROM python:3.13
+
+WORKDIR /usr/src/app
+COPY . .
+
+RUN chmod +x parse_investing_com_html.sh
+
+CMD ["bash", "parse_investing_com_html.sh"]
