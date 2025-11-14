@@ -9,6 +9,10 @@ services:
         - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
       ports:
         - "5901:5900"
+      deploy:
+        resources:
+          limits:
+            memory: 8g
   mysql:
     image: mysql:8.0
     container_name: wealth-tracker-mysql

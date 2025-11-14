@@ -1,56 +1,30 @@
 FROM browserless/chrome:1.52-chrome-stable
 
 
+
 USER root
-# Install Node.js 18 and xdotool
+# Install Node.js 18, x11vnc, xterm, fluxbox, and SingleFile extension for GUI/VNC support
 RUN apt-get update && \
-    apt-get install -y curl x11vnc fluxbox xterm xdotool && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
-RUN curl -L -o /tmp/singlefile-mv3.zip "https://github.com/gildas-lormeau/SingleFile-MV3/archive/master.zip" \
-    && unzip -q /tmp/singlefile-mv3.zip -d /opt \
-    && rm -rf /opt/singlefile-extension \
-    && mv /opt/SingleFile-MV3-* /opt/singlefile-extension \
-    && rm /tmp/singlefile-mv3.zip
-USER blessuser
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        apt-get install -y \
+            curl x11vnc xterm fluxbox unzip xdotool \
+            dbus libnss3 libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 libdrm2 libgbm1 libu2f-udev libxcomposite1 libxdamage1 libxrandr2 libxshmfence1 libxss1 libxtst6 fonts-liberation libappindicator3-1 lsb-release xdg-utils && \
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+        apt-get install -y nodejs && \
+        rm -rf /var/lib/apt/lists/* && \
+        curl -L -o /tmp/singlefile-mv3.zip "https://github.com/gildas-lormeau/SingleFile-MV3/archive/master.zip" && \
+        unzip -q /tmp/singlefile-mv3.zip -d /opt && \
+        rm -rf /opt/singlefile-extension && \
+        mv /opt/SingleFile-MV3-* /opt/singlefile-extension && \
+        rm /tmp/singlefile-mv3.zip
 
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install
+RUN if ! grep -q 'puppeteer' package.json; then npm install puppeteer; else npm install; fi && \
+    npm install puppeteer-extra puppeteer-extra-plugin-stealth cheerio
 COPY . .
 
-
-
-
-
-
-
 EXPOSE 5900
-CMD bash -c "\
-    rm -f /tmp/.X99-lock; \
-    Xvfb :99 -screen 0 1920x1080x24 & \
-    sleep 5; \
-    export DISPLAY=:99; \
-    fluxbox & \
-    x11vnc -forever -display :99 -shared -rfbport 5900 & \
-    xterm & \
-    sleep infinity"
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
