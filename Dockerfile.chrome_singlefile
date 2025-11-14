@@ -1,5 +1,6 @@
 FROM browserless/chrome:1.52-chrome-stable
 
+
 USER root
 # Install Node.js 18 and xdotool
 RUN apt-get update && \
@@ -7,6 +8,11 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
+RUN curl -L -o /tmp/singlefile-mv3.zip "https://github.com/gildas-lormeau/SingleFile-MV3/archive/master.zip" \
+    && unzip -q /tmp/singlefile-mv3.zip -d /opt \
+    && rm -rf /opt/singlefile-extension \
+    && mv /opt/SingleFile-MV3-* /opt/singlefile-extension \
+    && rm /tmp/singlefile-mv3.zip
 USER blessuser
 
 
@@ -23,7 +29,6 @@ USER blessuser
 
 
 
-COPY SingleFile-MV3 /opt/singlefile-extension
 
 
 
