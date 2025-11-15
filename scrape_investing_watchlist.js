@@ -1,6 +1,6 @@
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
-console.log('VERSION:16');
+console.log('VERSION:17');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 function getDateTimeString() {
@@ -28,6 +28,8 @@ const path = require('path');
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
+
+const { publishToKafka } = require('./publish_to_kafka');
 
 const http = require('http');
 
@@ -274,6 +276,8 @@ async function scrapeInvestingComMonitor(outputDir) {
 						capture_time: new Date().toISOString().replace("T", " ").replace("Z", " UTC"),
 						quote_time: rowData["time"]
 					};
+
+					
 					dataObjects.push(data);
 					logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
 				} else {
@@ -287,7 +291,15 @@ async function scrapeInvestingComMonitor(outputDir) {
 		logDebug(`securities contents: ${JSON.stringify(securities, null, 2)}`);
 		const outPath = require('path').join(outputDir, `investing_watchlist.${getDateTimeString()}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(securities, null, 2), 'utf-8');
+
 		logDebug(`Parsed data written to ${outPath}`);
+
+		// Publish each security to Kafka
+		const kafkaTopic = process.env.KAFKA_TOPIC || 'investing_watchlist';
+		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+		for (const sec of securities) {
+			publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
+		}
 
 		// Close the browser to release resources
 		//await browser.close();
