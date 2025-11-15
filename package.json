@@ -2,9 +2,9 @@
   "name": "wealth-tracker-chrome-singlefile",
   "version": "1.0.0",
   "description": "Chrome SingleFile automation",
-  "main": "scrape_investing_com_monitor.js",
+  "main": "scrape_investing_watchlist.js",
   "scripts": {
-    "start": "node scrape_investing_com_monitor.js"
+    "start": "node scrape_investing_watchlist.js"
   },
   "dependencies": {
     "puppeteer": "^24.15.0",
