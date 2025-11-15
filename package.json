@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "puppeteer": "^24.15.0",
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.4.5"
   }
 }
