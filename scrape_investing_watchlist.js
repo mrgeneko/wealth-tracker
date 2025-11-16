@@ -337,29 +337,33 @@ function isBusinessHours() {
 async function main() {
 	const outputDir = process.argv[3] || '/usr/src/app/logs';
 	if (!isBusinessHours()) {
-		logDebug('Not within business hours, exiting.');
-		return;
+	//	logDebug('Not within business hours, exiting.');
+	//	return;
 	}
 
 	// Scrape Investing.com every Y minutes
-	const investingMarker = path.join(__dirname, 'last_investing_scrape.txt');
-	const investingInterval = 10; // set your interval in minutes
+	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
+	const investingInterval = 2; // set your interval in minutes
 	if (shouldRunTask(investingInterval, investingMarker)) {
+		logDebug('Begin Investing.com scrape');
 		await scrapeInvestingComMonitor(outputDir);
 	} else {
 		logDebug('Skipping Investing.com scrape (interval not reached)');
 	}
 
-	// Scrape other URLs every X minutes
-	const urlMarker = path.join(__dirname, 'last_url_scrape.txt');
-	const urlInterval = 10; // set your interval in minutes
+	// scrape_group c URLs every X minutes
+	const urlMarker = path.join('/usr/src/app/logs/', 'last_url_scrape.txt');
+	const urlInterval = 4; // set your interval in minutes
 	if (shouldRunTask(urlInterval, urlMarker)) {
-		// Example: get URLs from CSV and scrape them
-		const csvPath = path.join(__dirname, 'wealth_tracker.csv');
+		// Use /usr/src/app/data/wealth_tracker.csv for input data
+		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
-		const csvParse = require('csv-parse/lib/sync');
-		const records = csvParse(content, { columns: true, skip_empty_lines: true });
-		const urls = records
+			   const { parse } = require('csv-parse/sync');
+			   const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+		// Filter rows where the 'scrape_group' column equals 'c'
+		const filtered = records.filter(row => row.scrape_group === 'c');
+
+		const urls = filtered
 			.map(row => row.webull)
 			.filter(url => url && url.startsWith('http'));
 		for (const url of urls) {

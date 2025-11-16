@@ -7,6 +7,7 @@ services:
       container_name: wealth-tracker-chrome-singlefile
       volumes:
         - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
+        - /Users/gene/wealth_tracker_data:/usr/src/app/data
       ports:
         - "5901:5901"
       deploy:

@@ -1,2 +1,2 @@
 # Run scrape_investing_watchlist.js every 3 minutes
-*/3 * * * * root cd /usr/src/app && node scrape_investing_watchlist.js >> /var/log/cron.log 2>&1
+*/1 * * * * root cd /usr/src/app && node scrape_investing_watchlist.js >> /var/log/cron.log 2>&1

@@ -10,6 +10,7 @@
     "puppeteer": "^24.15.0",
     "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.4.5",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "csv-parse": "^5.5.4"
   }
 }
