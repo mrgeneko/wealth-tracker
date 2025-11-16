@@ -309,8 +309,70 @@ async function scrapeInvestingComMonitor(outputDir) {
 	}
 }
 
-// Usage
-const outputDir = process.argv[3] || '/usr/src/app/logs';
 
-// To use the new Investing.com monitor function, uncomment:
-scrapeInvestingComMonitor(outputDir);
+function shouldRunTask(intervalMinutes, markerPath) {
+	let lastRun = 0;
+	if (fs.existsSync(markerPath)) {
+		lastRun = parseInt(fs.readFileSync(markerPath, 'utf8'), 10);
+	}
+	const now = Date.now();
+	if (now - lastRun >= intervalMinutes * 60 * 1000) {
+		fs.writeFileSync(markerPath, now.toString());
+		return true;
+	}
+	return false;
+}
+
+function isBusinessHours() {
+	const now = new Date();
+	const day = now.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+	const hour = now.getHours();
+	const minute = now.getMinutes();
+	// Monday–Friday, 4:00am–20:02pm
+	if (day === 0 || day === 6) return false;
+	if (hour < 4 || (hour === 20 && minute > 2) || hour > 20) return false;
+	return true;
+}
+
+async function main() {
+	const outputDir = process.argv[3] || '/usr/src/app/logs';
+	if (!isBusinessHours()) {
+		logDebug('Not within business hours, exiting.');
+		return;
+	}
+
+	// Scrape Investing.com every Y minutes
+	const investingMarker = path.join(__dirname, 'last_investing_scrape.txt');
+	const investingInterval = 10; // set your interval in minutes
+	if (shouldRunTask(investingInterval, investingMarker)) {
+		await scrapeInvestingComMonitor(outputDir);
+	} else {
+		logDebug('Skipping Investing.com scrape (interval not reached)');
+	}
+
+	// Scrape other URLs every X minutes
+	const urlMarker = path.join(__dirname, 'last_url_scrape.txt');
+	const urlInterval = 10; // set your interval in minutes
+	if (shouldRunTask(urlInterval, urlMarker)) {
+		// Example: get URLs from CSV and scrape them
+		const csvPath = path.join(__dirname, 'wealth_tracker.csv');
+		const content = fs.readFileSync(csvPath, 'utf8');
+		const csvParse = require('csv-parse/lib/sync');
+		const records = csvParse(content, { columns: true, skip_empty_lines: true });
+		const urls = records
+			.map(row => row.webull)
+			.filter(url => url && url.startsWith('http'));
+		for (const url of urls) {
+			// You need to implement scrapeOtherSite(page, url) or similar
+			// Example:
+			// const page = await browser.newPage();
+			// await scrapeOtherSite(page, url);
+			// await page.close();
+			logDebug(`Would scrape: ${url}`);
+		}
+	} else {
+		logDebug('Skipping URL scrape (interval not reached)');
+	}
+}
+
+main().catch(e => logDebug('Fatal error in main: ' + e));
