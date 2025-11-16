@@ -1,8 +1,137 @@
+// Scrape Google Finance stock page and extract price data
+async function scrapeGoogle(browser, url, outputDir) {
+	let page = null;
+	let data = {};
+	try {
+		logDebug(`Opening new tab for Google Finance: ${url}`);
+		page = await browser.newPage();
+		await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+		await page.setViewport({ width: 1280, height: 900 });
+		await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+		logDebug('Page loaded. Extracting HTML...');
+		const html = await page.content();
+
+		// Save the HTML to google.yyyymmdd_hhmmss.html using getDateTimeString
+		const htmlFileName = `google.${getDateTimeString()}.html`;
+		const htmlFilePath = require('path').join(outputDir, htmlFileName);
+		require('fs').writeFileSync(htmlFilePath, html, 'utf-8');
+		logDebug(`Saved Google HTML to ${htmlFilePath}`);
+		
+		const cheerio = require('cheerio');
+		const $ = cheerio.load(html);
+		// Extract main price
+		let last_price = '';
+		let price_change_decimal = '';
+		let price_change_percent = '';
+		let previous_close_price = '';
+		let after_hours_price = '';
+		let pre_market_price = '';
+		let key = url;
+		try {
+			const main_element = $('[class="Gfxi4"]').first();
+			const price_element = main_element.find('[class="YMlKec fxKbKc"]').first();
+			if (price_element.length) {
+				last_price = price_element.text().replace('$', '').replace(',', '');
+			}
+			// Previous close
+			const prev_close_label = $('div').filter((i, el) => $(el).text().trim().toLowerCase() === 'previous close').first();
+			if (prev_close_label.length) {
+				const parent = prev_close_label.closest('div.gyFHrc');
+				if (parent.length) {
+					const price_div = parent.find('div.P6K39c').first();
+					if (price_div.length) {
+						previous_close_price = price_div.text().replace('$', '').replace(',', '').trim();
+					}
+				}
+			}
+			// Price change
+			let change_element = main_element.find('[class="P2Luy Ez2Ioe ZYVHBb"], [class="P2Luy Ebnabc ZYVHBb"]').first();
+			if (change_element.length) {
+				const change_text = change_element.text();
+				if (change_text.startsWith('+') || change_text.startsWith('-')) {
+					const parts = change_text.split(' ');
+					price_change_decimal = parts[0];
+					// Percent is in a sibling span with class JwB6zf
+					const percent_element = main_element.find('[class="JwB6zf"]').first();
+					if (percent_element.length) {
+						price_change_percent = (change_text[0] || '') + percent_element.text();
+					}
+				}
+			}
+			// After/pre-market
+			const ext_hours_section = $('[jsname="QRHKC"]').first();
+			if (ext_hours_section.length) {
+				const ext_price = ext_hours_section.find('[class="YMlKec fxKbKc"]').first();
+				if (ext_price.length) {
+					if (ext_hours_section.text().startsWith('After Hours')) {
+						after_hours_price = ext_price.text().replace('$', '').replace(',', '').trim();
+					} else if (ext_hours_section.text().startsWith('Pre-market')) {
+						pre_market_price = ext_price.text().replace('$', '').replace(',', '').trim();
+					}
+				}
+			}
+			// Extract quote time (e.g., 'Nov 14, 8:00:00 PM GMT-5')
+			let quote_time = '';
+			// Look for a div/span with a date/time string in the format 'Nov 14, 8:00:00 PM GMT-5'
+			// This is often found in a span with class "ygUjEc" or similar, but fallback to regex search
+			const time_regex = /([A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2}:\d{2}\s*[AP]M\s*GMT[+-]\d+)/;
+			const body_text = $('body').text();
+			const match = body_text.match(time_regex);
+			if (match) {
+				quote_time = match[1];
+			}
+			// fallback: look for any span/div with GMT in text
+			if (!quote_time) {
+				$('[class], span, div').each((i, el) => {
+					const t = $(el).text();
+					if (/GMT[+-]\d+/.test(t) && /\d{1,2}:\d{2}:\d{2}/.test(t)) {
+						quote_time = t.trim();
+						return false;
+					}
+				});
+			}
+			// Attach to outer scope
+			globalThis._google_quote_time = quote_time;
+		} catch (extractErr) {
+			logDebug('Error extracting Google Finance data: ' + extractErr);
+		}
+
+		data = {
+			"key" : key,
+			"last_price" : last_price,
+			"price_change_decimal" : price_change_decimal,
+			"price_change_percent" : price_change_percent,
+			"previous_close_price" : previous_close_price,
+			"after_hours_price" : after_hours_price,
+			"pre_market_price" : pre_market_price,
+			source: 'google_finance',
+			capture_time: new Date().toISOString().replace("T", " ").replace("Z", " UTC"),
+			quote_time: globalThis._google_quote_time || ''
+		};
+
+		logDebug('Google Finance data: ' + JSON.stringify(data));
+		// Save the data object to google.yyyymmdd_hhmmss.json using getDateTimeString
+		const jsonFileName = `google.${getDateTimeString()}.json`;
+		const jsonFilePath = require('path').join(outputDir, jsonFileName);
+		require('fs').writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
+		logDebug(`Saved Google JSON to ${jsonFilePath}`);
+		
+	} catch (err) {
+		logDebug('Error in scrapeGoogle: ' + err);
+	} finally {
+		if (page) {
+			try { await page.close(); logDebug('Closed Google Finance tab.'); } catch (e) { logDebug('Error closing tab: ' + e); }
+		}
+	}
+	return data;
+}
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
-console.log('VERSION:19');
-const puppeteer = require('puppeteer');
 const fs = require('fs');
+const version = 'VERSION:24'
+console.log(version);
+const puppeteer = require('puppeteer');
+
 function getDateTimeString() {
     const now = new Date();
     const year = now.getFullYear();
@@ -34,7 +163,7 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 
 
-async function scrapeInvestingComMonitor(outputDir) {
+async function scrapeInvestingComMonitor(browser, outputDir) {
 	const investingUrl = process.env.INVESTING_URL;
 	if (!investingUrl) {
 		logDebug('WARNING: INVESTING_URL is not set in .env. Please set your portfolio URL.');
@@ -42,84 +171,9 @@ async function scrapeInvestingComMonitor(outputDir) {
 	}
 	const investingEmail = process.env.INVESTING_EMAIL;
 	const investingPassword = process.env.INVESTING_PASSWORD;
-	let browser = null;
 	try {
-		logDebug('Launching or connecting to browser for investing.com...');
+		logDebug('Using provided browser for investing.com...');
 		logDebug(`outputDir: ${outputDir}`);
-		// Use a persistent user-data-dir for extension reliability
-		const persistentProfileDir = '/tmp/chrome-profile2';
-		// Try to connect to an existing Chrome instance first
-		let connected = false;
-		let connectError = null;
-		let launchError = null;
-		try {
-			logDebug('Trying to connect to existing Chrome instance...');
-			const wsEndpoint = await new Promise((resolve, reject) => {
-				const http = require('http');
-				http.get('http://localhost:9222/json/version', res => {
-					let data = '';
-					res.on('data', chunk => data += chunk);
-					res.on('end', () => {
-						try {
-							const json = JSON.parse(data);
-							resolve(json.webSocketDebuggerUrl);
-						} catch (e) {
-							reject(e);
-						}
-					});
-				}).on('error', reject);
-			});
-			browser = await puppeteerExtra.connect({ browserWSEndpoint: wsEndpoint });
-			connected = true;
-			logDebug('Connected to existing Chrome instance.');
-		} catch (err) {
-			connectError = err;
-			logDebug('[CONNECT ERROR] No running Chrome instance found or failed to connect: ' + err.message);
-		}
-		if (!connected) {
-			try {
-				logDebug('Launching new Chrome instance...');
-				browser = await puppeteerExtra.launch({
-					headless: false,
-					executablePath: '/opt/google/chrome/chrome',
-					args: [
-						// '--load-extension=' + extensionPath, // SingleFile extension temporarily disabled
-						// '--disable-extensions-except=' + extensionPath, // SingleFile extension temporarily disabled
-						'--no-sandbox',
-						'--disable-gpu',
-						'--disable-dev-shm-usage',
-						'--disable-setuid-sandbox',
-						'--display=:99',
-						`--user-data-dir=${persistentProfileDir}`,
-						'--no-first-run',
-						'--no-default-browser-check',
-						'--disable-default-apps',
-						'--remote-debugging-port=9222',
-						'--disable-features=AudioServiceOutOfProcess',
-						'--disable-component-update',
-						'--disable-background-networking',
-						'--disable-domain-reliability'
-					],
-					env: {
-						...process.env,
-						DISPLAY: ':99',
-						CHROME_DISABLE_UPDATE: '1'
-					}
-				});
-				logDebug('Launched new Chrome instance.');
-			} catch (err) {
-				launchError = err;
-				logDebug('[LAUNCH ERROR] Failed to launch new Chrome instance: ' + err.message);
-			}
-		}
-		if (!browser) {
-			logDebug('[FATAL] Could not connect to or launch Chrome.');
-			if (connectError) logDebug('[CONNECT ERROR DETAILS] ' + connectError.stack);
-			if (launchError) logDebug('[LAUNCH ERROR DETAILS] ' + launchError.stack);
-			throw new Error('Could not connect to or launch Chrome.');
-		}
-
-
 		// Find an existing tab with the target URL, or open a new one if not found
 		logDebug('Looking for existing tab with target URL...');
 		let page = null;
@@ -157,12 +211,13 @@ async function scrapeInvestingComMonitor(outputDir) {
 		}
 
 		// Close all other tabs except the Investing.com tab
-		const allPages = await browser.pages();
-		for (const p of allPages) {
-			if (p !== page) {
-				try { await p.close(); } catch (e) {}
-			}
-		}
+		//const allPages = await browser.pages();
+		//for (const p of allPages) {
+		//	if (p !== page) {
+		//		try { await p.close(); } catch (e) {}
+		//	}
+		//}
+
 		// Bring the Investing.com tab to the front
 		await page.bringToFront();
 		logDebug('Page brought to front.');
@@ -277,7 +332,7 @@ async function scrapeInvestingComMonitor(outputDir) {
 						quote_time: rowData["time"]
 					};
 
-					
+                    
 					dataObjects.push(data);
 					logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
 				} else {
@@ -288,7 +343,6 @@ async function scrapeInvestingComMonitor(outputDir) {
 		}
 
 		// Write the parsed data to a JSON file in the outputDir
-		// logDebug(`securities contents: ${JSON.stringify(securities, null, 2)}`);
 		const outPath = require('path').join(outputDir, `investing_watchlist.${getDateTimeString()}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(securities, null, 2), 'utf-8');
 
@@ -300,24 +354,22 @@ async function scrapeInvestingComMonitor(outputDir) {
 		for (const sec of securities) {
 			publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
 		}
-
-		// Close the browser to release resources
-		//await browser.close();
-		//logDebug('Done. Browser closed.');
 	} catch (err) {
 		logDebug('Error in scrapeInvestingComMonitor: ' + err);
 	}
 }
 
-
 function shouldRunTask(intervalMinutes, markerPath) {
 	let lastRun = 0;
 	if (fs.existsSync(markerPath)) {
-		lastRun = parseInt(fs.readFileSync(markerPath, 'utf8'), 10);
+		// Read only the first line (timestamp) for compatibility
+		const lines = fs.readFileSync(markerPath, 'utf8').split('\n');
+		lastRun = parseInt(lines[0], 10);
 	}
 	const now = Date.now();
 	if (now - lastRun >= intervalMinutes * 60 * 1000) {
-		fs.writeFileSync(markerPath, now.toString());
+		const human = new Date(now).toLocaleString('en-US', { hour12: false });
+		fs.writeFileSync(markerPath, now.toString() + '\n' + human + '\n');
 		return true;
 	}
 	return false;
@@ -336,46 +388,124 @@ function isBusinessHours() {
 
 async function main() {
 	const outputDir = process.argv[3] || '/usr/src/app/logs';
+	logDebug(version);
 	if (!isBusinessHours()) {
-	//	logDebug('Not within business hours, exiting.');
-	//	return;
+		// logDebug('Not within business hours, exiting/');
+		// return;
+	}		
+
+	// Browser connect/launch logic
+	let browser = null;
+	let connected = false;
+	let connectError = null;
+	let launchError = null;
+	const persistentProfileDir = '/tmp/chrome-profile2';
+	try {
+		logDebug('Trying to connect to existing Chrome instance...');
+		const wsEndpoint = await new Promise((resolve, reject) => {
+			const http = require('http');
+			http.get('http://localhost:9222/json/version', res => {
+				let data = '';
+				res.on('data', chunk => data += chunk);
+				res.on('end', () => {
+					try {
+						const json = JSON.parse(data);
+						resolve(json.webSocketDebuggerUrl);
+					} catch (e) {
+						reject(e);
+					}
+				});
+			}).on('error', reject);
+		});
+		browser = await puppeteerExtra.connect({ browserWSEndpoint: wsEndpoint });
+		connected = true;
+		logDebug('Connected to existing Chrome instance.');
+	} catch (err) {
+		connectError = err;
+		logDebug('[CONNECT ERROR] No running Chrome instance found or failed to connect: ' + err.message);
 	}
-
-	// Scrape Investing.com every Y minutes
-	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
-	const investingInterval = 2; // set your interval in minutes
-	if (shouldRunTask(investingInterval, investingMarker)) {
-		logDebug('Begin investing.com scrape');
-		await scrapeInvestingComMonitor(outputDir);
-	} else {
-		logDebug('Skipping investing.com scrape (interval not reached)');
-	}
-
-	// scrape_group c URLs every X minutes
-	const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
-	const urlInterval = 4; // set your interval in minutes
-	if (shouldRunTask(urlInterval, urlMarker)) {
-		// Use /usr/src/app/data/wealth_tracker.csv for input data
-		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
-		const content = fs.readFileSync(csvPath, 'utf8');
-			   const { parse } = require('csv-parse/sync');
-			   const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
-		// Filter rows where the 'scrape_group' column equals 'c'
-		const filtered = records.filter(row => row.scrape_group === 'c');
-
-		const urls = filtered
-			.map(row => row.webull)
-			.filter(url => url && url.startsWith('http'));
-		for (const url of urls) {
-			// You need to implement scrapeOtherSite(page, url) or similar
-			// Example:
-			// const page = await browser.newPage();
-			// await scrapeOtherSite(page, url);
-			// await page.close();
-			logDebug(`Would scrape: ${url}`);
+	if (!connected) {
+		try {
+			logDebug('Launching new Chrome instance...');
+			browser = await puppeteerExtra.launch({
+				headless: false,
+				executablePath: '/opt/google/chrome/chrome',
+				args: [
+					'--no-sandbox',
+					'--disable-gpu',
+					'--disable-dev-shm-usage',
+					'--disable-setuid-sandbox',
+					'--display=:99',
+					`--user-data-dir=${persistentProfileDir}`,
+					'--no-first-run',
+					'--no-default-browser-check',
+					'--disable-default-apps',
+					'--remote-debugging-port=9222',
+					'--disable-features=AudioServiceOutOfProcess',
+					'--disable-component-update',
+					'--disable-background-networking',
+					'--disable-domain-reliability'
+				],
+				env: {
+					...process.env,
+					DISPLAY: ':99',
+					CHROME_DISABLE_UPDATE: '1'
+				}
+			});
+			logDebug('Launched new Chrome instance.');
+		} catch (err) {
+			launchError = err;
+			logDebug('[LAUNCH ERROR] Failed to launch new Chrome instance: ' + err.message);
 		}
-	} else {
-		logDebug('Skipping URL scrape (interval not reached)');
+	}
+	if (!browser) {
+		logDebug('[FATAL] Could not connect to or launch Chrome.');
+		if (connectError) logDebug('[CONNECT ERROR DETAILS] ' + connectError.stack);
+		if (launchError) logDebug('[LAUNCH ERROR DETAILS] ' + launchError.stack);
+		throw new Error('Could not connect to or launch Chrome.');
+	}
+
+	try {
+		// Scrape Investing.com every Y minutes
+		const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
+		const investingInterval = 2; // set your interval in minutes
+		if (shouldRunTask(investingInterval, investingMarker)) {
+			logDebug('Begin investing.com scrape');
+			await scrapeInvestingComMonitor(browser, outputDir);
+		} else {
+			logDebug('Skipping investing.com scrape (interval not reached)');
+		}
+
+		// scrape_group c URLs every X minutes
+		const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
+		const urlInterval = 4; // set your interval in minutes
+		if (shouldRunTask(urlInterval, urlMarker)) {
+			// Use /usr/src/app/data/wealth_tracker.csv for input data
+			const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
+			const content = fs.readFileSync(csvPath, 'utf8');
+			const { parse } = require('csv-parse/sync');
+			const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+			// Filter rows where the 'scrape_group' column equals 'c'
+			const filtered = records.filter(row => row.scrape_group === 'c');
+
+			const urls = filtered
+				.map(row => row.google)
+				.filter(url => url && url.startsWith('http'));
+			for (const url of urls) {
+				// Example: scrape Google Finance for a given URL
+				const googleData = await scrapeGoogle(browser, url, outputDir);
+				logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
+				// Sleep for 1 second between Google scrapes
+				await new Promise(resolve => setTimeout(resolve, 1000));
+			}
+		} else {
+			logDebug('Skipping URL scrape (interval not reached)');
+		}
+	} finally {
+		// Do not close the browser to keep it open for the next run
+		// if (browser) {
+		//     try { await browser.close(); logDebug('Browser closed.'); } catch (e) { logDebug('Error closing browser: ' + e); }
+		// }
 	}
 }
 
