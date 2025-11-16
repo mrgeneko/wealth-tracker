@@ -2,7 +2,7 @@ services:
   chrome-singlefile:
       build:
         context: .
-        dockerfile: Dockerfile.chrome_singlefile
+        dockerfile: Dockerfile.scrapers
       platform: linux/amd64
       container_name: wealth-tracker-chrome-singlefile
       volumes:

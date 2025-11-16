@@ -4,7 +4,8 @@ async function scrapeGoogle(browser, security, outputDir) {
 	let data = {};
 	try {
 		const url = security.google;
-		logDebug(`Opening new tab for Google Finance: ${url}`);
+		const ticker = security.key;
+		logDebug(`Security: ${ticker}   open Google Finance: ${url}`);
 		page = await browser.newPage();
 		await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 		await page.setViewport({ width: 1280, height: 900 });
@@ -13,7 +14,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		const html = await page.content();
 
 		// Save the HTML to google.yyyymmdd_hhmmss.html using getDateTimeString
-		const htmlFileName = `google.${getDateTimeString()}.html`;
+		const htmlFileName = `${ticker}.google.${getDateTimeString()}.html`;
 		const htmlFilePath = require('path').join(outputDir, htmlFileName);
 		require('fs').writeFileSync(htmlFilePath, html, 'utf-8');
 		logDebug(`Saved Google HTML to ${htmlFilePath}`);
@@ -27,7 +28,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		let previous_close_price = '';
 		let after_hours_price = '';
 		let pre_market_price = '';
-		let key = url;
+	
 		try {
 			const main_element = $('[class="Gfxi4"]').first();
 			const price_element = main_element.find('[class="YMlKec fxKbKc"]').first();
@@ -98,7 +99,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		}
 
 		data = {
-			"key" : key,
+			"key" : ticker,
 			"last_price" : last_price,
 			"price_change_decimal" : price_change_decimal,
 			"price_change_percent" : price_change_percent,
@@ -112,7 +113,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 
 		logDebug('Google Finance data: ' + JSON.stringify(data));
 		// Save the data object to google.yyyymmdd_hhmmss.json using getDateTimeString
-		const jsonFileName = `google.${getDateTimeString()}.json`;
+		const jsonFileName = `${ticker}.google.${getDateTimeString()}.json`;
 		const jsonFilePath = require('path').join(outputDir, jsonFileName);
 		require('fs').writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
 		logDebug(`Saved Google JSON to ${jsonFilePath}`);
@@ -129,7 +130,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
 const fs = require('fs');
-const version = 'VERSION:25'
+const version = 'VERSION:26'
 console.log(version);
 const puppeteer = require('puppeteer');
 
