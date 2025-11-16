@@ -1,8 +1,9 @@
 // Scrape Google Finance stock page and extract price data
-async function scrapeGoogle(browser, url, outputDir) {
+async function scrapeGoogle(browser, security, outputDir) {
 	let page = null;
 	let data = {};
 	try {
+		const url = security.google;
 		logDebug(`Opening new tab for Google Finance: ${url}`);
 		page = await browser.newPage();
 		await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -128,7 +129,7 @@ async function scrapeGoogle(browser, url, outputDir) {
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
 const fs = require('fs');
-const version = 'VERSION:24'
+const version = 'VERSION:25'
 console.log(version);
 const puppeteer = require('puppeteer');
 
@@ -485,19 +486,17 @@ async function main() {
 			const content = fs.readFileSync(csvPath, 'utf8');
 			const { parse } = require('csv-parse/sync');
 			const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
-			// Filter rows where the 'scrape_group' column equals 'c'
-			const filtered = records.filter(row => row.scrape_group === 'c');
+			// Filter securities where the 'scrape_group' column equals 'c'
+			const filtered_securities = records.filter(row => row.scrape_group === 'c');
 
-			const urls = filtered
-				.map(row => row.google)
-				.filter(url => url && url.startsWith('http'));
-			for (const url of urls) {
-				// Example: scrape Google Finance for a given URL
-				const googleData = await scrapeGoogle(browser, url, outputDir);
-				logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
-				// Sleep for 1 second between Google scrapes
-				await new Promise(resolve => setTimeout(resolve, 1000));
-			}
+			   for (const security of filtered_securities) {
+				   if (security.google && security.google.startsWith('http')) {
+					   const googleData = await scrapeGoogle(browser, security, outputDir);
+					   logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
+					   // Sleep for 1 second between Google scrapes
+					   await new Promise(resolve => setTimeout(resolve, 1000));
+				   }
+			   }
 		} else {
 			logDebug('Skipping URL scrape (interval not reached)');
 		}
