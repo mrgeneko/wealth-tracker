@@ -1,6 +1,6 @@
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
-console.log('VERSION:17');
+console.log('VERSION:18');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 function getDateTimeString() {
@@ -288,7 +288,7 @@ async function scrapeInvestingComMonitor(outputDir) {
 		}
 
 		// Write the parsed data to a JSON file in the outputDir
-		logDebug(`securities contents: ${JSON.stringify(securities, null, 2)}`);
+		// logDebug(`securities contents: ${JSON.stringify(securities, null, 2)}`);
 		const outPath = require('path').join(outputDir, `investing_watchlist.${getDateTimeString()}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(securities, null, 2), 'utf-8');
 
