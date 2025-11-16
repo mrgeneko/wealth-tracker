@@ -8,3 +8,4 @@ tests/__pycache__/
 out.json
 node_modules/
 nohup.out
+.env
