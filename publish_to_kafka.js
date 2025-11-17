@@ -1,4 +1,6 @@
+
 const { Kafka } = require('kafkajs');
+const { logDebug } = require('./scraper_utils');
 
 // Usage: publishToKafka({ key: 'AAPL', last_price: 123 }, 'my-topic', ['localhost:9092'])
 async function publishToKafka(data, topic, brokers) {
@@ -12,9 +14,13 @@ async function publishToKafka(data, topic, brokers) {
         { value: JSON.stringify(data) }
       ]
     });
-    console.log(`Published to Kafka topic ${topic}:`, data);
+    const msg = `Published to Kafka topic ${topic}: ${JSON.stringify(data)}`;
+    //console.log(msg);
+    logDebug(msg);
   } catch (err) {
-    console.error('Kafka publish error:', err);
+    const errMsg = `Kafka publish error: ${err}`;
+    console.error(errMsg);
+    logDebug(errMsg);
   } finally {
     await producer.disconnect();
   }

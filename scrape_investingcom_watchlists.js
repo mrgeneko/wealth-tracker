@@ -1,6 +1,23 @@
 const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 
+// Helper to check if error is from a known ad/tracker domain
+function isSuppressedPageError(err) {
+	if (!err || !err.stack) return false;
+	const suppressedPatterns = [
+		'pagead2.googlesyndication.com',
+		'doubleclick.net',
+		'googletagservices.com',
+		'googletagmanager.com',
+		'adservice.google.com',
+		'adservice.google.',
+		'adservice.',
+		'ads.',
+		'adserver.'
+	];
+	return suppressedPatterns.some(pattern => err.stack.includes(pattern));
+}
+
 async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 	const investingUrl = watchlist.url;
 	if (!investingUrl) {
@@ -28,7 +45,9 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			logDebug('No existing tab found. Opening new page...');
 			page = await browser.newPage();
 			page.on('pageerror', (err) => {
-				logDebug(`[BROWSER PAGE ERROR] ${err && err.stack ? err.stack : err}`);
+				if (!isSuppressedPageError(err)) {
+					logDebug(`[BROWSER PAGE ERROR] ${err && err.stack ? err.stack : err}`);
+				}
 			});
 			page.on('error', (err) => {
 				logDebug(`[BROWSER ERROR] ${err && err.stack ? err.stack : err}`);
