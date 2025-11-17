@@ -11,7 +11,7 @@ If you are using Docker Desktop on Apple Silicon and want to run Google Chrome (
          ```
      - For direct Docker builds:
          ```sh
-         docker build --platform linux/amd64 -t wealth-tracker-chrome-singlefile -f Dockerfile.chrome_singlefile .
+         docker build --platform linux/amd64 -t wealth-tracker-scrapers -f Dockerfile.scrapers .
          ```
 
 This ensures the container uses x86_64 emulation and can install Google Chrome for amd64.

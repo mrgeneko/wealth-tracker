@@ -1,3 +1,4 @@
+
 const { scrapeGoogle } = require('./scrape_google');
 const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug } = require('./scraper_utils');
 // Load environment variables from .env if present (for local dev)
@@ -6,6 +7,95 @@ const fs = require('fs');
 const version = 'VERSION:33'
 console.log(version);
 const puppeteer = require('puppeteer');
+
+// --- LOCK FILE MECHANISM ---
+const LOCK_FILE = '/tmp/scrape_security_data.lock';
+function isProcessRunning(pid) {
+	try {
+		// Signal 0 does not kill the process, just checks if it exists
+		process.kill(pid, 0);
+		return true;
+	} catch (e) {
+		return false;
+	}
+}
+// Async lock file check and main entry
+(async () => {
+	if (fs.existsSync(LOCK_FILE)) {
+		const diagTime = new Date().toISOString();
+		try {
+			const lockContents = fs.readFileSync(LOCK_FILE, 'utf-8');
+			const existingPid = parseInt(lockContents);
+			const diagMsg = `[${diagTime}] Detected lock file with contents: '${lockContents}' (parsed PID: ${existingPid})`;
+			console.log(diagMsg);
+			try { logDebug(diagMsg); } catch (e) {}
+			if (!isNaN(existingPid)) {
+				if (isProcessRunning(existingPid)) {
+					// 1. Log ps -p <PID> output for diagnostics
+					const { execSync } = require('child_process');
+					let psOutput = '';
+					try {
+						psOutput = execSync(`ps -p ${existingPid} -o pid,ppid,comm,args`, { encoding: 'utf-8' });
+					} catch (e) {
+						psOutput = `ps -p ${existingPid} failed: ${e}`;
+					}
+					const psMsg = `[${diagTime}] ps -p ${existingPid} output:\n${psOutput}`;
+					console.log(psMsg);
+					try { logDebug(psMsg); } catch (e) {}
+
+					// 2. Wait 1 second and re-check if process is still running
+					await new Promise(resolve => setTimeout(resolve, 1000));
+					const stillRunning = isProcessRunning(existingPid);
+					const retryMsg = `[${new Date().toISOString()}] After 1s delay, PID ${existingPid} still running: ${stillRunning}`;
+					console.log(retryMsg);
+					try { logDebug(retryMsg); } catch (e) {}
+					if (stillRunning) {
+						const msg = `[${diagTime}] Another instance of scrape_security_data.js is already running (PID: ${existingPid}). Exiting.`;
+						console.error(msg);
+						try { logDebug(msg); } catch (e) {}
+						process.exit(1);
+					} else {
+						const msg = `[${diagTime}] PID ${existingPid} is no longer running after delay. Removing stale lock and continuing.`;
+						console.warn(msg);
+						try { logDebug(msg); } catch (e) {}
+						fs.unlinkSync(LOCK_FILE);
+						// Continue script execution
+					}
+				} else {
+					// Stale lock file, remove and continue
+					const msg = `[${diagTime}] Stale lock file found for PID ${existingPid}. Removing stale lock and continuing.`;
+					console.warn(msg);
+					try { logDebug(msg); } catch (e) {}
+					fs.unlinkSync(LOCK_FILE);
+				}
+			} else {
+				// Corrupt lock file, remove and continue
+				const msg = `[${diagTime}] Corrupt lock file (contents: '${lockContents}'). Removing and continuing.`;
+				console.warn(msg);
+				try { logDebug(msg); } catch (e) {}
+				fs.unlinkSync(LOCK_FILE);
+			}
+		} catch (e) {
+			// If lock file is corrupt or unreadable, remove it and continue
+			const msg = `[${diagTime}] Error reading lock file: ${e}. Removing and continuing.`;
+			console.warn(msg);
+			try { logDebug(msg); } catch (e) {}
+			fs.unlinkSync(LOCK_FILE);
+		}
+	}
+	fs.writeFileSync(LOCK_FILE, process.pid.toString());
+	// Continue with main script
+	await main();
+})();
+function cleanupLockFile() {
+	if (fs.existsSync(LOCK_FILE)) {
+		try { fs.unlinkSync(LOCK_FILE); } catch (e) {}
+	}
+}
+process.on('exit', cleanupLockFile);
+process.on('SIGINT', () => { cleanupLockFile(); process.exit(130); });
+process.on('SIGTERM', () => { cleanupLockFile(); process.exit(143); });
+process.on('uncaughtException', (err) => { cleanupLockFile(); throw err; });
 
 
 const debugLogPath = getTimestampedLogPath();
@@ -419,4 +509,8 @@ async function main() {
 	}
 }
 
-main().catch(e => logDebug('Fatal error in main: ' + e));
+main().catch(e => logDebug('Fatal error in main: ' + e)).finally(() => {
+	const now = new Date();
+	const timestamp = now.toISOString().replace('T', ' ').replace('Z', ' UTC');
+	logDebug(`exiting at ${timestamp}`);
+});

@@ -1,5 +1,5 @@
 {
-  "name": "wealth-tracker-chrome-singlefile",
+  "name": "wealth-tracker-scrapers",
   "version": "1.0.0",
   "description": "Chrome SingleFile automation",
   "main": "scrape_security_data.js",
