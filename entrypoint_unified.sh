@@ -69,18 +69,9 @@ else
 fi
 
 
-# Disable cron for daemon mode; start scraper directly
+# Disable cron for daemon mode; run Node as PID 1 so Docker signals reach it directly
 echo "[DEBUG] Skipping cron startup (daemon mode)."
-echo "[DEBUG] Starting scrape_security_data daemon..."
-node /usr/src/app/scrape_security_data.js &
-SCRAPER_PID=$!
-echo "[DEBUG] Scraper PID: $SCRAPER_PID"
-echo "[DEBUG] Entrypoint running tail on scraper log for visibility." 
-LOG_DIR=/usr/src/app/logs
-LATEST_LOG=$(ls -1t $LOG_DIR/scrape_security_data*.log 2>/dev/null | head -n1)
-if [ -n "$LATEST_LOG" ]; then
-  tail -F "$LATEST_LOG"
-else
-  echo "[DEBUG] No scraper log yet; tailing process output." 
-  wait $SCRAPER_PID
-fi
+echo "[DEBUG] Executing scrape_security_data as PID 1 (exec)..."
+# Exec will replace this shell with the Node process, ensuring Docker SIGTERM/SIGINT
+# are delivered directly to Node and its handlers (graceful shutdown will run).
+exec node /usr/src/app/scrape_security_data.js

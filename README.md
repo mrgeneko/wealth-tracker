@@ -1,112 +1,116 @@
-## Building Chrome SingleFile Container on Apple Silicon (M1/M2/M3 Mac)
+# wealth-tracker
+Lightweight scrapers and processors for personal portfolio tracking.
 
-If you are using Docker Desktop on Apple Silicon and want to run Google Chrome (x86_64/amd64) in a container, you must:
-
-1. Enable "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" in Docker Desktop settings.
-2. Build and run your container with the amd64 platform specified:
-     - For Docker Compose:
-         ```sh
-         docker compose build --platform linux/amd64
-         docker compose up --platform linux/amd64
-         ```
-     - For direct Docker builds:
-         ```sh
-         docker build --platform linux/amd64 -t wealth-tracker-scrapers -f Dockerfile.scrapers .
-         ```
-
-This ensures the container uses x86_64 emulation and can install Google Chrome for amd64.
-wealth_tracker
-=========
-
-Developer README — minimal run instructions and notes.
-
-What changed
-------------
-- The repository was refactored into a package: all canonical implementations live under the `wealth_tracker/` package.
-- Top-level Python shim files and top-level script `.py` files were removed to avoid duplication. Use the package entrypoints instead.
-
-Quick setup (developer, editable install)
-----------------------------------------
-1) Use your preferred Python (the repo was tested with pyenv Python 3.13.3):
-
+This repository contains Node.js scraper code that runs a persistent daemon to collect price and watchlist data using Puppeteer/Chrome, publishes messages to Kafka, and writes logs to a mounted host directory.
+This README focuses on running the project in Docker, the long-running scraper daemon, and operational instructions (start/stop/logs/heartbeat). For additional operational notes see `DAEMON.md`.
+---
+## Quick Start (Docker Compose)
+The easiest way to run the full stack locally (Kafka, Zookeeper, MySQL, scrapers, etc.) is with Docker Compose.
+1. Build and start services:
 ```bash
-# example using pyenv-managed Python
-/Users/gene/.pyenv/versions/3.13.3/bin/python -m pip install -e .
+# build the scrapers image and start the scrapers service only
+docker compose build scrapers
+docker compose up -d scrapers
+# or start the entire stack
+docker compose up -d
 ```
-
-2) Run a smoke-import check (this verifies the package imports):
-
+2. See running services:
 ```bash
-/Users/gene/.pyenv/versions/3.13.3/bin/python -c "import importlib,sys; mods=['wealth_tracker','wealth_tracker.publish_to_kafka','wealth_tracker.write_price_data_to_mysql','wealth_tracker.parse_investing_com_html'];
-ok=True
-for m in mods:
-    try:
-        importlib.import_module(m)
-        print(m,'OK')
-    except Exception as e:
-        print(m,'ERROR',e); ok=False
-if not ok: sys.exit(2)
-print('SMOKE_IMPORTS_OK')"
+docker compose ps
 ```
-
-Running dev services (Kafka/MySQL)
----------------------------------
-- Kafka (dev) is configured in `docker-compose.kafka.yml`. From the repo root:
-
+3. View logs for scrapers (follow):
 ```bash
-docker compose -f docker-compose.kafka.yml up -d
+docker logs -f wealth-tracker-scrapers
 ```
-
-- For MySQL dev, you can run a MySQL container (example):
-
+4. Stop just the scrapers gracefully:
 ```bash
-docker run -d --name wealth-tracker-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
+docker compose stop scrapers
 ```
-
-Scripts / entrypoints
----------------------
-- Scripts are now packaged under `wealth_tracker.scripts` and should be executed with the `-m` flag, for example:
-
+To stop and remove all compose services:
 ```bash
-python -m wealth_tracker.scripts.publish_test_message
-python -m wealth_tracker.scripts.consume_kafka_test --from-beginning --num 1
+docker compose down
 ```
-
-Notes & troubleshooting
------------------------
-- If you relied on running top-level `scripts/*.py` previously, switch to the `python -m` form above. The top-level `.py` script duplicates were intentionally removed to reduce duplication.
-- If editable install fails, ensure you are using a compatible pip/python and that `pyproject.toml` is present.
-
-Next steps (recommended)
-------------------------
-- Add a small GitHub Actions workflow to run the smoke-import check on PRs.
-- Add unit tests under `tests/` for the MySQL writer and Kafka publisher (use mocks or sqlite for fast tests).
-
-Contact
--------
-If anything here looks wrong or you prefer keeping top-level runnable .py scripts as shims, tell me and I will restore thin stubs that call the package entrypoints.
-
-===============================
-
-
-
-
-
-=======================
-
-To use the Chrome Web Store version of an extension in Docker (headless Chrome), you need to:
-
-Download the extension as a .crx file or extract it to a folder.
-Unpack the .crx (if needed) to a directory in your Docker image.
-Use the --load-extension=/path/to/extension flag when launching Chrome.
-However, Chrome does not natively download extensions from the Web Store via command line or Docker. You must manually download the extension, unpack it, and add it to your build context.
-
-Steps:
-
-Go to the SingleFile Chrome Web Store page: https://chrome.google.com/webstore/detail/singlefile/mpiodijhokgodhhofbcjdecpffjipkle
-Use a Chrome extension downloader (such as "CRX Extractor/Downloader" or a service like https://crxextractor.com/) to download the .crx file.
-Unzip the .crx file (it’s just a zip archive).
-Copy the extracted folder into your project (e.g., singlefile-extension/).
-In your Dockerfile, copy this folder into the image:
-Use the same Chrome launch command:
-Would you like step-by-step instructions for downloading and unpacking the extension, or help updating your Dockerfile to use a local extension folder?
+---
+## Scraper Daemon (behavior)
+- The scrapers container runs `node /usr/src/app/scrape_security_data.js` as PID 1 (via `entrypoint_unified.sh`).
+- The scraper maintains a single Puppeteer browser instance and runs scrape cycles in an internal loop (no cron required).
+- Scraped records are published to Kafka using the configured brokers and topic.
+- Logs are written to the mounted logs directory (host: `/Users/gene/wealth_tracker_logs` mapped to container `/usr/src/app/logs`) and also written to stdout so `docker logs` shows them.
+Note: Operational details (heartbeat interval, graceful shutdown behavior, and troubleshooting steps) are documented in `DAEMON.md`.
+### Graceful shutdown
+- `docker compose stop scrapers` sends SIGTERM to the Node PID 1; the daemon traps SIGTERM/SIGINT, closes the Puppeteer browser, flushes shutdown messages to stdout and file logs, and exits.
+- You should see shutdown messages in `docker logs` similar to:
+```
+[2025-11-17T23:18:47.802Z] Received SIGTERM, shutting down...
+[2025-11-17T23:18:47.812Z] Browser closed.
+```
+If you do not see them, please ensure you are checking `docker logs --tail 200 wealth-tracker-scrapers` immediately after stopping.
+### Heartbeat (liveness)
+- The daemon emits a heartbeat to both the timestamped log file and stdout periodically so external monitors can detect liveness.
+- Default heartbeat interval: 5 minutes.
+- To change the interval, set the environment variable `HEARTBEAT_INTERVAL_MINUTES` for the `scrapers` service in `docker-compose.yml`.
+Example:
+```yaml
+services:
+	scrapers:
+	environment:
+	HEARTBEAT_INTERVAL_MINUTES: 5
+```
+Heartbeat messages look like:
+```
+[2025-11-17T23:18:45.194Z] HEARTBEAT: daemon alive
+```
+---
+## Important Environment Variables
+- `KAFKA_BROKERS`: Kafka bootstrap servers (example: `kafka:9092`) — configured in `docker-compose.yml` for local compose.
+- `KAFKA_TOPIC`: Topic to publish price data to (default set in code/config). Example: `price_data`.
+- `HEARTBEAT_INTERVAL_MINUTES`: Heartbeat interval in minutes (default `5`).
+Update these in the `docker-compose.yml` service block for `scrapers` as needed. Example service env block:
+```yaml
+services:
+	scrapers:
+	environment:
+	KAFKA_BROKERS: "kafka:9092"
+	KAFKA_TOPIC: "price_data"
+	HEARTBEAT_INTERVAL_MINUTES: "5"
+```
+---
+## Logs & Data
+- Logs are saved in the container under `/usr/src/app/logs`. In this workspace they are typically mounted to your host at `/Users/gene/wealth_tracker_logs`.
+- Each run creates timestamped log files like `scrape_security_data.20251117_231700.log` and sidecar JSON/HTML files for scraped content.
+- Use `tail -f` on the most recent log file or `docker logs` for real-time output.
+If you need to inspect the latest log file inside the running container you can run:
+```bash
+docker exec -it wealth-tracker-scrapers sh -c '\
+	LATEST=$(ls -1t /usr/src/app/logs/scrape_security_data*.log | head -n1) && \
+	echo "Latest: $LATEST" && tail -n 200 "$LATEST"'
+```
+---
+## Development notes
+- The scraper code uses `puppeteer-extra` with stealth plugin to drive Chrome. The container image provides a Chrome installation and Xvfb/VNC for a display.
+- The scrapers publish messages via `publish_to_kafka.js` using the `KAFKA_BROKERS` environment variable.
+- To run locally (without Docker) you must have a compatible Chrome and Node.js environment; most development and testing occurs inside the container for environment parity.
+If you run the scrapers outside Docker, set `KAFKA_BROKERS` to a reachable broker list (for example `localhost:9092` when running Kafka locally). Inside Docker Compose use the service DNS name (for example `kafka:9092`).
+---
+## Troubleshooting
+- Chrome launch/connect failures:
+	- Common errors include `ECONNREFUSED 127.0.0.1:9222` or Chromium startup errors. The daemon attempts to connect to an existing debugging port and will launch Chrome if necessary. See the container logs for Chrome startup stderr.
+	- Ensure the container has enough memory and the Chrome binary exists at `/opt/google/chrome/chrome` in the image.
+If you repeatedly see connection failures, rebuild the `scrapers` image and verify the container logs; the daemon includes retries with backoff when Chrome is not immediately available.
+- Kafka connectivity:
+	- If you see DNS or connection errors for Kafka, ensure `KAFKA_BROKERS` points to the correct host:port and that the Kafka container is reachable from the scrapers container (compose network). For local compose this is usually `kafka:9092`.
+- Stale lock files / concurrency:
+	- This project uses a long-running daemon pattern instead of cron + lock scripts. The legacy `scrape_security_data_lock.sh` and cron-related files have been removed from the image. If you previously used cron, remove any external cron entries that run the scraper.
+If you need to revert to scheduled runs instead of the daemon, let me know and I can add a controlled external runner or health-check wrapper.
+---
+## Files of interest
+- `scrape_security_data.js` — main daemon that orchestrates scrapes and publishes to Kafka.
+- `entrypoint_unified.sh` — container entrypoint that launches Node as PID 1.
+- `Dockerfile.scrapers` — build for the scrapers image.
+- `docker-compose.yml` — compose configuration for local development.
+- `DAEMON.md` — additional daemon operational notes (included in repo).
+---
+## Contributing
+PRs are welcome. When working on scrapers locally prefer building the scrapers image and running via Docker Compose for a consistent environment.
+---
+If you want more operational features (health endpoint, metrics, or structured JSON logs), tell me which one and I can add it as a follow-up change.

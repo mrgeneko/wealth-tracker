@@ -18,6 +18,9 @@ const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 
+// Global reference to the Puppeteer browser so we can close it on shutdown
+let globalBrowser = null;
+
 function shouldRunTask(intervalMinutes, markerPath) {
 	let lastRun = 0;
 	if (fs.existsSync(markerPath)) {
@@ -193,11 +196,29 @@ async function daemon() {
 		logDebug('Giving up after 5 ensureBrowser attempts; exiting daemon.');
 		return;
 	}
+	// expose browser for graceful shutdown
+	globalBrowser = browser;
+
+	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
+	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
+	let lastHeartbeat = 0;
 	while (true) {
 		try {
 			await runCycle(browser, outputDir);
 		} catch (e) {
 			logDebug('Fatal error in cycle: ' + e);
+		}
+		// Emit heartbeat if interval elapsed
+		try {
+			const now = Date.now();
+			if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MINUTES * 60 * 1000) {
+				const hb = `[${new Date().toISOString()}] HEARTBEAT: daemon alive\n`;
+				logDebug('HEARTBEAT: daemon alive');
+				try { require('fs').writeSync(1, hb); } catch (e) {}
+				lastHeartbeat = now;
+			}
+		} catch (e) {
+			// ignore heartbeat errors
 		}
 		await new Promise(r => setTimeout(r, 60000)); // sleep 60s between cycles
 	}
@@ -217,3 +238,27 @@ async function daemon() {
 		}
 	}
 })();
+
+// Graceful shutdown: attempt to close the browser when container is stopped
+async function gracefulShutdown(signal) {
+	try {
+		const msg = 'Received ' + signal + ', shutting down...';
+		logDebug(msg);
+		try { require('fs').writeSync(1, `[${new Date().toISOString()}] ${msg}\n`); } catch (e) {}
+		if (globalBrowser) {
+			await globalBrowser.close();
+			logDebug('Browser closed.');
+			try { require('fs').writeSync(1, `[${new Date().toISOString()}] Browser closed.\n`); } catch (e) {}
+		}
+	} catch (e) {
+		logDebug('Error during shutdown: ' + e);
+		try { require('fs').writeSync(2, `[${new Date().toISOString()}] Error during shutdown: ${e}\n`); } catch (e2) {}
+	} finally {
+		// give a moment for logs to flush
+		await new Promise(r => setTimeout(r, 250));
+		process.exit(0);
+	}
+}
+
+process.on('SIGTERM', () => { gracefulShutdown('SIGTERM'); });
+process.on('SIGINT', () => { gracefulShutdown('SIGINT'); });
