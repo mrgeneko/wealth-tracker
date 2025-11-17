@@ -112,6 +112,17 @@ async function scrapeGoogle(browser, security, outputDir) {
 		};
 
 		logDebug('Google Finance data: ' + JSON.stringify(data));
+
+		// Publish the data object to Kafka
+		try {
+			const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeGoogle';
+			const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+			await publishToKafka(data, kafkaTopic, kafkaBrokers);
+			logDebug(`Published Google Finance data to Kafka topic ${kafkaTopic}`);
+		} catch (kafkaErr) {
+			logDebug('Kafka publish error (Google Finance): ' + kafkaErr);
+		}
+
 		// Save the data object to google.yyyymmdd_hhmmss.json using getDateTimeString
 		const jsonFileName = `${ticker}.google.${getDateTimeString()}.json`;
 		const jsonFilePath = require('path').join(outputDir, jsonFileName);
@@ -165,7 +176,7 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 
 
-async function scrapeInvestingComMonitor(browser, outputDir) {
+async function scrapeInvestingComWatchlists(browser, outputDir) {
 	const investingUrl = process.env.INVESTING_URL;
 	if (!investingUrl) {
 		logDebug('WARNING: INVESTING_URL is not set in .env. Please set your portfolio URL.');
@@ -295,7 +306,7 @@ async function scrapeInvestingComMonitor(browser, outputDir) {
 		const tableHtml = await page.$eval('[id^="tbody_overview_"]', el => el.outerHTML);
 
 		// Write tableHtml to a separate file in wealth_tracker_logs
-		const htmlOutPath = `/usr/src/app/logs/investing_watchlist.${getDateTimeString()}.html`;
+		const htmlOutPath = `/usr/src/app/logs/investingcom_watchlist.${getDateTimeString()}.html`;
 		const fullPageHtml = await page.content();
 		require('fs').writeFileSync(htmlOutPath, fullPageHtml, 'utf-8');
 
@@ -345,19 +356,19 @@ async function scrapeInvestingComMonitor(browser, outputDir) {
 		}
 
 		// Write the parsed data to a JSON file in the outputDir
-		const outPath = require('path').join(outputDir, `investing_watchlist.${getDateTimeString()}.json`);
+		const outPath = require('path').join(outputDir, `investingcom_watchlist.${getDateTimeString()}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(securities, null, 2), 'utf-8');
 
 		logDebug(`Parsed data written to ${outPath}`);
 
 		// Publish each security to Kafka
-		const kafkaTopic = process.env.KAFKA_TOPIC || 'investing_watchlist';
+		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
 		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
 		for (const sec of securities) {
 			publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
 		}
 	} catch (err) {
-		logDebug('Error in scrapeInvestingComMonitor: ' + err);
+		logDebug('Error in scrapeInvestingComWatchlist: ' + err);
 	}
 }
 
@@ -473,7 +484,7 @@ async function main() {
 		const investingInterval = 2; // set your interval in minutes
 		if (shouldRunTask(investingInterval, investingMarker)) {
 			logDebug('Begin investing.com scrape');
-			await scrapeInvestingComMonitor(browser, outputDir);
+			await scrapeInvestingComWatchlists(browser, outputDir);
 		} else {
 			logDebug('Skipping investing.com scrape (interval not reached)');
 		}
