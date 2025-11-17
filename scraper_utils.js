@@ -17,8 +17,14 @@ function getDateTimeString() {
 }
 
 
+// Cache for the datetime string used in log file naming
+let cachedDateTimeString = null;
+
 function getTimestampedLogPath(prefix = 'scrape_security_data') {
-    return `/usr/src/app/logs/${prefix}.${getDateTimeString()}.log`;
+    if (!cachedDateTimeString) {
+        cachedDateTimeString = getDateTimeString();
+    }
+    return `/usr/src/app/logs/${prefix}.${cachedDateTimeString}.log`;
 }
 
 function logDebug(msg, logPath) {
