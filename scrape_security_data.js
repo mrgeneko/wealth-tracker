@@ -1,10 +1,14 @@
 // Scrape Google Finance stock page and extract price data
+function sanitizeForFilename(str) {
+	return String(str).replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 async function scrapeGoogle(browser, security, outputDir) {
 	let page = null;
 	let data = {};
 	try {
 		const url = security.google;
-		const ticker = security.key;
+		const ticker = sanitizeForFilename(security.key);
 		logDebug(`Security: ${ticker}   open Google Finance: ${url}`);
 		page = await browser.newPage();
 		await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -141,7 +145,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
 const fs = require('fs');
-const version = 'VERSION:26'
+const version = 'VERSION:30'
 console.log(version);
 const puppeteer = require('puppeteer');
 
@@ -176,10 +180,11 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 
 
-async function scrapeInvestingComWatchlists(browser, outputDir) {
-	const investingUrl = process.env.INVESTING_URL;
+async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
+	investingUrl=watchlist.url;
+	//const investingUrl = process.env.INVESTING_URL;
 	if (!investingUrl) {
-		logDebug('WARNING: INVESTING_URL is not set in .env. Please set your portfolio URL.');
+		logDebug('WARNING: INVESTING_URL is missing or invalid');
 		throw new Error('INVESTING_URL is not set in .env');
 	}
 	const investingEmail = process.env.INVESTING_EMAIL;
@@ -222,14 +227,6 @@ async function scrapeInvestingComWatchlists(browser, outputDir) {
 			await page.bringToFront();
 			logDebug('Brought existing tab to front, skipping reload.');
 		}
-
-		// Close all other tabs except the Investing.com tab
-		//const allPages = await browser.pages();
-		//for (const p of allPages) {
-		//	if (p !== page) {
-		//		try { await p.close(); } catch (e) {}
-		//	}
-		//}
 
 		// Bring the Investing.com tab to the front
 		await page.bringToFront();
@@ -287,12 +284,26 @@ async function scrapeInvestingComWatchlists(browser, outputDir) {
 				}),
 				page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
 			]);
+			
+
+			
 			logDebug('FOUND My Watchlist heading or Summary tab...');
 		} catch (e) {
 			logDebug('Wait for My Watchlist heading/Summary tab failed: ' + e.message);
 			throw e;
 		}
 
+		// Try to click the tab with title=watchlist.key if it exists
+		try {
+			const tabSelector = `li[title="${watchlist.key}"]`;
+			await page.waitForSelector(tabSelector, { visible: true, timeout: 5000 });
+			await page.click(tabSelector);
+			logDebug(`Clicked the tab with title="${watchlist.key}".`);
+			// Wait for 4 seconds after clicking the tab
+			await new Promise(resolve => setTimeout(resolve, 4000));
+		} catch (e) {
+			logDebug(`Tab with title="${watchlist.key}" not found or not clickable: ` + e.message);
+		}
 
 		// Wait for the watchlist table to load
 		logDebug('Waiting for watchlist table to load...');
@@ -306,7 +317,8 @@ async function scrapeInvestingComWatchlists(browser, outputDir) {
 		const tableHtml = await page.$eval('[id^="tbody_overview_"]', el => el.outerHTML);
 
 		// Write tableHtml to a separate file in wealth_tracker_logs
-		const htmlOutPath = `/usr/src/app/logs/investingcom_watchlist.${getDateTimeString()}.html`;
+		const safeWatchlistKey = sanitizeForFilename(watchlist.key);
+		const htmlOutPath = `/usr/src/app/logs/investingcom_watchlist.${safeWatchlistKey}.${getDateTimeString()}.html`;
 		const fullPageHtml = await page.content();
 		require('fs').writeFileSync(htmlOutPath, fullPageHtml, 'utf-8');
 
@@ -356,9 +368,8 @@ async function scrapeInvestingComWatchlists(browser, outputDir) {
 		}
 
 		// Write the parsed data to a JSON file in the outputDir
-		const outPath = require('path').join(outputDir, `investingcom_watchlist.${getDateTimeString()}.json`);
+		const outPath = require('path').join(outputDir, `investingcom_watchlist.${safeWatchlistKey}.${getDateTimeString()}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(securities, null, 2), 'utf-8');
-
 		logDebug(`Parsed data written to ${outPath}`);
 
 		// Publish each security to Kafka
@@ -369,6 +380,11 @@ async function scrapeInvestingComWatchlists(browser, outputDir) {
 		}
 	} catch (err) {
 		logDebug('Error in scrapeInvestingComWatchlist: ' + err);
+		if (err.stack) {
+			// Extract the first stack line after the error message
+			const stackLine = err.stack.split('\n')[1];
+			console.error('Occurred at:', stackLine.trim());
+		}
 	}
 }
 
@@ -443,22 +459,23 @@ async function main() {
 			browser = await puppeteerExtra.launch({
 				headless: false,
 				executablePath: '/opt/google/chrome/chrome',
-				args: [
-					'--no-sandbox',
-					'--disable-gpu',
-					'--disable-dev-shm-usage',
-					'--disable-setuid-sandbox',
-					'--display=:99',
-					`--user-data-dir=${persistentProfileDir}`,
-					'--no-first-run',
-					'--no-default-browser-check',
-					'--disable-default-apps',
-					'--remote-debugging-port=9222',
-					'--disable-features=AudioServiceOutOfProcess',
-					'--disable-component-update',
-					'--disable-background-networking',
-					'--disable-domain-reliability'
-				],
+				   args: [
+					   '--no-sandbox',
+					   '--disable-gpu',
+					   '--disable-dev-shm-usage',
+					   '--disable-setuid-sandbox',
+					   '--display=:99',
+					   `--user-data-dir=${persistentProfileDir}`,
+					   '--no-first-run',
+					   '--no-default-browser-check',
+					   '--disable-default-apps',
+					   '--remote-debugging-port=9222',
+					   '--disable-features=AudioServiceOutOfProcess',
+					   '--disable-component-update',
+					   '--disable-background-networking',
+					   '--disable-domain-reliability',
+					   '--disable-certificate-transparency'
+				   ],
 				env: {
 					...process.env,
 					DISPLAY: ':99',
@@ -478,13 +495,40 @@ async function main() {
 		throw new Error('Could not connect to or launch Chrome.');
 	}
 
+	// Close any tab opened to "chrome://welcome"
+	//try {
+	//	const pages = await browser.pages();
+	//	for (const page of pages) {
+	//		if (page.url().startsWith('chrome://welcome')) {
+	//			await page.close();
+	//			logDebug('Closed chrome://welcome tab.');
+	//		}
+	//	}
+	//} catch (e) {
+	//	logDebug('Error closing chrome://welcome tab: ' + e);
+	//}
+
 	try {
 		// Scrape Investing.com every Y minutes
 		const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
 		const investingInterval = 2; // set your interval in minutes
 		if (shouldRunTask(investingInterval, investingMarker)) {
 			logDebug('Begin investing.com scrape');
-			await scrapeInvestingComWatchlists(browser, outputDir);
+			// Use /usr/src/app/data/investingcom_watchlists.csv for input data
+			const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
+			const content = fs.readFileSync(csvPath, 'utf8');
+			const { parse } = require('csv-parse/sync');
+			const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+			// Loop over records and call scrapeInvestingComWatchlists for each valid investing URL
+			for (const record of records) {
+				logDebug(`investingcom watchlist: ${record.key} ${record.interval} ${record.url}`)
+				const investingUrl = record.url;
+				if (investingUrl && investingUrl.startsWith('http')) {
+					await scrapeInvestingComWatchlists(browser, record, outputDir);
+				} else {
+					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
+				}
+			}
 		} else {
 			logDebug('Skipping investing.com scrape (interval not reached)');
 		}
