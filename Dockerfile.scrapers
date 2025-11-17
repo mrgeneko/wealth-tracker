@@ -25,20 +25,14 @@ COPY . .
 
 
 
-# Install cron
-RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
+# cron removed for daemon mode (node runs as PID 1)
 
 EXPOSE 5901
 
 
-# Copy cronfile, lock shell script, and unified entrypoint
-COPY cronfile /etc/cron.d/cronfile
-COPY scrape_security_data_lock.sh /usr/src/app/scrape_security_data_lock.sh
+# Copy unified entrypoint only (cron and lock script removed)
 COPY entrypoint_unified.sh /usr/local/bin/entrypoint_unified.sh
-RUN chmod 0644 /etc/cron.d/cronfile && \
-	chmod +x /usr/local/bin/entrypoint_unified.sh && \
-	chmod +x /usr/src/app/scrape_security_data_lock.sh && \
-	touch /var/log/cron.log
+RUN chmod +x /usr/local/bin/entrypoint_unified.sh
 
 # Use the unified entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint_unified.sh"]
