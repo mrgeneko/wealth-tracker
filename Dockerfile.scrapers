@@ -24,17 +24,20 @@ RUN if ! grep -q 'puppeteer' package.json; then npm install puppeteer; else npm 
 COPY . .
 
 
+
 # Install cron
 RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 5901
 
-# Copy cronfile and unified entrypoint
+
+# Copy cronfile, lock shell script, and unified entrypoint
 COPY cronfile /etc/cron.d/cronfile
+COPY scrape_security_data_lock.sh /usr/src/app/scrape_security_data_lock.sh
 COPY entrypoint_unified.sh /usr/local/bin/entrypoint_unified.sh
 RUN chmod 0644 /etc/cron.d/cronfile && \
-	crontab /etc/cron.d/cronfile && \
 	chmod +x /usr/local/bin/entrypoint_unified.sh && \
+	chmod +x /usr/src/app/scrape_security_data_lock.sh && \
 	touch /var/log/cron.log
 
 # Use the unified entrypoint

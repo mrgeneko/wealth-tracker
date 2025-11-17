@@ -1,122 +1,26 @@
 
-const { scrapeGoogle } = require('./scrape_google');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug } = require('./scraper_utils');
-// Load environment variables from .env if present (for local dev)
-require('dotenv').config();
+
 const fs = require('fs');
+require('dotenv').config();
 const version = 'VERSION:33'
 console.log(version);
+
+const { scrapeGoogle } = require('./scrape_google');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug } = require('./scraper_utils');
 const puppeteer = require('puppeteer');
-
-// --- LOCK FILE MECHANISM ---
-const LOCK_FILE = '/tmp/scrape_security_data.lock';
-function isProcessRunning(pid) {
-	try {
-		// Signal 0 does not kill the process, just checks if it exists
-		process.kill(pid, 0);
-		return true;
-	} catch (e) {
-		return false;
-	}
-}
-// Async lock file check and main entry
-(async () => {
-	if (fs.existsSync(LOCK_FILE)) {
-		const diagTime = new Date().toISOString();
-		try {
-			const lockContents = fs.readFileSync(LOCK_FILE, 'utf-8');
-			const existingPid = parseInt(lockContents);
-			const diagMsg = `[${diagTime}] Detected lock file with contents: '${lockContents}' (parsed PID: ${existingPid})`;
-			console.log(diagMsg);
-			try { logDebug(diagMsg); } catch (e) {}
-			if (!isNaN(existingPid)) {
-				if (isProcessRunning(existingPid)) {
-					// 1. Log ps -p <PID> output for diagnostics
-					const { execSync } = require('child_process');
-					let psOutput = '';
-					try {
-						psOutput = execSync(`ps -p ${existingPid} -o pid,ppid,comm,args`, { encoding: 'utf-8' });
-					} catch (e) {
-						psOutput = `ps -p ${existingPid} failed: ${e}`;
-					}
-					const psMsg = `[${diagTime}] ps -p ${existingPid} output:\n${psOutput}`;
-					console.log(psMsg);
-					try { logDebug(psMsg); } catch (e) {}
-
-					// 2. Wait 1 second and re-check if process is still running
-					await new Promise(resolve => setTimeout(resolve, 1000));
-					const stillRunning = isProcessRunning(existingPid);
-					const retryMsg = `[${new Date().toISOString()}] After 1s delay, PID ${existingPid} still running: ${stillRunning}`;
-					console.log(retryMsg);
-					try { logDebug(retryMsg); } catch (e) {}
-					if (stillRunning) {
-						const msg = `[${diagTime}] Another instance of scrape_security_data.js is already running (PID: ${existingPid}). Exiting.`;
-						console.error(msg);
-						try { logDebug(msg); } catch (e) {}
-						process.exit(1);
-					} else {
-						const msg = `[${diagTime}] PID ${existingPid} is no longer running after delay. Removing stale lock and continuing.`;
-						console.warn(msg);
-						try { logDebug(msg); } catch (e) {}
-						fs.unlinkSync(LOCK_FILE);
-						// Continue script execution
-					}
-				} else {
-					// Stale lock file, remove and continue
-					const msg = `[${diagTime}] Stale lock file found for PID ${existingPid}. Removing stale lock and continuing.`;
-					console.warn(msg);
-					try { logDebug(msg); } catch (e) {}
-					fs.unlinkSync(LOCK_FILE);
-				}
-			} else {
-				// Corrupt lock file, remove and continue
-				const msg = `[${diagTime}] Corrupt lock file (contents: '${lockContents}'). Removing and continuing.`;
-				console.warn(msg);
-				try { logDebug(msg); } catch (e) {}
-				fs.unlinkSync(LOCK_FILE);
-			}
-		} catch (e) {
-			// If lock file is corrupt or unreadable, remove it and continue
-			const msg = `[${diagTime}] Error reading lock file: ${e}. Removing and continuing.`;
-			console.warn(msg);
-			try { logDebug(msg); } catch (e) {}
-			fs.unlinkSync(LOCK_FILE);
-		}
-	}
-	fs.writeFileSync(LOCK_FILE, process.pid.toString());
-	// Continue with main script
-	await main();
-})();
-function cleanupLockFile() {
-	if (fs.existsSync(LOCK_FILE)) {
-		try { fs.unlinkSync(LOCK_FILE); } catch (e) {}
-	}
-}
-process.on('exit', cleanupLockFile);
-process.on('SIGINT', () => { cleanupLockFile(); process.exit(130); });
-process.on('SIGTERM', () => { cleanupLockFile(); process.exit(143); });
-process.on('uncaughtException', (err) => { cleanupLockFile(); throw err; });
-
-
 const debugLogPath = getTimestampedLogPath();
 const path = require('path');
-// Add puppeteer-extra and stealth plugin
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
-
 const { publishToKafka } = require('./publish_to_kafka');
-
 const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
-
-
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 
 function shouldRunTask(intervalMinutes, markerPath) {
 	let lastRun = 0;
 	if (fs.existsSync(markerPath)) {
-		// Read only the first line (timestamp) for compatibility
 		const lines = fs.readFileSync(markerPath, 'utf8').split('\n');
 		lastRun = parseInt(lines[0], 10);
 	}
@@ -131,24 +35,15 @@ function shouldRunTask(intervalMinutes, markerPath) {
 
 function isBusinessHours() {
 	const now = new Date();
-	const day = now.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+	const day = now.getDay();
 	const hour = now.getHours();
 	const minute = now.getMinutes();
-	// Monday–Friday, 4:00am–20:02pm
 	if (day === 0 || day === 6) return false;
 	if (hour < 4 || (hour === 20 && minute > 2) || hour > 20) return false;
 	return true;
 }
 
-async function main() {
-	const outputDir = process.argv[3] || '/usr/src/app/logs';
-	logDebug(version);
-	if (!isBusinessHours()) {
-		// logDebug('Not within business hours, exiting/');
-		// return;
-	}		
-
-	// Browser connect/launch logic
+async function ensureBrowser() {
 	let browser = null;
 	let connected = false;
 	let connectError = null;
@@ -184,23 +79,23 @@ async function main() {
 			browser = await puppeteerExtra.launch({
 				headless: false,
 				executablePath: '/opt/google/chrome/chrome',
-				   args: [
-					   '--no-sandbox',
-					   '--disable-gpu',
-					   '--disable-dev-shm-usage',
-					   '--disable-setuid-sandbox',
-					   '--display=:99',
-					   `--user-data-dir=${persistentProfileDir}`,
-					   '--no-first-run',
-					   '--no-default-browser-check',
-					   '--disable-default-apps',
-					   '--remote-debugging-port=9222',
-					   '--disable-features=AudioServiceOutOfProcess',
-					   '--disable-component-update',
-					   '--disable-background-networking',
-					   '--disable-domain-reliability',
-					   '--disable-certificate-transparency'
-				   ],
+				args: [
+					'--no-sandbox',
+					'--disable-gpu',
+					'--disable-dev-shm-usage',
+					'--disable-setuid-sandbox',
+					'--display=:99',
+					`--user-data-dir=${persistentProfileDir}`,
+					'--no-first-run',
+					'--no-default-browser-check',
+					'--disable-default-apps',
+					'--remote-debugging-port=9222',
+					'--disable-features=AudioServiceOutOfProcess',
+					'--disable-component-update',
+					'--disable-background-networking',
+					'--disable-domain-reliability',
+					'--disable-certificate-transparency'
+				],
 				env: {
 					...process.env,
 					DISPLAY: ':99',
@@ -219,92 +114,106 @@ async function main() {
 		if (launchError) logDebug('[LAUNCH ERROR DETAILS] ' + launchError.stack);
 		throw new Error('Could not connect to or launch Chrome.');
 	}
+	return browser;
+}
 
-	// Close any tab opened to "chrome://welcome"
-	//try {
-	//	const pages = await browser.pages();
-	//	for (const page of pages) {
-	//		if (page.url().startsWith('chrome://welcome')) {
-	//			await page.close();
-	//			logDebug('Closed chrome://welcome tab.');
-	//		}
-	//	}
-	//} catch (e) {
-	//	logDebug('Error closing chrome://welcome tab: ' + e);
-	//}
+async function runCycle(browser, outputDir) {
+	//if (!isBusinessHours()) {
+	//	logDebug('Outside business hours, skipping cycle.');
+//		return;
+//	}
+	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
+	const investingInterval = 2; // minutes
+	if (shouldRunTask(investingInterval, investingMarker)) {
+		logDebug('Begin investing.com scrape');
+		const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
+		const content = fs.readFileSync(csvPath, 'utf8');
+		const { parse } = require('csv-parse/sync');
+		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+		for (const record of records) {
+			logDebug(`investingcom watchlist: ${record.key} ${record.interval} ${record.url}`)
+			const investingUrl = record.url;
+			if (investingUrl && investingUrl.startsWith('http')) {
+				await scrapeInvestingComWatchlists(browser, record, outputDir);
+			} else {
+				logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
+			}
+		}
+	} else {
+		logDebug('Skipping investing.com scrape (interval not reached)');
+	}
 
-	try {
-		// Scrape Investing.com every Y minutes
-		const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
-		const investingInterval = 2; // set your interval in minutes
-		if (shouldRunTask(investingInterval, investingMarker)) {
-			logDebug('Begin investing.com scrape');
-			// Use /usr/src/app/data/investingcom_watchlists.csv for input data
-			const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
-			const content = fs.readFileSync(csvPath, 'utf8');
-			const { parse } = require('csv-parse/sync');
-			const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
-			// Loop over records and call scrapeInvestingComWatchlists for each valid investing URL
-			for (const record of records) {
-				logDebug(`investingcom watchlist: ${record.key} ${record.interval} ${record.url}`)
-				const investingUrl = record.url;
-				if (investingUrl && investingUrl.startsWith('http')) {
-					await scrapeInvestingComWatchlists(browser, record, outputDir);
+	const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
+	const urlInterval = 60; // minutes
+	if (shouldRunTask(urlInterval, urlMarker)) {
+		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
+		const content = fs.readFileSync(csvPath, 'utf8');
+		const { parse } = require('csv-parse/sync');
+		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+		const filtered_securities = records.filter(row => row.scrape_group === 'c');
+		for (const security of filtered_securities) {
+			logDebug('security type:' + security.type);
+			if (security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
+				const webullData = await scrapeWebull(browser, security, outputDir);
+				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
+			} else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
+				if (security.google && security.google.startsWith('http')) {
+					const googleData = await scrapeGoogle(browser, security, outputDir);
+					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
+				} else if (security.webull && security.webull.startsWith('http')) {
+					const webullData = await scrapeWebull(browser, security, outputDir);
+					logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 				} else {
-					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
+					logDebug('unhandled UNHANDLED SECURITY:' + security.key);
 				}
 			}
-		} else {
-			logDebug('Skipping investing.com scrape (interval not reached)');
+			await new Promise(r => setTimeout(r, 1000));
 		}
+	} else {
+		logDebug('Skipping URL scrape (interval not reached)');
+	}
+	logDebug('Cycle complete.');
+}
 
-		// scrape_group c URLs every X minutes
-		const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
-		const urlInterval = 60; // set your interval in minutes
-		if (shouldRunTask(urlInterval, urlMarker)) {
-			// Use /usr/src/app/data/wealth_tracker.csv for input data
-			const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
-			const content = fs.readFileSync(csvPath, 'utf8');
-			const { parse } = require('csv-parse/sync');
-			const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
-			// Filter securities where the 'scrape_group' column equals 'c'
-			const filtered_securities = records.filter(row => row.scrape_group === 'c');
-
-			   for (const security of filtered_securities) {
-				   logDebug('security type:' + security.type)
-				   if (security.type && security.type == "bond" && security.webull && security.webull.startsWith('http')) {
-					   const webullData = await scrapeWebull(browser, security, outputDir);
-					   logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
-				   }
-				   else if (security.type && (security.type == "stock" || security.type == "etf")) {
-						if (security.google && security.google.startsWith('http')) {
-							const googleData = await scrapeGoogle(browser, security, outputDir);
-							logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
-						}
-						else if (security.webull && security.webull.startsWith('http')) {
-							const webullData = await scrapeWebull(browser, security, outputDir);
-							logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
-						}
-						else {
-							logDebug('unhandled UNHANDLED SECURITY:' + security.key);
-						}
-					}
-				   // Sleep for 1 second between scrapes
-				   await new Promise(resolve => setTimeout(resolve, 1000));
-			   }
-		} else {
-			logDebug('Skipping URL scrape (interval not reached)');
+async function daemon() {
+	const outputDir = '/usr/src/app/logs';
+	logDebug(version);
+	let browser = null;
+	// Retry connecting/launching Chrome with backoff to avoid early exit if Chrome not ready yet
+	for (let attempt = 1; attempt <= 5; attempt++) {
+		try {
+			browser = await ensureBrowser();
+			break;
+		} catch (e) {
+			logDebug(`ensureBrowser attempt ${attempt} failed: ${e.message}`);
+			await new Promise(r => setTimeout(r, attempt * 2000)); // incremental backoff
 		}
-	} finally {
-		// Do not close the browser to keep it open for the next run
-		// if (browser) {
-		//     try { await browser.close(); logDebug('Browser closed.'); } catch (e) { logDebug('Error closing browser: ' + e); }
-		// }
+	}
+	if (!browser) {
+		logDebug('Giving up after 5 ensureBrowser attempts; exiting daemon.');
+		return;
+	}
+	while (true) {
+		try {
+			await runCycle(browser, outputDir);
+		} catch (e) {
+			logDebug('Fatal error in cycle: ' + e);
+		}
+		await new Promise(r => setTimeout(r, 60000)); // sleep 60s between cycles
 	}
 }
 
-main().catch(e => logDebug('Fatal error in main: ' + e)).finally(() => {
-	const now = new Date();
-	const timestamp = now.toISOString().replace('T', ' ').replace('Z', ' UTC');
-	logDebug(`exiting at ${timestamp}`);
-});
+(async () => {
+	try {
+		await daemon();
+	} catch (e) {
+		// If daemon throws synchronously, log and try one more full restart after short delay
+		logDebug('Daemon outer failure: ' + e.message);
+		await new Promise(r => setTimeout(r, 5000));
+		try {
+			await daemon();
+		} catch (e2) {
+			logDebug('Daemon second failure, giving up: ' + e2.message);
+		}
+	}
+})();
