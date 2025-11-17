@@ -1,4 +1,7 @@
 #!/bin/bash
+# Log current cron processes for diagnostics
+echo "[DEBUG] Current cron processes before check:" 
+ps aux | grep cron | grep -v grep || echo "[DEBUG] No cron process found."
 set -ex
 
 # Log file for debug output
@@ -65,8 +68,19 @@ else
   echo "[DEBUG] x11vnc already running."
 fi
 
-# Start cron in the background
-service cron start
 
-echo "[DEBUG] Entrypoint script completed. Container will now idle."
-exec tail -f /var/log/cron.log
+# Disable cron for daemon mode; start scraper directly
+echo "[DEBUG] Skipping cron startup (daemon mode)."
+echo "[DEBUG] Starting scrape_security_data daemon..."
+node /usr/src/app/scrape_security_data.js &
+SCRAPER_PID=$!
+echo "[DEBUG] Scraper PID: $SCRAPER_PID"
+echo "[DEBUG] Entrypoint running tail on scraper log for visibility." 
+LOG_DIR=/usr/src/app/logs
+LATEST_LOG=$(ls -1t $LOG_DIR/scrape_security_data*.log 2>/dev/null | head -n1)
+if [ -n "$LATEST_LOG" ]; then
+  tail -F "$LATEST_LOG"
+else
+  echo "[DEBUG] No scraper log yet; tailing process output." 
+  wait $SCRAPER_PID
+fi

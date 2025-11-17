@@ -5,6 +5,11 @@ services:
         dockerfile: Dockerfile.scrapers
       platform: linux/amd64
       container_name: wealth-tracker-scrapers
+      environment:
+        # Use internal Docker DNS hostname for Kafka instead of localhost
+        KAFKA_BROKERS: kafka:9092
+        # Unified topic for all published price data
+        KAFKA_TOPIC: price_data
       volumes:
         - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
         - /Users/gene/wealth_tracker_data:/usr/src/app/data
@@ -53,6 +58,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Ensure producers auto-create topics when first message is sent
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
       - "9092:9092"
     healthcheck:
