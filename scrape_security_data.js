@@ -18,6 +18,7 @@ puppeteerExtra.use(StealthPlugin());
 const { publishToKafka } = require('./publish_to_kafka');
 
 const http = require('http');
+const { scrapeWebull } = require('./scrape_webull');
 
 
 async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
@@ -386,12 +387,26 @@ async function main() {
 			const filtered_securities = records.filter(row => row.scrape_group === 'c');
 
 			   for (const security of filtered_securities) {
-				   if (security.google && security.google.startsWith('http')) {
-					   const googleData = await scrapeGoogle(browser, security, outputDir);
-					   logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
-					   // Sleep for 1 second between Google scrapes
-					   await new Promise(resolve => setTimeout(resolve, 1000));
+				   logDebug('security type:' + security.type)
+				   if (security.type && security.type == "bond" && security.webull && security.webull.startsWith('http')) {
+					   const webullData = await scrapeWebull(browser, security, outputDir);
+					   logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 				   }
+				   else if (security.type && (security.type == "stock" || security.type == "etf")) {
+						if (security.google && security.google.startsWith('http')) {
+							const googleData = await scrapeGoogle(browser, security, outputDir);
+							logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
+						}
+						else if (security.webull && security.webull.startsWith('http')) {
+							const webullData = await scrapeWebull(browser, security, outputDir);
+							logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
+						}
+						else {
+							logDebug('unhandled UNHANDLED SECURITY:' + security.key);
+						}
+					}
+				   // Sleep for 1 second between scrapes
+				   await new Promise(resolve => setTimeout(resolve, 1000));
 			   }
 		} else {
 			logDebug('Skipping URL scrape (interval not reached)');
