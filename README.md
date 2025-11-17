@@ -1,3 +1,20 @@
+## Building Chrome SingleFile Container on Apple Silicon (M1/M2/M3 Mac)
+
+If you are using Docker Desktop on Apple Silicon and want to run Google Chrome (x86_64/amd64) in a container, you must:
+
+1. Enable "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" in Docker Desktop settings.
+2. Build and run your container with the amd64 platform specified:
+     - For Docker Compose:
+         ```sh
+         docker compose build --platform linux/amd64
+         docker compose up --platform linux/amd64
+         ```
+     - For direct Docker builds:
+         ```sh
+         docker build --platform linux/amd64 -t wealth-tracker-chrome-singlefile -f Dockerfile.chrome_singlefile .
+         ```
+
+This ensures the container uses x86_64 emulation and can install Google Chrome for amd64.
 wealth_tracker
 =========
 
@@ -43,7 +60,7 @@ docker compose -f docker-compose.kafka.yml up -d
 - For MySQL dev, you can run a MySQL container (example):
 
 ```bash
-docker run -d --name wealth_tracker-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
+docker run -d --name wealth-tracker-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=testdb -e MYSQL_USER=test -e MYSQL_PASSWORD=test -p 3306:3306 mysql:8.0
 ```
 
 Scripts / entrypoints
@@ -68,3 +85,28 @@ Next steps (recommended)
 Contact
 -------
 If anything here looks wrong or you prefer keeping top-level runnable .py scripts as shims, tell me and I will restore thin stubs that call the package entrypoints.
+
+===============================
+
+
+
+
+
+=======================
+
+To use the Chrome Web Store version of an extension in Docker (headless Chrome), you need to:
+
+Download the extension as a .crx file or extract it to a folder.
+Unpack the .crx (if needed) to a directory in your Docker image.
+Use the --load-extension=/path/to/extension flag when launching Chrome.
+However, Chrome does not natively download extensions from the Web Store via command line or Docker. You must manually download the extension, unpack it, and add it to your build context.
+
+Steps:
+
+Go to the SingleFile Chrome Web Store page: https://chrome.google.com/webstore/detail/singlefile/mpiodijhokgodhhofbcjdecpffjipkle
+Use a Chrome extension downloader (such as "CRX Extractor/Downloader" or a service like https://crxextractor.com/) to download the .crx file.
+Unzip the .crx file (it’s just a zip archive).
+Copy the extracted folder into your project (e.g., singlefile-extension/).
+In your Dockerfile, copy this folder into the image:
+Use the same Chrome launch command:
+Would you like step-by-step instructions for downloading and unpacking the extension, or help updating your Dockerfile to use a local extension folder?

@@ -8,7 +8,7 @@ from datetime import datetime
 def run_applescript(script):
     process = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
     if process.returncode != 0:
-        logging.error("AppleScript error:", process.stderr)
+        logging.error(f"AppleScript error: {process.stderr}")
         return None
     return process.stdout.strip()
 
@@ -75,11 +75,11 @@ def update_numbers(data):
                     price = data["last_price"]
                     logging.info(f"{data['key']} - no after hours price. insert last price {price}")
 
-    if "previous_price" not in data:
-        logging.info("no previous price")
-        previous_price = "-1"
+    if "previous_close_price" not in data:
+        logging.info("no previous close price")
+        previous_close_price = "-1"
     else:
-        previous_price = data["previous_price"]
+        previous_close_price = data["previous_close_price"]
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     script = f'''
@@ -96,13 +96,14 @@ def update_numbers(data):
                     end repeat
                     if price_col is 0 then error "Price column not found."  
 
+                    
                     repeat with i from 1 to column count
                         if value of cell i of row 1 is "Previous Price" then
                             set prev_price_col to i
                             exit repeat
                         end if
                     end repeat
-                    if prev_price_col is 0 then error "Previous Price column not found."  
+                    if prev_price_col is 0 then error "Previous Price column not found."
 
                     set key_col to 0
                     repeat with i from 1 to column count
@@ -138,8 +139,9 @@ def update_numbers(data):
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell price_col of row r to "{price}"'
                             ])}
+                            # Only set Previous Price if previous_close_price != "-1"
                             {chr(10).join([
-                                f'if tickerVal is "{data["key"]}" then set value of cell prev_price_col of row r to "{previous_price}"'
+                                f'if tickerVal is "{data["key"]}" and "{previous_close_price}" is not "-1" then set value of cell prev_price_col of row r to "{previous_close_price}"'
                             ])}
                             {chr(10).join([
                                 f'if tickerVal is "{data["key"]}" then set value of cell update_time_col of row r to "{now}"'

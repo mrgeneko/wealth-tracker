@@ -4,7 +4,7 @@ import logging
 def get_cnbc_attributes():
     attributes = {
         "name" : "cnbc",
-        "download" : "singlefile",
+        "download" : "singlefile", # was singlefile
         "extract" : extract_cnbc,
         "has_realtime" : True,
         "has_pre_market" : True,

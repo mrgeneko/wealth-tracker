@@ -22,8 +22,8 @@ def get_google_attributes():
     return attributes
 
 def extract_google(ticker,html_content):
+
     logging.info(f"extract google")
-    soup = BeautifulSoup(html_content, 'html.parser')
     last_price = ""
     after_hours_price = ""
     pre_market_price = ""
@@ -36,6 +36,18 @@ def extract_google(ticker,html_content):
     if last_price.startswith("$"):
         last_price = last_price[1:]
     logging.info(f"last_price: {last_price}")
+
+    # Parse previous close price from 'Previous close' label and its following div with class 'P6K39c'
+    previous_close_price = ""
+    prev_close_label = soup.find('div', string=lambda s: s and s.strip().lower() == 'previous close')
+    if prev_close_label:
+        parent = prev_close_label.find_parent('div', class_='gyFHrc')
+        if parent:
+            price_div = parent.find('div', class_='P6K39c')
+            if price_div and price_div.text.strip().startswith('$'):
+                previous_close_price = price_div.text.strip()[1:].replace(',', '')
+    logging.info(f"previous_close_price: {previous_close_price}")
+
 
     element = soup.select_one('[class="P2Luy Ez2Ioe ZYVHBb"]')
     if element == None:
@@ -88,8 +100,9 @@ def extract_google(ticker,html_content):
     data["last_price"] = last_price
     data["price_change_decimal"] = price_change_decimal
     data["price_change_percent"] = price_change_percent
+    data["previous_close_price"] = previous_close_price
     data["after_hours_price"] = after_hours_price
     data["pre_market_price"] = pre_market_price
-    data["source"] = "google finance"
+    data["source"] = "google_finance"
     logging.info(data)
     return data

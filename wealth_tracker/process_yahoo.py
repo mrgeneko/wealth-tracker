@@ -80,11 +80,11 @@ def extract_yahoo(ticker,html_content):
             logging.error(f"error: yf.Ticker returned None")
             return None
     except Exception as e:
-        print(f"extract_yahoo error fetching {ticker}: {e}")
+        logging.error(f"extract_yahoo error fetching {ticker}: {e}")
         return None
     
     info = yfdata.info
-    pprint.pprint(info)
+    #pprint.pprint(info)
 
     price = info.get("regularMarketPrice")
     pre_market_price = ""
@@ -96,15 +96,18 @@ def extract_yahoo(ticker,html_content):
     elif is_after_hours_session():
         after_hours_price = info.get("postMarketPrice")
 
+    previous_close_price = info.get("previousClose")
+
     data = {
         "key": ticker,
         "last_price": price,
         "pre_market_price": pre_market_price if pre_market_price is not None else "",
         "after_hours_price": after_hours_price if after_hours_price is not None else "",
+        "previous_close_price": previous_close_price if previous_close_price is not None else "",
         "source" : "yahoo"
     }
 
-    print(f"Fetched price for {ticker} {data}")
+    logging.info(f"Fetched price for {ticker} {data}")
     return data
 
 
@@ -132,7 +135,7 @@ def fetch_prices(tickers):
                 "source" : "yahoo"
             }
             price_data.append(single_ticker)
-            print(f"Fetched price for {ticker} {single_ticker}")
+            logging.info(f"Fetched price for {ticker} {single_ticker}")
             time.sleep(2)
         except Exception as e:
             print(f"Error fetching {ticker}: {e}")

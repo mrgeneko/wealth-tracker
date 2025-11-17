@@ -10,7 +10,7 @@ log_file="$HOME/singlefile_html/singlefile_wrap.$timestamp.log"
 # Log the date at the start of the log file for this run
 echo "$(date)" >> "$log_file"
 
-/usr/bin/osascript $HOME/bin/chrome_singlefile.scpt
+/usr/bin/osascript chrome_singlefile.scpt
 
 # Prefer the canonical saved script location, but fall back to the current working directory
 #SCPT_PRIMARY="$HOME/Library/Mobile Documents/com~apple~ScriptEditor2/Documents/chrome_singlefile.scpt"

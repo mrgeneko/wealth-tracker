@@ -16,6 +16,7 @@ import json
 
 def parse_watchlist_table(html_content):
     logging.info("parse_watchlist_table")
+    capture_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
     soup = BeautifulSoup(html_content, 'html.parser')
     specific_rows_json = []
     table = soup.select_one('[id^="tbody_overview_"]')
@@ -55,8 +56,9 @@ def parse_watchlist_table(html_content):
             data = {}
             data["key"] = row_data["symbol"]
             data["last_price"] = row_data["last"]
-            data["source"] = "investing mon"
-            data["previous_price"] = row_data["prev"]
+            data["source"] = "investing"
+            data["previous_close_price"] = row_data["prev"]
+            data["capture_time"] = capture_time
 
             qt = row_data["time"]
             try:

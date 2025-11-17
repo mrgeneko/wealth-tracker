@@ -1,0 +1,97 @@
+services:
+  chrome-singlefile:
+      build:
+        context: .
+        dockerfile: Dockerfile.scrapers
+      platform: linux/amd64
+      container_name: wealth-tracker-chrome-singlefile
+      volumes:
+        - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
+        - /Users/gene/wealth_tracker_data:/usr/src/app/data
+      ports:
+        - "5901:5901"
+      deploy:
+        resources:
+          limits:
+            memory: 8g
+  mysql:
+    image: mysql:8.0
+    container_name: wealth-tracker-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+
+  kafka:
+    container_name: wealth-tracker-kafka
+    image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      retries: 10
+      start_period: 10s
+
+  kafka-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    container_name: wealth-tracker-kafka-consumer
+    depends_on:
+      - kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: price_data
+    # command can be omitted if set in Dockerfile
+
+  singlefile:
+    image: capsulecode/singlefile:latest
+    container_name: wealth-tracker-singlefile
+    volumes:
+      - /Users/gene/wealth_tracker_logs:/usr/src/app/out
+
+  parse-investing:
+    build:
+      context: .
+      dockerfile: Dockerfile.parse_investing
+    container_name: wealth-tracker-parse-investing
+    volumes:
+      - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
+    depends_on:
+      - kafka
+      - mysql
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Add other needed env vars here
+    command: ["bash", "parse_investing_com_html.sh"]
+      
