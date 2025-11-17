@@ -9,3 +9,4 @@ out.json
 node_modules/
 nohup.out
 .env
+wealth_tracker_log/
