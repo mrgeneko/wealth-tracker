@@ -32,6 +32,8 @@ async function scrapeGoogle(browser, security, outputDir) {
 		let previous_close_price = '';
 		let after_hours_price = '';
 		let pre_market_price = '';
+		let pre_market_price_change_decimal = '';
+		let pre_market_price_change_percent = '';
 	
 		try {
 			const main_element = $('[class="Gfxi4"]').first();
@@ -73,6 +75,46 @@ async function scrapeGoogle(browser, security, outputDir) {
 						after_hours_price = ext_price.text().replace('$', '').replace(',', '').trim();
 					} else if (ext_hours_section.text().startsWith('Pre-market')) {
 						pre_market_price = ext_price.text().replace('$', '').replace(',', '').trim();
+						// Extract pre-market price change decimal
+						// No longer restrict to ext_hours_section: search whole document for pre-market price change
+						let preMarketChangeElem = $('span.P2Luy.Ebnabc.DnMTof');
+						if (preMarketChangeElem.length) {
+							logDebug('premarketchange text:' + preMarketChangeElem.text());
+							const changeText = preMarketChangeElem.text().trim();
+							// Expect format like "1.77%-3.36" or just "-3.36"
+							const match = changeText.match(/^([+-]?[0-9,.]+%)?\s*([+-]?[0-9,.]+)$/);
+							if (match) {
+								let percent = match[1] ? match[1].replace(',', '') : '';
+								let decimal = match[2].replace(',', '');
+
+								// Try to find the arrow in the same parent node
+								let arrowElem = preMarketChangeElem.parent().find('span.notranslate.V53LMb').first();
+								logDebug('arrowElem.html:' + (arrowElem.length ? arrowElem.html() : 'null'));
+								logDebug('length:' + arrowElem.length);
+
+								let sign = '';
+								let svgHtml = '';
+								if (arrowElem.length) {
+									svgHtml = arrowElem.html() || '';
+									logDebug('premarket arrow SVG HTML: ' + svgHtml);
+									if (svgHtml.includes('M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z')) {
+										sign = '-'; // Down arrow
+									} else if (svgHtml.includes('M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.58L20 12l-8-8-8 8z')) {
+										sign = '+'; // Up arrow
+									}
+								}
+								logDebug('premarket percent before sign logic: ' + percent);
+								logDebug('premarket detected sign: ' + sign);
+								// Only set the sign for percent
+								if (percent) {
+									percent = percent.replace(/^[-+]/, ''); // Remove any sign
+									if (sign) percent = sign + percent;
+									logDebug('premarket percent after sign logic: ' + percent);
+									pre_market_price_change_percent = percent;
+								}
+								pre_market_price_change_decimal = decimal;
+							}
+						}
 					}
 				}
 			}
@@ -110,6 +152,8 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"previous_close_price" : previous_close_price,
 			"after_hours_price" : after_hours_price,
 			"pre_market_price" : pre_market_price,
+			"pre_market_price_change_decimal": pre_market_price_change_decimal,
+			"pre_market_price_change_percent": pre_market_price_change_percent,
 			source: 'google_finance',
 			capture_time: new Date().toISOString().replace("T", " ").replace("Z", " UTC"),
 			quote_time: globalThis._google_quote_time || ''
@@ -145,7 +189,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 // Load environment variables from .env if present (for local dev)
 require('dotenv').config();
 const fs = require('fs');
-const version = 'VERSION:30'
+const version = 'VERSION:33'
 console.log(version);
 const puppeteer = require('puppeteer');
 
@@ -535,7 +579,7 @@ async function main() {
 
 		// scrape_group c URLs every X minutes
 		const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
-		const urlInterval = 4; // set your interval in minutes
+		const urlInterval = 2; // set your interval in minutes
 		if (shouldRunTask(urlInterval, urlMarker)) {
 			// Use /usr/src/app/data/wealth_tracker.csv for input data
 			const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
