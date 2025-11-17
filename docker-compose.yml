@@ -1,10 +1,10 @@
 services:
-  chrome-singlefile:
+  scrapers:
       build:
         context: .
         dockerfile: Dockerfile.scrapers
       platform: linux/amd64
-      container_name: wealth-tracker-chrome-singlefile
+      container_name: wealth-tracker-scrapers
       volumes:
         - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
         - /Users/gene/wealth_tracker_data:/usr/src/app/data
