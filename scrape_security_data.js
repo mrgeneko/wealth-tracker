@@ -181,7 +181,7 @@ async function runCycle(browser, outputDir) {
 	}
 
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', 'last_yahoo_batch_api.txt');
-	const yahooBatchInterval = 10; // minutes
+	const yahooBatchInterval = 30; // minutes
 	if (shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');

@@ -7,6 +7,12 @@ const path = require('path');
 let _yahooModule = null;
 async function ensureYahoo() {
   if (_yahooModule) return _yahooModule;
+  // Helper: detect ES6 class constructors so we can instantiate them.
+  function isClass(fn) {
+    if (typeof fn !== 'function') return false;
+    const s = Function.prototype.toString.call(fn);
+    return /^class\s/.test(s);
+  }
   try {
     // Try CommonJS require first (works when package exposes CJS or default)
     const req = require('yahoo-finance2');
@@ -16,20 +22,21 @@ async function ensureYahoo() {
     // - a function-style `quote` factory, or
     // - an object with `.quote` / `.quotes` methods.
     if (typeof _yahooModule === 'function') {
-      // If it's a class-like constructor that exposes `quote` on its prototype,
-      // instantiate it.
-      if (_yahooModule.prototype && (typeof _yahooModule.prototype.quote === 'function' || typeof _yahooModule.prototype.quotes === 'function')) {
+      // If it's an ES6 class or a constructor exposing `quote`/`quotes`, try to instantiate.
+      if (isClass(_yahooModule) || (_yahooModule.prototype && (typeof _yahooModule.prototype.quote === 'function' || typeof _yahooModule.prototype.quotes === 'function'))) {
         try {
           _yahooModule = new _yahooModule();
         } catch (e) {
-          // If instantiation fails, fall back to treating it as a function below
-          const fn = _yahooModule;
+          // If instantiation fails (rare), create safe wrappers that instantiate per-call.
+          const FnCtor = _yahooModule;
           _yahooModule = {
-            quote: fn,
-            quotes: (fn.quotes && typeof fn.quotes === 'function') ? fn.quotes.bind(fn) : async (symbols, opts) => {
+            quote: async (symbol, opts) => {
+              try { const inst = new FnCtor(); return await inst.quote(symbol, opts); } catch (err) { return null; }
+            },
+            quotes: async (symbols, opts) => {
               const out = [];
               for (const s of symbols) {
-                try { out.push(await fn(s, opts)); } catch (err) { out.push(null); }
+                try { const inst = new FnCtor(); out.push(await inst.quote(s, opts)); } catch (err) { out.push(null); }
               }
               return out;
             }
@@ -50,27 +57,61 @@ async function ensureYahoo() {
         };
       }
     }
+    // Ensure a `quotes` helper exists even if the resolved module only provides `quote`.
+    if (typeof _yahooModule.quotes !== 'function' && typeof _yahooModule.quote === 'function') {
+      const boundQuote = _yahooModule.quote.bind(_yahooModule);
+      _yahooModule.quotes = async (symbols, opts) => {
+        const out = [];
+        for (const s of symbols) {
+          try { out.push(await boundQuote(s, opts)); } catch (err) { out.push(null); }
+          // gentle pacing when falling back to per-symbol quotes
+          await sleep(250);
+        }
+        return out;
+      };
+    }
     return _yahooModule;
   } catch (err) {
     // Fall back to dynamic ESM import when package is ESM-only
     const imported = await import('yahoo-finance2');
     _yahooModule = (imported && imported.default) ? imported.default : imported;
     if (typeof _yahooModule === 'function') {
-      const fn = _yahooModule;
-      _yahooModule = {
-        quote: fn,
-        quotes: (fn.quotes && typeof fn.quotes === 'function') ? fn.quotes.bind(fn) : async (symbols, opts) => {
-          const out = [];
-          for (const s of symbols) {
-            try {
-              const r = await fn(s, opts);
-              out.push(r);
-            } catch (e) {
-              out.push(null);
-            }
-          }
-          return out;
+      // Distinguish ES6 class constructor vs function-style export in dynamic import path too
+      if (isClass(_yahooModule) || (_yahooModule.prototype && (typeof _yahooModule.prototype.quote === 'function' || typeof _yahooModule.prototype.quotes === 'function'))) {
+        try {
+          _yahooModule = new _yahooModule();
+        } catch (e) {
+          const FnCtor = _yahooModule;
+          _yahooModule = {
+            quote: async (symbol, opts) => { try { const inst = new FnCtor(); return await inst.quote(symbol, opts); } catch (err) { return null; } },
+            quotes: async (symbols, opts) => { const out = []; for (const s of symbols) { try { const inst = new FnCtor(); out.push(await inst.quote(s, opts)); } catch (err) { out.push(null); } } return out; }
+          };
         }
+      } else {
+        const fn = _yahooModule;
+        _yahooModule = {
+          quote: fn,
+          quotes: (fn.quotes && typeof fn.quotes === 'function') ? fn.quotes.bind(fn) : async (symbols, opts) => {
+            const out = [];
+            for (const s of symbols) {
+              try { out.push(await fn(s, opts)); } catch (err) { out.push(null); }
+            }
+            return out;
+          }
+        };
+      }
+    }
+    // Ensure a `quotes` helper exists even if the resolved module only provides `quote`.
+    if (typeof _yahooModule.quotes !== 'function' && typeof _yahooModule.quote === 'function') {
+      const boundQuote = _yahooModule.quote.bind(_yahooModule);
+      _yahooModule.quotes = async (symbols, opts) => {
+        const out = [];
+        for (const s of symbols) {
+          try { out.push(await boundQuote(s, opts)); } catch (err) { out.push(null); }
+          // gentle pacing when falling back to per-symbol quotes
+          await sleep(250);
+        }
+        return out;
       };
     }
     return _yahooModule;
@@ -93,21 +134,23 @@ async function scrapeYahoo(browser, security, outputDir) {
     logDebug(`Security: ${ticker}   query Yahoo Finance for ${tickerRaw}`);
 
     // Use yahoo-finance2 to fetch quote data
+    // The `quote`/`quotes` endpoints return fields at the top level (e.g., regularMarketPrice),
+    // not nested under a `price` module. We'll support both shapes just in case.
     let quote = null;
     try {
-      quote = await yahoo.quote(tickerRaw, { modules: ['price'] });
+      quote = await yahoo.quote(tickerRaw);
     } catch (e) {
       logDebug('Yahoo quote fetch error for ' + tickerRaw + ': ' + e);
       // try a raw symbol only attempt
-      try { quote = await yahoo.quote(ticker, { modules: ['price'] }); } catch (e2) { logDebug('Yahoo fallback quote fetch error: ' + e2); }
+      try { quote = await yahoo.quote(ticker); } catch (e2) { logDebug('Yahoo fallback quote fetch error: ' + e2); }
     }
 
-    if (!quote || !quote.price) {
-      logDebug('Yahoo returned no price for ' + tickerRaw);
+    if (!quote) {
+      logDebug('Yahoo returned no object for ' + tickerRaw);
       return {};
     }
 
-    const p = quote.price;
+    const p = quote.price || quote; // support both shapes
     const last_price = (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '';
     const price_change_decimal = (p.regularMarketChange != null) ? String(p.regularMarketChange) : '';
     const price_change_percent = (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '';
@@ -119,7 +162,8 @@ async function scrapeYahoo(browser, security, outputDir) {
     const pre_market_change_decimal = (p.preMarketChange != null) ? String(p.preMarketChange) : '';
     const pre_market_change_percent = (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '';
 
-    const quote_time = p.regularMarketTime ? new Date(p.regularMarketTime * 1000).toISOString() : '';
+    const qm = epochToMs(p.regularMarketTime);
+    const quote_time = qm ? new Date(qm).toISOString() : '';
 
     data = {
       key: sanitizeForFilename(security.key),
@@ -180,6 +224,16 @@ function parseRetryAfter(hdr) {
   return null;
 }
 
+// Normalize epoch-like values from Yahoo: some fields may be seconds or milliseconds.
+function epochToMs(v) {
+  if (v == null) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  // Seconds are ~1e9 (2025 ~= 1.7e9). Milliseconds are ~1e12.
+  // If the value looks like milliseconds, leave as-is; otherwise assume seconds.
+  return n > 1e12 ? n : Math.round(n * 1000);
+}
+
 // Batch-mode fetcher with adaptive fallback.
 // - Chunks symbols with pacing
 // - On 429: honors Retry-After when present, else exponential backoff with jitter
@@ -228,7 +282,8 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
     let lastErr = null;
     while (attempt <= maxRetries) {
       try {
-        chunkRes = await yahoo.quotes(chunk, { modules: ['price'] });
+        // `quotes` returns an array of quote objects with top-level price fields
+        chunkRes = await yahoo.quotes(chunk);
         break; // success
       } catch (e) {
         lastErr = e;
@@ -261,7 +316,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         let sAttempt = 0;
         while (sAttempt <= maxRetries) {
           try {
-            single = await yahoo.quote(sym, { modules: ['price'] });
+            single = await yahoo.quote(sym);
             break;
           } catch (e) {
             const status = (e && (e.status || (e.response && e.response.status))) || (String(e && e.message).includes('429') ? 429 : undefined);
@@ -312,7 +367,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         continue;
       }
 
-      const p = quoteObj.price || {};
+      const p = quoteObj.price || quoteObj || {};
       const common = {
         last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
         price_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
@@ -324,7 +379,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         pre_market_price: (p.preMarketPrice != null) ? String(p.preMarketPrice) : '',
         pre_market_price_change_decimal: (p.preMarketChange != null) ? String(p.preMarketChange) : '',
         pre_market_price_change_percent: (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '',
-        quote_time: p.regularMarketTime ? new Date(p.regularMarketTime * 1000).toISOString() : ''
+        quote_time: (epochToMs(p.regularMarketTime) ? new Date(epochToMs(p.regularMarketTime)).toISOString() : '')
       };
 
       for (const sec of targets) {
@@ -353,3 +408,25 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
 }
 
 module.exports = { scrapeYahoo, scrapeYahooBatch };
+
+// Simple helper for quick manual testing or REPL usage.
+// Example: require('./scrape_yahoo').fetchStockData('AAPL')
+async function fetchStockData(ticker) {
+  try {
+    const yahoo = await ensureYahoo();
+    const quote = await yahoo.quote(ticker);
+    const p = quote && (quote.price || quote) ;
+    const price = p && (p.regularMarketPrice != null ? p.regularMarketPrice : (p.regularPrice != null ? p.regularPrice : null));
+    if (price == null) {
+      console.log(`No price available for ${ticker}`);
+      return null;
+    }
+    console.log(`Current Price of ${ticker}: $${price}`);
+    return { ticker, price };
+  } catch (error) {
+    console.error(`Failed to fetch data for ${ticker}:`, error && (error.stack || error.message || error));
+    return null;
+  }
+}
+
+module.exports.fetchStockData = fetchStockData;
