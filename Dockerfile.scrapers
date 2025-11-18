@@ -3,19 +3,14 @@ FROM browserless/chrome:1.52-chrome-stable
 
 
 USER root
-# Install Node.js 18, x11vnc, xterm, fluxbox, and SingleFile extension for GUI/VNC support
+# Install Node.js 20, x11vnc, xterm, fluxbox and GUI dependencies
 RUN apt-get update && \
 		apt-get install -y \
 			curl x11vnc xterm fluxbox unzip xdotool \
 			dbus libnss3 libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 libdrm2 libgbm1 libu2f-udev libxcomposite1 libxdamage1 libxrandr2 libxshmfence1 libxss1 libxtst6 fonts-liberation libappindicator3-1 lsb-release xdg-utils && \
 		curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 		apt-get install -y nodejs && \
-		rm -rf /var/lib/apt/lists/* && \
-		curl -L -o /tmp/singlefile-mv3.zip "https://github.com/gildas-lormeau/SingleFile-MV3/archive/master.zip" && \
-		unzip -q /tmp/singlefile-mv3.zip -d /opt && \
-		rm -rf /opt/singlefile-extension && \
-		mv /opt/SingleFile-MV3-* /opt/singlefile-extension && \
-		rm /tmp/singlefile-mv3.zip
+		rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 COPY package*.json ./
