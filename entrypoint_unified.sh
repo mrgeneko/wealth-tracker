@@ -94,9 +94,7 @@ if ! pgrep -f 'chrome.*--remote-debugging-port=9222' > /dev/null; then
     --disable-setuid-sandbox \
     --no-first-run \
     --no-default-browser-check \
-    --disable-features=AudioServiceOutOfProcess \
-    --load-extension=/opt/singlefile-extension \
-    --disable-extensions-except=/opt/singlefile-extension &
+    --disable-features=AudioServiceOutOfProcess &
 else
   echo "[DEBUG] Chrome already running."
 fi
