@@ -41,11 +41,95 @@ let metrics = {
     failedRequests: 0
 };
 
-function attachRequestFailureCounters(page) {
+async function attachRequestFailureCounters(page, opts = {}) {
+    // opts: { suppressionPatterns: [regexOrString], logSuppressed: false }
     if (!page || typeof page.on !== 'function') return;
-    // increment totalRequests for each request and failedRequests when requestfailed fires
-    page.on('request', () => { metrics.totalRequests += 1; });
+
+    const suppressionPatterns = opts.suppressionPatterns || [
+        /doubleclick\.net/i,
+        /googlesyndication\.com/i,
+        /google-analytics\.com/i,
+        /analytics\.google/i,
+        /securepubads\.g\.doubleclick\.net/i,
+        /pagead2\.googlesyndication\.com/i,
+        /creativedot2\.net/i,
+        /media\.net/i,
+        /tracking\.mygaru\.com/i,
+        /krxd\.net/i,
+        /pubmatic\.com/i,
+        /id5-sync\.com/i,
+        /connectad\.io/i,
+        /adkernel\.com/i,
+        /ingage\.tech/i,
+        /image8\.pubmatic\.com/i,
+        /promos\.investing\.com/i,
+        /pagead\d*\.googlesyndication\.com/i,
+        /match\.adsrvr\.org/i,
+        /tapad\.com/i,
+        /d\.turn\.com/i,
+        /turn\.com/i,
+        /sonobi\.com/i,
+        /adnxs\.com/i,
+        /openx\.net/i,
+        /rubiconproject\.com/i,
+        /360yield\.com/i,
+        /fastclick\.net/i,
+        /2mdn\.net/i,
+        /s0\.2mdn\.net/i,
+        /casalemedia\.com/i,
+        /casalemedia/i,
+        /sadbundle/i,
+        /4dex\.io/i,
+        /mp\.4dex\.io/i,
+        /ids?\./i,
+        /ids\.ad\.gt/i,
+        /adform\.net|adform\.com|adform/i
+    ];
+
+    function isSuppressed(url) {
+        if (!url) return false;
+        try {
+            for (const p of suppressionPatterns) {
+                if (p instanceof RegExp && p.test(url)) return true;
+                if (typeof p === 'string' && url.includes(p)) return true;
+            }
+        } catch (e) {
+            return false;
+        }
+        return false;
+    }
+
+    // Enable request interception so we can control and observe requests before navigation.
+    try {
+        await page.setRequestInterception(true);
+    } catch (e) {
+        // some environments may not support interception; log and continue
+        logDebug('setRequestInterception failed: ' + (e && e.message ? e.message : e));
+    }
+
+    // Intercept requests: continue suppressed URLs without counting, count others
+    page.on('request', req => {
+        const url = req.url();
+        // Do not increment totalRequests for suppressed URLs. Instead of aborting (which
+        // can cause "Request is already handled" errors in some Chromium versions),
+        // just continue the request and ignore its failures in the requestfailed handler.
+        if (isSuppressed(url)) {
+            // continue() returns a promise; catch rejections to avoid unhandled rejections
+            try { req.continue().catch(() => {}); } catch (e) { /* ignore */ }
+            return;
+        }
+        metrics.totalRequests += 1;
+        try { req.continue().catch(() => {}); } catch (e) { /* ignore */ }
+    });
+
     page.on('requestfailed', req => {
+        const url = req.url();
+        // Skip failures for common non-essential resource types
+        let rtype = null;
+        try { rtype = typeof req.resourceType === 'function' ? req.resourceType() : null; } catch (e) { rtype = null; }
+        const ignoredResourceTypes = ['image', 'media', 'font'];
+        if (rtype && ignoredResourceTypes.includes(rtype)) return;
+        if (isSuppressed(url)) return; // don't count or log suppressed failures
         metrics.failedRequests += 1;
         try {
             const failure = req.failure ? req.failure() : null;
@@ -111,9 +195,60 @@ async function createPreparedPage(browser, opts = {}) {
         waitUntil = 'domcontentloaded',
         timeout = 15000,
         attachCounters = true,
-        gotoRetries = 3
+        gotoRetries = 3,
+        // reuseIfUrlMatches: string or RegExp to match existing page.url()
+        reuseIfUrlMatches = null,
+        // if true and an existing page is reused, navigate/reload it to the provided `url`
+        reloadExisting = false
     } = opts;
 
+    // If reuseIfUrlMatches provided, try to find an existing page whose URL matches
+    if (reuseIfUrlMatches) {
+        try {
+            const pages = await browser.pages();
+            for (const p of pages) {
+                let u = null;
+                try { u = p.url(); } catch (e) { /* ignore */ }
+                if (!u) continue;
+                let matched = false;
+                if (reuseIfUrlMatches instanceof RegExp) matched = reuseIfUrlMatches.test(u);
+                else if (typeof reuseIfUrlMatches === 'string') matched = u.includes(reuseIfUrlMatches);
+                if (matched) {
+                    // Attach counters and best-effort setup
+                    if (attachCounters) attachRequestFailureCounters(p);
+                    try { await p.setUserAgent(userAgent); } catch (e) { /* ignore */ }
+                    try { await p.setViewport(viewport); } catch (e) { /* ignore */ }
+                    try { await p.bringToFront(); } catch (e) { /* ignore */ }
+                    if (reloadExisting && url) {
+                        try {
+                            await gotoWithRetries(p, url, { waitUntil, timeout }, gotoRetries);
+                        } catch (e) {
+                            logDebug('Reloading existing page failed: ' + (e && e.message ? e.message : e));
+                        }
+                    }
+                    // Ensure download behavior / certificate ignore applied for reused page if requested
+                    if (downloadPath) {
+                        try {
+                            const client = await p.target().createCDPSession();
+                            await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath });
+                            try {
+                                await client.send('Security.setIgnoreCertificateErrors', { ignore: true });
+                            } catch (secErr) {
+                                logDebug('Security.setIgnoreCertificateErrors failed on reused page: ' + (secErr && secErr.message ? secErr.message : secErr));
+                            }
+                        } catch (e) {
+                            logDebug('Failed to set download behavior on reused page: ' + (e && e.message ? e.message : e));
+                        }
+                    }
+                    return p;
+                }
+            }
+        } catch (e) {
+            logDebug('Error while searching for existing pages: ' + (e && e.message ? e.message : e));
+        }
+    }
+
+    // No reusable page found, create a new one
     const page = await browser.newPage();
     if (attachCounters) attachRequestFailureCounters(page);
     try { await page.setUserAgent(userAgent); } catch (e) { /* ignore */ }
