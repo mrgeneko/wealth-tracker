@@ -51,7 +51,7 @@ async function attachRequestFailureCounters(page, opts = {}) {
         /google-analytics\.com/i,
         /analytics\.google/i,
         /securepubads\.g\.doubleclick\.net/i,
-        /pagead2\.googlesyndication\.com/i,
+        /pagead\d*\.googlesyndication\.com/i,
         /creativedot2\.net/i,
         /media\.net/i,
         /tracking\.mygaru\.com/i,
@@ -77,7 +77,6 @@ async function attachRequestFailureCounters(page, opts = {}) {
         /2mdn\.net/i,
         /s0\.2mdn\.net/i,
         /casalemedia\.com/i,
-        /casalemedia/i,
         /sadbundle/i,
         /4dex\.io/i,
         /mp\.4dex\.io/i,
@@ -98,6 +97,36 @@ async function attachRequestFailureCounters(page, opts = {}) {
         /ids\.ad\.gt/i,
         /adform\.net|adform\.com|adform/i
     ];
+    
+    // Additions: suppress known noisy bidder/sync/analytics endpoints observed in logs
+    suppressionPatterns.push(
+        /inmobi\.com/i,
+        /sync\.inmobi\.com/i,
+        /api\.w\.inmobi\.com/i,
+        /rlcdn\.com/i,
+        /check\.analytics\.rlcdn\.com/i,
+        /adentifi\.com/i,
+        /rtb\.adentifi\.com/i,
+        /bricks-co\.com/i,
+        /pbsj\.bricks-co\.com/i,
+        /admatic\.de/i,
+        /static\.cdn\.admatic\.de/i,
+        /fwmrm\.net/i,
+        /user-sync\.fwmrm\.net/i,
+        /sitescout\.com/i,
+        /pixel-sync\.sitescout\.com/i
+    );
+
+    // Additional noisy endpoints observed: forexpros, facebook/fbevents, investing data script, scorecardresearch
+    suppressionPatterns.push(
+        /streaming\.forexpros\.com/i,
+        /forexpros\.com/i,
+        /connect\.facebook\.net/i,
+        /fbevents\.js/i,
+        /data\.investing\.com\/p\.js/i,
+        /scorecardresearch\.com/i,
+        /sb\.scorecardresearch\.com/i
+    );
 
         // bidder/bidding endpoints commonly used for header bidding / prebid
         // suppress noisy auction endpoints (3lift, richaudience, seedtag, criteo)
@@ -165,6 +194,16 @@ async function attachRequestFailureCounters(page, opts = {}) {
     // add analytics/tag manager/bidder substrings
     suppressionSubstrings.push(
         'googleadservices.com', 'googletagmanager.com', 'gtm.js', 'accounts.google.com', 'cloudfront.net', 'outbrain.com', 'cloudflareinsights.com', 'jsdelivr.net', 'pbxai.com', 'floor.pbxai.com', 'taboola.com', 'privacymanager.io', '33across.com', 'crwdcntrl.net', 'maze.co', 'amazon-adsystem.com', 'springserve.com', 'pm.w55c.net', 'adtarget.biz', 'invmed.co', 'taboola', 'outbrain'
+    );
+
+    // Fallback substrings for additional noisy domains observed
+    suppressionSubstrings.push(
+        'inmobi.com', 'sync.inmobi.com', 'api.w.inmobi.com', 'rlcdn.com', 'check.analytics.rlcdn.com', 'adentifi.com', 'rtb.adentifi.com', 'bricks-co.com', 'pbsj.bricks-co.com', 'admatic.de', 'static.cdn.admatic.de', 'fwmrm.net', 'user-sync.fwmrm.net', 'sitescout.com', 'pixel-sync.sitescout.com'
+    );
+
+    // Add forexpros, facebook fbevents, investing p.js and scorecardresearch to fallback substrings
+    suppressionSubstrings.push(
+        'streaming.forexpros.com', 'forexpros.com', 'connect.facebook.net', 'fbevents.js', 'data.investing.com/p.js', 'scorecardresearch.com', 'sb.scorecardresearch.com'
     );
 
     function isSuppressedFallback(url) {
