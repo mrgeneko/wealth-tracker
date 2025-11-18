@@ -17,6 +17,7 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
+const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
@@ -159,7 +160,7 @@ async function runCycle(browser, outputDir) {
 //		return;
 //	}
 	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
-	const investingInterval = 2; // minutes
+	const investingInterval = 4; // minutes
 	if (shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
@@ -178,6 +179,27 @@ async function runCycle(browser, outputDir) {
 	} else {
 		logDebug('Skipping investing.com scrape (interval not reached)');
 	}
+
+	const yahooBatchMarker = path.join('/usr/src/app/logs/', 'last_yahoo_batch_api.txt');
+	const yahooBatchInterval = 10; // minutes
+	if (shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
+		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
+		const content = fs.readFileSync(csvPath, 'utf8');
+		const { parse } = require('csv-parse/sync');
+		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+
+		// Run Yahoo batch for any record that has a `yahoo` column populated
+		const yahooSecurities = records.filter(s => s.yahoo && s.yahoo.toString().trim());
+		if (yahooSecurities.length) {
+			try {
+				const batchResults = await scrapeYahooBatch(browser, yahooSecurities, outputDir, { chunkSize: 50, delayMs: 500 });
+				logDebug(`Yahoo batch fetched ${batchResults.length} items`);
+			} catch (e) {
+				logDebug('Yahoo batch fetch error: ' + e);
+			}
+		}
+	}
+
 
 	const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
 	const urlInterval = 60; // minutes

@@ -12,6 +12,11 @@ services:
         KAFKA_TOPIC: price_data
         # Health endpoint port exposed by the daemon
         HEALTH_PORT: "3000"
+        # Yahoo batch tuning (chunking, delays, retries)
+        YAHOO_CHUNK_SIZE: "2"
+        YAHOO_DELAY_MS: "5000"
+        YAHOO_MAX_RETRIES: "4"
+        YAHOO_BACKOFF_BASE_MS: "1000"
       volumes:
         - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
         - /Users/gene/wealth_tracker_data:/usr/src/app/data
