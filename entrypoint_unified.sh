@@ -33,6 +33,47 @@ else
   echo "[DEBUG] Xvfb already running."
 fi
 
+# Wait for Xvfb to be ready before starting clients (x11vnc / Chrome)
+wait_for_xvfb() {
+  local display=":99"
+  local retries=20
+  local sleep_sec=0.5
+  echo "[DEBUG] Waiting for Xvfb to be ready on ${display} (retries=${retries}, interval=${sleep_sec}s)..."
+  for i in $(seq 1 "$retries"); do
+    if command -v xdpyinfo >/dev/null 2>&1; then
+      xdpyinfo -display "${display}" >/dev/null 2>&1 && { echo "[DEBUG] Xvfb ready (xdpyinfo)"; return 0; }
+    elif command -v xset >/dev/null 2>&1; then
+      xset -display "${display}" q >/dev/null 2>&1 && { echo "[DEBUG] Xvfb ready (xset)"; return 0; }
+    else
+      if [ -S "/tmp/.X11-unix/X99" ]; then
+        echo "[DEBUG] Xvfb socket exists (/tmp/.X11-unix/X99)";
+        return 0
+      fi
+    fi
+    sleep "$sleep_sec"
+  done
+  echo "[ERROR] Xvfb did not become ready after $((retries*sleep_sec)) seconds"
+  return 1
+}
+
+if ! wait_for_xvfb; then
+  echo "[ERROR] Xvfb readiness check failed — exiting to allow container restart."
+  exit 1
+fi
+
+# Make the system DBus socket visible to Chrome and avoid a possibly-bad
+# session address that Chrome may attempt to parse (causes non-fatal logs).
+if [ -S /run/dbus/system_bus_socket ]; then
+  export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
+  echo "[DEBUG] Exported DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket"
+fi
+# Also point session bus to the system socket to avoid malformed session addresses
+# Some builds of Chrome probe both system and session addresses and may log parse
+# errors if session contains an unexpected value; using the system socket as a
+# fallback keeps behavior predictable in the container.
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
+echo "[DEBUG] Set DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket"
+
 # Clean up Chrome update state and notification files to suppress update popup
 echo "[DEBUG] Cleaning up Chrome profile lock and notification files..."
 rm -f /tmp/chrome-profile2/SingletonLock /tmp/chrome-profile2/SingletonCookie /tmp/chrome-profile2/SingletonSocket

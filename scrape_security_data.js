@@ -20,6 +20,15 @@ const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlis
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
+// Health state
+let lastCycleAt = null;
+let lastCycleStatus = 'not-run';
+let lastCycleError = null;
+const startTime = Date.now();
+
+// Health server
+const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || '3000', 10);
+let healthServer = null;
 
 function shouldRunTask(intervalMinutes, markerPath) {
 	let lastRun = 0;
@@ -202,10 +211,43 @@ async function daemon() {
 	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
 	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
 	let lastHeartbeat = 0;
+
+	// start health server so external monitors can query status
+	try {
+		healthServer = http.createServer((req, res) => {
+			if (req.url === '/health') {
+				const payload = {
+					status: 'ok',
+					pid: process.pid,
+					uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
+					last_cycle_at: lastCycleAt ? new Date(lastCycleAt).toISOString() : null,
+					last_cycle_status: lastCycleStatus,
+					last_cycle_error: lastCycleError
+				};
+				res.writeHead(200, { 'Content-Type': 'application/json' });
+				res.end(JSON.stringify(payload));
+			} else {
+				res.writeHead(404);
+				res.end('Not found');
+			}
+		});
+		healthServer.listen(HEALTH_PORT, () => {
+			logDebug(`Health endpoint listening on ${HEALTH_PORT}`);
+		});
+	} catch (e) {
+		logDebug('Failed to start health server: ' + e.message);
+	}
 	while (true) {
 		try {
+			lastCycleStatus = 'running';
+			lastCycleError = null;
 			await runCycle(browser, outputDir);
+			lastCycleAt = Date.now();
+			lastCycleStatus = 'ok';
 		} catch (e) {
+			lastCycleAt = Date.now();
+			lastCycleStatus = 'error';
+			lastCycleError = String(e && e.message ? e.message : e);
 			logDebug('Fatal error in cycle: ' + e);
 		}
 		// Emit heartbeat if interval elapsed
@@ -249,6 +291,14 @@ async function gracefulShutdown(signal) {
 			await globalBrowser.close();
 			logDebug('Browser closed.');
 			try { require('fs').writeSync(1, `[${new Date().toISOString()}] Browser closed.\n`); } catch (e) {}
+		}
+		// close health server if running
+		try {
+			if (healthServer) {
+				healthServer.close(() => { logDebug('Health server closed.'); });
+			}
+		} catch (e) {
+			// ignore
 		}
 	} catch (e) {
 		logDebug('Error during shutdown: ' + e);
