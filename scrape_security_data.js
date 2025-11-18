@@ -6,7 +6,7 @@ const version = 'VERSION:33'
 console.log(version);
 
 const { scrapeGoogle } = require('./scrape_google');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics } = require('./scraper_utils');
 const puppeteer = require('puppeteer');
 const debugLogPath = getTimestampedLogPath();
 const path = require('path');
@@ -24,6 +24,7 @@ let globalBrowser = null;
 let lastCycleAt = null;
 let lastCycleStatus = 'not-run';
 let lastCycleError = null;
+let lastCycleDurationMs = null;
 const startTime = Date.now();
 
 // Health server
@@ -118,6 +119,29 @@ async function ensureBrowser() {
 		} catch (err) {
 			launchError = err;
 			logDebug('[LAUNCH ERROR] Failed to launch new Chrome instance: ' + err.message);
+			// If Chrome failed to launch because X isn't available, attempt a headless fallback
+			if (launchError && /X server|Missing X server|headful/i.test(launchError.message || '')) {
+				logDebug('[LAUNCH ERROR] Detected X/server issue in Chrome launch, attempting headless fallback...');
+				try {
+					browser = await puppeteerExtra.launch({
+						headless: true,
+						executablePath: '/opt/google/chrome/chrome',
+						args: [
+							'--no-sandbox',
+							'--disable-gpu',
+							'--disable-dev-shm-usage',
+							'--disable-setuid-sandbox',
+							`--user-data-dir=${persistentProfileDir}`,
+							'--disable-features=AudioServiceOutOfProcess',
+						],
+						env: { ...process.env, CHROME_DISABLE_UPDATE: '1' }
+					});
+					logDebug('Headless Chrome fallback launched.');
+				} catch (headlessErr) {
+					logDebug('[LAUNCH ERROR] Headless fallback failed: ' + (headlessErr && headlessErr.message ? headlessErr.message : headlessErr));
+					// keep original launchError in place for diagnostics
+				}
+			}
 		}
 	}
 	if (!browser) {
@@ -212,24 +236,65 @@ async function daemon() {
 	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
 	let lastHeartbeat = 0;
 
-	// start health server so external monitors can query status
+	// start health server so external monitors can query status and (optionally) metrics
 	try {
+		const METRICS_ENABLED = (process.env.METRICS_ENABLED || 'false').toLowerCase() === 'true';
 		healthServer = http.createServer((req, res) => {
 			if (req.url === '/health') {
+				const compactMetrics = getMetrics ? getMetrics() : null;
 				const payload = {
 					status: 'ok',
 					pid: process.pid,
 					uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
 					last_cycle_at: lastCycleAt ? new Date(lastCycleAt).toISOString() : null,
 					last_cycle_status: lastCycleStatus,
-					last_cycle_error: lastCycleError
+					last_cycle_error: lastCycleError,
+					last_cycle_duration_ms: lastCycleDurationMs,
+					metrics: compactMetrics
 				};
 				res.writeHead(200, { 'Content-Type': 'application/json' });
 				res.end(JSON.stringify(payload));
-			} else {
-				res.writeHead(404);
-				res.end('Not found');
+				return;
 			}
+			if (req.url === '/metrics') {
+				if (!METRICS_ENABLED) {
+					res.writeHead(404);
+					res.end('Not found');
+					return;
+				}
+				// Expose a minimal Prometheus exposition format using current metrics
+				const m = getMetrics ? getMetrics() : { totalNavigations: 0, failedNavigations: 0, totalRequests: 0, failedRequests: 0 };
+				const uptime = Math.floor((Date.now() - startTime) / 1000);
+				const lines = [];
+				lines.push('# HELP scrape_uptime_seconds Daemon uptime in seconds');
+				lines.push('# TYPE scrape_uptime_seconds gauge');
+				lines.push(`scrape_uptime_seconds ${uptime}`);
+				lines.push('# HELP scrape_last_cycle_duration_ms Duration of last cycle in milliseconds');
+				lines.push('# TYPE scrape_last_cycle_duration_ms gauge');
+				lines.push(`scrape_last_cycle_duration_ms ${lastCycleDurationMs || 0}`);
+				lines.push('# HELP scrape_total_navigations Total navigation attempts this cycle');
+				lines.push('# TYPE scrape_total_navigations counter');
+				lines.push(`scrape_total_navigations ${m.totalNavigations || 0}`);
+				lines.push('# HELP scrape_failed_navigations Total failed navigations this cycle');
+				lines.push('# TYPE scrape_failed_navigations counter');
+				lines.push(`scrape_failed_navigations ${m.failedNavigations || 0}`);
+				lines.push('# HELP scrape_total_requests Total requests observed this cycle');
+				lines.push('# TYPE scrape_total_requests counter');
+				lines.push(`scrape_total_requests ${m.totalRequests || 0}`);
+				lines.push('# HELP scrape_failed_requests Total failed requests this cycle');
+				lines.push('# TYPE scrape_failed_requests counter');
+				lines.push(`scrape_failed_requests ${m.failedRequests || 0}`);
+				// last cycle status as labeled gauge
+				lines.push('# HELP scrape_last_cycle_status Status of last cycle (1 for status label present)');
+				lines.push('# TYPE scrape_last_cycle_status gauge');
+				const statusLabel = lastCycleStatus || 'unknown';
+				lines.push(`scrape_last_cycle_status{status="${statusLabel}"} 1`);
+				res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
+				res.end(lines.join('\n') + '\n');
+				return;
+			}
+			res.writeHead(404);
+			res.end('Not found');
 		});
 		healthServer.listen(HEALTH_PORT, () => {
 			logDebug(`Health endpoint listening on ${HEALTH_PORT}`);
@@ -238,17 +303,34 @@ async function daemon() {
 		logDebug('Failed to start health server: ' + e.message);
 	}
 	while (true) {
+		let cycleStart = null;
 		try {
 			lastCycleStatus = 'running';
 			lastCycleError = null;
+			// reset per-cycle metrics so each cycle reports its own counts
+			try { resetMetrics(); } catch (e) {}
+			cycleStart = Date.now();
+			try { resetMetrics(); } catch (e) {}
 			await runCycle(browser, outputDir);
 			lastCycleAt = Date.now();
+			lastCycleDurationMs = Date.now() - cycleStart;
 			lastCycleStatus = 'ok';
+			// report navigation/request metrics and alert if thresholds exceeded
+			try {
+				const thresholds = { navFail: parseInt(process.env.NAV_FAIL_THRESHOLD || '5', 10), reqFail: parseInt(process.env.REQ_FAIL_THRESHOLD || '10', 10) };
+				reportMetrics(thresholds, debugLogPath);
+			} catch (e) { logDebug('Error reporting metrics: ' + e); }
 		} catch (e) {
 			lastCycleAt = Date.now();
 			lastCycleStatus = 'error';
 			lastCycleError = String(e && e.message ? e.message : e);
+			// set duration even on error
+			try { lastCycleDurationMs = Date.now() - (typeof cycleStart === 'number' ? cycleStart : Date.now()); } catch (err) { lastCycleDurationMs = null; }
 			logDebug('Fatal error in cycle: ' + e);
+			try {
+				const thresholds = { navFail: parseInt(process.env.NAV_FAIL_THRESHOLD || '5', 10), reqFail: parseInt(process.env.REQ_FAIL_THRESHOLD || '10', 10) };
+				reportMetrics(thresholds, debugLogPath);
+			} catch (e2) { logDebug('Error reporting metrics after failure: ' + e2); }
 		}
 		// Emit heartbeat if interval elapsed
 		try {
