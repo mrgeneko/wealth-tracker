@@ -1,4 +1,4 @@
-const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 
 // Helper to check if error is from a known ad/tracker domain
@@ -7,6 +7,9 @@ function isSuppressedPageError(err) {
 	const suppressedPatterns = [
 		'pagead2.googlesyndication.com',
 		'doubleclick.net',
+		'securepubads.g.doubleclick.net',
+		'creativedot2.net',
+		'media.net',
 		'googletagservices.com',
 		'googletagmanager.com',
 		'adservice.google.com',
@@ -27,23 +30,21 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 	const investingEmail = process.env.INVESTING_EMAIL;
 	const investingPassword = process.env.INVESTING_PASSWORD;
 	try {
-		logDebug('Using provided browser for investing.com...');
+		logDebug('Using createPreparedPage (reuse investing tab if present)');
 		logDebug(`outputDir: ${outputDir}`);
-		logDebug('Looking for existing tab with target URL...');
-		let page = null;
-		const pages = await browser.pages();
-		for (const p of pages) {
-			const url = p.url();
-			logDebug('Tab URL: ' + url);
-			if (url && url.startsWith(investingUrl.split('?')[0])) {
-				page = p;
-				logDebug('Found existing tab with target URL.');
-				break;
-			}
-		}
-		if (!page) {
-			logDebug('No existing tab found. Opening new page...');
-			page = await browser.newPage();
+		const page = await createPreparedPage(browser, {
+			reuseIfUrlMatches: /investing\.com/,
+			url: investingUrl,
+			downloadPath: outputDir,
+			waitUntil: 'domcontentloaded',
+			timeout: 15000,
+			attachCounters: true,
+			gotoRetries: 3,
+			// do not force a reload of an existing tab by default; keep existing session
+			reloadExisting: false
+		});
+		// Ensure we have standard page error handlers
+		try {
 			page.on('pageerror', (err) => {
 				if (!isSuppressedPageError(err)) {
 					logDebug(`[BROWSER PAGE ERROR] ${err && err.stack ? err.stack : err}`);
@@ -52,26 +53,8 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			page.on('error', (err) => {
 				logDebug(`[BROWSER ERROR] ${err && err.stack ? err.stack : err}`);
 			});
-			logDebug('Setting user agent and viewport, navigating to Investing.com...');
-			await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-			await page.setViewport({ width: 1280, height: 900 });
-			logDebug('Navigating to: ' + investingUrl);
-			await page.goto(investingUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-			logDebug('Navigation complete.');
-		} else {
-			await page.bringToFront();
-			logDebug('Brought existing tab to front, skipping reload.');
-		}
-
-		await page.bringToFront();
-		logDebug('Page brought to front.');
-		logDebug('Setting download behavior...');
-		const client = await page.target().createCDPSession();
-		await client.send('Page.setDownloadBehavior', {
-			behavior: 'allow',
-			downloadPath: outputDir
-		});
-		logDebug('Download behavior set.');
+		} catch (e) { /* ignore if page closed or events not supported */ }
+		try { await page.bringToFront(); } catch (e) { /* ignore */ }
 		let needsLogin = false;
 		try {
 			logDebug('Checking for login form...');
@@ -191,6 +174,16 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 		if (err.stack) {
 			const stackLine = err.stack.split('\n')[1];
 			console.error('Occurred at:', stackLine.trim());
+		}
+		// Attempt to save a diagnostic snapshot for later analysis
+		try {
+			if (typeof savePageSnapshot === 'function' && typeof page !== 'undefined' && page) {
+				const base = `/usr/src/app/logs/investingcom_login_failure.${getDateTimeString()}`;
+				await savePageSnapshot(page, base);
+				logDebug('Wrote diagnostic snapshot to ' + base + '.*');
+			}
+		} catch (snapErr) {
+			logDebug('Failed to write diagnostic snapshot: ' + (snapErr && snapErr.message ? snapErr.message : snapErr));
 		}
 	}
 }

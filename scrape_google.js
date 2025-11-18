@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
 
 async function scrapeGoogle(browser, security, outputDir) {
 	let page = null;
@@ -14,18 +14,12 @@ async function scrapeGoogle(browser, security, outputDir) {
 		const url = security.google;
 		const ticker = sanitizeForFilename(security.key);
 		logDebug(`Security: ${ticker}   open Google Finance: ${url}`);
-		page = await browser.newPage();
-		await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-		await page.setViewport({ width: 1280, height: 900 });
-		await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+		const snapshotBase = path.join(outputDir, `${ticker}.google.${getDateTimeString()}`);
+		const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
+		page = await createPreparedPage(browser, pageOpts);
 		logDebug('Page loaded. Extracting HTML...');
-		const html = await page.content();
-
-		// Save the HTML to google.yyyymmdd_hhmmss.html using getDateTimeString
-		const htmlFileName = `${ticker}.google.${getDateTimeString()}.html`;
-		const htmlFilePath = path.join(outputDir, htmlFileName);
-		fs.writeFileSync(htmlFilePath, html, 'utf-8');
-		logDebug(`Saved Google HTML to ${htmlFilePath}`);
+		const html = await savePageSnapshot(page, snapshotBase);
+		if (html) logDebug(`Saved Google snapshot base ${snapshotBase}`);
 		
 		const $ = cheerio.load(html);
 		// Extract main price
