@@ -10,11 +10,14 @@ services:
         KAFKA_BROKERS: kafka:9092
         # Unified topic for all published price data
         KAFKA_TOPIC: price_data
+        # Health endpoint port exposed by the daemon
+        HEALTH_PORT: "3000"
       volumes:
         - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
         - /Users/gene/wealth_tracker_data:/usr/src/app/data
       ports:
         - "5901:5901"
+        - "3000:3000"
       deploy:
         resources:
           limits:
@@ -102,3 +105,22 @@ services:
       # Add other needed env vars here
     command: ["bash", "parse_investing_com_html.sh"]
       
+  log-rotator:
+    image: alpine:3.19
+    container_name: wealth-tracker-log-rotator
+    restart: unless-stopped
+    volumes:
+      - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
+      - ./scripts/rotate-logs.sh:/usr/local/bin/rotate-logs.sh:ro
+    entrypoint: ["sh", "/usr/local/bin/rotate-logs.sh", "/usr/src/app/logs", "7", "1", "300"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -x /usr/local/bin/rotate-logs.sh || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

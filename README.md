@@ -22,6 +22,31 @@ docker compose ps
 ```bash
 docker logs -f wealth-tracker-scrapers
 ```
+
+Optional: start the log rotator sidecar that compresses and prunes old logs (recommended when running long-lived scrapers):
+
+```bash
+# start only the rotator
+docker compose up -d log-rotator
+
+# the rotator is also started when you bring up the entire stack
+docker compose up -d
+```
+
+Tuning retention and compression:
+
+- The rotator script accepts arguments: `<log_dir> <retention_days> <compression_level> <loop_seconds>`.
+- To change retention and compression, update the `entrypoint` args in the `docker-compose.yml` `log-rotator` service. Example: keep logs 14 days, use gzip level 1, and run every 10 minutes:
+
+```yaml
+log-rotator:
+	entrypoint: ["sh","/usr/local/bin/rotate-logs.sh","/usr/src/app/logs","14","1","600"]
+```
+
+Notes:
+- `retention_days` removes `.log` and `.gz` files older than the value.
+- `compression_level` follows `gzip` levels (1 = fastest, 9 = best compression).
+- `loop_seconds` controls how often the rotator checks and compresses old logs.
 4. Stop just the scrapers gracefully:
 ```bash
 docker compose stop scrapers
@@ -59,6 +84,26 @@ services:
 Heartbeat messages look like:
 ```
 [2025-11-17T23:18:45.194Z] HEARTBEAT: daemon alive
+```
+
+### Health endpoint
+
+- The daemon exposes a small HTTP health endpoint on `HEALTH_PORT` (default `3000`). If you expose the port in `docker-compose.yml`, you can query it from the host:
+
+```bash
+curl http://localhost:3000/health
+```
+
+- Example `docker-compose.yml` snippet to expose the port and set the env var:
+
+```yaml
+services:
+	scrapers:
+		ports:
+			- "5901:5901"
+			- "3000:3000"
+		environment:
+			HEALTH_PORT: "3000"
 ```
 ---
 ## Important Environment Variables
