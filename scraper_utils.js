@@ -81,10 +81,67 @@ async function attachRequestFailureCounters(page, opts = {}) {
         /sadbundle/i,
         /4dex\.io/i,
         /mp\.4dex\.io/i,
+        /aidemsrv\.com/i,
+        /gum\.aidemsrv\.com/i,
+        /iqzone\.com/i,
+        /cs\.iqzone\.com/i,
+        /ybp\.yahoo\.com/i,
+        /pr-bh\.ybp\.yahoo\.com/i,
+        /mrtnsvr\.com/i,
+        /ad\.mrtnsvr\.com/i,
+        /acuityplatform\.com/i,
+        /ums\.acuityplatform\.com/i,
+        /audienceexposure\.com/i,
+        /bidswitch\.net/i,
+        /x\.bidswitch\.net/i,
         /ids?\./i,
         /ids\.ad\.gt/i,
         /adform\.net|adform\.com|adform/i
     ];
+
+        // bidder/bidding endpoints commonly used for header bidding / prebid
+        // suppress noisy auction endpoints (3lift, richaudience, seedtag, criteo)
+        suppressionPatterns.push(
+            /tlx\.3lift\.com/i,
+            /3lift\.com/i,
+            /richaudience\.com/i,
+            /shb\.richaudience\.com/i,
+            /seedtag\.com/i,
+            /s\.seedtag\.com/i,
+            /criteo\.com/i,
+            /grid-bidder\.criteo\.com/i
+        );
+
+        // additional analytics, tag managers, and bidder endpoints observed
+        suppressionPatterns.push(
+            /googleadservices\.com/i,
+            /googletagmanager\.com/i,
+            /gtm\.js/i,
+            /accounts\.google\.com/i,
+            /cloudfront\.net/i,
+            /outbrain\.com/i,
+            /cloudflareinsights\.com/i,
+            /jsdelivr\.net/i,
+            /prebid\/currency-file/i,
+            /pbxai\.com/i,
+            /floor\.pbxai\.com/i,
+            /taboola\.com/i,
+            /privacymanager\.io/i,
+            /launchpad-wrapper\.privacymanager\.io/i,
+            /33across\.com/i,
+            /crwdcntrl\.net/i,
+            /maze\.co/i,
+            /amazon-adsystem\.com/i,
+            /springserve\.com/i,
+            /pm\.w55c\.net/i,
+            /adtarget\.biz/i,
+            /invmed\.co/i,
+            /trc\.taboola\.com/i,
+            /tags\.crwdcntrl\.net/i,
+            /snippet\.maze\.co/i,
+            /cdn-ima\.33across\.com/i,
+            /amplify\.outbrain\.com/i
+        );
 
     function isSuppressed(url) {
         if (!url) return false;
@@ -96,6 +153,26 @@ async function attachRequestFailureCounters(page, opts = {}) {
         } catch (e) {
             return false;
         }
+        return false;
+    }
+
+    // Additional simple substring list as a robust fallback for noisy domains
+    const suppressionSubstrings = [
+        'aidemsrv.com', 'gum.aidemsrv', 'iqzone.com', 'cs.iqzone', 'ybp.yahoo.com', 'mrtnsvr.com', 'ad.mrtnsvr.com', 'acuityplatform.com', 'ums.acuityplatform.com', 'audienceexposure.com', 'bidswitch.net', 'x.bidswitch.net', 'nextmillmedia.com', 'technoratimedia.com',
+        '3lift.com', 'tlx.3lift.com', 'richaudience.com', 'shb.richaudience.com', 'seedtag.com', 's.seedtag.com', 'criteo.com', 'grid-bidder.criteo.com'
+    ];
+
+    // add analytics/tag manager/bidder substrings
+    suppressionSubstrings.push(
+        'googleadservices.com', 'googletagmanager.com', 'gtm.js', 'accounts.google.com', 'cloudfront.net', 'outbrain.com', 'cloudflareinsights.com', 'jsdelivr.net', 'pbxai.com', 'floor.pbxai.com', 'taboola.com', 'privacymanager.io', '33across.com', 'crwdcntrl.net', 'maze.co', 'amazon-adsystem.com', 'springserve.com', 'pm.w55c.net', 'adtarget.biz', 'invmed.co', 'taboola', 'outbrain'
+    );
+
+    function isSuppressedFallback(url) {
+        if (!url) return false;
+        try {
+            const lower = url.toLowerCase();
+            for (const s of suppressionSubstrings) if (lower.includes(s)) return true;
+        } catch (e) {}
         return false;
     }
 
@@ -129,7 +206,7 @@ async function attachRequestFailureCounters(page, opts = {}) {
         try { rtype = typeof req.resourceType === 'function' ? req.resourceType() : null; } catch (e) { rtype = null; }
         const ignoredResourceTypes = ['image', 'media', 'font'];
         if (rtype && ignoredResourceTypes.includes(rtype)) return;
-        if (isSuppressed(url)) return; // don't count or log suppressed failures
+        if (isSuppressed(url) || isSuppressedFallback(url)) return; // don't count or log suppressed failures
         metrics.failedRequests += 1;
         try {
             const failure = req.failure ? req.failure() : null;
@@ -215,7 +292,7 @@ async function createPreparedPage(browser, opts = {}) {
                 else if (typeof reuseIfUrlMatches === 'string') matched = u.includes(reuseIfUrlMatches);
                 if (matched) {
                     // Attach counters and best-effort setup
-                    if (attachCounters) attachRequestFailureCounters(p);
+                    if (attachCounters) await attachRequestFailureCounters(p, { suppressionPatterns: opts.suppressionPatterns });
                     try { await p.setUserAgent(userAgent); } catch (e) { /* ignore */ }
                     try { await p.setViewport(viewport); } catch (e) { /* ignore */ }
                     try { await p.bringToFront(); } catch (e) { /* ignore */ }
@@ -250,7 +327,7 @@ async function createPreparedPage(browser, opts = {}) {
 
     // No reusable page found, create a new one
     const page = await browser.newPage();
-    if (attachCounters) attachRequestFailureCounters(page);
+    if (attachCounters) await attachRequestFailureCounters(page, { suppressionPatterns: opts.suppressionPatterns });
     try { await page.setUserAgent(userAgent); } catch (e) { /* ignore */ }
     try { await page.setViewport(viewport); } catch (e) { /* ignore */ }
     if (url) {
