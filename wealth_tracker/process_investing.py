@@ -3,20 +3,11 @@ import logging
 from bs4 import BeautifulSoup
 from datetime import datetime
 from .is_number import is_number
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_investing_attributes():
-    attributes = {
-        "name" : "investing",
-        "download" : "singlefile",
-        "extract" : extract_investing,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('investing') or {}
+    attributes['extract'] = extract_investing
     return attributes
 
 def extract_investing(ticker, html_content):

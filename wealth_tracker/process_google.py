@@ -5,20 +5,11 @@ import time
 from datetime import datetime
 import pandas as pd
 from .is_number import is_number
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_google_attributes():
-    attributes = {
-        "name" : "google",
-        "download" : "singlefile",
-        "extract" : extract_google,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('google') or {}
+    attributes['extract'] = extract_google
     return attributes
 
 def extract_google(ticker,html_content):
