@@ -124,7 +124,7 @@ async function scrapeYahoo(browser, security, outputDir) {
   let data = {};
   try {
     const yahoo = await ensureYahoo();
-    const tickerRaw = (security.yahoo || '').toString().trim();
+    const tickerRaw = (security.ticker_yahoo || '').toString().trim();
     if (!tickerRaw) {
       logDebug('No yahoo ticker specified for ' + security.key);
       return {};
