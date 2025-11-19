@@ -23,30 +23,41 @@ async function scrapeNasdaq(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open Nasdaq: ${url}`);
-    const snapshotBase = path.join(outputDir, `${ticker}.nasdaq.${getDateTimeString()}`);
-    const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 25000, gotoRetries: 3 };
-    page = await createPreparedPage(browser, pageOpts);
-    logDebug('Page loaded. Extracting HTML...');
-    const html = await savePageSnapshot(page, snapshotBase);
-    if (html) logDebug(`Saved Nasdaq snapshot base ${snapshotBase}`);
+      const snapshotBase = path.join(outputDir, `${ticker}.nasdaq.${getDateTimeString()}`);
+      const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 25000, gotoRetries: 3 };
 
-    try {
-      const htmlOutPath = `/usr/src/app/logs/${ticker}.nasdaq.${getDateTimeString()}.html`;
-      fs.writeFileSync(htmlOutPath, html || await page.content(), 'utf-8');
-      logDebug(`Wrote full Nasdaq HTML to ${htmlOutPath}`);
-    } catch (e) { logDebug('Failed to write Nasdaq full page HTML: ' + e); }
+      // Track which path satisfied the scrape so we can log metrics
+      let cheapHtml = '';
+      let usedCheapPath = false;
+      let usedBrowser = false;
 
-    const result = parseNasdaqHtml(html || '', { key: ticker });
-    data = result;
-
-    // If DOM parsing didn't find main fields — or extended-session fields are missing —
-    // call Nasdaq API as a fallback so we can use `marketStatus` to populate
-    // after-hours / pre-market values when appropriate.
-    const needApi = ((!data.last_price || data.last_price === '') || (!data.previous_close_price || data.previous_close_price === ''))
-      || ((!data.after_hours_price || data.after_hours_price === '') && (!data.pre_market_price || data.pre_market_price === ''));
-    if (needApi) {
+      // 1) Try a cheap HTML fetch first (no browser). This captures embedded JSON in many cases.
       try {
-        logDebug('DOM parse incomplete for ' + ticker + ', calling Nasdaq API fallback');
+        const fetchHeaders = { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+        logDebug('Attempting simple HTML fetch for ' + ticker);
+        if (typeof fetch === 'function') {
+          const res = await fetch(url, { headers: fetchHeaders });
+          if (res && res.ok) {
+            cheapHtml = await res.text();
+          }
+        } else {
+          // fallback to curl if global fetch not available
+          try { cheapHtml = execSync(`curl -s -A 'Mozilla/5.0' '${url}'`).toString(); } catch (e) { logDebug('curl html fetch failed: ' + e); }
+        }
+        if (cheapHtml) {
+          try {
+            const htmlOutPath = `/usr/src/app/logs/${ticker}.nasdaq.${getDateTimeString()}.html`;
+            fs.writeFileSync(htmlOutPath, cheapHtml, 'utf-8');
+            logDebug(`Wrote Nasdaq HTML (cheap fetch) to ${htmlOutPath}`);
+          } catch (e) { logDebug('Failed to write cheap-fetched HTML: ' + e); }
+          const result = parseNasdaqHtml(cheapHtml || '', { key: ticker });
+          data = result;
+        }
+      } catch (e) { logDebug('Cheap HTML fetch error: ' + e); }
+
+      // 2) Always call Nasdaq API to get structured primary data and marketStatus
+      try {
+        logDebug('Calling Nasdaq API to supplement parsed HTML for ' + ticker);
         const apiData = await fetchNasdaqApi(ticker);
         // merge only missing fields
         data.last_price = data.last_price || apiData.last_price || '';
@@ -60,14 +71,14 @@ async function scrapeNasdaq(browser, security, outputDir) {
         data.pre_market_price_change_decimal = data.pre_market_price_change_decimal || apiData.pre_market_price_change_decimal || '';
         data.pre_market_price_change_percent = data.pre_market_price_change_percent || apiData.pre_market_price_change_percent || '';
         data.quote_time = data.quote_time || apiData.quote_time || '';
-        // If API reports a market status (e.g., 'After-Hours' or 'Pre-Market'), and extended-session
-        // fields are still missing from DOM, populate them from API primary values.
+        // If API reports market status and extended-session fields are still missing,
+        // populate from primary API values when marketStatus indicates an extended session.
         try {
           const apiMarket = apiData.market_status || apiData.marketStatus || '';
           if ((!data.after_hours_price || data.after_hours_price === '') && /after[- ]?hours/i.test(String(apiMarket))) {
-            data.after_hours_price = data.after_hours_price || apiData.after_hours_price || apiData.last_price || '';
-            data.after_hours_change_decimal = data.after_hours_change_decimal || apiData.after_hours_change_decimal || apiData.price_change_decimal || '';
-            data.after_hours_change_percent = data.after_hours_change_percent || apiData.after_hours_change_percent || apiData.price_change_percent || '';
+            data.after_hours_price = data.after_hours_price || apiData.last_price || '';
+            data.after_hours_change_decimal = data.after_hours_change_decimal || apiData.price_change_decimal || '';
+            data.after_hours_change_percent = data.after_hours_change_percent || apiData.price_change_percent || '';
           }
           if ((!data.pre_market_price || data.pre_market_price === '') && /pre[- ]?market/i.test(String(apiMarket))) {
             data.pre_market_price = data.pre_market_price || apiData.pre_market_price || apiData.last_price || '';
@@ -76,7 +87,50 @@ async function scrapeNasdaq(browser, security, outputDir) {
           }
         } catch (e) { /* ignore */ }
       } catch (e) { logDebug('Nasdaq API fallback error: ' + e); }
-    }
+
+      // 3) If we still don't have required fields (primary or extended), fall back to full browser render
+      const needBrowser = ((!data.last_price || data.last_price === '') || (!data.previous_close_price || data.previous_close_price === '') ||
+        ((!data.after_hours_price || data.after_hours_price === '') && (!data.pre_market_price || data.pre_market_price === '')));
+      // Log whether the cheap path was sufficient
+      if (!needBrowser) {
+        usedCheapPath = true;
+        logDebug(`nasdaq scrape: cheap HTML+API path satisfied for ${ticker}`);
+      } else {
+        logDebug(`nasdaq scrape: cheap HTML+API insufficient for ${ticker}, will use Puppeteer`);
+      }
+
+      if (needBrowser) {
+        try {
+          usedBrowser = true;
+          page = await createPreparedPage(browser, pageOpts);
+          logDebug('Page loaded. Extracting HTML (full render)...');
+          const html = await savePageSnapshot(page, snapshotBase);
+          if (html) logDebug(`Saved Nasdaq snapshot base ${snapshotBase}`);
+          try {
+            const htmlOutPath = `/usr/src/app/logs/${ticker}.nasdaq.${getDateTimeString()}.html`;
+            fs.writeFileSync(htmlOutPath, html || await page.content(), 'utf-8');
+            logDebug(`Wrote full Nasdaq HTML to ${htmlOutPath}`);
+          } catch (e) { logDebug('Failed to write Nasdaq full page HTML: ' + e); }
+          const result = parseNasdaqHtml(html || await page.content(), { key: ticker });
+          // merge parsed page values (prefer page values when present)
+          data.last_price = result.last_price || data.last_price || '';
+          data.price_change_decimal = result.price_change_decimal || data.price_change_decimal || '';
+          data.price_change_percent = result.price_change_percent || data.price_change_percent || '';
+          data.previous_close_price = result.previous_close_price || data.previous_close_price || '';
+          data.after_hours_price = result.after_hours_price || data.after_hours_price || '';
+          data.after_hours_change_decimal = result.after_hours_change_decimal || data.after_hours_change_decimal || '';
+          data.after_hours_change_percent = result.after_hours_change_percent || data.after_hours_change_percent || '';
+          data.pre_market_price = result.pre_market_price || data.pre_market_price || '';
+          data.pre_market_price_change_decimal = result.pre_market_price_change_decimal || data.pre_market_price_change_decimal || '';
+          data.pre_market_price_change_percent = result.pre_market_price_change_percent || data.pre_market_price_change_percent || '';
+          data.quote_time = result.quote_time || data.quote_time || '';
+        } catch (e) { logDebug('Full page render fallback error: ' + e); }
+      }
+
+      // Final path used log
+      try {
+        logDebug(`nasdaq scrape path used for ${ticker}: ${usedBrowser ? 'browser' : 'cheap+api'}`);
+      } catch (e) { /* ignore logging errors */ }
 
     // publish & save
     try {
