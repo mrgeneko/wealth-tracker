@@ -13,19 +13,11 @@ sheet_investments = "Investments"
 table_investments = "T"
 
 def get_yahoo_attributes():
-    attributes = {
-        "name" : "yahoo",
-        "download" : "yfinance",
-        "process" : process_yahoo,
-        "extract" : extract_yahoo,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : True,
-        "hits" : 0
-    }
+    from .scraper_config import get_attributes as _get_config_attrs
+    attributes = _get_config_attrs('yahoo') or {}
+    # attach callable references
+    attributes['process'] = process_yahoo
+    attributes['extract'] = extract_yahoo
     return attributes
 
 def run_applescript(script):

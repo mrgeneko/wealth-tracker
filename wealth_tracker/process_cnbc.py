@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 import logging
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_cnbc_attributes():
-    attributes = {
-        "name" : "cnbc",
-        "download" : "singlefile", # was singlefile
-        "extract" : extract_cnbc,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('cnbc') or {}
+    # attach local function references
+    attributes['extract'] = extract_cnbc
     return attributes
 
 def extract_cnbc(ticker, html_content):

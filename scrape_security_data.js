@@ -1,5 +1,3 @@
-
-
 const fs = require('fs');
 require('dotenv').config();
 const version = 'VERSION:33'
@@ -21,6 +19,53 @@ const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
+
+// Load centralized scraper attributes (same JSON used by Python processors)
+// This file lives at `wealth_tracker/scraper_attributes.json` relative to repo root.
+// Hot-reload the JSON attributes using an mtime-based cache so edits are
+// picked up without restarting the daemon, but repeated accesses within the
+// same file-modification window are cheap.
+const ATTR_PATH = path.join(__dirname, 'wealth_tracker', 'scraper_attributes.json');
+let _cachedAttrs = null;
+let _cachedMtime = 0;
+
+function loadScraperAttributes() {
+	try {
+		const st = fs.statSync(ATTR_PATH);
+		const mtime = st && st.mtimeMs ? st.mtimeMs : 0;
+		if (_cachedAttrs && _cachedMtime === mtime) {
+			return _cachedAttrs;
+		}
+		const txt = fs.readFileSync(ATTR_PATH, 'utf8');
+		const parsed = JSON.parse(txt);
+		_cachedAttrs = parsed || {};
+		_cachedMtime = mtime;
+		try { logDebug('Loaded/updated scraper attributes (mtime=' + _cachedMtime + ')'); } catch (e) {}
+		return _cachedAttrs;
+	} catch (e) {
+		try { logDebug('Failed to read/parse scraper attributes: ' + (e && e.message ? e.message : e)); } catch (e2) { console.error('Failed to read/parse scraper attributes', e); }
+		return _cachedAttrs || {};
+	}
+}
+
+function getScraperAttributes(name) {
+	if (!name) return {};
+	const attrs = loadScraperAttributes();
+	if (attrs[name]) return attrs[name];
+	const lc = name.toLowerCase();
+	if (attrs[lc]) return attrs[lc];
+	return {};
+}
+
+function getScrapeGroupInterval(groupLetter, defaultMinutes = 5) {
+	const attrs = loadScraperAttributes();
+	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
+	if (groups && groups[groupLetter]) {
+		const v = Number(groups[groupLetter]);
+		if (!Number.isNaN(v) && isFinite(v)) return v;
+	}
+	return defaultMinutes;
+}
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
@@ -165,7 +210,7 @@ async function runCycle(browser, outputDir) {
 
 	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
-	const investingInterval = 3; // minutes
+	const investingInterval = getScrapeGroupInterval('A', 3); // minutes
 	if (1 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
@@ -187,7 +232,7 @@ async function runCycle(browser, outputDir) {
 
 	// ======== YAHOO FINANCE2 API ===========
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', 'last_yahoo_batch_api.txt');
-	const yahooBatchInterval = 45; // minutes
+	const yahooBatchInterval = getScrapeGroupInterval('B', 45); // minutes
 	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
@@ -208,7 +253,7 @@ async function runCycle(browser, outputDir) {
 
 	// ======== WEB SCRAPING VARIOUS SINGLE SECURITY WEB PAGES ===========
 	const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
-	const urlInterval = 60; // minutes
+	const urlInterval = getScrapeGroupInterval('C', 60); // minutes
 	if (shouldRunTask(urlInterval, urlMarker)) {
 		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');

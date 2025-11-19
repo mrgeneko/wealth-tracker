@@ -1,19 +1,10 @@
 #!/usr/bin/env python3
 import logging
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_wsj_attributes():
-    attributes = {
-        "name" : "wsj",
-        "download" : "singlefile",
-        "extract" : extract_wsj,
-        "has_realtime" : False,
-        "has_pre_market" : False,
-        "has_after_hours" : False,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('wsj') or {}
+    attributes['extract'] = extract_wsj
     return attributes
 
 def extract_wsj(ticker, html_content):

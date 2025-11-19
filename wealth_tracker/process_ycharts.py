@@ -1,20 +1,11 @@
 #!/usr/bin/env python3
 import logging
 from .is_number import is_number
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_ycharts_attributes():
-    attributes = {
-        "name" : "ycharts",
-        "download" : "singlefile",
-        "extract" : extract_ycharts,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('ycharts') or {}
+    attributes['extract'] = extract_ycharts
     return attributes
 
 def extract_ycharts(ticker, html_content):
