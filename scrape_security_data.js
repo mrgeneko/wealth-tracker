@@ -20,6 +20,7 @@ const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlis
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
+const { scrapeNasdaq } = require('./scrape_nasdaq');
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
@@ -221,7 +222,10 @@ async function runCycle(browser, outputDir) {
 				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 			}
 			else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (security.cnbc && security.cnbc.startsWith('http')) {
+				if (security.nasdaq && security.cnbc.startsWith('http')) {
+					const nasdaqData = await scrapeNasdaq(browser, security, outputDir);
+					logDebug(`NASDAQ scrape result: ${JSON.stringify(nasdaqData)}`);
+				} else if (security.cnbc && security.cnbc.startsWith('http')) {
 					const cnbcData = await scrapeCNBC(browser, security, outputDir);
 					logDebug(`CNBC scrape result: ${JSON.stringify(cnbcData)}`);
 				} else if (security.stock_analysis && security.stock_analysis.startsWith('http')) {

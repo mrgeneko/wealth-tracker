@@ -340,7 +340,7 @@ def main():
     #   google           |     X      |      X      |     X     |         |             |            |      X
     #   ycharts          |     X      |      X      |     X     |         |             |            |      X     |     X
     #   moomoo           |  no etf    |   no etf    |     X     |         |             |            |      X     |     X
-    #   marketbeat       |     ?      |    some?    |           |    X    |
+    #   marketbeat       |     ?      |    some?    |     X     |         |
     #   nasdaq           |            |      X      |     X     | 
     #   cnbc (times out) |     ?      |      X      |     X     |         |             |
 
