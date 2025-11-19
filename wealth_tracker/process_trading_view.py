@@ -3,20 +3,11 @@ import logging
 from bs4 import BeautifulSoup
 from datetime import datetime
 from .is_number import is_number
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_trading_view_attributes():
-    attributes = {
-        "name" : "trading_view",
-        "download" : "singlefile",
-        "extract" : extract_trading_view,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('trading_view') or {}
+    attributes['extract'] = extract_trading_view
     return attributes
 
 def extract_trading_view(ticker, html_content):
@@ -121,23 +112,3 @@ def extract_trading_view(ticker, html_content):
         return None
     logging.info(data)
     return data
-#!/usr/bin/env python3
-import logging
-from bs4 import BeautifulSoup
-from datetime import datetime
-from .is_number import is_number
-
-def get_trading_view_attributes():
-    attributes = {
-        "name" : "trading_view",
-        "download" : "singlefile",
-        "extract" : extract_trading_view,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
-    return attributes

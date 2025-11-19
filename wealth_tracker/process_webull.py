@@ -3,20 +3,11 @@ import logging
 from datetime import datetime
 from bs4 import BeautifulSoup
 from .is_number import is_number
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_webull_attributes():
-    attributes = {
-        "name" : "webull",
-        "download" : "singlefile",
-        "extract" : extract_webull,
-        "has_realtime" : True,
-        "has_pre_market" : True,
-        "has_after_hours" : True,
-        "has_bond_prices" : True,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('webull') or {}
+    attributes['extract'] = extract_webull
     return attributes
 
 def extract_webull(ticker, html_content):
