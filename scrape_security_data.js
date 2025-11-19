@@ -18,6 +18,7 @@ const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
+const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
@@ -161,7 +162,7 @@ async function runCycle(browser, outputDir) {
 //	}
 	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
 	const investingInterval = 4; // minutes
-	if (shouldRunTask(investingInterval, investingMarker)) {
+	if (0 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
@@ -182,7 +183,7 @@ async function runCycle(browser, outputDir) {
 
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', 'last_yahoo_batch_api.txt');
 	const yahooBatchInterval = 30; // minutes
-	if (shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
+	if (0 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
 		const { parse } = require('csv-parse/sync');
@@ -215,7 +216,10 @@ async function runCycle(browser, outputDir) {
 				const webullData = await scrapeWebull(browser, security, outputDir);
 				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 			} else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (security.google && security.google.startsWith('http')) {
+				if (security.stock_analysis && security.stock_analysis.startsWith('http')) {
+					const stockAnalysisData = await scrapeStockAnalysis(browser, security, outputDir);
+					logDebug(`Stock_analysis scrape result: ${JSON.stringify(stockAnalysisData)}`);
+				} else if (security.google && security.google.startsWith('http')) {
 					const googleData = await scrapeGoogle(browser, security, outputDir);
 					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
 				} else if (security.webull && security.webull.startsWith('http')) {
