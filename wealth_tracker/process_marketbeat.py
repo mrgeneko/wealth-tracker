@@ -1,19 +1,10 @@
 #!/usr/bin/env python3
 import logging
+from .scraper_config import get_attributes as _get_config_attrs
 
 def get_marketbeat_attributes():
-    attributes = {
-        "name" : "marketbeat",
-        "download" : "singlefile",
-        "extract" : extract_marketbeat,
-        "has_realtime" : False,
-        "has_pre_market" : False,
-        "has_after_hours" : False,
-        "has_bond_prices" : False,
-        "has_stock_prices" : True,
-        "has_previous_close" : False,
-        "hits" : 0
-    }
+    attributes = _get_config_attrs('marketbeat') or {}
+    attributes['extract'] = extract_marketbeat
     return attributes
 
 def extract_marketbeat(ticker, html_content):
