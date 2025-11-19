@@ -31,7 +31,8 @@ async function scrapeCNBC(browser, security, outputDir) {
     if (html) logDebug(`Saved CNBC snapshot base ${snapshotBase}`);
 
     try {
-      const htmlOutPath = `/usr/src/app/logs/cnbc.${ticker}.${getDateTimeString()}.html`;
+      // Use consistent filename pattern: <TICKER>.cnbc.<timestamp>.html
+      const htmlOutPath = `/usr/src/app/logs/${ticker}.cnbc.${getDateTimeString()}.html`;
       fs.writeFileSync(htmlOutPath, html || await page.content(), 'utf-8');
       logDebug(`Wrote full CNBC HTML to ${htmlOutPath}`);
     } catch (e) { logDebug('Failed to write CNBC full page HTML: ' + e); }
