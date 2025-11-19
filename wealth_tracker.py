@@ -294,8 +294,8 @@ def main():
 
     parser.add_argument('--input-file', '-i', dest='input_file',
                         type=str,
-                        default="wealth_tracker.csv",
-                        help='Path to the input file (default: wealth_tracker.csv)')
+                        default="/usr/src/app/data/single_security.csv",
+                        help='Path to the input file (default: /usr/src/app/data/single_security.csv)')
     
     parser.add_argument('--include-type', '-t', dest='include_type', type=str,
                         choices=['stocks', 'bonds'], default='stocks',

@@ -255,7 +255,8 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
   const mapping = {};
   const symbols = [];
   for (const sec of securities) {
-    const tickerRaw = (sec.yahoo || '').toString().trim();
+    // Read ticker from CSV field `ticker_yahoo` (do not use `yahoo`).
+    const tickerRaw = (sec.ticker_yahoo || '').toString().trim();
     if (!tickerRaw) continue;
     // normalize to a simple symbol for lookup (best-effort)
     const sym = tickerRaw.replace(/^https?:\/\/(?:www\.)?finance\.yahoo\.com\/.+quote\//i, '') || tickerRaw;
