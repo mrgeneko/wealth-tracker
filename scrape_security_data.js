@@ -18,6 +18,7 @@ const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
+const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
@@ -160,9 +161,11 @@ async function runCycle(browser, outputDir) {
 	//	logDebug('Outside business hours, skipping cycle.');
 //		return;
 //	}
+
+	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingMarker = path.join('/usr/src/app/logs/', 'last_investing_scrape.txt');
-	const investingInterval = 4; // minutes
-	if (0 && shouldRunTask(investingInterval, investingMarker)) {
+	const investingInterval = 3; // minutes
+	if (1 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
@@ -181,16 +184,17 @@ async function runCycle(browser, outputDir) {
 		logDebug('Skipping investing.com scrape (interval not reached)');
 	}
 
+	// ======== YAHOO FINANCE2 API ===========
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', 'last_yahoo_batch_api.txt');
-	const yahooBatchInterval = 30; // minutes
-	if (0 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
+	const yahooBatchInterval = 45; // minutes
+	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
 		const { parse } = require('csv-parse/sync');
 		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
 
 		// Run Yahoo batch for any record that has a `yahoo` column populated
-		const yahooSecurities = records.filter(s => s.yahoo && s.yahoo.toString().trim());
+		const yahooSecurities = records.filter(s => s.ticker_yahoo && s.ticker_yahoo.toString().trim());
 		if (yahooSecurities.length) {
 			try {
 				const batchResults = await scrapeYahooBatch(browser, yahooSecurities, outputDir, { chunkSize: 50, delayMs: 500 });
@@ -201,7 +205,7 @@ async function runCycle(browser, outputDir) {
 		}
 	}
 
-
+	// ======== WEB SCRAPING VARIOUS SINGLE SECURITY WEB PAGES ===========
 	const urlMarker = path.join('/usr/src/app/logs/', 'last_group_c_scrape.txt');
 	const urlInterval = 60; // minutes
 	if (shouldRunTask(urlInterval, urlMarker)) {
@@ -215,8 +219,12 @@ async function runCycle(browser, outputDir) {
 			if (security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
 				const webullData = await scrapeWebull(browser, security, outputDir);
 				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
-			} else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (security.stock_analysis && security.stock_analysis.startsWith('http')) {
+			}
+			else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
+				if (security.cnbc && security.cnbc.startsWith('http')) {
+					const cnbcData = await scrapeCNBC(browser, security, outputDir);
+					logDebug(`CNBC scrape result: ${JSON.stringify(cnbcData)}`);
+				} else if (security.stock_analysis && security.stock_analysis.startsWith('http')) {
 					const stockAnalysisData = await scrapeStockAnalysis(browser, security, outputDir);
 					logDebug(`Stock_analysis scrape result: ${JSON.stringify(stockAnalysisData)}`);
 				} else if (security.google && security.google.startsWith('http')) {
