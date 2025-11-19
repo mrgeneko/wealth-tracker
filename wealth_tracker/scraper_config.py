@@ -7,10 +7,12 @@ def _load_config():
     global _CONFIG
     if _CONFIG is not None:
         return _CONFIG
-    base = os.path.dirname(__file__)
-    path = os.path.join(base, 'scraper_attributes.json')
+    # Load scraper attributes only from the container data mount.
+    # Per project convention, runtime data is available at `/usr/src/app/data`.
+    primary = os.path.join('/usr/src/app', 'data', 'scraper_attributes.json')
+    _CONFIG = {}
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(primary, 'r', encoding='utf-8') as f:
             _CONFIG = json.load(f)
     except Exception:
         _CONFIG = {}
