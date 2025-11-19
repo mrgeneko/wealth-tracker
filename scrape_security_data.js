@@ -20,12 +20,13 @@ const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
 
-// Load centralized scraper attributes (same JSON used by Python processors)
-// This file lives at `wealth_tracker/scraper_attributes.json` relative to repo root.
-// Hot-reload the JSON attributes using an mtime-based cache so edits are
-// picked up without restarting the daemon, but repeated accesses within the
-// same file-modification window are cheap.
-const ATTR_PATH = path.join(__dirname, 'wealth_tracker', 'scraper_attributes.json');
+// Determine canonical data directory (host mount or repo folder). This
+// avoids relying on a `config/` folder and prefers the host-mounted
+// `/usr/src/app/data` or repo `wealth_tracker_data`.
+// Use the container-hosted data directory for all runtime data/config.
+// This is the single canonical path for scraper attributes and CSVs.
+const DATA_DIR = path.join('/usr/src/app', 'data');
+const ATTR_PATH = path.join(DATA_DIR, 'scraper_attributes.json');
 let _cachedAttrs = null;
 let _cachedMtime = 0;
 
@@ -215,7 +216,7 @@ async function runCycle(browser, outputDir) {
 	const investingInterval = getScrapeGroupInterval(investing_watchlists_name, 3); // minutes
 	if (1 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
-		const csvPath = path.join('/usr/src/app/data/', 'investingcom_watchlists.csv');
+		const csvPath = path.join(DATA_DIR, 'investingcom_watchlists.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
 		const { parse } = require('csv-parse/sync');
 		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
@@ -236,13 +237,15 @@ async function runCycle(browser, outputDir) {
 	const yahoo_batch_name = 'yahoo_batch'
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahoo_batch_name}.txt`);
 	const yahooBatchInterval = getScrapeGroupInterval(yahoo_batch_name, 45); // minutes
+	logDebug('yahooBatchInterval:' + yahooBatchInterval)
 	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
-		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
+		logDebug('Begin yahoo_batch api');
+		const csvPath = path.join(DATA_DIR, 'single_security.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
 		const { parse } = require('csv-parse/sync');
 		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
 
-		// Run Yahoo batch for any record that has a `yahoo` column populated
+		// Run Yahoo batch for any record that has a `ticker_yahoo` column populated
 		const yahooSecurities = records.filter(s => s.ticker_yahoo && s.ticker_yahoo.toString().trim());
 		if (yahooSecurities.length) {
 			try {
@@ -259,7 +262,8 @@ async function runCycle(browser, outputDir) {
 	const urlMarker = path.join('/usr/src/app/logs/', `last.${single_security_name}.txt`);
 	const urlInterval = getScrapeGroupInterval(single_security_name, 60); // minutes
 	if (shouldRunTask(urlInterval, urlMarker)) {
-		const csvPath = path.join('/usr/src/app/data/', 'wealth_tracker.csv');
+		logDebug('Begin single security scrape');
+		const csvPath = path.join(DATA_DIR, 'single_security.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
 		const { parse } = require('csv-parse/sync');
 		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});

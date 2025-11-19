@@ -117,6 +117,15 @@ async function attachRequestFailureCounters(page, opts = {}) {
         /pixel-sync\.sitescout\.com/i
     );
 
+    // Suppress monetixads and mdhv/jelly endpoints observed in logs
+    suppressionPatterns.push(
+        /monetixads\.com/i,
+        /monetix/i,
+        /mdhv\.io/i,
+        /jelly\.mdhv\.io/i,
+        /jelly\./i
+    );
+
     // Additional noisy endpoints observed: forexpros, facebook/fbevents, investing data script, scorecardresearch
     suppressionPatterns.push(
         /streaming\.forexpros\.com/i,
@@ -205,6 +214,9 @@ async function attachRequestFailureCounters(page, opts = {}) {
     suppressionSubstrings.push(
         'streaming.forexpros.com', 'forexpros.com', 'connect.facebook.net', 'fbevents.js', 'data.investing.com/p.js', 'scorecardresearch.com', 'sb.scorecardresearch.com'
     );
+
+    // Add monetixads and mdhv/jelly endpoints to substring fallback
+    suppressionSubstrings.push('monetixads.com', 'monetix', 'mdhv.io', 'jelly.mdhv.io', 'jelly.');
 
     function isSuppressedFallback(url) {
         if (!url) return false;
