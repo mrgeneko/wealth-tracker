@@ -210,10 +210,10 @@ async function runCycle(browser, outputDir) {
 //	}
 
 	// ======== INVESTING.COM WATCHLISTS ===========
-	const investing_watchlists_name = 'investing_watchlists'
+	const investingWatchlistsName = 'investing_watchlists'
 	// use the name variable for the filename so it's consistent and easy to change
-	const investingMarker = path.join('/usr/src/app/logs', `last.${investing_watchlists_name}.txt`);
-	const investingInterval = getScrapeGroupInterval(investing_watchlists_name, 3); // minutes
+	const investingMarker = path.join('/usr/src/app/logs', `last.${investingWatchlistsName}.txt`);
+	const investingInterval = getScrapeGroupInterval(investingWatchlistsName, 3); // minutes
 	if (1 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		const csvPath = path.join(DATA_DIR, 'investingcom_watchlists.csv');
@@ -234,9 +234,9 @@ async function runCycle(browser, outputDir) {
 	}
 
 	// ======== YAHOO FINANCE2 API ===========
-	const yahoo_batch_name = 'yahoo_batch'
-	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahoo_batch_name}.txt`);
-	const yahooBatchInterval = getScrapeGroupInterval(yahoo_batch_name, 45); // minutes
+	const yahooBatchName = 'yahoo_batch'
+	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahooBatchName}.txt`);
+	const yahooBatchInterval = getScrapeGroupInterval(yahooBatchName, 45); // minutes
 	logDebug('yahooBatchInterval:' + yahooBatchInterval)
 	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		logDebug('Begin yahoo_batch api');
@@ -258,10 +258,10 @@ async function runCycle(browser, outputDir) {
 	}
 
 	// ======== WEB SCRAPING VARIOUS SINGLE SECURITY WEB PAGES ===========
-	const single_security_name = 'single_security'
-	const urlMarker = path.join('/usr/src/app/logs/', `last.${single_security_name}.txt`);
-	const urlInterval = getScrapeGroupInterval(single_security_name, 60); // minutes
-	if (shouldRunTask(urlInterval, urlMarker)) {
+	const singleSecurityName = 'single_security'
+	const singleSecurityMarker = path.join('/usr/src/app/logs/', `last.${singleSecurityName}.txt`);
+	const singleScurityInterval = getScrapeGroupInterval(singleSecurityName, 60); // minutes
+	if (shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
 		logDebug('Begin single security scrape');
 		const csvPath = path.join(DATA_DIR, 'single_security.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
