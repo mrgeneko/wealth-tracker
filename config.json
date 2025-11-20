@@ -4,6 +4,20 @@
     "yahoo_batch": 2,
     "single_security": 5
   },
+  "investing_watchlists": {
+    "url": "https://www.investing.com/portfolio/?portfolioID=YOUR_PORTFOLIO_ID_HERE",
+    "items": [
+      { "key": "primary", "interval": 2 },
+      { "key": "secondary", "interval": 5 }
+    ]
+  },
+  "webull_watchlists": {
+    "url": "https://www.webull.com/watch",
+    "items": [
+      { "key": "My Watchlist", "interval": 5 },
+      { "key": "testlist 2", "interval": 5 }
+    ]
+  },
   "cnbc": {
     "name": "cnbc",
     "download": "singlefile",

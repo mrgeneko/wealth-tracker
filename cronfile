@@ -1,2 +1,0 @@
-# Run scrape_security_data.js every 3 minutes
-*/1 * * * * root cd /usr/src/app && ./scrape_security_data_lock.sh >> /var/log/cron.log 2>&1
