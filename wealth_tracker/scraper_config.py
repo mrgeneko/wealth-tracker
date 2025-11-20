@@ -9,7 +9,7 @@ def _load_config():
         return _CONFIG
     # Load scraper attributes only from the container data mount.
     # Per project convention, runtime data is available at `/usr/src/app/data`.
-    primary = os.path.join('/usr/src/app', 'data', 'scraper_attributes.json')
+    primary = os.path.join('/usr/src/app', 'data', 'config.json')
     _CONFIG = {}
     try:
         with open(primary, 'r', encoding='utf-8') as f:
