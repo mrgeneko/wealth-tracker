@@ -15,6 +15,7 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
+const { scrapeWebullWatchlists } = require('./scrape_webull_watchlists');
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeWSJ } = require('./scrape_wsj');
@@ -27,7 +28,7 @@ const { scrapeNasdaq } = require('./scrape_nasdaq');
 // Use the container-hosted data directory for all runtime data/config.
 // This is the single canonical path for scraper attributes and CSVs.
 const DATA_DIR = path.join('/usr/src/app', 'data');
-const ATTR_PATH = path.join(DATA_DIR, 'scraper_attributes.json');
+const ATTR_PATH = path.join(DATA_DIR, 'config.json');
 let _cachedAttrs = null;
 let _cachedMtime = 0;
 
@@ -50,7 +51,7 @@ function loadScraperAttributes() {
 	}
 }
 
-function getScraperAttributes(name) {
+function getConfig(name) {
 	if (!name) return {};
 	const attrs = loadScraperAttributes();
 	if (attrs[name]) return attrs[name];
@@ -217,21 +218,63 @@ async function runCycle(browser, outputDir) {
 	const investingInterval = getScrapeGroupInterval(investingWatchlistsName, 3); // minutes
 	if (1 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
-		const csvPath = path.join(DATA_DIR, 'investingcom_watchlists.csv');
-		const content = fs.readFileSync(csvPath, 'utf8');
-		const { parse } = require('csv-parse/sync');
-		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
-		for (const record of records) {
-			logDebug(`investingcom watchlist: ${record.key} ${record.interval} ${record.url}`)
-			const investingUrl = record.url;
-			if (investingUrl && investingUrl.startsWith('http')) {
-				await scrapeInvestingComWatchlists(browser, record, outputDir);
-			} else {
-				logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
+		// Prefer configuration from config.json
+		const attrs = getConfig(investingWatchlistsName);
+		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
+			for (const item of attrs.items) {
+				const record = { key: item.key, interval: item.interval, url: attrs.url };
+				logDebug(`investingcom watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
+				if (record.url && record.url.startsWith('http')) {
+					await scrapeInvestingComWatchlists(browser, record, outputDir);
+				} else {
+					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
+				}
 			}
+		} else {
+			logDebug('No investing watchlists in attributes; skipping investing.com scrape');
 		}
 	} else {
 		logDebug('Skipping investing.com scrape (interval not reached)');
+	}
+
+	// ======== WEBULL WATCHLISTS ===========
+	const webullWatchListsName = 'webull_watchlists'
+	const webullMarker = path.join('/usr/src/app/logs', `last.${webullWatchListsName}.txt`);
+	const webullInterval = getScrapeGroupInterval(webullWatchListsName, 3); // minutes
+	if (0 && shouldRunTask(webullInterval, webullMarker)) {
+		logDebug('Begin webull watchlists scrape');
+		// Prefer configuration from config.json (same shape as investing_watchlists)
+		const attrs = getConfig(webullWatchListsName);
+		// Debug: print attrs content (truncated) so we can confirm what's loaded at runtime
+		try {
+			const _attrsStr = JSON.stringify(attrs || {}, null, 2);
+			logDebug('webull attrs: ' + (_attrsStr.length > 1000 ? _attrsStr.slice(0, 1000) + '... (truncated)' : _attrsStr));
+			// Also write a timestamped dump of the attrs to logs for easier inspection inside the container/host
+			//try {
+			//	const dumpPath = path.join('/usr/src/app/logs', `attrs_dump.webull.${getDateTimeString()}.json`);
+			//	fs.writeFileSync(dumpPath, _attrsStr, 'utf8');
+			//	logDebug('Wrote attrs dump to ' + dumpPath);
+			//} catch (e2) {
+			//	logDebug('Failed to write attrs dump: ' + (e2 && e2.message ? e2.message : e2));
+			//}
+		} catch (e) {
+			logDebug('webull attrs: <unstringifiable> ' + String(e));
+		}
+		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
+			for (const item of attrs.items) {
+				const record = { key: item.key, interval: item.interval, url: attrs.url };
+				logDebug(`webull watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
+				if (record.url && record.url.startsWith('http')) {
+					await scrapeWebullWatchlists(browser, record, outputDir);
+				} else {
+					logDebug(`Skipping record with missing or invalid webull URL: ${JSON.stringify(record)}`);
+				}
+			}
+		} else {
+			logDebug('No webull watchlists in attributes; skipping webull watchlists scrape');
+		}
+	} else {
+		logDebug('Skipping webull watchlists scrape (interval not reached)');
 	}
 
 	// ======== YAHOO FINANCE2 API ===========
@@ -262,7 +305,7 @@ async function runCycle(browser, outputDir) {
 	const singleSecurityName = 'single_security'
 	const singleSecurityMarker = path.join('/usr/src/app/logs/', `last.${singleSecurityName}.txt`);
 	const singleScurityInterval = getScrapeGroupInterval(singleSecurityName, 60); // minutes
-	if (shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
+	if (1 && shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
 		logDebug('Begin single security scrape');
 		const csvPath = path.join(DATA_DIR, 'single_security.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
@@ -310,6 +353,19 @@ async function runCycle(browser, outputDir) {
 async function daemon() {
 	const outputDir = '/usr/src/app/logs';
 	logDebug(version);
+	// Runtime check: confirm config path is readable and log top-level keys
+	try {
+		const attrsCheck = loadScraperAttributes();
+		const cfgExists = fs.existsSync(ATTR_PATH);
+		logDebug(`Config path: ${ATTR_PATH} exists=${cfgExists}`);
+		if (attrsCheck && typeof attrsCheck === 'object' && Object.keys(attrsCheck).length) {
+			logDebug('Config loaded keys: ' + Object.keys(attrsCheck).join(', '));
+		} else {
+			logDebug('Config loaded but empty or missing');
+		}
+	} catch (e) {
+		logDebug('Error checking config path: ' + (e && e.message ? e.message : e));
+	}
 	let browser = null;
 	// Retry connecting/launching Chrome with backoff to avoid early exit if Chrome not ready yet
 	for (let attempt = 1; attempt <= 5; attempt++) {

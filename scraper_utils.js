@@ -30,7 +30,29 @@ function getTimestampedLogPath(prefix = 'scrape_security_data') {
 function logDebug(msg, logPath) {
     const line = `[${new Date().toISOString()}] ${msg}\n`;
     const path = logPath || getTimestampedLogPath();
-    fs.appendFileSync(path, line);
+    try {
+        // Ensure directory exists for the target path
+        try {
+            const dir = require('path').dirname(path);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        } catch (e) {
+            // ignore directory creation errors and fall back
+        }
+        fs.appendFileSync(path, line);
+    } catch (e) {
+        // Fallback: write to local ./logs if original path is not writable
+        try {
+            const fallbackDir = './logs';
+            if (!fs.existsSync(fallbackDir)) fs.mkdirSync(fallbackDir, { recursive: true });
+            const p = require('path');
+            const fname = (logPath && p.basename(logPath)) || p.basename(getTimestampedLogPath('scrape_security_data'));
+            const fallbackPath = p.join(fallbackDir, fname);
+            fs.appendFileSync(fallbackPath, line);
+        } catch (e2) {
+            // As a last resort, write to stderr
+            try { console.error('logDebug fallback failed:', e2); } catch (e3) {}
+        }
+    }
 }
 
 // Runtime navigation/request metrics
