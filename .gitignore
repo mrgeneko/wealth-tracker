@@ -11,4 +11,5 @@ nohup.out
 .env
 wealth_tracker_log/
 chrome-netlog-202*
+run_scrape_nasdaq.js
 
