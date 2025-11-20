@@ -32,5 +32,5 @@ RUN chmod +x /usr/local/bin/entrypoint_unified.sh
 # Use the unified entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint_unified.sh"]
 
-# Default command (can be overridden)
-CMD ["tail", "-f", "/var/log/cron.log"]
+# Default command is handled via the unified entrypoint which execs Node.
+# No cron log tailing here; node runs as PID 1 via `entrypoint_unified.sh`.
