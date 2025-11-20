@@ -96,6 +96,7 @@ async function attachRequestFailureCounters(page, opts = {}) {
         /ids?\./i,
         /ids\.ad\.gt/i,
         /adform\.net|adform\.com|adform/i
+        ,/aniview\.com/i
     ];
     
     // Additions: suppress known noisy bidder/sync/analytics endpoints observed in logs
@@ -199,6 +200,9 @@ async function attachRequestFailureCounters(page, opts = {}) {
         'aidemsrv.com', 'gum.aidemsrv', 'iqzone.com', 'cs.iqzone', 'ybp.yahoo.com', 'mrtnsvr.com', 'ad.mrtnsvr.com', 'acuityplatform.com', 'ums.acuityplatform.com', 'audienceexposure.com', 'bidswitch.net', 'x.bidswitch.net', 'nextmillmedia.com', 'technoratimedia.com',
         '3lift.com', 'tlx.3lift.com', 'richaudience.com', 'shb.richaudience.com', 'seedtag.com', 's.seedtag.com', 'criteo.com', 'grid-bidder.criteo.com'
     ];
+
+    // Add aniview.com to suppression substrings
+    suppressionSubstrings.push('aniview.com');
 
     // add analytics/tag manager/bidder substrings
     suppressionSubstrings.push(
