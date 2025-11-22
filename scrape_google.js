@@ -14,7 +14,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		const url = security.google;
 		const ticker = sanitizeForFilename(security.key);
 		logDebug(`Security: ${ticker}   open Google Finance: ${url}`);
-		const snapshotBase = path.join(outputDir, `${ticker}.google.${getDateTimeString()}`);
+		const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.google`);
 		const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
 		page = await createPreparedPage(browser, pageOpts);
 		logDebug('Page loaded. Extracting HTML...');
@@ -161,7 +161,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		}
 
 		// Save the data object to google.yyyymmdd_hhmmss.json using getDateTimeString
-		const jsonFileName = `${ticker}.google.${getDateTimeString()}.json`;
+		const jsonFileName = `${getDateTimeString()}.${ticker}.google.json`;
 		const jsonFilePath = path.join(outputDir, jsonFileName);
 		fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
 		logDebug(`Saved Google JSON to ${jsonFilePath}`);

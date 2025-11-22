@@ -23,7 +23,7 @@ async function scrapeCNBC(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open CNBC: ${url}`);
-    const snapshotBase = path.join(outputDir, `${ticker}.cnbc.${getDateTimeString()}`);
+    const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.cnbc`);
     const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
     page = await createPreparedPage(browser, pageOpts);
     logDebug('Page loaded. Extracting HTML...');
@@ -40,7 +40,7 @@ async function scrapeCNBC(browser, security, outputDir) {
     } catch (kafkaErr) { logDebug('Kafka publish error (CNBC): ' + kafkaErr); }
 
     try {
-      const jsonFileName = `${ticker}.cnbc.${getDateTimeString()}.json`;
+      const jsonFileName = `${getDateTimeString()}.${ticker}.cnbc.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved CNBC JSON to ${jsonFilePath}`);
