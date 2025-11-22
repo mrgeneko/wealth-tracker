@@ -30,125 +30,8 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
     const html = await savePageSnapshot(page, snapshotBase);
     if (html) logDebug(`Saved StockAnalysis snapshot base ${snapshotBase}`);
 
-    try {
-      const htmlOutPath = `/usr/src/app/logs/stockanalysis.${ticker}.${getDateTimeString()}.html`;
-      fs.writeFileSync(htmlOutPath, html || await page.content(), 'utf-8');
-      logDebug(`Wrote full StockAnalysis HTML to ${htmlOutPath}`);
-    } catch (e) { logDebug('Failed to write StockAnalysis full page HTML: ' + e); }
-
-    const $ = cheerio.load(html || '');
-
-    let last_price = '';
-    let previous_close_price = '';
-    let price_change_decimal = '';
-    let price_change_percent = '';
-    let after_hours_price = '';
-    let after_hours_change_decimal = '';
-    let after_hours_change_percent = '';
-
-    try {
-      const mainPriceEl = $('[class*="text-4xl"]').first();
-      if (mainPriceEl && mainPriceEl.length) last_price = cleanNumberText(mainPriceEl.text());
-
-      // main change extraction with multiple fallbacks
-      try {
-        const changeRegex = /([+-]?[0-9,.]+)\s*\(?([+-]?[0-9,.]+%?)?\)?/;
-        let changeText = '';
-        const changeEl = mainPriceEl && mainPriceEl.length ? mainPriceEl.closest('div').find('[class*="text-red-vivid"]').first() : null;
-        if (changeEl && changeEl.length) changeText = changeEl.text().trim();
-        if (!changeText && mainPriceEl && mainPriceEl.length) {
-          const parent = mainPriceEl.parent();
-          const mainText = mainPriceEl.text().trim();
-          const found = parent.find('*').filter((i, el) => {
-            const t = $(el).text().trim();
-            return el !== mainPriceEl[0] && t && t !== mainText && changeRegex.test(t);
-          }).first();
-          if (found && found.length) changeText = found.text().trim();
-        }
-        if (!changeText && mainPriceEl && mainPriceEl.length) {
-          const mainText = mainPriceEl.text().trim();
-          const nextFound = mainPriceEl.nextAll().filter((i, el) => {
-            const t = $(el).text().trim();
-            return t && t !== mainText && changeRegex.test(t);
-          }).first();
-          if (nextFound && nextFound.length) changeText = nextFound.text().trim();
-        }
-        if (!changeText) {
-          const topRow = $('div.mb-5').first();
-          const mainText = mainPriceEl && mainPriceEl.length ? mainPriceEl.text().trim() : '';
-          const anyFound = topRow.find('*').filter((i, el) => {
-            const t = $(el).text().trim();
-            return t && t !== mainText && changeRegex.test(t);
-          }).first();
-          if (anyFound && anyFound.length) changeText = anyFound.text().trim();
-        }
-        if (changeText) {
-          const m = changeText.match(changeRegex);
-          if (m) {
-            price_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
-            price_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
-          }
-        }
-      } catch (e) { /* noop */ }
-
-      // previous close
-      const prevLabel = $('td').filter((i, el) => $(el).text().trim() === 'Previous Close').first();
-      if (prevLabel && prevLabel.length) {
-        const val = prevLabel.next('td').text() || prevLabel.parent().find('td').eq(1).text();
-        if (val) previous_close_price = cleanNumberText(val);
-      }
-
-      // after-hours
-      const afterLabel = $('*:contains("After-hours:")').filter((i, el) => $(el).text().trim().includes('After-hours')).first();
-      if (afterLabel && afterLabel.length) {
-        let container = afterLabel.parents().filter((i, el) => { const c = $(el).attr('class') || ''; return c.includes('border-l'); }).first();
-        if (!container || !container.length) container = afterLabel.closest('div');
-        let candidate = container.find('div').filter((i, el) => /[0-9]/.test($(el).text())).first();
-        if ((!candidate || !candidate.length)) {
-          const topRow = $('div.mb-5').first();
-          const bordered = topRow.find('div.border-l').first();
-          if (bordered && bordered.length) candidate = bordered.find('div').filter((i, el) => /[0-9]/.test($(el).text())).first();
-        }
-        if (candidate && candidate.length) {
-          after_hours_price = cleanNumberText(candidate.text());
-          let changeSmall = null;
-          try {
-            const bordered = $('div.mb-5').first().find('div.border-l').first();
-            const scopes = [container, candidate, candidate && candidate.parent(), bordered].filter(Boolean);
-            for (let s of scopes) {
-              changeSmall = s.find('div').filter((i, el) => /\([+-]?[0-9,.]+%?\)/.test($(el).text())).first();
-              if (changeSmall && changeSmall.length) break;
-            }
-          } catch (e) { changeSmall = null; }
-          if (changeSmall && changeSmall.length) {
-            const cs = changeSmall.text().trim();
-            const cm = cs.match(/([+-]?[0-9,.]+)\s*\(([+-]?[0-9,.]+%?)\)/);
-            if (cm) {
-              after_hours_change_decimal = cleanNumberText(cm[1]).replace(/^\+/, '');
-              after_hours_change_percent = cm[2] ? String(cm[2]).replace(/\s/g, '') : '';
-            } else {
-              const dm = cs.match(/([+-]?[0-9,.]+)/);
-              if (dm) after_hours_change_decimal = cleanNumberText(dm[1]).replace(/^\+/, '');
-            }
-          }
-        }
-      }
-
-    } catch (e) { logDebug('Error extracting stockanalysis fields: ' + e); }
-
-    data = {
-      key: ticker,
-      last_price: last_price || '',
-      price_change_decimal: price_change_decimal || '',
-      price_change_percent: price_change_percent || '',
-      previous_close_price: previous_close_price || '',
-      after_hours_price: after_hours_price || '',
-      after_hours_change_decimal: after_hours_change_decimal || '',
-      after_hours_change_percent: after_hours_change_percent || '',
-      source: 'stockanalysis',
-      capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
-      quote_time: ''
-    };
+    // Parse the HTML to extract data
+    data = parseStockAnalysisHtml(html || await page.content(), { key: ticker });
 
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeStockAnalysis';
@@ -168,9 +51,10 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
   return data;
 }
 
-async function parseStockAnalysisHtml(html, security) {
+function parseStockAnalysisHtml(html, security) {
   const $ = cheerio.load(html || '');
-  let ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
+  const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
+  
   let last_price = '';
   let previous_close_price = '';
   let price_change_decimal = '';
@@ -178,31 +62,52 @@ async function parseStockAnalysisHtml(html, security) {
   let after_hours_price = '';
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
+
   try {
     const mainPriceEl = $('[class*="text-4xl"]').first();
     if (mainPriceEl && mainPriceEl.length) last_price = cleanNumberText(mainPriceEl.text());
+
+    // Main change extraction
     try {
       const changeRegex = /([+-]?[0-9,.]+)\s*\(?([+-]?[0-9,.]+%?)?\)?/;
       let changeText = '';
-      const changeEl = mainPriceEl && mainPriceEl.length ? mainPriceEl.closest('div').find('[class*="text-red-vivid"]').first() : null;
+      
+      // Strategy 1: Look for red/green text in same container
+      const changeEl = mainPriceEl && mainPriceEl.length ? mainPriceEl.closest('div').find('[class*="text-red-vivid"], [class*="text-green-vivid"]').first() : null;
       if (changeEl && changeEl.length) changeText = changeEl.text().trim();
+
+      // Strategy 2: Look for siblings matching regex
       if (!changeText && mainPriceEl && mainPriceEl.length) {
         const parent = mainPriceEl.parent();
         const mainText = mainPriceEl.text().trim();
-        const found = parent.find('*').filter((i, el) => { const t = $(el).text().trim(); return el !== mainPriceEl[0] && t && t !== mainText && changeRegex.test(t); }).first();
+        const found = parent.find('*').filter((i, el) => {
+          const t = $(el).text().trim();
+          return el !== mainPriceEl[0] && t && t !== mainText && changeRegex.test(t);
+        }).first();
         if (found && found.length) changeText = found.text().trim();
       }
+
+      // Strategy 3: Look for next siblings
       if (!changeText && mainPriceEl && mainPriceEl.length) {
         const mainText = mainPriceEl.text().trim();
-        const nextFound = mainPriceEl.nextAll().filter((i, el) => { const t = $(el).text().trim(); return t && t !== mainText && changeRegex.test(t); }).first();
+        const nextFound = mainPriceEl.nextAll().filter((i, el) => {
+          const t = $(el).text().trim();
+          return t && t !== mainText && changeRegex.test(t);
+        }).first();
         if (nextFound && nextFound.length) changeText = nextFound.text().trim();
       }
+
+      // Strategy 4: Look in top row container
       if (!changeText) {
         const topRow = $('div.mb-5').first();
         const mainText = mainPriceEl && mainPriceEl.length ? mainPriceEl.text().trim() : '';
-        const anyFound = topRow.find('*').filter((i, el) => { const t = $(el).text().trim(); return t && t !== mainText && changeRegex.test(t); }).first();
+        const anyFound = topRow.find('*').filter((i, el) => {
+          const t = $(el).text().trim();
+          return t && t !== mainText && changeRegex.test(t);
+        }).first();
         if (anyFound && anyFound.length) changeText = anyFound.text().trim();
       }
+
       if (changeText) {
         const m = changeText.match(changeRegex);
         if (m) {
@@ -210,30 +115,71 @@ async function parseStockAnalysisHtml(html, security) {
           price_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
         }
       }
-    } catch (e) {}
+    } catch (e) { /* ignore change extraction errors */ }
+
+    // Previous Close
     const prevLabel = $('td').filter((i, el) => $(el).text().trim() === 'Previous Close').first();
-    if (prevLabel && prevLabel.length) { const val = prevLabel.next('td').text() || prevLabel.parent().find('td').eq(1).text(); if (val) previous_close_price = cleanNumberText(val); }
+    if (prevLabel && prevLabel.length) {
+      const val = prevLabel.next('td').text() || prevLabel.parent().find('td').eq(1).text();
+      if (val) previous_close_price = cleanNumberText(val);
+    }
+
+    // After-hours
     const afterLabel = $('*:contains("After-hours:")').filter((i, el) => $(el).text().trim().includes('After-hours')).first();
     if (afterLabel && afterLabel.length) {
-      let container = afterLabel.parents().filter((i, el) => { const c = $(el).attr('class') || ''; return c.includes('border-l'); }).first();
+      let container = afterLabel.parents().filter((i, el) => {
+        const c = $(el).attr('class') || '';
+        return c.includes('border-l');
+      }).first();
+      
       if (!container || !container.length) container = afterLabel.closest('div');
+      
       let candidate = container.find('div').filter((i, el) => /[0-9]/.test($(el).text())).first();
-      if ((!candidate || !candidate.length)) { const topRow = $('div.mb-5').first(); const bordered = topRow.find('div.border-l').first(); if (bordered && bordered.length) candidate = bordered.find('div').filter((i, el) => /[0-9]/.test($(el).text())).first(); }
+      
+      if ((!candidate || !candidate.length)) {
+        const topRow = $('div.mb-5').first();
+        const bordered = topRow.find('div.border-l').first();
+        if (bordered && bordered.length) candidate = bordered.find('div').filter((i, el) => /[0-9]/.test($(el).text())).first();
+      }
+
       if (candidate && candidate.length) {
         after_hours_price = cleanNumberText(candidate.text());
         let changeSmall = null;
-        try { const bordered = $('div.mb-5').first().find('div.border-l').first(); const scopes = [container, candidate, candidate && candidate.parent(), bordered].filter(Boolean); for (let s of scopes) { changeSmall = s.find('div').filter((i, el) => /\([+-]?[0-9,.]+%?\)/.test($(el).text())).first(); if (changeSmall && changeSmall.length) break; } } catch (e) { changeSmall = null; }
-        if (changeSmall && changeSmall.length) { const cs = changeSmall.text().trim(); const cm = cs.match(/([+-]?[0-9,.]+)\s*\(([+-]?[0-9,.]+%?)\)/); if (cm) { after_hours_change_decimal = cleanNumberText(cm[1]).replace(/^\+/, ''); after_hours_change_percent = cm[2] ? String(cm[2]).replace(/\s/g, '') : ''; } else { const dm = cs.match(/([+-]?[0-9,.]+)/); if (dm) after_hours_change_decimal = cleanNumberText(dm[1]).replace(/^\+/, ''); } }
+        try {
+          const bordered = $('div.mb-5').first().find('div.border-l').first();
+          const scopes = [container, candidate, candidate && candidate.parent(), bordered].filter(Boolean);
+          for (let s of scopes) {
+            changeSmall = s.find('div').filter((i, el) => /\([+-]?[0-9,.]+%?\)/.test($(el).text())).first();
+            if (changeSmall && changeSmall.length) break;
+          }
+        } catch (e) { changeSmall = null; }
+
+        if (changeSmall && changeSmall.length) {
+          const cs = changeSmall.text().trim();
+          const cm = cs.match(/([+-]?[0-9,.]+)\s*\(([+-]?[0-9,.]+%?)\)/);
+          if (cm) {
+            after_hours_change_decimal = cleanNumberText(cm[1]).replace(/^\+/, '');
+            after_hours_change_percent = cm[2] ? String(cm[2]).replace(/\s/g, '') : '';
+          } else {
+            const dm = cs.match(/([+-]?[0-9,.]+)/);
+            if (dm) after_hours_change_decimal = cleanNumberText(dm[1]).replace(/^\+/, '');
+          }
+        }
       }
     }
-  } catch (e) { logDebug('parseStockAnalysisHtml error: ' + e); }
+  } catch (e) {
+    logDebug('parseStockAnalysisHtml error: ' + e);
+  }
+
   return {
     key: ticker,
     last_price: last_price || '',
+    last_price_quote_time: '',
     price_change_decimal: price_change_decimal || '',
     price_change_percent: price_change_percent || '',
     previous_close_price: previous_close_price || '',
     after_hours_price: after_hours_price || '',
+    after_hours_price_quote_time: '',
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'stock_analysis',
