@@ -429,7 +429,7 @@ async function savePageSnapshot(page, basePath) {
         const fullHtml = await page.content();
         try { fs.writeFileSync(basePath + '.html', fullHtml, 'utf-8'); } catch (e) { logDebug('Failed to write html snapshot: ' + e.message); }
         try { await page.screenshot({ path: basePath + '.png', fullPage: true }); } catch (e) { logDebug('Screenshot failed: ' + (e && e.message ? e.message : e)); }
-        try { const cookies = await page.cookies(); fs.writeFileSync(basePath + '.cookies.json', JSON.stringify(cookies, null, 2), 'utf-8'); } catch (e) { logDebug('Failed to write cookies snapshot: ' + (e && e.message ? e.message : e)); }
+        //try { const cookies = await page.cookies(); fs.writeFileSync(basePath + '.cookies.json', JSON.stringify(cookies, null, 2), 'utf-8'); } catch (e) { logDebug('Failed to write cookies snapshot: ' + (e && e.message ? e.message : e)); }
         return fullHtml;
     } catch (e) {
         logDebug('savePageSnapshot failed: ' + (e && e.message ? e.message : e));
