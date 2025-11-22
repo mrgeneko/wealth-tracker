@@ -1,7 +1,7 @@
 {
   "name": "wealth-tracker-scrapers",
   "version": "1.0.0",
-  "description": "Chrome SingleFile automation",
+  "description": "web scraping via Chrome automation",
   "main": "scrape_security_data.js",
   "scripts": {
     "start": "node scrape_security_data.js"
