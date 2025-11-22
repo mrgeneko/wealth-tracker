@@ -4,12 +4,27 @@
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
 
 function cleanNumberText(s) {
   if (!s && s !== 0) return '';
   return String(s).replace(/[,\s]/g, '').replace(/[^0-9.\-]/g, '');
+}
+
+function parseToIso(timeStr) {
+  if (!timeStr) return '';
+  try {
+    // Expected format: "Nov 21, 2025, 7:59 PM EST"
+    // We strip the timezone abbreviation and force America/New_York to avoid ambiguity
+    const cleaned = timeStr.replace(/\s+[A-Z]{3}$/, '').trim();
+    const dt = DateTime.fromFormat(cleaned, "MMM d, yyyy, h:mm a", { zone: 'America/New_York', locale: 'en-US' });
+    if (dt.isValid) return dt.toISO(); // Returns ISO 8601 with offset (e.g. -05:00)
+    return timeStr; // Return original if parsing fails
+  } catch (e) {
+    return timeStr;
+  }
 }
 
 async function scrapeStockAnalysis(browser, security, outputDir) {
@@ -78,7 +93,7 @@ function parseStockAnalysisHtml(html, security) {
       const timeContainer = mainPriceEl.parent().find('div').filter((i, el) => $(el).text().includes('At close:')).first();
       if (timeContainer && timeContainer.length) {
         const text = timeContainer.text().replace('At close:', '').trim();
-        if (text) last_price_quote_time = text;
+        if (text) last_price_quote_time = parseToIso(text);
       }
     }
 
@@ -149,7 +164,7 @@ function parseStockAnalysisHtml(html, security) {
       if (timeContainer && timeContainer.length) {
         const fullText = timeContainer.text();
         const timeText = fullText.split('Pre-market:')[1];
-        if (timeText) pre_market_price_quote_time = timeText.trim();
+        if (timeText) pre_market_price_quote_time = parseToIso(timeText.trim());
       }
 
       // Extract price and change
@@ -204,7 +219,7 @@ function parseStockAnalysisHtml(html, security) {
       if (timeContainer && timeContainer.length) {
         const fullText = timeContainer.text();
         const parts = fullText.split('After-hours:');
-        if (parts.length > 1) after_hours_price_quote_time = parts[1].trim();
+        if (parts.length > 1) after_hours_price_quote_time = parseToIso(parts[1].trim());
       }
 
       let container = afterLabel.parents().filter((i, el) => {
@@ -267,7 +282,7 @@ function parseStockAnalysisHtml(html, security) {
     after_hours_change_percent: after_hours_change_percent || '',
     after_hours_price_quote_time: after_hours_price_quote_time || '',
     source: 'stock_analysis',
-    capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
+    capture_time: new Date().toISOString(),
     quote_time: ''
   };
 }
