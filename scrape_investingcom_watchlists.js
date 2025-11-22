@@ -118,7 +118,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 		}
 		const tableHtml = await page.$eval('[id^="tbody_overview_"]', el => el.outerHTML);
 		const safeWatchlistKey = sanitizeForFilename(watchlist.key);
-		const htmlOutPath = `/usr/src/app/logs/investingcom_watchlist.${safeWatchlistKey}.${getDateTimeString()}.html`;
+		const htmlOutPath = `/usr/src/app/logs/${getDateTimeString()}.investingcom_watchlist.${safeWatchlistKey}.html`;
 		const fullPageHtml = await page.content();
 		require('fs').writeFileSync(htmlOutPath, fullPageHtml, 'utf-8');
 		logDebug('Parsing full page HTML for stock table...');
@@ -163,7 +163,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			});
 			logDebug(`Total valid stock rows found: ${dataObjects.length}`);
 		}
-		const outPath = require('path').join(outputDir, `investingcom_watchlist.${safeWatchlistKey}.${getDateTimeString()}.json`);
+		const outPath = require('path').join(outputDir, `${getDateTimeString()}.investingcom_watchlist.${safeWatchlistKey}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(dataObjects, null, 2), 'utf-8');
 		logDebug(`Parsed data written to ${outPath}`);
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
@@ -180,7 +180,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 		// Attempt to save a diagnostic snapshot for later analysis
 		try {
 			if (typeof savePageSnapshot === 'function' && typeof page !== 'undefined' && page) {
-				const base = `/usr/src/app/logs/investingcom_login_failure.${getDateTimeString()}`;
+				const base = `/usr/src/app/logs/${getDateTimeString()}.investingcom_login_failure`;
 				await savePageSnapshot(page, base);
 				logDebug('Wrote diagnostic snapshot to ' + base + '.*');
 			}
