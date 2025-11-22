@@ -264,6 +264,14 @@ async function runCycle(browser, outputDir) {
 		try {
 			const _attrsStr = JSON.stringify(attrs || {}, null, 2);
 			logDebug('webull attrs: ' + (_attrsStr.length > 1000 ? _attrsStr.slice(0, 1000) + '... (truncated)' : _attrsStr));
+			// Also write a timestamped dump of the attrs to logs for easier inspection inside the container/host
+			//try {
+			//	const dumpPath = path.join('/usr/src/app/logs', `attrs_dump.webull.${getDateTimeString()}.json`);
+			//	fs.writeFileSync(dumpPath, _attrsStr, 'utf8');
+			//	logDebug('Wrote attrs dump to ' + dumpPath);
+			//} catch (e2) {
+			//	logDebug('Failed to write attrs dump: ' + (e2 && e2.message ? e2.message : e2));
+			//}
 		} catch (e) {
 			logDebug('webull attrs: <unstringifiable> ' + String(e));
 		}
@@ -325,27 +333,27 @@ async function runCycle(browser, outputDir) {
 
 		for (const security of filtered_securities) {
 			logDebug('security type:' + security.type);
-			if (security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
+			if (0 && security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
 				const webullData = await scrapeWebull(browser, security, outputDir);
 				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 			}
 			else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (security.nasdaq && security.cnbc.startsWith('http')) {
+				if (0 && security.nasdaq && security.cnbc.startsWith('http')) {
 					const nasdaqData = await scrapeNasdaq(browser, security, outputDir);
 					logDebug(`NASDAQ scrape result: ${JSON.stringify(nasdaqData)}`);
-				} else if (security.cnbc && security.cnbc.startsWith('http')) {
+				} else if (0 && security.cnbc && security.cnbc.startsWith('http')) {
 					const cnbcData = await scrapeCNBC(browser, security, outputDir);
 					logDebug(`CNBC scrape result: ${JSON.stringify(cnbcData)}`);
 				} else if (security.stock_analysis && security.stock_analysis.startsWith('http')) {
 					const stockAnalysisData = await scrapeStockAnalysis(browser, security, outputDir);
 					logDebug(`Stock_analysis scrape result: ${JSON.stringify(stockAnalysisData)}`);
-				} else if (security.google && security.google.startsWith('http')) {
+				} else if (0 && security.google && security.google.startsWith('http')) {
 					const googleData = await scrapeGoogle(browser, security, outputDir);
 					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
 				//} else if (security.wsj && security.wsj.startsWith('http')) {
 				//	const wsjData = await scrapeWSJ(browser, security, outputDir);
 				//	logDebug(`WSJ scrape result: ${JSON.stringify(wsjData)}`);
-				} else if (security.webull && security.webull.startsWith('http')) {
+				} else if (0 && security.webull && security.webull.startsWith('http')) {
 					const webullData = await scrapeWebull(browser, security, outputDir);
 					logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 				} else {
