@@ -1,5 +1,6 @@
 // Shared utility functions for all scrapers
 const fs = require('fs');
+const path = require('path');
 
 function sanitizeForFilename(str) {
     return String(str).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -13,7 +14,8 @@ function getDateTimeString() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
-    return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    return `${year}${month}${day}_${hours}${minutes}${seconds}_${ms}`;
 }
 
 
@@ -24,29 +26,30 @@ function getTimestampedLogPath(prefix = 'scrape_security_data') {
     if (!cachedDateTimeString) {
         cachedDateTimeString = getDateTimeString();
     }
-    return `/usr/src/app/logs/${prefix}.${cachedDateTimeString}.log`;
+    // Use process.env.LOG_DIR if available, otherwise default to ./logs relative to CWD
+    const logDir = process.env.LOG_DIR || path.join(process.cwd(), 'logs');
+    return path.join(logDir, `${prefix}.${cachedDateTimeString}.log`);
 }
 
 function logDebug(msg, logPath) {
     const line = `[${new Date().toISOString()}] ${msg}\n`;
-    const path = logPath || getTimestampedLogPath();
+    const targetPath = logPath || getTimestampedLogPath();
     try {
         // Ensure directory exists for the target path
         try {
-            const dir = require('path').dirname(path);
+            const dir = path.dirname(targetPath);
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         } catch (e) {
             // ignore directory creation errors and fall back
         }
-        fs.appendFileSync(path, line);
+        fs.appendFileSync(targetPath, line);
     } catch (e) {
         // Fallback: write to local ./logs if original path is not writable
         try {
             const fallbackDir = './logs';
             if (!fs.existsSync(fallbackDir)) fs.mkdirSync(fallbackDir, { recursive: true });
-            const p = require('path');
-            const fname = (logPath && p.basename(logPath)) || p.basename(getTimestampedLogPath('scrape_security_data'));
-            const fallbackPath = p.join(fallbackDir, fname);
+            const fname = (logPath && path.basename(logPath)) || path.basename(getTimestampedLogPath('scrape_security_data'));
+            const fallbackPath = path.join(fallbackDir, fname);
             fs.appendFileSync(fallbackPath, line);
         } catch (e2) {
             // As a last resort, write to stderr
@@ -339,6 +342,24 @@ function reportMetrics(thresholds = { navFail: 5, reqFail: 10 }, logPath) {
     }
 }
 
+async function setupCDPSession(page, downloadPath) {
+    if (!downloadPath) return;
+    try {
+        const client = await page.target().createCDPSession();
+        await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath });
+        // In some environments Chrome enforces certificate transparency checks
+        // which can cause net::ERR_CERTIFICATE_TRANSPARENCY_REQUIRED when navigating.
+        // Enable ignoring certificate errors via the Security domain for this session.
+        try {
+            await client.send('Security.setIgnoreCertificateErrors', { ignore: true });
+        } catch (secErr) {
+            logDebug('Security.setIgnoreCertificateErrors failed: ' + (secErr && secErr.message ? secErr.message : secErr));
+        }
+    } catch (e) {
+        logDebug('Failed to set download behavior/CDP setup: ' + (e && e.message ? e.message : e));
+    }
+}
+
 async function createPreparedPage(browser, opts = {}) {
     // opts: { url, downloadPath, userAgent, viewport, waitUntil, timeout, attachCounters=true, gotoRetries }
     const {
@@ -381,19 +402,7 @@ async function createPreparedPage(browser, opts = {}) {
                         }
                     }
                     // Ensure download behavior / certificate ignore applied for reused page if requested
-                    if (downloadPath) {
-                        try {
-                            const client = await p.target().createCDPSession();
-                            await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath });
-                            try {
-                                await client.send('Security.setIgnoreCertificateErrors', { ignore: true });
-                            } catch (secErr) {
-                                logDebug('Security.setIgnoreCertificateErrors failed on reused page: ' + (secErr && secErr.message ? secErr.message : secErr));
-                            }
-                        } catch (e) {
-                            logDebug('Failed to set download behavior on reused page: ' + (e && e.message ? e.message : e));
-                        }
-                    }
+                    await setupCDPSession(p, downloadPath);
                     return p;
                 }
             }
@@ -410,22 +419,7 @@ async function createPreparedPage(browser, opts = {}) {
     if (url) {
         await gotoWithRetries(page, url, { waitUntil, timeout }, gotoRetries);
     }
-    if (downloadPath) {
-        try {
-            const client = await page.target().createCDPSession();
-            await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath });
-            // In some environments Chrome enforces certificate transparency checks
-            // which can cause net::ERR_CERTIFICATE_TRANSPARENCY_REQUIRED when navigating.
-            // Enable ignoring certificate errors via the Security domain for this session.
-            try {
-                await client.send('Security.setIgnoreCertificateErrors', { ignore: true });
-            } catch (secErr) {
-                logDebug('Security.setIgnoreCertificateErrors failed: ' + (secErr && secErr.message ? secErr.message : secErr));
-            }
-        } catch (e) {
-            logDebug('Failed to set download behavior: ' + (e && e.message ? e.message : e));
-        }
-    }
+    await setupCDPSession(page, downloadPath);
     return page;
 }
 
@@ -433,9 +427,9 @@ async function savePageSnapshot(page, basePath) {
     // Writes <basePath>.html, <basePath>.png and <basePath>.cookies.json
     try {
         const fullHtml = await page.content();
-        try { require('fs').writeFileSync(basePath + '.html', fullHtml, 'utf-8'); } catch (e) { logDebug('Failed to write html snapshot: ' + e.message); }
+        try { fs.writeFileSync(basePath + '.html', fullHtml, 'utf-8'); } catch (e) { logDebug('Failed to write html snapshot: ' + e.message); }
         try { await page.screenshot({ path: basePath + '.png', fullPage: true }); } catch (e) { logDebug('Screenshot failed: ' + (e && e.message ? e.message : e)); }
-        try { const cookies = await page.cookies(); require('fs').writeFileSync(basePath + '.cookies.json', JSON.stringify(cookies, null, 2), 'utf-8'); } catch (e) { logDebug('Failed to write cookies snapshot: ' + (e && e.message ? e.message : e)); }
+        try { const cookies = await page.cookies(); fs.writeFileSync(basePath + '.cookies.json', JSON.stringify(cookies, null, 2), 'utf-8'); } catch (e) { logDebug('Failed to write cookies snapshot: ' + (e && e.message ? e.message : e)); }
         return fullHtml;
     } catch (e) {
         logDebug('savePageSnapshot failed: ' + (e && e.message ? e.message : e));
