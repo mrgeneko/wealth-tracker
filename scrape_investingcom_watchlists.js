@@ -143,7 +143,9 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						rowData[columnName] = $(col).text().trim();
 					}
 				});
-				if (Object.keys(rowData).length === requiredColumns.length) {
+				// Check if we have at least some critical columns, not necessarily all
+				// Some rows might be missing extended_hours or next_earning
+				if (rowData["symbol"] && rowData["last"]) {
 					securities.push(rowData);
 					const data = {
 						key: rowData["symbol"],
@@ -156,17 +158,17 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 					dataObjects.push(data);
 					logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
 				} else {
-					logDebug(`Row ${i} missing columns: ${requiredColumns.filter(c => !(c in rowData)).join(', ')}`);
+					logDebug(`Row ${i} missing critical columns (symbol/last): ${JSON.stringify(rowData)}`);
 				}
 			});
 			logDebug(`Total valid stock rows found: ${dataObjects.length}`);
 		}
 		const outPath = require('path').join(outputDir, `investingcom_watchlist.${safeWatchlistKey}.${getDateTimeString()}.json`);
-		require('fs').writeFileSync(outPath, JSON.stringify(securities, null, 2), 'utf-8');
+		require('fs').writeFileSync(outPath, JSON.stringify(dataObjects, null, 2), 'utf-8');
 		logDebug(`Parsed data written to ${outPath}`);
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
 		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
-		for (const sec of securities) {
+		for (const sec of dataObjects) {
 			publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
 		}
 	} catch (err) {
