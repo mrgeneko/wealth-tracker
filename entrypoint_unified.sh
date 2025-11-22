@@ -1,7 +1,5 @@
 #!/bin/bash
-# Log current cron processes for diagnostics
-echo "[DEBUG] Current cron processes before check:" 
-ps aux | grep cron | grep -v grep || echo "[DEBUG] No cron process found."
+# (running in daemon mode)
 set -ex
 
 # Log file for debug output
@@ -108,8 +106,6 @@ else
 fi
 
 
-# Disable cron for daemon mode; run Node as PID 1 so Docker signals reach it directly
-echo "[DEBUG] Skipping cron startup (daemon mode)."
 # Ensure the data directory exists (host mount may override image contents).
 echo "[DEBUG] Ensuring /usr/src/app/data exists (host mount may override image contents)..."
 mkdir -p /usr/src/app/data || true
