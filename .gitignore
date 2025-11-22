@@ -12,4 +12,5 @@ nohup.out
 wealth_tracker_log/
 chrome-netlog-202*
 run_scrape_nasdaq.js
-
+docker_chrome_profile/
+logs/
