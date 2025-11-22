@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const cheerio = require('cheerio');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
@@ -46,7 +47,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
         }
         if (cheapHtml) {
           try {
-            const htmlOutPath = `/usr/src/app/logs/${ticker}.nasdaq.${getDateTimeString()}.html`;
+            const htmlOutPath = path.join(outputDir, `${ticker}.nasdaq.${getDateTimeString()}.html`);
             fs.writeFileSync(htmlOutPath, cheapHtml, 'utf-8');
             logDebug(`Wrote Nasdaq HTML (cheap fetch) to ${htmlOutPath}`);
           } catch (e) { logDebug('Failed to write cheap-fetched HTML: ' + e); }
@@ -106,11 +107,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
           logDebug('Page loaded. Extracting HTML (full render)...');
           const html = await savePageSnapshot(page, snapshotBase);
           if (html) logDebug(`Saved Nasdaq snapshot base ${snapshotBase}`);
-          try {
-            const htmlOutPath = `/usr/src/app/logs/${ticker}.nasdaq.${getDateTimeString()}.html`;
-            fs.writeFileSync(htmlOutPath, html || await page.content(), 'utf-8');
-            logDebug(`Wrote full Nasdaq HTML to ${htmlOutPath}`);
-          } catch (e) { logDebug('Failed to write Nasdaq full page HTML: ' + e); }
+          
           const result = parseNasdaqHtml(html || await page.content(), { key: ticker });
           // merge parsed page values (prefer page values when present)
           data.last_price = result.last_price || data.last_price || '';
@@ -300,98 +297,95 @@ function parseNasdaqHtml(html, security) {
 
 async function fetchNasdaqApi(symbol) {
   // Use Nasdaq public API endpoints to fetch info and summary. Try fetch first, then curl fallback.
-  const { execSync } = require('child_process');
   const headers = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json, text/plain, */*' };
   const out = {
-    last_price: '',
-    price_change_decimal: '',
-    price_change_percent: '',
-    previous_close_price: '',
-    after_hours_price: '',
-    after_hours_change_decimal: '',
-    after_hours_change_percent: '',
-    pre_market_price: '',
-    pre_market_price_change_decimal: '',
-    pre_market_price_change_percent: '',
-    quote_time: '',market_status: ''
+    last_price: '', price_change_decimal: '', price_change_percent: '', previous_close_price: '',
+    after_hours_price: '', after_hours_change_decimal: '', after_hours_change_percent: '',
+    pre_market_price: '', pre_market_price_change_decimal: '', pre_market_price_change_percent: '',
+    quote_time: '', market_status: ''
   };
   // Try several assetclass variants: stocks (or stock), etf, or no assetclass.
   const candidates = [ 'stock', 'stocks', 'etf', '' ];
-  function infoUrlFor(ac) { return ac ? `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/info?assetclass=${ac}` : `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/info`; }
-  function summaryUrlFor(ac) { return ac ? `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/summary?assetclass=${ac}` : `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/summary`; }
-  function clean(s){ if (!s && s !== 0) return ''; return String(s).replace(/[^0-9.\-]/g,''); }
-  // Try fetch (modern Node) across candidate asset classes. Stop when we see valid primary.lastSalePrice or previous close.
+  const infoUrlFor = (ac) => ac ? `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/info?assetclass=${ac}` : `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/info`;
+  const summaryUrlFor = (ac) => ac ? `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/summary?assetclass=${ac}` : `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/summary`;
+
+  // Helper to process JSON data from API
+  const processApiData = (infoJson, summaryJson) => {
+    const primary = infoJson && infoJson.data && infoJson.data.primaryData ? infoJson.data.primaryData : {};
+    const marketStatusTop = infoJson && infoJson.data && (infoJson.data.marketStatus || infoJson.data.market_status) ? (infoJson.data.marketStatus || infoJson.data.market_status) : '';
+    const prev = summaryJson && summaryJson.data && summaryJson.data.summaryData && summaryJson.data.summaryData.PreviousClose && summaryJson.data.summaryData.PreviousClose.value ? summaryJson.data.summaryData.PreviousClose.value : '';
+    
+    const lp = cleanNumberText(primary.lastSalePrice);
+    const prevClean = cleanNumberText(prev);
+    
+    if (lp || prevClean) {
+      out.last_price = lp;
+      out.price_change_decimal = cleanNumberText(primary.netChange);
+      out.price_change_percent = primary.percentageChange || '';
+      out.previous_close_price = prevClean;
+      out.quote_time = primary.lastTradeTimestamp || '';
+      out.market_status = marketStatusTop;
+
+      // Try to extract after-hours / extended session data from common fields
+      try {
+        if (primary.extended) {
+          out.after_hours_price = cleanNumberText(primary.extended.last || primary.extended.lastSale || primary.extended.lastSalePrice || primary.extended.price);
+          out.after_hours_change_decimal = cleanNumberText(primary.extended.change || primary.extended.netChange || primary.extended.changeAmount);
+          out.after_hours_change_percent = primary.extended.changePercent || primary.extended.percentageChange || '';
+        }
+        if (primary.preMarket) {
+          out.pre_market_price = out.pre_market_price || cleanNumberText(primary.preMarket.last || primary.preMarket.lastSale || primary.preMarket.lastSalePrice || primary.preMarket.price || primary.preMarket.lastTradePrice);
+          out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || cleanNumberText(primary.preMarket.change || primary.preMarket.netChange || primary.preMarket.changeAmount || primary.preMarket.preMarketChange);
+          out.pre_market_price_change_percent = out.pre_market_price_change_percent || (primary.preMarket.changePercent || primary.preMarket.percentageChange || '');
+        }
+        // Common alternate field names
+        out.after_hours_price = out.after_hours_price || cleanNumberText(primary.postMarketPrice || primary.afterHoursPrice || primary.extendedLast || primary.extendedPrice || primary.postMarketLast);
+        out.after_hours_change_decimal = out.after_hours_change_decimal || cleanNumberText(primary.postMarketChange || primary.afterHoursChange || primary.extendedChange || primary.postMarketNetChange);
+        out.after_hours_change_percent = out.after_hours_change_percent || (primary.postMarketChangePercent || primary.afterHoursChangePercent || primary.extendedChangePercent || '');
+        out.pre_market_price = out.pre_market_price || cleanNumberText(primary.preMarketPrice || primary.preMarketLast || primary.preMarketLastSale || primary.preMarketLastSalePrice || primary.preMarketTradePrice);
+        out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || cleanNumberText(primary.preMarketChange || primary.preMarketNetChange || primary.preMarketChangeAmount);
+        out.pre_market_price_change_percent = out.pre_market_price_change_percent || (primary.preMarketChangePercent || primary.preMarketPercentageChange || '');
+      } catch (e) { /* ignore */ }
+
+      // If marketStatus indicates after-hours or pre-market but explicit extended fields are missing,
+      // populate after_hours/pre_market from the primary last price and change.
+      try {
+        const ms = (marketStatusTop || primary.marketStatus || primary.market_status || '').toString().toLowerCase();
+        const isAfterHours = /after[- ]?hours/i.test(ms);
+        const isPreMarket = /pre[- ]?market/i.test(ms);
+        
+        if ((!out.after_hours_price || out.after_hours_price === '') && isAfterHours) {
+          logDebug(`nasdaq api: marketStatus indicates after-hours (${marketStatusTop || primary.marketStatus}), setting after_hours from primary`);
+          out.after_hours_price = out.after_hours_price || out.last_price;
+          out.after_hours_change_decimal = out.after_hours_change_decimal || out.price_change_decimal;
+          out.after_hours_change_percent = out.after_hours_change_percent || out.price_change_percent;
+        }
+        if ((!out.pre_market_price || out.pre_market_price === '') && isPreMarket) {
+          logDebug(`nasdaq api: marketStatus indicates pre-market (${marketStatusTop || primary.marketStatus}), populating pre_market fields`);
+          const pm = primary.preMarket || primary.pre_market || {};
+          out.pre_market_price = out.pre_market_price || cleanNumberText(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.last_price || cleanNumberText(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
+          out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || cleanNumberText(pm.change || pm.netChange || pm.changeAmount) || out.price_change_decimal || cleanNumberText(primary.netChange || primary.change);
+          out.pre_market_price_change_percent = out.pre_market_price_change_percent || (pm.changePercent || pm.percentageChange || out.price_change_percent || primary.percentageChange || primary.changePercent || '');
+        }
+      } catch (e) { /* ignore */ }
+      
+      return true; // Data found
+    }
+    return false;
+  };
+
+  // Try fetch (modern Node) across candidate asset classes.
   try {
     if (typeof fetch === 'function') {
       for (const ac of candidates) {
         try {
-          const infoUrlC = infoUrlFor(ac);
-          const summaryUrlC = summaryUrlFor(ac);
           const [infoRes, summaryRes] = await Promise.all([
-            fetch(infoUrlC, { headers }),
-            fetch(summaryUrlC, { headers })
+            fetch(infoUrlFor(ac), { headers }),
+            fetch(summaryUrlFor(ac), { headers })
           ]);
           const infoJson = infoRes.ok ? await infoRes.json() : null;
           const summaryJson = summaryRes.ok ? await summaryRes.json() : null;
-          const primary = infoJson && infoJson.data && infoJson.data.primaryData ? infoJson.data.primaryData : {};
-          const marketStatusTop = infoJson && infoJson.data && (infoJson.data.marketStatus || infoJson.data.market_status) ? (infoJson.data.marketStatus || infoJson.data.market_status) : '';
-          const prev = summaryJson && summaryJson.data && summaryJson.data.summaryData && summaryJson.data.summaryData.PreviousClose && summaryJson.data.summaryData.PreviousClose.value ? summaryJson.data.summaryData.PreviousClose.value : '';
-          const lp = clean(primary.lastSalePrice);
-          const prevClean = clean(prev);
-          if (lp || prevClean) {
-            out.last_price = lp;
-            out.price_change_decimal = clean(primary.netChange);
-            out.price_change_percent = primary.percentageChange || '';
-            out.previous_close_price = prevClean;
-            out.quote_time = primary.lastTradeTimestamp || '';
-            // Try to extract after-hours / extended session data from common fields
-            try {
-                if (primary.extended) {
-                  out.after_hours_price = clean(primary.extended.last || primary.extended.lastSale || primary.extended.lastSalePrice || primary.extended.price);
-                  out.after_hours_change_decimal = clean(primary.extended.change || primary.extended.netChange || primary.extended.changeAmount);
-                  out.after_hours_change_percent = primary.extended.changePercent || primary.extended.percentageChange || '';
-                }
-                if (primary.preMarket) {
-                  out.pre_market_price = out.pre_market_price || clean(primary.preMarket.last || primary.preMarket.lastSale || primary.preMarket.lastSalePrice || primary.preMarket.price || primary.preMarket.lastTradePrice);
-                  out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || clean(primary.preMarket.change || primary.preMarket.netChange || primary.preMarket.changeAmount || primary.preMarket.preMarketChange);
-                  out.pre_market_price_change_percent = out.pre_market_price_change_percent || (primary.preMarket.changePercent || primary.preMarket.percentageChange || '');
-              }
-              // Common alternate field names
-              out.after_hours_price = out.after_hours_price || clean(primary.postMarketPrice || primary.afterHoursPrice || primary.extendedLast || primary.extendedPrice || primary.postMarketLast);
-              out.after_hours_change_decimal = out.after_hours_change_decimal || clean(primary.postMarketChange || primary.afterHoursChange || primary.extendedChange || primary.postMarketNetChange);
-              out.after_hours_change_percent = out.after_hours_change_percent || (primary.postMarketChangePercent || primary.afterHoursChangePercent || primary.extendedChangePercent || '');
-                out.pre_market_price = out.pre_market_price || clean(primary.preMarketPrice || primary.preMarketLast || primary.preMarketLastSale || primary.preMarketLastSalePrice || primary.preMarketTradePrice);
-                out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || clean(primary.preMarketChange || primary.preMarketNetChange || primary.preMarketChangeAmount);
-                out.pre_market_price_change_percent = out.pre_market_price_change_percent || (primary.preMarketChangePercent || primary.preMarketPercentageChange || '');
-            } catch (e) { /* ignore */ }
-            // If marketStatus indicates after-hours or pre-market but explicit extended fields are missing,
-            // populate after_hours/pre_market from the primary last price and change.
-            try {
-              const ms = (marketStatusTop || primary.marketStatus || primary.market_status || '').toString().toLowerCase();
-              // match 'after-hours', 'after hours', or similar variants
-              const isAfterHours = /after[- ]?hours/i.test(ms);
-              const isPreMarket = /pre[- ]?market/i.test(ms);
-              // expose market status on the output for callers to inspect
-              out.market_status = marketStatusTop || primary.marketStatus || primary.market_status || '';
-              if ((!out.after_hours_price || out.after_hours_price === '') && isAfterHours) {
-                logDebug(`nasdaq api: marketStatus indicates after-hours (${marketStatusTop || primary.marketStatus}), setting after_hours from primary`);
-                logDebug(`nasdaq api: last_price='${out.last_price}', price_change_decimal='${out.price_change_decimal}', price_change_percent='${out.price_change_percent}'`);
-                out.after_hours_price = out.after_hours_price || out.last_price;
-                out.after_hours_change_decimal = out.after_hours_change_decimal || out.price_change_decimal;
-                out.after_hours_change_percent = out.after_hours_change_percent || out.price_change_percent;
-              }
-              if ((!out.pre_market_price || out.pre_market_price === '') && isPreMarket) {
-                logDebug(`nasdaq api: marketStatus indicates pre-market (${marketStatusTop || primary.marketStatus}), populating pre_market fields`);
-                // Prefer explicit primary.preMarket fields if present, otherwise fall back to primary values
-                const pm = primary.preMarket || primary.pre_market || {};
-                out.pre_market_price = out.pre_market_price || clean(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.last_price || clean(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
-                out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || clean(pm.change || pm.netChange || pm.changeAmount) || out.price_change_decimal || clean(primary.netChange || primary.change);
-                out.pre_market_price_change_percent = out.pre_market_price_change_percent || (pm.changePercent || pm.percentageChange || out.price_change_percent || primary.percentageChange || primary.changePercent || '');
-              }
-            } catch (e) { /* ignore */ }
-            // Rely on `marketStatus` (checked above) to populate after-hours; no timestamp-based fallback.
-            return out;
-          }
+          if (processApiData(infoJson, summaryJson)) return out;
         } catch (innerE) {
           logDebug(`fetch for assetclass=${ac} failed: ${innerE}`);
         }
@@ -405,71 +399,12 @@ async function fetchNasdaqApi(symbol) {
   try {
     for (const ac of candidates) {
       try {
-        const infoUrlC = infoUrlFor(ac);
-        const summaryUrlC = summaryUrlFor(ac);
-        const infoRaw = execSync(`curl -s -A 'Mozilla/5.0' '${infoUrlC}'`);
-        const summaryRaw = execSync(`curl -s -A 'Mozilla/5.0' '${summaryUrlC}'`);
+        const infoRaw = execSync(`curl -s -A 'Mozilla/5.0' '${infoUrlFor(ac)}'`);
+        const summaryRaw = execSync(`curl -s -A 'Mozilla/5.0' '${summaryUrlFor(ac)}'`);
         let infoJson = null, summaryJson = null;
         try { infoJson = JSON.parse(infoRaw.toString()); } catch (e) { logDebug('parse infoRaw err: '+e); }
         try { summaryJson = JSON.parse(summaryRaw.toString()); } catch (e) { logDebug('parse summaryRaw err: '+e); }
-        const primary = infoJson && infoJson.data && infoJson.data.primaryData ? infoJson.data.primaryData : {};
-        const marketStatusTop = infoJson && infoJson.data && (infoJson.data.marketStatus || infoJson.data.market_status) ? (infoJson.data.marketStatus || infoJson.data.market_status) : '';
-        const prev = summaryJson && summaryJson.data && summaryJson.data.summaryData && summaryJson.data.summaryData.PreviousClose && summaryJson.data.summaryData.PreviousClose.value ? summaryJson.data.summaryData.PreviousClose.value : '';
-        const lp = clean(primary.lastSalePrice);
-        const prevClean = clean(prev);
-        if (lp || prevClean) {
-          out.last_price = lp;
-          out.price_change_decimal = clean(primary.netChange);
-          out.price_change_percent = primary.percentageChange || '';
-          out.previous_close_price = prevClean;
-          out.quote_time = primary.lastTradeTimestamp || '';
-            // Try to extract after-hours / extended session data from common fields
-            try {
-              if (primary.extended) {
-                out.after_hours_price = clean(primary.extended.last || primary.extended.lastSale || primary.extended.lastSalePrice || primary.extended.price);
-                out.after_hours_change_decimal = clean(primary.extended.change || primary.extended.netChange || primary.extended.changeAmount);
-                out.after_hours_change_percent = primary.extended.changePercent || primary.extended.percentageChange || '';
-              }
-              // pre-market
-              if (primary.preMarket) {
-                out.pre_market_price = out.pre_market_price || clean(primary.preMarket.last || primary.preMarket.lastSale || primary.preMarket.lastSalePrice || primary.preMarket.price || primary.preMarket.lastTradePrice);
-                out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || clean(primary.preMarket.change || primary.preMarket.netChange || primary.preMarket.changeAmount || primary.preMarket.preMarketChange);
-                out.pre_market_price_change_percent = out.pre_market_price_change_percent || (primary.preMarket.changePercent || primary.preMarket.percentageChange || '');
-              }
-              // Common alternate field names for after-hours and pre-market
-              out.after_hours_price = out.after_hours_price || clean(primary.postMarketPrice || primary.afterHoursPrice || primary.extendedLast || primary.extendedPrice || primary.postMarketLast);
-              out.after_hours_change_decimal = out.after_hours_change_decimal || clean(primary.postMarketChange || primary.afterHoursChange || primary.extendedChange || primary.postMarketNetChange);
-              out.after_hours_change_percent = out.after_hours_change_percent || (primary.postMarketChangePercent || primary.afterHoursChangePercent || primary.extendedChangePercent || '');
-              out.pre_market_price = out.pre_market_price || clean(primary.preMarketPrice || primary.preMarketLast || primary.preMarketLastSale || primary.preMarketLastSalePrice || primary.preMarketTradePrice);
-              out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || clean(primary.preMarketChange || primary.preMarketNetChange || primary.preMarketChangeAmount);
-              out.pre_market_price_change_percent = out.pre_market_price_change_percent || (primary.preMarketChangePercent || primary.preMarketPercentageChange || '');
-            } catch (e) {
-              /* ignore */
-            }
-            // If marketStatus indicates after-hours or pre-market but explicit extended fields are missing,
-            // populate after_hours/pre_market from the primary last price and change.
-            try {
-              const ms = (marketStatusTop || primary.marketStatus || primary.market_status || '').toString().toLowerCase();
-              const isAfterHours = /after[- ]?hours/i.test(ms);
-              const isPreMarket = /pre[- ]?market/i.test(ms);
-              if ((!out.after_hours_price || out.after_hours_price === '') && isAfterHours) {
-                logDebug(`nasdaq api (curl): marketStatus indicates after-hours (${marketStatusTop || primary.marketStatus}), setting after_hours from primary`);
-                logDebug(`nasdaq api (curl): last_price='${out.last_price}', price_change_decimal='${out.price_change_decimal}', price_change_percent='${out.price_change_percent}'`);
-                out.after_hours_price = out.after_hours_price || out.last_price;
-                out.after_hours_change_decimal = out.after_hours_change_decimal || out.price_change_decimal;
-                out.after_hours_change_percent = out.after_hours_change_percent || out.price_change_percent;
-              }
-              if ((!out.pre_market_price || out.pre_market_price === '') && isPreMarket) {
-                logDebug(`nasdaq api (curl): marketStatus indicates pre-market (${marketStatusTop || primary.marketStatus}), populating pre_market fields`);
-                const pm = primary.preMarket || primary.pre_market || {};
-                out.pre_market_price = out.pre_market_price || clean(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.last_price || clean(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
-                out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || clean(pm.change || pm.netChange || pm.changeAmount) || out.price_change_decimal || clean(primary.netChange || primary.change);
-                out.pre_market_price_change_percent = out.pre_market_price_change_percent || (pm.changePercent || pm.percentageChange || out.price_change_percent || primary.percentageChange || primary.changePercent || '');
-              }
-            } catch (e) { /* ignore */ }
-            // Rely on `marketStatus` (checked above) to populate after-hours; no timestamp-based fallback.
-          return out;
-        }
+        if (processApiData(infoJson, summaryJson)) return out;
       } catch (innerE) {
         logDebug(`curl for assetclass=${ac} failed: ${innerE}`);
       }

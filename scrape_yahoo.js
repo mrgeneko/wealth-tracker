@@ -120,6 +120,29 @@ async function ensureYahoo() {
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_utils');
 
+// Helper to map Yahoo quote object to our internal data structure
+function mapYahooQuoteToData(quote, securityKey) {
+  const p = quote.price || quote || {};
+  const qm = epochToMs(p.regularMarketTime);
+  
+  return {
+    key: sanitizeForFilename(securityKey),
+    last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
+    price_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
+    price_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
+    previous_close_price: (p.regularMarketPreviousClose != null) ? String(p.regularMarketPreviousClose) : '',
+    after_hours_price: (p.postMarketPrice != null) ? String(p.postMarketPrice) : '',
+    after_hours_change_decimal: (p.postMarketChange != null) ? String(p.postMarketChange) : '',
+    after_hours_change_percent: (p.postMarketChangePercent != null) ? (String(p.postMarketChangePercent) + '%') : '',
+    pre_market_price: (p.preMarketPrice != null) ? String(p.preMarketPrice) : '',
+    pre_market_price_change_decimal: (p.preMarketChange != null) ? String(p.preMarketChange) : '',
+    pre_market_price_change_percent: (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '',
+    source: 'yahoo_finance',
+    capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
+    quote_time: qm ? new Date(qm).toISOString() : ''
+  };
+}
+
 async function scrapeYahoo(browser, security, outputDir) {
   let data = {};
   try {
@@ -150,37 +173,7 @@ async function scrapeYahoo(browser, security, outputDir) {
       return {};
     }
 
-    const p = quote.price || quote; // support both shapes
-    const last_price = (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '';
-    const price_change_decimal = (p.regularMarketChange != null) ? String(p.regularMarketChange) : '';
-    const price_change_percent = (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '';
-    const previous_close_price = (p.regularMarketPreviousClose != null) ? String(p.regularMarketPreviousClose) : '';
-    const after_hours_price = (p.postMarketPrice != null) ? String(p.postMarketPrice) : '';
-    const after_hours_change_decimal = (p.postMarketChange != null) ? String(p.postMarketChange) : '';
-    const after_hours_change_percent = (p.postMarketChangePercent != null) ? (String(p.postMarketChangePercent) + '%') : '';
-    const pre_market_price = (p.preMarketPrice != null) ? String(p.preMarketPrice) : '';
-    const pre_market_change_decimal = (p.preMarketChange != null) ? String(p.preMarketChange) : '';
-    const pre_market_change_percent = (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '';
-
-    const qm = epochToMs(p.regularMarketTime);
-    const quote_time = qm ? new Date(qm).toISOString() : '';
-
-    data = {
-      key: sanitizeForFilename(security.key),
-      last_price,
-      price_change_decimal,
-      price_change_percent,
-      previous_close_price,
-      after_hours_price,
-      after_hours_change_decimal,
-      after_hours_change_percent,
-      pre_market_price,
-      pre_market_price_change_decimal: pre_market_change_decimal,
-      pre_market_price_change_percent: pre_market_change_percent,
-      source: 'yahoo_finance',
-      capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
-      quote_time: quote_time
-    };
+    data = mapYahooQuoteToData(quote, security.key);
 
     logDebug('Yahoo Finance data: ' + JSON.stringify(data));
 
@@ -369,22 +362,24 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
       }
 
       const p = quoteObj.price || quoteObj || {};
-      const common = {
-        last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
-        price_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
-        price_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
-        previous_close_price: (p.regularMarketPreviousClose != null) ? String(p.regularMarketPreviousClose) : '',
-        after_hours_price: (p.postMarketPrice != null) ? String(p.postMarketPrice) : '',
-        after_hours_change_decimal: (p.postMarketChange != null) ? String(p.postMarketChange) : '',
-        after_hours_change_percent: (p.postMarketChangePercent != null) ? (String(p.postMarketChangePercent) + '%') : '',
-        pre_market_price: (p.preMarketPrice != null) ? String(p.preMarketPrice) : '',
-        pre_market_price_change_decimal: (p.preMarketChange != null) ? String(p.preMarketChange) : '',
-        pre_market_price_change_percent: (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '',
-        quote_time: (epochToMs(p.regularMarketTime) ? new Date(epochToMs(p.regularMarketTime)).toISOString() : '')
-      };
+      
+      // Use helper to map data, but we need to override key/source/capture_time per security
+      const commonData = mapYahooQuoteToData(quoteObj, 'temp');
+      // Remove fields we want to set per-security
+      delete commonData.key;
+      delete commonData.source;
+      delete commonData.capture_time;
 
       for (const sec of targets) {
-        const data = Object.assign({ key: sanitizeForFilename(sec.key), source: 'yahoo_finance', capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC') }, common);
+        const data = Object.assign(
+          { 
+            key: sanitizeForFilename(sec.key), 
+            source: 'yahoo_finance', 
+            capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC') 
+          }, 
+          commonData
+        );
+        
         // publish per-security
         try {
           const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeYahoo';

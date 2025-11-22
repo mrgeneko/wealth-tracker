@@ -127,7 +127,8 @@ async function scrapeGoogle(browser, security, outputDir) {
 					}
 				});
 			}
-			globalThis._google_quote_time = quote_time;
+			// Use a local variable instead of globalThis to avoid side effects across concurrent scrapes
+			var local_quote_time = quote_time;
 		} catch (extractErr) {
 			logDebug('Error extracting Google Finance data: ' + extractErr);
 		}
@@ -144,7 +145,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"pre_market_price_change_percent": pre_market_price_change_percent,
 			source: 'google_finance',
 			capture_time: new Date().toISOString().replace("T", " ").replace("Z", " UTC"),
-			quote_time: globalThis._google_quote_time || ''
+			quote_time: typeof local_quote_time !== 'undefined' ? local_quote_time : ''
 		};
 
 		logDebug('Google Finance data: ' + JSON.stringify(data));

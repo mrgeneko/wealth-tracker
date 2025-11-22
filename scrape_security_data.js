@@ -113,27 +113,42 @@ async function ensureBrowser() {
 	let connected = false;
 	let connectError = null;
 	let launchError = null;
-	const persistentProfileDir = '/tmp/chrome-profile2';
+	// Use a persistent profile under DATA_DIR if possible, or fallback to /tmp
+	const persistentProfileDir = path.join(DATA_DIR, 'chrome_profile');
 	try {
 		logDebug('Trying to connect to existing Chrome instance...');
+		const debugUrl = process.env.CHROME_DEBUG_URL || 'http://localhost:9222';
+		const versionUrl = debugUrl.replace(/\/+$/, '') + '/json/version';
+		
 		const wsEndpoint = await new Promise((resolve, reject) => {
-			const http = require('http');
-			http.get('http://localhost:9222/json/version', res => {
+			const url = new URL(versionUrl);
+			const req = http.get({
+				hostname: url.hostname,
+				port: url.port,
+				path: url.pathname,
+				timeout: 2000 // 2s timeout
+			}, res => {
 				let data = '';
 				res.on('data', chunk => data += chunk);
 				res.on('end', () => {
 					try {
+						if (res.statusCode !== 200) {
+							reject(new Error(`HTTP ${res.statusCode} from ${versionUrl}`));
+							return;
+						}
 						const json = JSON.parse(data);
 						resolve(json.webSocketDebuggerUrl);
 					} catch (e) {
 						reject(e);
 					}
 				});
-			}).on('error', reject);
+			});
+			req.on('error', reject);
+			req.on('timeout', () => { req.destroy(); reject(new Error('Timeout connecting to Chrome')); });
 		});
 		browser = await puppeteerExtra.connect({ browserWSEndpoint: wsEndpoint });
 		connected = true;
-		logDebug('Connected to existing Chrome instance.');
+		logDebug('Connected to existing Chrome instance at ' + debugUrl);
 	} catch (err) {
 		connectError = err;
 		logDebug('[CONNECT ERROR] No running Chrome instance found or failed to connect: ' + err.message);
@@ -216,7 +231,7 @@ async function runCycle(browser, outputDir) {
 	// use the name variable for the filename so it's consistent and easy to change
 	const investingMarker = path.join('/usr/src/app/logs', `last.${investingWatchlistsName}.txt`);
 	const investingInterval = getScrapeGroupInterval(investingWatchlistsName, 3); // minutes
-	if (1 && shouldRunTask(investingInterval, investingMarker)) {
+	if (shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		// Prefer configuration from config.json
 		const attrs = getConfig(investingWatchlistsName);
@@ -282,7 +297,7 @@ async function runCycle(browser, outputDir) {
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahooBatchName}.txt`);
 	const yahooBatchInterval = getScrapeGroupInterval(yahooBatchName, 45); // minutes
 	logDebug('yahooBatchInterval:' + yahooBatchInterval)
-	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
+	if (shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		logDebug('Begin yahoo_batch api');
 		const csvPath = path.join(DATA_DIR, 'single_security.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
@@ -305,14 +320,17 @@ async function runCycle(browser, outputDir) {
 	const singleSecurityName = 'single_security'
 	const singleSecurityMarker = path.join('/usr/src/app/logs/', `last.${singleSecurityName}.txt`);
 	const singleScurityInterval = getScrapeGroupInterval(singleSecurityName, 60); // minutes
-	if (1 && shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
+	if (shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
 		logDebug('Begin single security scrape');
 		const csvPath = path.join(DATA_DIR, 'single_security.csv');
 		const content = fs.readFileSync(csvPath, 'utf8');
 		const { parse } = require('csv-parse/sync');
 		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
-		//// REVIEW THIS FILTER FOR scrape_group c !!!
-		const filtered_securities = records.filter(row => row.scrape_group === 'c');
+		
+		// Filter by scrape_group if needed. Currently processing all.
+		// const filtered_securities = records.filter(row => row.scrape_group === 'c');
+		const filtered_securities = records; 
+
 		for (const security of filtered_securities) {
 			logDebug('security type:' + security.type);
 			if (security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
@@ -320,22 +338,22 @@ async function runCycle(browser, outputDir) {
 				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 			}
 			else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (1 && security.nasdaq && security.cnbc.startsWith('http')) {
+				if (security.nasdaq && security.cnbc.startsWith('http')) {
 					const nasdaqData = await scrapeNasdaq(browser, security, outputDir);
 					logDebug(`NASDAQ scrape result: ${JSON.stringify(nasdaqData)}`);
-				} else if (1 && security.cnbc && security.cnbc.startsWith('http')) {
+				} else if (security.cnbc && security.cnbc.startsWith('http')) {
 					const cnbcData = await scrapeCNBC(browser, security, outputDir);
 					logDebug(`CNBC scrape result: ${JSON.stringify(cnbcData)}`);
-				} else if (1 && security.stock_analysis && security.stock_analysis.startsWith('http')) {
+				} else if (security.stock_analysis && security.stock_analysis.startsWith('http')) {
 					const stockAnalysisData = await scrapeStockAnalysis(browser, security, outputDir);
 					logDebug(`Stock_analysis scrape result: ${JSON.stringify(stockAnalysisData)}`);
-				} else if (1 && security.google && security.google.startsWith('http')) {
+				} else if (security.google && security.google.startsWith('http')) {
 					const googleData = await scrapeGoogle(browser, security, outputDir);
 					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
 				//} else if (security.wsj && security.wsj.startsWith('http')) {
 				//	const wsjData = await scrapeWSJ(browser, security, outputDir);
 				//	logDebug(`WSJ scrape result: ${JSON.stringify(wsjData)}`);
-				} else if (1 && security.webull && security.webull.startsWith('http')) {
+				} else if (security.webull && security.webull.startsWith('http')) {
 					const webullData = await scrapeWebull(browser, security, outputDir);
 					logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 				} else {
@@ -462,7 +480,6 @@ async function daemon() {
 			// reset per-cycle metrics so each cycle reports its own counts
 			try { resetMetrics(); } catch (e) {}
 			cycleStart = Date.now();
-			try { resetMetrics(); } catch (e) {}
 			await runCycle(browser, outputDir);
 			lastCycleAt = Date.now();
 			lastCycleDurationMs = Date.now() - cycleStart;
