@@ -7,11 +7,12 @@
     "start": "node scrape_security_data.js"
   },
   "dependencies": {
-    "puppeteer": "^24.15.0",
     "cheerio": "^1.0.0-rc.12",
-    "yahoo-finance2": "^2.0.0",
+    "csv-parse": "^5.5.4",
     "dotenv": "^16.4.5",
     "kafkajs": "^2.2.4",
-    "csv-parse": "^5.5.4"
+    "luxon": "^3.7.2",
+    "puppeteer": "^24.15.0",
+    "yahoo-finance2": "^2.0.0"
   }
 }
