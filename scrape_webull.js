@@ -15,7 +15,7 @@ async function scrapeWebull(browser, security, outputDir) {
         const url = security.webull;
         const ticker = sanitizeForFilename(security.key);
         logDebug(`Security: ${ticker}   open Webull: ${url}`);
-        const snapshotBase = path.join(outputDir, `${ticker}.webull.${getDateTimeString()}`);
+        const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.webull`);
         const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
         page = await createPreparedPage(browser, pageOpts);
         logDebug('Page loaded. Extracting HTML...');
@@ -115,7 +115,7 @@ async function scrapeWebull(browser, security, outputDir) {
         }
 
         // Save the data object to webull.yyyymmdd_hhmmss.json using getDateTimeString
-        const jsonFileName = `${ticker}.webull.${getDateTimeString()}.json`;
+        const jsonFileName = `${getDateTimeString()}.${ticker}.webull.json`;
         const jsonFilePath = path.join(outputDir, jsonFileName);
         fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
         logDebug(`Saved Webull JSON to ${jsonFilePath}`);

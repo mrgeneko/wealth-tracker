@@ -28,7 +28,7 @@ function getTimestampedLogPath(prefix = 'scrape_security_data') {
     }
     // Use process.env.LOG_DIR if available, otherwise default to ./logs relative to CWD
     const logDir = process.env.LOG_DIR || path.join(process.cwd(), 'logs');
-    return path.join(logDir, `${prefix}.${cachedDateTimeString}.log`);
+    return path.join(logDir, `${cachedDateTimeString}.${prefix}.log`);
 }
 
 function logDebug(msg, logPath) {
