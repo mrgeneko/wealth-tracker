@@ -24,7 +24,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open Nasdaq: ${url}`);
-      const snapshotBase = path.join(outputDir, `${ticker}.nasdaq.${getDateTimeString()}`);
+      const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.nasdaq`);
       const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 25000, gotoRetries: 3 };
 
       // Track which path satisfied the scrape so we can log metrics
@@ -47,7 +47,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
         }
         if (cheapHtml) {
           try {
-            const htmlOutPath = path.join(outputDir, `${ticker}.nasdaq.${getDateTimeString()}.html`);
+            const htmlOutPath = path.join(outputDir, `${getDateTimeString()}.${ticker}.nasdaq.html`);
             fs.writeFileSync(htmlOutPath, cheapHtml, 'utf-8');
             logDebug(`Wrote Nasdaq HTML (cheap fetch) to ${htmlOutPath}`);
           } catch (e) { logDebug('Failed to write cheap-fetched HTML: ' + e); }
@@ -137,7 +137,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
     } catch (kafkaErr) { logDebug('Kafka publish error (Nasdaq): ' + kafkaErr); }
 
     try {
-      const jsonFileName = `${ticker}.nasdaq.${getDateTimeString()}.json`;
+      const jsonFileName = `${getDateTimeString()}.${ticker}.nasdaq.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved Nasdaq JSON to ${jsonFilePath}`);

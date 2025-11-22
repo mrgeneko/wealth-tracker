@@ -189,7 +189,7 @@ async function scrapeYahoo(browser, security, outputDir) {
 
     // Save JSON file
     try {
-      const jsonFileName = `${sanitizeForFilename(security.key)}.yahoo.${getDateTimeString()}.json`;
+      const jsonFileName = `${getDateTimeString()}.${sanitizeForFilename(security.key)}.yahoo.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved Yahoo JSON to ${jsonFilePath}`);
@@ -388,7 +388,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         } catch (kafkaErr) { logDebug('Kafka publish error (Yahoo batch): ' + kafkaErr); }
         // write JSON file
         try {
-          const jsonFileName = `${sanitizeForFilename(sec.key)}.yahoo.${getDateTimeString()}.json`;
+          const jsonFileName = `${getDateTimeString()}.${sanitizeForFilename(sec.key)}.yahoo.json`;
           const jsonFilePath = path.join(outputDir, jsonFileName);
           fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
         } catch (e) { logDebug('Error saving Yahoo JSON (batch): ' + e); }

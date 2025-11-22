@@ -264,14 +264,6 @@ async function runCycle(browser, outputDir) {
 		try {
 			const _attrsStr = JSON.stringify(attrs || {}, null, 2);
 			logDebug('webull attrs: ' + (_attrsStr.length > 1000 ? _attrsStr.slice(0, 1000) + '... (truncated)' : _attrsStr));
-			// Also write a timestamped dump of the attrs to logs for easier inspection inside the container/host
-			//try {
-			//	const dumpPath = path.join('/usr/src/app/logs', `attrs_dump.webull.${getDateTimeString()}.json`);
-			//	fs.writeFileSync(dumpPath, _attrsStr, 'utf8');
-			//	logDebug('Wrote attrs dump to ' + dumpPath);
-			//} catch (e2) {
-			//	logDebug('Failed to write attrs dump: ' + (e2 && e2.message ? e2.message : e2));
-			//}
 		} catch (e) {
 			logDebug('webull attrs: <unstringifiable> ' + String(e));
 		}

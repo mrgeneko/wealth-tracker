@@ -33,7 +33,7 @@ async function scrapeWSJ(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open WSJ: ${url}`);
-    const snapshotBase = path.join(outputDir, `${ticker}.wsj.${getDateTimeString()}`);
+    const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.wsj`);
     const pageOpts = {
       url,
       downloadPath: outputDir,
@@ -97,7 +97,7 @@ async function scrapeWSJ(browser, security, outputDir) {
 
     try {
       // Save full HTML to logs dir for reference
-      const htmlOutPath = path.join(outputDir, `${ticker}.wsj.${getDateTimeString()}.html`);
+      const htmlOutPath = path.join(outputDir, `${getDateTimeString()}.${ticker}.wsj.html`);
       fs.writeFileSync(htmlOutPath, html || await page.content(), 'utf-8');
       logDebug(`Wrote full WSJ HTML to ${htmlOutPath}`);
     } catch (e) { logDebug('Failed to write WSJ full page HTML: ' + e); }
@@ -164,7 +164,7 @@ async function scrapeWSJ(browser, security, outputDir) {
 
     // Save JSON
     try {
-      const jsonFileName = `${ticker}.wsj.${getDateTimeString()}.json`;
+      const jsonFileName = `${getDateTimeString()}.${ticker}.wsj.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved WSJ JSON to ${jsonFilePath}`);

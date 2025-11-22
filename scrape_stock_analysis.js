@@ -23,7 +23,7 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open StockAnalysis: ${url}`);
-    const snapshotBase = path.join(outputDir, `${ticker}.stockanalysis.${getDateTimeString()}`);
+    const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.stockanalysis`);
     const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
     page = await createPreparedPage(browser, pageOpts);
     logDebug('Page loaded. Extracting HTML...');
@@ -40,7 +40,7 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
     } catch (kafkaErr) { logDebug('Kafka publish error (StockAnalysis): ' + kafkaErr); }
 
     try {
-      const jsonFileName = `${ticker}.stockanalysis.${getDateTimeString()}.json`;
+      const jsonFileName = `${getDateTimeString()}.${ticker}.stockanalysis.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved StockAnalysis JSON to ${jsonFilePath}`);
