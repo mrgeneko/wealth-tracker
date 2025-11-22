@@ -56,16 +56,31 @@ function parseStockAnalysisHtml(html, security) {
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
   
   let last_price = '';
+  let last_price_quote_time = '';
   let previous_close_price = '';
+  let pre_market_price = '';
+  let pre_market_price_change_decimal = '';
+  let pre_market_price_change_percent = '';
+  let pre_market_price_quote_time = '';
   let price_change_decimal = '';
   let price_change_percent = '';
   let after_hours_price = '';
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
+  let after_hours_price_quote_time = '';
 
   try {
     const mainPriceEl = $('[class*="text-4xl"]').first();
-    if (mainPriceEl && mainPriceEl.length) last_price = cleanNumberText(mainPriceEl.text());
+    if (mainPriceEl && mainPriceEl.length) {
+      last_price = cleanNumberText(mainPriceEl.text());
+      // Extract last_price_quote_time
+      // Look for sibling div with "At close:"
+      const timeContainer = mainPriceEl.parent().find('div').filter((i, el) => $(el).text().includes('At close:')).first();
+      if (timeContainer && timeContainer.length) {
+        const text = timeContainer.text().replace('At close:', '').trim();
+        if (text) last_price_quote_time = text;
+      }
+    }
 
     // Main change extraction
     try {
@@ -124,9 +139,74 @@ function parseStockAnalysisHtml(html, security) {
       if (val) previous_close_price = cleanNumberText(val);
     }
 
+    // Pre-market
+    const preLabel = $('span:contains("Pre-market:")').filter((i, el) => $(el).text().trim().includes('Pre-market')).first();
+    if (preLabel && preLabel.length) {
+      // Extract time
+      // Structure: <div><span>...<span>Pre-market:</span></span> <span class="sm:ml-1">Nov 19, 2025...</span></div>
+      // The time might be in a sibling span or just text in the parent
+      const timeContainer = preLabel.closest('div');
+      if (timeContainer && timeContainer.length) {
+        const fullText = timeContainer.text();
+        const timeText = fullText.split('Pre-market:')[1];
+        if (timeText) pre_market_price_quote_time = timeText.trim();
+      }
+
+      // Extract price and change
+      let container = preLabel.parents().filter((i, el) => {
+        const c = $(el).attr('class') || '';
+        return c.includes('border-l');
+      }).first();
+      
+      if (!container || !container.length) container = preLabel.closest('div').parent();
+
+      if (container && container.length) {
+        // Price is usually in a div with text-[1.7rem] or similar large text
+        let priceEl = container.find('div').filter((i, el) => {
+           const c = $(el).attr('class') || '';
+           return c.includes('text-[1.7rem]') || c.includes('text-2xl');
+        }).first();
+        
+        if (!priceEl.length) {
+             // Fallback: look for any number that isn't the change
+             priceEl = container.find('div').filter((i, el) => {
+                 const t = $(el).text().trim();
+                 return /[0-9]/.test(t) && !t.includes('(') && !t.includes('%');
+             }).first();
+        }
+
+        if (priceEl && priceEl.length) {
+            pre_market_price = cleanNumberText(priceEl.text());
+        }
+
+        // Change
+        const changeEl = container.find('div').filter((i, el) => {
+            const t = $(el).text();
+            return t.includes('(') && t.includes('%');
+        }).first();
+
+        if (changeEl && changeEl.length) {
+            const cs = changeEl.text().trim();
+            const cm = cs.match(/([+-]?[0-9,.]+)\s*\(([+-]?[0-9,.]+%?)\)/);
+            if (cm) {
+                pre_market_price_change_decimal = cleanNumberText(cm[1]).replace(/^\+/, '');
+                pre_market_price_change_percent = cm[2] ? String(cm[2]).replace(/\s/g, '') : '';
+            }
+        }
+      }
+    }
+
     // After-hours
-    const afterLabel = $('*:contains("After-hours:")').filter((i, el) => $(el).text().trim().includes('After-hours')).first();
+    const afterLabel = $('span:contains("After-hours:")').filter((i, el) => $(el).text().trim().includes('After-hours')).first();
     if (afterLabel && afterLabel.length) {
+      // Extract time
+      const timeContainer = afterLabel.closest('div');
+      if (timeContainer && timeContainer.length) {
+        const fullText = timeContainer.text();
+        const parts = fullText.split('After-hours:');
+        if (parts.length > 1) after_hours_price_quote_time = parts[1].trim();
+      }
+
       let container = afterLabel.parents().filter((i, el) => {
         const c = $(el).attr('class') || '';
         return c.includes('border-l');
@@ -174,14 +254,18 @@ function parseStockAnalysisHtml(html, security) {
   return {
     key: ticker,
     last_price: last_price || '',
-    last_price_quote_time: '',
+    last_price_quote_time: last_price_quote_time || '',
     price_change_decimal: price_change_decimal || '',
     price_change_percent: price_change_percent || '',
     previous_close_price: previous_close_price || '',
+    pre_market_price: pre_market_price || '',
+    pre_market_price_change_decimal: pre_market_price_change_decimal || '',
+    pre_market_price_change_percent: pre_market_price_change_percent || '',
+    pre_market_price_quote_time: pre_market_price_quote_time || '',
     after_hours_price: after_hours_price || '',
-    after_hours_price_quote_time: '',
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
+    after_hours_price_quote_time: after_hours_price_quote_time || '',
     source: 'stock_analysis',
     capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
     quote_time: ''
