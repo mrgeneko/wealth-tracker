@@ -12,7 +12,6 @@ import time
 import os
 from subprocess import run, CalledProcessError, CompletedProcess
 import datetime
-import pandas as pd
 from wealth_tracker.update_cell_in_numbers import update_numbers
 from wealth_tracker.process_yahoo import process_yahoo_with_tickers_from_numbers
 from wealth_tracker.process_yahoo import get_yahoo_attributes
@@ -27,18 +26,20 @@ from wealth_tracker.process_cnbc import *
 from wealth_tracker.session_times import *
 import random
 
-def get_tickers_and_urls_from_csv(file_path, include_type=None):
-    logging.info(f'get_tickers_and_urls_from_csv: {file_path}')
+import json
+
+def get_tickers_and_urls_from_config(file_path, include_type=None):
+    logging.info(f'get_tickers_and_urls_from_config: {file_path}')
     
     try:
-        # Read the CSV file into a DataFrame
-        df = pd.read_csv(file_path)
+        with open(file_path, 'r') as f:
+            config = json.load(f)
+            data_objects = config.get('single_securities', [])
 
     except Exception as e:
         logging.error(f"Error opening file {file_path}: {e}")
         exit(1)
 
-    data_objects = df.to_dict(orient='records')
     logging.info(f"include_type: {include_type}")
     if include_type == "bonds":
         # change this to compare against include_type instead of hardcoded 'bond'
@@ -65,19 +66,14 @@ def get_html_for_url(mode, driver,tickers, source):
 
     for i, ticker in enumerate(tickers):
 
-        if source in ticker:
-            logging.debug(f"Key {ticker['key']} has url: {ticker[source]}")
+        url = ticker.get(source)
+        if url:
+            logging.debug(f"Key {ticker.get('key')} has url: {url}")
         else:
-            logging.debug(f"Key {source} does not exist in this object.")
-
-        if not pd.isna(ticker[source]):
-            logging.debug(f"Key {ticker['key']} has value: {ticker[source]}")
-        else:
-            logging.debug(f"Key {source} does not have a value or has NaN.")
+            logging.debug(f"Key {source} does not exist or is empty.")
             continue
 
-        url = ticker[source]
-        key = ticker['key']
+        key = ticker.get('key')
         #logging.info("\n")
         logging.info(f'get html ticker: {ticker['key']} selected url: {url}')
         
@@ -206,11 +202,12 @@ def process_round_robin(driver, tickers, sources, function_handlers):
             logging.debug(f"{sources[current]['name']} pre:{sources[current]['has_pre_market']} ah:{sources[current]['has_after_hours']}")
             #logging.info(f"sources[current]['name']: {sources[current]['name']}")
             #logging.info(f"ticker[sources[current]['name']]: {ticker[sources[current]['name']]}")
-            if sources[current]['name'] in ticker and not pd.isna(ticker[sources[current]['name']]) \
+            source_name = sources[current]['name']
+            if ticker.get(source_name) \
                 and ((is_pre_market_session() and sources[current]['has_pre_market']) or \
                 (is_after_hours_session() and sources[current]['has_after_hours']) or \
                 (is_regular_trading_session() or not is_weekday() )):
-                logging.info(f"has source {sources[current]['name']} for {ticker[sources[current]['name']]}")
+                logging.info(f"has source {sources[current]['name']} for {ticker[source_name]}")
                 selected = current
             else:
                 logging.info(f"does not have source {current} {sources[current]['name']}")
@@ -294,8 +291,8 @@ def main():
 
     parser.add_argument('--input-file', '-i', dest='input_file',
                         type=str,
-                        default="/usr/src/app/data/single_security.csv",
-                        help='Path to the input file (default: /usr/src/app/data/single_security.csv)')
+                        default="/usr/src/app/data/config.json",
+                        help='Path to the input file (default: /usr/src/app/data/config.json)')
     
     parser.add_argument('--include-type', '-t', dest='include_type', type=str,
                         choices=['stocks', 'bonds'], default='stocks',
@@ -325,7 +322,7 @@ def main():
     setup_logging(args.log_level)
 
     input_file = args.input_file
-    tickers = get_tickers_and_urls_from_csv(input_file, args.include_type)
+    tickers = get_tickers_and_urls_from_config(input_file, args.include_type)
     browser = args.browser
     yahoo_batch = args.yahoo_batch
     sleep_interval = 1

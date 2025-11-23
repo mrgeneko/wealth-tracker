@@ -299,10 +299,8 @@ async function runCycle(browser, outputDir) {
 	logDebug('yahooBatchInterval:' + yahooBatchInterval)
 	if (shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		logDebug('Begin yahoo_batch api');
-		const csvPath = path.join(DATA_DIR, 'single_security.csv');
-		const content = fs.readFileSync(csvPath, 'utf8');
-		const { parse } = require('csv-parse/sync');
-		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+		const attrs = loadScraperAttributes();
+		const records = attrs.single_securities || [];
 
 		// Run Yahoo batch for any record that has a `ticker_yahoo` column populated
 		const yahooSecurities = records.filter(s => s.ticker_yahoo && s.ticker_yahoo.toString().trim());
@@ -322,10 +320,8 @@ async function runCycle(browser, outputDir) {
 	const singleScurityInterval = getScrapeGroupInterval(singleSecurityName, 60); // minutes
 	if (shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
 		logDebug('Begin single security scrape');
-		const csvPath = path.join(DATA_DIR, 'single_security.csv');
-		const content = fs.readFileSync(csvPath, 'utf8');
-		const { parse } = require('csv-parse/sync');
-		const records = parse(content, { columns: true, skip_empty_lines: true, comment: '#'});
+		const attrs = loadScraperAttributes();
+		const records = attrs.single_securities || [];
 		
 		// Filter by scrape_group if needed. Currently processing all.
 		// const filtered_securities = records.filter(row => row.scrape_group === 'c');
