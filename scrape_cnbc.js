@@ -4,8 +4,46 @@
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+
+function parseToIso(timeStr) {
+  if (!timeStr) return '';
+  let clean = String(timeStr).trim().replace(/\s+/g, ' ');
+  // Remove "Last | " prefix if present
+  clean = clean.replace(/^\|\s*/, '').replace(/Last\s*\|\s*/i, '');
+  
+  // If already ISO-like (YYYY-MM-DD...), return as is or validate
+  if (/^\d{4}-\d{2}-\d{2}T/.test(clean)) return clean;
+
+  // Remove timezone abbreviations (EST, EDT, etc.) to rely on explicit zone
+  clean = clean.replace(/\s+(?:EST|EDT|ET)\s*$/i, '');
+  
+  const zone = 'America/New_York';
+  // CNBC formats: "11/21/25", "9:27 AM", "Last | 9:27 AM"
+  const formats = [
+    'M/d/yy h:mm a',
+    'M/d/yy',
+    'h:mm a'
+  ];
+
+  for (const fmt of formats) {
+    const dt = DateTime.fromFormat(clean, fmt, { zone });
+    if (dt.isValid) {
+      // If format was time-only, it defaults to today's date. 
+      // If that's in the future (e.g. parsing 9AM when it's 8AM), Luxon uses today.
+      // Usually fine for "Last Updated" times.
+      return dt.toUTC().toISO();
+    }
+  }
+  
+  // Try ISO direct parse
+  const dtIso = DateTime.fromISO(clean, { zone });
+  if (dtIso.isValid) return dtIso.toUTC().toISO();
+
+  return timeStr;
+}
 
 function cleanNumberText(s) {
   if (!s && s !== 0) return '';
@@ -251,8 +289,8 @@ function parseCNBCHtml(html, security) {
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'cnbc',
-    capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
-    quote_time: quote_time || ''
+    capture_time: new Date().toISOString(),
+    quote_time: parseToIso(quote_time) || ''
   };
 }
 
