@@ -5,8 +5,25 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const cheerio = require('cheerio');
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+
+function parseToIso(timeStr) {
+  if (!timeStr) return '';
+  let clean = String(timeStr).trim().replace(/\s+/g, ' ');
+  if (/^\d{4}-\d{2}-\d{2}T/.test(clean)) return clean;
+  clean = clean.replace(/\s*E[DS]?T$/i, '');
+  const zone = 'America/New_York';
+  const formats = ['h:mm:ss a', 'h:mm a', 'MMM d, yyyy h:mm a', 'MMM d, yyyy', 'yyyy-MM-dd HH:mm:ss', 'M/d/yyyy h:mm:ss a', 'M/d/yyyy'];
+  for (const fmt of formats) {
+    const dt = DateTime.fromFormat(clean, fmt, { zone });
+    if (dt.isValid) return dt.toUTC().toISO();
+  }
+  const dtIso = DateTime.fromISO(clean, { zone });
+  if (dtIso.isValid) return dtIso.toUTC().toISO();
+  return timeStr;
+}
 
 function cleanNumberText(s) {
   if (!s && s !== 0) return '';
@@ -184,7 +201,7 @@ function parseNasdaqHtml(html, security) {
             if (qd.preMarket && qd.preMarket.last) pre_market_price = cleanNumberText(qd.preMarket.last);
             if (qd.preMarket && qd.preMarket.change) pre_market_change_decimal = cleanNumberText(qd.preMarket.change);
             if (qd.preMarket && qd.preMarket.changePercent) pre_market_change_percent = String(qd.preMarket.changePercent);
-            if (qd.lastTradeTime) quote_time = qd.lastTradeTime;
+            if (qd.lastTradeTime) quote_time = parseToIso(qd.lastTradeTime);
           } else if (o && o.quote && o.quote.last) {
             const qd = o.quote;
             if (qd.last) last_price = cleanNumberText(qd.last);
@@ -271,7 +288,7 @@ function parseNasdaqHtml(html, security) {
       if (timeEl && timeEl.length) {
         const txt = timeEl.text().replace(/\s+/g,' ').trim();
         const m = txt.match(/([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM)(?:\s*[A-Z]{2,3})?)/i);
-        if (m) quote_time = m[1];
+        if (m) quote_time = parseToIso(m[1]);
       }
     }
 
@@ -290,7 +307,7 @@ function parseNasdaqHtml(html, security) {
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'nasdaq',
-    capture_time: new Date().toISOString().replace('T',' ').replace('Z',' UTC'),
+    capture_time: new Date().toISOString(),
     quote_time: quote_time || ''
   };
 }
@@ -323,7 +340,7 @@ async function fetchNasdaqApi(symbol) {
       out.price_change_decimal = cleanNumberText(primary.netChange);
       out.price_change_percent = primary.percentageChange || '';
       out.previous_close_price = prevClean;
-      out.quote_time = primary.lastTradeTimestamp || '';
+      out.quote_time = parseToIso(primary.lastTradeTimestamp || '');
       out.market_status = marketStatusTop;
 
       // Try to extract after-hours / extended session data from common fields

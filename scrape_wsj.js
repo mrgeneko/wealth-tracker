@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const {
   sanitizeForFilename,
@@ -14,6 +15,36 @@ const {
   createPreparedPage,
   savePageSnapshot
 } = require('./scraper_utils');
+
+function parseToIso(timeStr) {
+  if (!timeStr) return '';
+  // Remove "Last Updated:", "As of", etc.
+  let clean = String(timeStr).replace(/Last Updated:?/i, '').replace(/As of/i, '').trim();
+  // Normalize p.m. / a.m.
+  clean = clean.replace(/p\.?m\.?/i, 'PM').replace(/a\.?m\.?/i, 'AM');
+  // Remove timezone abbreviations to rely on explicit zone
+  clean = clean.replace(/\s+(?:EST|EDT|ET)\s*$/i, '');
+  clean = clean.replace(/\s+/g, ' ').trim();
+
+  const zone = 'America/New_York';
+  // WSJ formats: "Nov 22, 2025 4:00 PM", "11/22/25"
+  const formats = [
+    'MMM d, yyyy h:mm a',
+    'MMM d, yyyy HH:mm',
+    'MM/dd/yy',
+    'MM/dd/yyyy'
+  ];
+  
+  for (const fmt of formats) {
+    const dt = DateTime.fromFormat(clean, fmt, { zone });
+    if (dt.isValid) return dt.toUTC().toISO();
+  }
+  // Try ISO
+  const dtIso = DateTime.fromISO(clean, { zone });
+  if (dtIso.isValid) return dtIso.toUTC().toISO();
+  
+  return timeStr;
+}
 
 function cleanNumberText(s) {
   if (!s && s !== 0) return '';
@@ -122,8 +153,8 @@ async function scrapeWSJ(browser, security, outputDir) {
       $('[data-field="PercentChange"] [class*="percentChange"]').first().text().trim());
     previous_close_price = cleanNumberText($('[data-field="PrevClose"] .WSJTheme--prevClose--1Hk8a').first().text().trim() ||
       $('[data-field="PrevClose"] [class*="prevClose"]').first().text().trim());
-    quote_time = $('[data-field="Time"] .WSJTheme--timestamp--1o1tF').first().text().trim() ||
-      $('[data-field="Time"] [class*="timestamp"]').first().text().trim();
+    quote_time = parseToIso($('[data-field="Time"] .WSJTheme--timestamp--1o1tF').first().text().trim() ||
+      $('[data-field="Time"] [class*="timestamp"]').first().text().trim());
 
     // Fallback: try to find values by label if above fails
     if (!last_price) {
@@ -146,7 +177,7 @@ async function scrapeWSJ(browser, security, outputDir) {
       after_hours_change_decimal: after_hours_change_decimal || '',
       after_hours_change_percent: after_hours_change_percent || '',
       source: 'wsj',
-      capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
+      capture_time: new Date().toISOString(),
       quote_time: quote_time || ''
     };
 

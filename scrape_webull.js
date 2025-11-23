@@ -4,9 +4,23 @@
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug, gotoWithRetries, attachRequestFailureCounters } = require('./scraper_utils');
 const { createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+
+function parseToIso(val) {
+    if (!val) return '';
+    if (typeof val === 'number') {
+        return DateTime.fromMillis(val).toUTC().toISO();
+    }
+    const str = String(val).trim();
+    
+    const zone = 'America/New_York';
+    const dt = DateTime.fromISO(str, { zone });
+    if (dt.isValid) return dt.toUTC().toISO();
+    return str;
+}
 
 async function scrapeWebull(browser, security, outputDir) {
     let page = null;
@@ -70,7 +84,7 @@ async function scrapeWebull(browser, security, outputDir) {
                                 }
 
                                 if (rt.tradeTime) {
-                                    quote_time = rt.tradeTime;
+                                    quote_time = parseToIso(rt.tradeTime);
                                 }
                                 foundJson = true;
                             }
@@ -98,7 +112,7 @@ async function scrapeWebull(browser, security, outputDir) {
             pre_market_price_change_percent,
             previous_close_price,
             source: 'webull',
-            capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
+            capture_time: new Date().toISOString(),
             quote_time
         };
 
