@@ -117,6 +117,7 @@ async function ensureYahoo() {
     return _yahooModule;
   }
 }
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_utils');
 
@@ -138,7 +139,7 @@ function mapYahooQuoteToData(quote, securityKey) {
     pre_market_price_change_decimal: (p.preMarketChange != null) ? String(p.preMarketChange) : '',
     pre_market_price_change_percent: (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '',
     source: 'yahoo_finance',
-    capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
+    capture_time: new Date().toISOString(),
     quote_time: qm ? new Date(qm).toISOString() : ''
   };
 }
@@ -375,7 +376,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
           { 
             key: sanitizeForFilename(sec.key), 
             source: 'yahoo_finance', 
-            capture_time: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC') 
+            capture_time: new Date().toISOString() 
           }, 
           commonData
         );
