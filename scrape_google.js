@@ -4,8 +4,44 @@
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+
+function parseToIso(timeStr) {
+  if (!timeStr) return '';
+  try {
+    // Expected format: "Nov 14, 8:00:00 PM GMT-5"
+    // Luxon's fromFormat with 'z' or 'Z' can be tricky with "GMT-5".
+    // We can try to parse it directly if it matches standard formats, or strip the offset and apply it manually.
+    
+    // Try parsing with offset included
+    let dt = DateTime.fromFormat(timeStr, "MMM d, h:mm:ss a 'GMT'Z", { locale: 'en-US' });
+    if (dt.isValid) return dt.toISO();
+
+    // Try without seconds
+    dt = DateTime.fromFormat(timeStr, "MMM d, h:mm a 'GMT'Z", { locale: 'en-US' });
+    if (dt.isValid) return dt.toISO();
+
+    // Fallback: try standard JS Date parsing (often handles "Nov 14, 8:00:00 PM GMT-5" well)
+    // But we need to add the current year if it's missing (Google often omits year)
+    let parseStr = timeStr;
+    if (!/\d{4}/.test(timeStr)) {
+        const year = new Date().getFullYear();
+        // Insert year after "Nov 14" -> "Nov 14 2025"
+        parseStr = timeStr.replace(/([A-Z][a-z]{2} \d{1,2})/, `$1 ${year}`);
+    }
+    
+    const jsDate = new Date(parseStr);
+    if (!isNaN(jsDate.getTime())) {
+        return jsDate.toISOString();
+    }
+
+    return timeStr;
+  } catch (e) {
+    return timeStr;
+  }
+}
 
 async function scrapeGoogle(browser, security, outputDir) {
 	let page = null;
@@ -144,8 +180,8 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"pre_market_price_change_decimal": pre_market_price_change_decimal,
 			"pre_market_price_change_percent": pre_market_price_change_percent,
 			source: 'google_finance',
-			capture_time: new Date().toISOString().replace("T", " ").replace("Z", " UTC"),
-			quote_time: typeof local_quote_time !== 'undefined' ? local_quote_time : ''
+			capture_time: new Date().toISOString(),
+			quote_time: typeof local_quote_time !== 'undefined' ? parseToIso(local_quote_time) : ''
 		};
 
 		logDebug('Google Finance data: ' + JSON.stringify(data));

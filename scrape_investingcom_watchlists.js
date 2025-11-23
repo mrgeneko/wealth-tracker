@@ -1,5 +1,6 @@
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
+const { DateTime } = require('luxon');
 
 // Helper to check if error is from a known ad/tracker domain
 function isSuppressedPageError(err) {
@@ -19,6 +20,40 @@ function isSuppressedPageError(err) {
 		'adserver.'
 	];
 	return suppressedPatterns.some(pattern => err.stack.includes(pattern));
+}
+
+function parseToIso(timeStr) {
+  if (!timeStr) return '';
+  try {
+    // Investing.com formats:
+    // 1. "16:00:00" (time only, assume today)
+    // 2. "21/11" (date only, assume current year)
+    // 3. "21/11/2025" (full date)
+    
+    // Try time only (HH:mm:ss)
+    if (/^\d{1,2}:\d{2}:\d{2}$/.test(timeStr)) {
+        const dt = DateTime.fromFormat(timeStr, "H:mm:ss", { zone: 'America/New_York', locale: 'en-US' });
+        if (dt.isValid) return dt.toISO();
+    }
+
+    // Try date only (dd/MM)
+    if (/^\d{1,2}\/\d{1,2}$/.test(timeStr)) {
+        // Append current year
+        const year = new Date().getFullYear();
+        const dt = DateTime.fromFormat(`${timeStr}/${year}`, "d/M/yyyy", { zone: 'America/New_York', locale: 'en-US' });
+        if (dt.isValid) return dt.toISO();
+    }
+
+    // Try full date (dd/MM/yyyy)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(timeStr)) {
+        const dt = DateTime.fromFormat(timeStr, "d/M/yyyy", { zone: 'America/New_York', locale: 'en-US' });
+        if (dt.isValid) return dt.toISO();
+    }
+
+    return timeStr;
+  } catch (e) {
+    return timeStr;
+  }
 }
 
 async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
@@ -152,8 +187,8 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						last_price: rowData["last"],
 						source: "investing",
 						previous_close_price: rowData["prev"],
-						capture_time: new Date().toISOString().replace("T", " ").replace("Z", " UTC"),
-						quote_time: rowData["time"]
+						capture_time: new Date().toISOString(),
+						quote_time: parseToIso(rowData["time"])
 					};
 					dataObjects.push(data);
 					logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
