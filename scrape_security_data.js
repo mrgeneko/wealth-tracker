@@ -22,6 +22,7 @@ const { scrapeWSJ } = require('./scrape_wsj');
 const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
 const { scrapeMarketBeat } = require('./scrape_marketbeat');
+const { scrapeMoomoo } = require('./scrape_moomoo');
 
 // Determine canonical data directory (host mount or repo folder). This
 // avoids relying on a `config/` folder and prefers the host-mounted
@@ -373,6 +374,9 @@ async function runCycle(browser, outputDir) {
 				} else if (1 && security.marketbeat && security.marketbeat.startsWith('http')) {
 					const marketbeatData = await scrapeMarketBeat(browser, security, outputDir);
 					logDebug(`MarketBeat scrape result: ${JSON.stringify(marketbeatData)}`);
+				} else if (1 && security.moomoo && security.moomoo.startsWith('http')) {
+					const moomooData = await scrapeMoomoo(browser, security, outputDir);
+					logDebug(`Moomoo scrape result: ${JSON.stringify(moomooData)}`);
 				//} else if (security.wsj && security.wsj.startsWith('http')) {
 				//	const wsjData = await scrapeWSJ(browser, security, outputDir);
 				//	logDebug(`WSJ scrape result: ${JSON.stringify(wsjData)}`);
