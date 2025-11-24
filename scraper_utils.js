@@ -1,6 +1,7 @@
 // Shared utility functions for all scrapers
 const fs = require('fs');
 const path = require('path');
+const { DateTime } = require('luxon');
 
 function sanitizeForFilename(str) {
     return String(str).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -326,6 +327,45 @@ function resetMetrics() {
     metrics = { totalNavigations: 0, failedNavigations: 0, totalRequests: 0, failedRequests: 0 };
 }
 
+function cleanNumberText(s) {
+    if (!s && s !== 0) return '';
+    return String(s).replace(/[,\s]/g, '').replace(/[^0-9.\-]/g, '');
+}
+
+function parseToIso(timeStr) {
+    if (!timeStr) return '';
+    let clean = String(timeStr).trim().replace(/\s+/g, ' ');
+    // Remove "Last | " prefix if present
+    clean = clean.replace(/^\|\s*/, '').replace(/Last\s*\|\s*/i, '');
+    
+    // If already ISO-like (YYYY-MM-DD...), return as is or validate
+    if (/^\d{4}-\d{2}-\d{2}T/.test(clean)) return clean;
+  
+    // Remove timezone abbreviations (EST, EDT, etc.) to rely on explicit zone
+    clean = clean.replace(/\s+(?:EST|EDT|ET)\s*$/i, '');
+    
+    const zone = 'America/New_York';
+    // Common formats
+    const formats = [
+      'M/d/yy h:mm a',
+      'M/d/yy',
+      'h:mm a'
+    ];
+  
+    for (const fmt of formats) {
+      const dt = DateTime.fromFormat(clean, fmt, { zone });
+      if (dt.isValid) {
+        return dt.toUTC().toISO();
+      }
+    }
+    
+    // Try ISO direct parse
+    const dtIso = DateTime.fromISO(clean, { zone });
+    if (dtIso.isValid) return dtIso.toUTC().toISO();
+  
+    return timeStr;
+}
+
 function reportMetrics(thresholds = { navFail: 5, reqFail: 10 }, logPath) {
     const m = getMetrics();
     const summary = `METRICS: totalNavigations=${m.totalNavigations} failedNavigations=${m.failedNavigations} totalRequests=${m.totalRequests} failedRequests=${m.failedRequests}`;
@@ -446,7 +486,9 @@ module.exports = {
     attachRequestFailureCounters,
     reportMetrics,
     getMetrics,
-    resetMetrics
+    resetMetrics,
+    cleanNumberText,
+    parseToIso
 };
 
 // Export helpers for page setup and snapshots
