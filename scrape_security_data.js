@@ -4,7 +4,7 @@ const version = 'VERSION:33'
 console.log(version);
 
 const { scrapeGoogle } = require('./scrape_google');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession } = require('./scraper_utils');
 const puppeteer = require('puppeteer');
 const debugLogPath = getTimestampedLogPath();
 const path = require('path');
@@ -24,6 +24,18 @@ const { scrapeNasdaq } = require('./scrape_nasdaq');
 const { scrapeMarketBeat } = require('./scrape_marketbeat');
 const { scrapeMoomoo } = require('./scrape_moomoo');
 const { scrapeYCharts } = require('./scrape_ycharts');
+
+const scraperMap = {
+    'webull': scrapeWebull,
+    'nasdaq': scrapeNasdaq,
+    'cnbc': scrapeCNBC,
+    'stock_analysis': scrapeStockAnalysis,
+    'google': scrapeGoogle,
+    'marketbeat': scrapeMarketBeat,
+    'ycharts': scrapeYCharts,
+    'moomoo': scrapeMoomoo,
+    'wsj': scrapeWSJ
+};
 
 // Determine canonical data directory (host mount or repo folder). This
 // avoids relying on a `config/` folder and prefers the host-mounted
@@ -353,46 +365,112 @@ async function runCycle(browser, outputDir) {
 		// const filtered_securities = records.filter(row => row.scrape_group === 'c');
 		const filtered_securities = records; 
 
-		for (const security of filtered_securities) {
-			logDebug('security type:' + security.type);
-			if (0 && security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
-				const webullData = await scrapeWebull(browser, security, outputDir);
-				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
-			}
-			else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (0 && security.nasdaq && security.cnbc.startsWith('http')) {
-					const nasdaqData = await scrapeNasdaq(browser, security, outputDir);
-					logDebug(`NASDAQ scrape result: ${JSON.stringify(nasdaqData)}`);
-				} else if (0 && security.cnbc && security.cnbc.startsWith('http')) {
-					const cnbcData = await scrapeCNBC(browser, security, outputDir);
-					logDebug(`CNBC scrape result: ${JSON.stringify(cnbcData)}`);
-				} else if (0 && security.stock_analysis && security.stock_analysis.startsWith('http')) {
-					const stockAnalysisData = await scrapeStockAnalysis(browser, security, outputDir);
-					logDebug(`Stock_analysis scrape result: ${JSON.stringify(stockAnalysisData)}`);
-				} else if (0 && security.google && security.google.startsWith('http')) {
-					const googleData = await scrapeGoogle(browser, security, outputDir);
-					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
-				} else if (0 && security.marketbeat && security.marketbeat.startsWith('http')) {
-					const marketbeatData = await scrapeMarketBeat(browser, security, outputDir);
-					logDebug(`MarketBeat scrape result: ${JSON.stringify(marketbeatData)}`);
-				} else if (security.ycharts && security.ycharts.startsWith('http')) {
-					const ychartsData = await scrapeYCharts(browser, security, outputDir);
-					logDebug(`YCharts scrape result: ${JSON.stringify(ychartsData)}`);
-				} else if (0 && security.moomoo && security.moomoo.startsWith('http')) {
-					const moomooData = await scrapeMoomoo(browser, security, outputDir);
-					logDebug(`Moomoo scrape result: ${JSON.stringify(moomooData)}`);
-				//} else if (security.wsj && security.wsj.startsWith('http')) {
-				//	const wsjData = await scrapeWSJ(browser, security, outputDir);
-				//	logDebug(`WSJ scrape result: ${JSON.stringify(wsjData)}`);
-				} else if (0 && security.webull && security.webull.startsWith('http')) {
-					const webullData = await scrapeWebull(browser, security, outputDir);
-					logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
-				} else {
-					logDebug('unhandled UNHANDLED SECURITY:' + security.key);
-				}
-			}
-			await new Promise(r => setTimeout(r, 1000));
-		}
+        // Determine mode from config, default to 'round_robin' if not specified
+        const mode = attrs.single_security_mode || 'round_robin';
+        logDebug(`Single security scrape mode: ${mode}`);
+
+        if (mode === 'round_robin') {
+            // Define available sources for round robin
+            const availableSources = Object.keys(scraperMap);
+            const numSources = availableSources.length;
+            // Pick a random start index
+            let currentSourceIndex = Math.floor(Math.random() * numSources);
+
+            for (const security of filtered_securities) {
+                logDebug('security type:' + security.type);
+                
+                // Round Robin Selection
+                let selectedSource = null;
+                const start = currentSourceIndex;
+                
+                // Loop through sources starting from currentSourceIndex to find a valid one
+                do {
+                    const sourceName = availableSources[currentSourceIndex];
+                    const sourceConfig = getConfig(sourceName); // Get attributes from config.json
+                    const securityUrl = security[sourceName];
+
+                    // Check if security has URL for this source
+                    if (securityUrl && securityUrl.startsWith('http')) {
+                        // Check session validity
+                        const isPre = isPreMarketSession();
+                        const isReg = isRegularTradingSession();
+                        const isPost = isAfterHoursSession();
+                        const isWkday = isWeekday();
+                        
+                        const isValidSession = 
+                            (isPre && sourceConfig.has_pre_market) ||
+                            (isPost && sourceConfig.has_after_hours) ||
+                            (isReg || !isWkday);
+
+                        // Check if source supports security type
+                        let isTypeSupported = true;
+                        if (security.type === 'bond' && !sourceConfig.has_bond_prices) {
+                            isTypeSupported = false;
+                        } else if ((security.type === 'stock' || security.type === 'etf') && !sourceConfig.has_stock_prices) {
+                            isTypeSupported = false;
+                        }
+
+                        if (isValidSession && isTypeSupported) {
+                            logDebug(`Selected source ${sourceName} for ${security.key}`);
+                            selectedSource = sourceName;
+                            break; // Found a valid source, stop looking for this security
+                        } else {
+                            // logDebug(`Source ${sourceName} skipped for ${security.key} (session mismatch)`);
+                        }
+                    }
+
+                    // Move to next source
+                    currentSourceIndex = (currentSourceIndex + 1) % numSources;
+                } while (currentSourceIndex !== start);
+
+                // If we found a source, execute it
+                if (selectedSource && scraperMap[selectedSource]) {
+                    try {
+                        const data = await scraperMap[selectedSource](browser, security, outputDir);
+                        logDebug(`${selectedSource} scrape result: ${JSON.stringify(data)}`);
+                    } catch (e) {
+                        logDebug(`Error scraping ${security.key} with ${selectedSource}: ${e.message}`);
+                    }
+                    
+                    // Increment index for next security to ensure rotation
+                    currentSourceIndex = (currentSourceIndex + 1) % numSources;
+                } else {
+                    logDebug(`No valid source found for ${security.key}`);
+                }
+
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        } else {
+            // 'all' mode: Scrape every security with every available source
+            for (const security of filtered_securities) {
+                logDebug('security type:' + security.type);
+                
+                // Iterate through all available sources in the map
+                for (const [sourceName, scraperFunc] of Object.entries(scraperMap)) {
+                    const sourceConfig = getConfig(sourceName);
+                    const securityUrl = security[sourceName];
+
+                    // Check if source supports security type
+                    let isTypeSupported = true;
+                    if (security.type === 'bond' && !sourceConfig.has_bond_prices) {
+                        isTypeSupported = false;
+                    } else if ((security.type === 'stock' || security.type === 'etf') && !sourceConfig.has_stock_prices) {
+                        isTypeSupported = false;
+                    }
+
+                    if (securityUrl && securityUrl.startsWith('http') && isTypeSupported) {
+                        try {
+                            logDebug(`Scraping ${security.key} with ${sourceName}`);
+                            const data = await scraperFunc(browser, security, outputDir);
+                            logDebug(`${sourceName} scrape result: ${JSON.stringify(data)}`);
+                        } catch (e) {
+                            logDebug(`Error scraping ${security.key} with ${sourceName}: ${e.message}`);
+                        }
+                    }
+                }
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
 	} else {
 		logDebug('Skipping URL scrape (interval not reached)');
 	}
