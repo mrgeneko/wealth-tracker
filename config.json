@@ -3,7 +3,8 @@
   "scrape_groups": {
     "investing_watchlists": 1,
     "yahoo_batch": 10,
-    "single_security": 10
+    "single_security": 10,
+    "bonds": 240
   },
   "investing_watchlists": {
     "url": "https://www.investing.com/portfolio/?portfolioID=OTpkM2QwZDE1ZW9iN2FjaA%3D%3D",
