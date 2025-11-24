@@ -23,6 +23,7 @@ const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
 const { scrapeMarketBeat } = require('./scrape_marketbeat');
 const { scrapeMoomoo } = require('./scrape_moomoo');
+const { scrapeYCharts } = require('./scrape_ycharts');
 
 // Determine canonical data directory (host mount or repo folder). This
 // avoids relying on a `config/` folder and prefers the host-mounted
@@ -354,33 +355,36 @@ async function runCycle(browser, outputDir) {
 
 		for (const security of filtered_securities) {
 			logDebug('security type:' + security.type);
-			if (1 && security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
+			if (0 && security.type && security.type == 'bond' && security.webull && security.webull.startsWith('http')) {
 				const webullData = await scrapeWebull(browser, security, outputDir);
 				logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 			}
 			else if (security.type && (security.type == 'stock' || security.type == 'etf')) {
-				if (1 && security.nasdaq && security.cnbc.startsWith('http')) {
+				if (0 && security.nasdaq && security.cnbc.startsWith('http')) {
 					const nasdaqData = await scrapeNasdaq(browser, security, outputDir);
 					logDebug(`NASDAQ scrape result: ${JSON.stringify(nasdaqData)}`);
-				} else if (1 && security.cnbc && security.cnbc.startsWith('http')) {
+				} else if (0 && security.cnbc && security.cnbc.startsWith('http')) {
 					const cnbcData = await scrapeCNBC(browser, security, outputDir);
 					logDebug(`CNBC scrape result: ${JSON.stringify(cnbcData)}`);
-				} else if (1 && security.stock_analysis && security.stock_analysis.startsWith('http')) {
+				} else if (0 && security.stock_analysis && security.stock_analysis.startsWith('http')) {
 					const stockAnalysisData = await scrapeStockAnalysis(browser, security, outputDir);
 					logDebug(`Stock_analysis scrape result: ${JSON.stringify(stockAnalysisData)}`);
-				} else if (1 && security.google && security.google.startsWith('http')) {
+				} else if (0 && security.google && security.google.startsWith('http')) {
 					const googleData = await scrapeGoogle(browser, security, outputDir);
 					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
-				} else if (1 && security.marketbeat && security.marketbeat.startsWith('http')) {
+				} else if (0 && security.marketbeat && security.marketbeat.startsWith('http')) {
 					const marketbeatData = await scrapeMarketBeat(browser, security, outputDir);
 					logDebug(`MarketBeat scrape result: ${JSON.stringify(marketbeatData)}`);
-				} else if (1 && security.moomoo && security.moomoo.startsWith('http')) {
+				} else if (security.ycharts && security.ycharts.startsWith('http')) {
+					const ychartsData = await scrapeYCharts(browser, security, outputDir);
+					logDebug(`YCharts scrape result: ${JSON.stringify(ychartsData)}`);
+				} else if (0 && security.moomoo && security.moomoo.startsWith('http')) {
 					const moomooData = await scrapeMoomoo(browser, security, outputDir);
 					logDebug(`Moomoo scrape result: ${JSON.stringify(moomooData)}`);
 				//} else if (security.wsj && security.wsj.startsWith('http')) {
 				//	const wsjData = await scrapeWSJ(browser, security, outputDir);
 				//	logDebug(`WSJ scrape result: ${JSON.stringify(wsjData)}`);
-				} else if (1 && security.webull && security.webull.startsWith('http')) {
+				} else if (0 && security.webull && security.webull.startsWith('http')) {
 					const webullData = await scrapeWebull(browser, security, outputDir);
 					logDebug(`Webull scrape result: ${JSON.stringify(webullData)}`);
 				} else {

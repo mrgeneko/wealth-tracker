@@ -351,7 +351,9 @@ function parseToIso(timeStr) {
       'M/d/yy',
       'h:mm a',
       'MMM d HH:mm',
-      'MMM d H:mm'
+      'MMM d H:mm',
+      'MMM d, HH:mm',
+      'MMM d, H:mm'
     ];
   
     for (const fmt of formats) {
