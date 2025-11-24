@@ -1,9 +1,9 @@
 {
   "single_security_mode": "round_robin",
   "scrape_groups": {
-    "investing_watchlists": 1,
-    "yahoo_batch": 10,
-    "single_security": 10,
+    "investing_watchlists": 3,
+    "yahoo_batch": 60,
+    "single_security": 90,
     "bonds": 240
   },
   "investing_watchlists": {
