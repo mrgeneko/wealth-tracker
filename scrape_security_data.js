@@ -15,6 +15,7 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
+const { scrapeTradingViewWatchlists } = require('./scrape_tradingview_watchlists');
 const { scrapeWebullWatchlists } = require('./scrape_webull_watchlists');
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeCNBC } = require('./scrape_cnbc');
@@ -269,7 +270,7 @@ async function runCycle(browser, outputDir) {
 	// use the name variable for the filename so it's consistent and easy to change
 	const investingMarker = path.join('/usr/src/app/logs', `last.${investingWatchlistsName}.txt`);
 	const investingInterval = getScrapeGroupInterval(investingWatchlistsName, 3); // minutes
-	if (1 && shouldRunTask(investingInterval, investingMarker)) {
+	if (0 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		// Prefer configuration from config.json
 		const attrs = getConfig(investingWatchlistsName);
@@ -328,6 +329,30 @@ async function runCycle(browser, outputDir) {
 		}
 	} else {
 		logDebug('Skipping webull watchlists scrape (interval not reached)');
+	}
+
+	// ======== TRADINGVIEW WATCHLISTS ===========
+	const tvWatchlistsName = 'tradingview_watchlists'
+	const tvMarker = path.join('/usr/src/app/logs', `last.${tvWatchlistsName}.txt`);
+	const tvInterval = getScrapeGroupInterval(tvWatchlistsName, 3); // minutes
+	if (0 && shouldRunTask(tvInterval, tvMarker)) {
+		logDebug('Begin tradingview watchlists scrape');
+		const attrs = getConfig(tvWatchlistsName);
+		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
+			for (const item of attrs.items) {
+				const record = { key: item.key, interval: item.interval, url: attrs.url };
+				logDebug(`tradingview watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
+				if (record.url && record.url.startsWith('http')) {
+					await scrapeTradingViewWatchlists(browser, record, outputDir);
+				} else {
+					logDebug(`Skipping record with missing or invalid tradingview URL: ${JSON.stringify(record)}`);
+				}
+			}
+		} else {
+			logDebug('No tradingview watchlists in attributes; skipping tradingview watchlists scrape');
+		}
+	} else {
+		logDebug('Skipping tradingview watchlists scrape (interval not reached)');
 	}
 
 	// ======== YAHOO FINANCE2 API ===========
