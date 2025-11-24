@@ -352,8 +352,57 @@ async function runCycle(browser, outputDir) {
 		}
 	}
 
+	// ======== BONDS ===========
+	const bondsName = 'bonds';
+	const bondsMarker = path.join('/usr/src/app/logs/', 'last.bond.txt');
+	const bondsInterval = getScrapeGroupInterval(bondsName, 60); // default 60 min
+	if (shouldRunTask(bondsInterval, bondsMarker)) {
+		logDebug('Begin bonds scrape');
+		const attrs = loadScraperAttributes();
+		const records = attrs.single_securities || [];
+		const bondSecurities = records.filter(s => s.type === 'bond');
+
+		for (const security of bondSecurities) {
+			// Iterate through all available sources in the map to find a valid one
+			for (const [sourceName, scraperFunc] of Object.entries(scraperMap)) {
+				const sourceConfig = getConfig(sourceName);
+				const securityUrl = security[sourceName];
+
+				// Check if source supports security type (must be bond)
+				if (!sourceConfig.has_bond_prices) {
+					continue;
+				}
+
+				if (securityUrl && securityUrl.startsWith('http')) {
+					// Check session validity
+					const isPre = isPreMarketSession();
+					const isReg = isRegularTradingSession();
+					const isPost = isAfterHoursSession();
+					const isWkday = isWeekday();
+					
+					const isValidSession = 
+						(isPre && sourceConfig.has_pre_market) ||
+						(isPost && sourceConfig.has_after_hours) ||
+						(isReg || !isWkday);
+
+					if (isValidSession) {
+						try {
+							logDebug(`Scraping bond ${security.key} with ${sourceName}`);
+							const data = await scraperFunc(browser, security, outputDir);
+							logDebug(`${sourceName} scrape result: ${JSON.stringify(data)}`);
+							break; // Scrape successful (or at least attempted), move to next bond
+						} catch (e) {
+							logDebug(`Error scraping bond ${security.key} with ${sourceName}: ${e.message}`);
+						}
+					}
+				}
+			}
+			await new Promise(r => setTimeout(r, 1000));
+		}
+	}
+
 	// ======== WEB SCRAPING VARIOUS SINGLE SECURITY WEB PAGES ===========
-	const singleSecurityName = 'single_security'
+	const singleSecurityName = 'stocks_etfs'
 	const singleSecurityMarker = path.join('/usr/src/app/logs/', `last.${singleSecurityName}.txt`);
 	const singleScurityInterval = getScrapeGroupInterval(singleSecurityName, 60); // minutes
 	if (shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
@@ -363,7 +412,7 @@ async function runCycle(browser, outputDir) {
 		
 		// Filter by scrape_group if needed. Currently processing all.
 		// const filtered_securities = records.filter(row => row.scrape_group === 'c');
-		const filtered_securities = records; 
+		const filtered_securities = records.filter(s => s.type !== 'bond'); 
 
         // Determine mode from config, default to 'round_robin' if not specified
         const mode = attrs.single_security_mode || 'round_robin';
