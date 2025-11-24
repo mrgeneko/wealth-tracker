@@ -334,7 +334,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         }
         chunkRes.push(single);
         // pacing between single requests
-        await sleep(jitter(Math.max(250, Math.floor(baseDelayMs / Math.max(1, chunkSize)))));
+        await sleep(jitter(Math.max(1000, Math.floor(baseDelayMs / Math.max(1, chunkSize)))));
       }
     }
 
