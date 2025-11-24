@@ -76,14 +76,26 @@ function getConfig(name) {
 	return {};
 }
 
-function getScrapeGroupInterval(groupLetter, defaultMinutes = 5) {
+function getScrapeGroupSettings(groupName, defaultMinutes = 5) {
 	const attrs = loadScraperAttributes();
 	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
-	if (groups && groups[groupLetter]) {
-		const v = Number(groups[groupLetter]);
-		if (!Number.isNaN(v) && isFinite(v)) return v;
+    let interval = defaultMinutes;
+    // Default to false. Only set to true if explicitly enabled in config.
+    let enabled = false;
+
+	if (groups && groups[groupName]) {
+        const val = groups[groupName];
+        if (typeof val === 'object' && val !== null) {
+            if (val.interval !== undefined) {
+                const v = Number(val.interval);
+                if (!Number.isNaN(v) && isFinite(v)) interval = v;
+            }
+            if (val.enabled !== undefined) {
+                enabled = val.enabled === true;
+            }
+        }
 	}
-	return defaultMinutes;
+	return { interval, enabled };
 }
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
@@ -99,7 +111,10 @@ const startTime = Date.now();
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || '3000', 10);
 let healthServer = null;
 
-function shouldRunTask(intervalMinutes, markerPath) {
+function shouldRunTask(settings, markerPath) {
+    if (!settings.enabled) return false;
+    const intervalMinutes = settings.interval;
+
 	let lastRun = 0;
 	if (fs.existsSync(markerPath)) {
 		const lines = fs.readFileSync(markerPath, 'utf8').split('\n');
@@ -269,8 +284,8 @@ async function runCycle(browser, outputDir) {
 	const investingWatchlistsName = 'investing_watchlists'
 	// use the name variable for the filename so it's consistent and easy to change
 	const investingMarker = path.join('/usr/src/app/logs', `last.${investingWatchlistsName}.txt`);
-	const investingInterval = getScrapeGroupInterval(investingWatchlistsName, 3); // minutes
-	if (0 && shouldRunTask(investingInterval, investingMarker)) {
+	const investingSettings = getScrapeGroupSettings(investingWatchlistsName, 3); // minutes
+	if (shouldRunTask(investingSettings, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		// Prefer configuration from config.json
 		const attrs = getConfig(investingWatchlistsName);
@@ -294,8 +309,8 @@ async function runCycle(browser, outputDir) {
 	// ======== WEBULL WATCHLISTS ===========
 	const webullWatchListsName = 'webull_watchlists'
 	const webullMarker = path.join('/usr/src/app/logs', `last.${webullWatchListsName}.txt`);
-	const webullInterval = getScrapeGroupInterval(webullWatchListsName, 3); // minutes
-	if (0 && shouldRunTask(webullInterval, webullMarker)) {
+	const webullSettings = getScrapeGroupSettings(webullWatchListsName, 3); // minutes
+	if (shouldRunTask(webullSettings, webullMarker)) {
 		logDebug('Begin webull watchlists scrape');
 		// Prefer configuration from config.json (same shape as investing_watchlists)
 		const attrs = getConfig(webullWatchListsName);
@@ -334,8 +349,8 @@ async function runCycle(browser, outputDir) {
 	// ======== TRADINGVIEW WATCHLISTS ===========
 	const tvWatchlistsName = 'tradingview_watchlists'
 	const tvMarker = path.join('/usr/src/app/logs', `last.${tvWatchlistsName}.txt`);
-	const tvInterval = getScrapeGroupInterval(tvWatchlistsName, 3); // minutes
-	if (0 && shouldRunTask(tvInterval, tvMarker)) {
+	const tvSettings = getScrapeGroupSettings(tvWatchlistsName, 3); // minutes
+	if (shouldRunTask(tvSettings, tvMarker)) {
 		logDebug('Begin tradingview watchlists scrape');
 		const attrs = getConfig(tvWatchlistsName);
 		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
@@ -358,9 +373,9 @@ async function runCycle(browser, outputDir) {
 	// ======== YAHOO FINANCE2 API ===========
 	const yahooBatchName = 'yahoo_batch'
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahooBatchName}.txt`);
-	const yahooBatchInterval = getScrapeGroupInterval(yahooBatchName, 45); // minutes
-	logDebug('yahooBatchInterval:' + yahooBatchInterval)
-	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
+	const yahooBatchSettings = getScrapeGroupSettings(yahooBatchName, 45); // minutes
+	logDebug('yahooBatchInterval:' + yahooBatchSettings.interval)
+	if (shouldRunTask(yahooBatchSettings, yahooBatchMarker)) {
 		logDebug('Begin yahoo_batch api');
 		const attrs = loadScraperAttributes();
 		const records = attrs.single_securities || [];
@@ -380,8 +395,8 @@ async function runCycle(browser, outputDir) {
 	// ======== BONDS ===========
 	const bondsName = 'bonds';
 	const bondsMarker = path.join('/usr/src/app/logs/', 'last.bond.txt');
-	const bondsInterval = getScrapeGroupInterval(bondsName, 60); // default 60 min
-	if (shouldRunTask(bondsInterval, bondsMarker)) {
+	const bondsSettings = getScrapeGroupSettings(bondsName, 60); // default 60 min
+	if (shouldRunTask(bondsSettings, bondsMarker)) {
 		logDebug('Begin bonds scrape');
 		const attrs = loadScraperAttributes();
 		const records = attrs.single_securities || [];
@@ -429,8 +444,8 @@ async function runCycle(browser, outputDir) {
 	// ======== WEB SCRAPING VARIOUS SINGLE SECURITY WEB PAGES ===========
 	const singleSecurityName = 'stocks_etfs'
 	const singleSecurityMarker = path.join('/usr/src/app/logs/', `last.${singleSecurityName}.txt`);
-	const singleScurityInterval = getScrapeGroupInterval(singleSecurityName, 60); // minutes
-	if (shouldRunTask(singleScurityInterval, singleSecurityMarker)) {
+	const singleSecuritySettings = getScrapeGroupSettings(singleSecurityName, 60); // minutes
+	if (shouldRunTask(singleSecuritySettings, singleSecurityMarker)) {
 		logDebug('Begin single security scrape');
 		const attrs = loadScraperAttributes();
 		const records = attrs.single_securities || [];
