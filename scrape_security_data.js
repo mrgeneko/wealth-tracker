@@ -21,6 +21,7 @@ const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeWSJ } = require('./scrape_wsj');
 const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
+const { scrapeMarketBeat } = require('./scrape_marketbeat');
 
 // Determine canonical data directory (host mount or repo folder). This
 // avoids relying on a `config/` folder and prefers the host-mounted
@@ -231,7 +232,7 @@ async function runCycle(browser, outputDir) {
 	// use the name variable for the filename so it's consistent and easy to change
 	const investingMarker = path.join('/usr/src/app/logs', `last.${investingWatchlistsName}.txt`);
 	const investingInterval = getScrapeGroupInterval(investingWatchlistsName, 3); // minutes
-	if (shouldRunTask(investingInterval, investingMarker)) {
+	if (1 && shouldRunTask(investingInterval, investingMarker)) {
 		logDebug('Begin investing.com scrape');
 		// Prefer configuration from config.json
 		const attrs = getConfig(investingWatchlistsName);
@@ -297,7 +298,7 @@ async function runCycle(browser, outputDir) {
 	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahooBatchName}.txt`);
 	const yahooBatchInterval = getScrapeGroupInterval(yahooBatchName, 45); // minutes
 	logDebug('yahooBatchInterval:' + yahooBatchInterval)
-	if (shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
+	if (1 && shouldRunTask(yahooBatchInterval, yahooBatchMarker)) {
 		logDebug('Begin yahoo_batch api');
 		const attrs = loadScraperAttributes();
 		const records = attrs.single_securities || [];
@@ -346,6 +347,9 @@ async function runCycle(browser, outputDir) {
 				} else if (1 && security.google && security.google.startsWith('http')) {
 					const googleData = await scrapeGoogle(browser, security, outputDir);
 					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
+				} else if (0 && security.marketbeat && security.marketbeat.startsWith('http')) {
+					const marketbeatData = await scrapeMarketBeat(browser, security, outputDir);
+					logDebug(`MarketBeat scrape result: ${JSON.stringify(marketbeatData)}`);
 				//} else if (security.wsj && security.wsj.startsWith('http')) {
 				//	const wsjData = await scrapeWSJ(browser, security, outputDir);
 				//	logDebug(`WSJ scrape result: ${JSON.stringify(wsjData)}`);
