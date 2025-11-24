@@ -1,4 +1,5 @@
 {
+  "single_security_mode": "round_robin",
   "scrape_groups": {
     "investing_watchlists": 1,
     "yahoo_batch": 10,

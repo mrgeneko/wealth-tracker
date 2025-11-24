@@ -370,6 +370,36 @@ function parseToIso(timeStr) {
     return timeStr;
 }
 
+function isWeekday() {
+    const now = DateTime.now().setZone('America/New_York');
+    const day = now.weekday; // 1 is Monday, 7 is Sunday
+    return day >= 1 && day <= 5;
+}
+
+function isPreMarketSession() {
+    const now = DateTime.now().setZone('America/New_York');
+    const preMarketOpen = now.set({ hour: 4, minute: 0, second: 0, millisecond: 0 });
+    const marketOpen = now.set({ hour: 9, minute: 30, second: 0, millisecond: 0 });
+    return now >= preMarketOpen && now < marketOpen;
+}
+
+function isRegularTradingSession() {
+    const now = DateTime.now().setZone('America/New_York');
+    const marketOpen = now.set({ hour: 9, minute: 30, second: 0, millisecond: 0 });
+    const marketClose = now.set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
+    return now >= marketOpen && now < marketClose;
+}
+
+function isAfterHoursSession() {
+    const now = DateTime.now().setZone('America/New_York');
+    const marketClose = now.set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
+    const preMarketOpen = now.set({ hour: 4, minute: 0, second: 0, millisecond: 0 });
+    // After hours is > 16:00 OR < 04:00 (next day? No, usually same day until midnight, then pre-market starts at 4am)
+    // The python logic: current_time > market_close_time or current_time < pre_market_open_time
+    // If it's 2 AM, it's < 4 AM, so it's after hours (or pre-pre-market).
+    return now >= marketClose || now < preMarketOpen;
+}
+
 function reportMetrics(thresholds = { navFail: 5, reqFail: 10 }, logPath) {
     const m = getMetrics();
     const summary = `METRICS: totalNavigations=${m.totalNavigations} failedNavigations=${m.failedNavigations} totalRequests=${m.totalRequests} failedRequests=${m.failedRequests}`;
@@ -492,7 +522,11 @@ module.exports = {
     getMetrics,
     resetMetrics,
     cleanNumberText,
-    parseToIso
+    parseToIso,
+    isWeekday,
+    isPreMarketSession,
+    isRegularTradingSession,
+    isAfterHoursSession
 };
 
 // Export helpers for page setup and snapshots
