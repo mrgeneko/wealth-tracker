@@ -157,6 +157,29 @@ async function ensureBrowser() {
 	if (!connected) {
 		try {
 			logDebug('Launching new Chrome instance...');
+			// Check for and remove stale SingletonLock if it exists to prevent "Profile Locked" errors
+			logDebug('Checking for stale lock files in ' + persistentProfileDir);
+			const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+			for (const f of lockFiles) {
+				const p = path.join(persistentProfileDir, f);
+				try {
+					// Use lstatSync to check for existence (including broken symlinks)
+					let exists = false;
+					try {
+						if (fs.existsSync(p) || fs.lstatSync(p)) exists = true;
+					} catch (e) {}
+
+					if (exists) {
+						logDebug('Removing stale Chrome profile lock file: ' + p);
+						fs.unlinkSync(p);
+						logDebug('Successfully removed ' + p);
+					} else {
+						logDebug('Lock file not found: ' + p);
+					}
+				} catch (e) {
+					logDebug('Failed to remove lock file ' + p + ': ' + e.message);
+				}
+			}
 			browser = await puppeteerExtra.launch({
 				headless: false,
 				executablePath: '/opt/google/chrome/chrome',
@@ -347,7 +370,7 @@ async function runCycle(browser, outputDir) {
 				} else if (1 && security.google && security.google.startsWith('http')) {
 					const googleData = await scrapeGoogle(browser, security, outputDir);
 					logDebug(`Google scrape result: ${JSON.stringify(googleData)}`);
-				} else if (0 && security.marketbeat && security.marketbeat.startsWith('http')) {
+				} else if (1 && security.marketbeat && security.marketbeat.startsWith('http')) {
 					const marketbeatData = await scrapeMarketBeat(browser, security, outputDir);
 					logDebug(`MarketBeat scrape result: ${JSON.stringify(marketbeatData)}`);
 				//} else if (security.wsj && security.wsj.startsWith('http')) {
