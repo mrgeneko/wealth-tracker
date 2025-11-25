@@ -176,19 +176,31 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 					const columnName = $(col).attr('data-column-name');
 					if (requiredColumns.includes(columnName)) {
 						rowData[columnName] = $(col).text().trim();
+						if (columnName === 'time') {
+							rowData['time_value'] = $(col).attr('data-value');
+						}
 					}
 				});
 				// Check if we have at least some critical columns, not necessarily all
 				// Some rows might be missing extended_hours or next_earning
 				if (rowData["symbol"] && rowData["last"]) {
 					securities.push(rowData);
+					
+					let qTime = parseToIso(rowData["time"]);
+					if (rowData["time_value"]) {
+						const ts = parseInt(rowData["time_value"], 10);
+						if (!isNaN(ts)) {
+							qTime = new Date(ts * 1000).toISOString();
+						}
+					}
+
 					const data = {
 						key: rowData["symbol"],
 						last_price: rowData["last"],
 						source: "investing",
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString(),
-						quote_time: parseToIso(rowData["time"])
+						last_price_quote_time: qTime
 					};
 					dataObjects.push(data);
 					logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
