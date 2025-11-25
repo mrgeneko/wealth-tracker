@@ -52,10 +52,10 @@ table {
 }
 
 th, td {
-    padding: 10px;
+    padding: 8px;
     text-align: right;
     border-bottom: 1px solid #eee;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
 
 th {
@@ -76,7 +76,7 @@ th:first-child, td:first-child {
 th:first-child { background-color: #f8f9fa; z-index: 2; }
 
 .account-type {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #666;
     font-weight: normal;
     text-transform: uppercase;
@@ -90,12 +90,12 @@ th:first-child { background-color: #f8f9fa; z-index: 2; }
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
 }
 
-.shares { color: #7f8c8d; font-size: 0.75rem; }
+.shares { color: #7f8c8d; font-size: 0.7rem; }
 .value { font-weight: 600; }
-.price-info { color: #95a5a6; font-size: 0.7rem; }
+.price-info { color: #95a5a6; font-size: 0.65rem; }
 .cash { color: #27ae60; font-weight: bold; }
 
 .row-total {
