@@ -43,9 +43,11 @@ services:
       PORT: 3001
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
-      MYSQL_USER: test
-      MYSQL_PASSWORD: test
-      MYSQL_DATABASE: testdb
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD}
     ports:
       - "3001:3001"
     volumes:
@@ -56,10 +58,10 @@ services:
     container_name: wealth-tracker-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: testdb
-      MYSQL_USER: test
-      MYSQL_PASSWORD: test
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     healthcheck:
@@ -115,9 +117,9 @@ services:
       KAFKA_TOPIC: price_data
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
-      MYSQL_USER: test
-      MYSQL_PASSWORD: test
-      MYSQL_DATABASE: testdb
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     # command can be omitted if set in Dockerfile
 
   singlefile:
