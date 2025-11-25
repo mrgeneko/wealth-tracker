@@ -5,13 +5,13 @@ from datetime import datetime
 from .is_number import is_number
 from .scraper_config import get_attributes as _get_config_attrs
 
-def get_trading_view_attributes():
-    attributes = _get_config_attrs('trading_view') or {}
-    attributes['extract'] = extract_trading_view
+def get_tradingview_attributes():
+    attributes = _get_config_attrs('tradingview') or {}
+    attributes['extract'] = extract_tradingview
     return attributes
 
-def extract_trading_view(ticker, html_content):
-    logging.info(f"extract_trading_view for {ticker}")
+def extract_tradingview(ticker, html_content):
+    logging.info(f"extract_tradingview for {ticker}")
     soup = BeautifulSoup(html_content, 'html.parser')
     data = {}
     # Extract last price (try multiple selectors)
@@ -105,7 +105,7 @@ def extract_trading_view(ticker, html_content):
     data["after_hours_price"] = after_hours_price
     data["pre_market_price"] = pre_market_price
     data["currency"] = currency
-    data["source"] = "trading_view"
+    data["source"] = "tradingview"
     # If no key fields found, log raw HTML for debugging
     if not last_price and not price_change_decimal:
         logging.error(f"TradingView extraction failed for {ticker}. Raw HTML:\n{html_content[:2000]}")
