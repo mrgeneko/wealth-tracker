@@ -1,0 +1,136 @@
+{
+  "real_estate": [
+    {
+      "description": "Primary Residence - 2 Bedroom Apartment in NYC",
+      "value": 1250000.00,
+      "currency": "USD"
+    },
+    {
+      "description": "Vacation Home in Provence",
+      "value": 450000.00,
+      "currency": "EUR"
+    }
+  ],
+  "vehicles": [
+    {
+      "description": "2023 Tesla Model Y",
+      "value": 42000.00,
+      "currency": "USD"
+    },
+    {
+      "description": "2018 Honda Civic",
+      "value": 15000.00,
+      "currency": "USD"
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Chase Total Checking",
+      "type": "checking",
+      "holdings": {
+        "cash": {
+          "value": 8500.00,
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "name": "Marcus HYSA",
+      "type": "HYSA",
+      "holdings": {
+        "cash": {
+          "value": 50000.00,
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "name": "Fidelity Brokerage",
+      "type": "individual brokerage",
+      "holdings": {
+        "cash": {
+          "value": 1250.45,
+          "currency": "USD"
+        },
+        "stocks": [
+          {
+            "ticker": "AAPL",
+            "shares": 150,
+            "price": 189.50,
+            "currency": "USD"
+          },
+          {
+            "ticker": "NVDA",
+            "shares": 50,
+            "price": 485.00,
+            "currency": "USD"
+          },
+          {
+            "ticker": "VOO",
+            "shares": 200,
+            "price": 435.20,
+            "currency": "USD"
+          }
+        ],
+        "bonds": [
+          {
+            "ticker": "US10Y",
+            "maturity_date": "2033-05-15",
+            "coupon": 3.375,
+            "shares": 100,
+            "price": 96.50,
+            "currency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Vanguard Roth IRA",
+      "type": "roth ira",
+      "holdings": {
+        "stocks": [
+          {
+            "ticker": "VTI",
+            "shares": 350.5,
+            "price": 225.10,
+            "currency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Employee 401k",
+      "type": "401k",
+      "holdings": {
+        "stocks": [
+          {
+            "ticker": "FXAIX",
+            "shares": 1200.00,
+            "price": 165.40,
+            "currency": "USD"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Chase Sapphire Reserve",
+      "type": "credit card",
+      "holdings": {
+        "cash": {
+          "value": -3450.20,
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "name": "Primary Mortgage",
+      "type": "mortgage",
+      "holdings": {
+        "cash": {
+          "value": -750000.00,
+          "currency": "USD"
+        }
+      }
+    }
+  ]
+}
