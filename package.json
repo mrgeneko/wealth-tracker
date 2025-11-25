@@ -8,11 +8,14 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
     "csv-parse": "^5.5.4",
     "dotenv": "^16.4.5",
+    "express": "^5.1.0",
     "kafkajs": "^2.2.4",
     "luxon": "^3.7.2",
     "puppeteer": "^24.15.0",
+    "socket.io": "^4.8.1",
     "yahoo-finance2": "^2.0.0"
   }
 }
