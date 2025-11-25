@@ -1,4 +1,4 @@
-// scrape_stock_analysis.js
+// scrape_stockanalysis.js
 // Scrape StockAnalysis pages (e.g., ETF or stock pages) and extract price data
 
 const fs = require('fs');
@@ -31,7 +31,7 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
   let page = null;
   let data = {};
   try {
-    const url = security.stock_analysis || security.stockanalysis || security.stockAnalysis;
+    const url = security.stockanalysis || security.stockanalysis || security.stockAnalysis;
     if (!url) {
       logDebug('No StockAnalysis URL provided for ' + security.key);
       return {};
@@ -281,7 +281,7 @@ function parseStockAnalysisHtml(html, security) {
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
     after_hours_price_quote_time: after_hours_price_quote_time || '',
-    source: 'stock_analysis',
+    source: 'stockanalysis',
     capture_time: new Date().toISOString(),
     quote_time: ''
   };

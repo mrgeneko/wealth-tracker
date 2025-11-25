@@ -13,28 +13,32 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
 const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
-const { scrapeWebull } = require('./scrape_webull');
+
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 const { scrapeTradingViewWatchlists } = require('./scrape_tradingview_watchlists');
 const { scrapeWebullWatchlists } = require('./scrape_webull_watchlists');
-const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
+
 const { scrapeCNBC } = require('./scrape_cnbc');
-const { scrapeWSJ } = require('./scrape_wsj');
-const { scrapeStockAnalysis } = require('./scrape_stock_analysis');
-const { scrapeNasdaq } = require('./scrape_nasdaq');
 const { scrapeMarketBeat } = require('./scrape_marketbeat');
 const { scrapeMoomoo } = require('./scrape_moomoo');
+const { scrapeNasdaq } = require('./scrape_nasdaq');
+const { scrapeRobinhood } = require('./scrape_robinhood');
+const { scrapeStockAnalysis } = require('./scrape_stockanalysis');
+const { scrapeWebull } = require('./scrape_webull');
+const { scrapeWSJ } = require('./scrape_wsj');
+const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeYCharts } = require('./scrape_ycharts');
 
 const scraperMap = {
-    'webull': scrapeWebull,
-    'nasdaq': scrapeNasdaq,
     'cnbc': scrapeCNBC,
-    'stock_analysis': scrapeStockAnalysis,
     'google': scrapeGoogle,
     'marketbeat': scrapeMarketBeat,
-    'ycharts': scrapeYCharts,
     'moomoo': scrapeMoomoo,
+	'nasdaq': scrapeNasdaq,
+    'robinhood': scrapeRobinhood,
+	'stockanalysis': scrapeStockAnalysis,
+    'ycharts': scrapeYCharts,
+	'webull': scrapeWebull,
     'wsj': scrapeWSJ
 };
 

@@ -106,7 +106,7 @@ Sample Kafka message (use this as canonical example)
   "after_hours_change_decimal": "0.81",
   "after_hours_change_percent": "0.37%",
   "after_hours_price_quote_time": "Nov 21, 2025, 7:59 PM EST",
-  "source": "stock_analysis",
+  "source": "stockanalysis",
   "capture_time": "2025-11-22 20:36:14.714 UTC",
   "quote_time": ""
 }
