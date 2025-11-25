@@ -5,6 +5,7 @@ const { Kafka } = require('kafkajs');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const mysql = require('mysql2/promise');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,12 +20,55 @@ const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',')
 const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'price_data';
 const KAFKA_GROUP_ID = process.env.KAFKA_GROUP_ID || 'dashboard-group';
 
+// MySQL Configuration
+const MYSQL_HOST = process.env.MYSQL_HOST || 'mysql';
+const MYSQL_PORT = process.env.MYSQL_PORT || 3306;
+const MYSQL_USER = process.env.MYSQL_USER || 'test';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'test';
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'testdb';
+
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory cache for latest prices: { "AAPL": { price: 150.00, currency: "USD", time: "..." } }
 const priceCache = {};
 let assetsCache = null;
+
+async function fetchInitialPrices() {
+    try {
+        console.log(`Connecting to MySQL at ${MYSQL_HOST}:${MYSQL_PORT}...`);
+        const connection = await mysql.createConnection({
+            host: MYSQL_HOST,
+            port: MYSQL_PORT,
+            user: MYSQL_USER,
+            password: MYSQL_PASSWORD,
+            database: MYSQL_DATABASE
+        });
+
+        const [rows] = await connection.execute('SELECT * FROM latest_prices');
+        console.log(`Loaded ${rows.length} prices from MySQL`);
+
+        rows.forEach(row => {
+            // row.price is likely a string or number depending on driver config, ensure float
+            const priceVal = parseFloat(row.price);
+            if (!isNaN(priceVal)) {
+                priceCache[row.ticker] = {
+                    price: priceVal,
+                    change: row.change_decimal ? parseFloat(row.change_decimal) : null,
+                    change_percent: row.change_percent,
+                    currency: 'USD',
+                    time: row.capture_time,
+                    source: row.source
+                };
+            }
+        });
+        
+        await connection.end();
+    } catch (err) {
+        console.error('Error fetching initial prices from MySQL:', err.message);
+        // Don't crash, just continue with empty cache
+    }
+}
 
 function loadAssets() {
     if (fs.existsSync(ASSETS_FILE)) {
@@ -138,7 +182,8 @@ io.on('connection', (socket) => {
 });
 
 // Start
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
     console.log(`Dashboard server running on http://localhost:${PORT}`);
+    await fetchInitialPrices();
     startKafkaConsumer();
 });

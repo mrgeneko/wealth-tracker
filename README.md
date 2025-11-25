@@ -131,6 +131,21 @@ docker exec -it wealth-tracker-scrapers sh -c '\
 	echo "Latest: $LATEST" && tail -n 200 "$LATEST"'
 ```
 ---
+## Database Schema
+The system persists the latest price updates to a MySQL database in the `latest_prices` table. This allows the dashboard to load the most recent data immediately upon startup.
+
+### Table: `latest_prices`
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `ticker` | `VARCHAR(50)` | Primary Key. The stock symbol (e.g., "AAPL", "US500"). |
+| `price` | `DECIMAL(18, 4)` | The current price. |
+| `change_decimal` | `DECIMAL(18, 4)` | The price change value. |
+| `change_percent` | `VARCHAR(20)` | The percentage change (e.g., "+0.56%"). |
+| `source` | `VARCHAR(50)` | The data source (e.g., "investing"). |
+| `capture_time` | `DATETIME` | The timestamp when the price was captured. |
+| `updated_at` | `TIMESTAMP` | Automatically updated timestamp of the record modification. |
+
+---
 ## Development notes
 - The scraper code uses `puppeteer-extra` with stealth plugin to drive Chrome. The container image provides a Chrome installation and Xvfb/VNC for a display.
 - The scrapers publish messages via `publish_to_kafka.js` using the `KAFKA_BROKERS` environment variable.

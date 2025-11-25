@@ -35,11 +35,17 @@ services:
     container_name: wealth-tracker-dashboard
     depends_on:
       - kafka
+      - mysql
     environment:
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC: price_data
       KAFKA_GROUP_ID: dashboard-group
       PORT: 3001
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+      MYSQL_DATABASE: testdb
     ports:
       - "3001:3001"
     volumes:
@@ -102,10 +108,16 @@ services:
     container_name: wealth-tracker-kafka-consumer
     depends_on:
       - kafka
+      - mysql
     restart: unless-stopped
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: price_data
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+      MYSQL_DATABASE: testdb
     # command can be omitted if set in Dockerfile
 
   singlefile:
