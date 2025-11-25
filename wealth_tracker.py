@@ -16,7 +16,7 @@ from wealth_tracker.update_cell_in_numbers import update_numbers
 from wealth_tracker.process_yahoo import process_yahoo_with_tickers_from_numbers
 from wealth_tracker.process_yahoo import get_yahoo_attributes
 from wealth_tracker.process_google import get_google_attributes
-from wealth_tracker.process_trading_view import get_trading_view_attributes
+from wealth_tracker.process_tradingview import get_tradingview_attributes
 from wealth_tracker.process_ycharts import get_ycharts_attributes
 from wealth_tracker.process_webull import get_webull_attributes
 from wealth_tracker.process_marketbeat import get_marketbeat_attributes
@@ -311,7 +311,7 @@ def main():
         nargs='+',  # This allows one or more arguments to be passed
         type=str,
         required=False,
-        help='pricing sources [google|investing|trading_view|webull|yahoo|ycharts] (default: yahoo'
+        help='pricing sources [google|investing|tradingview|webull|yahoo|ycharts] (default: yahoo'
     )
     
     parser.add_argument('--yahoo', '-y', dest='yahoo_batch', type=bool, default=False,
@@ -344,7 +344,7 @@ def main():
     yahoo = get_yahoo_attributes()
     webull = get_webull_attributes()
     ycharts = get_ycharts_attributes()
-    trading_view = get_trading_view_attributes()
+    tradingview = get_tradingview_attributes()
     google = get_google_attributes()
     #wsj = get_wsj_attributes() # does not work with singlefile due to bot detection
     #moomoo = get_moomoo_attributes()
@@ -353,8 +353,8 @@ def main():
     #investing = get_investing_attributes() # investing.com is blocked by cloudflare
     #nasdaq = get_nasdaq_attributes() # does not seem to work in headless mode
 
-    available_sources = [ google, trading_view, webull, yahoo, ycharts ]
-    #available_sources = [ trading_view ]
+    available_sources = [ google, tradingview, webull, yahoo, ycharts ]
+    #available_sources = [ tradingview ]
     delayed_sources = [ marketbeat ]
 
     logging.info(f"args.sources: {args.sources}")
