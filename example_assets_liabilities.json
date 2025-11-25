@@ -86,9 +86,13 @@
       "holdings": {
         "stocks": [
           {
-            "ticker": "VTI",
-            "shares": 350.5,
-            "price": 225.10,
+            "ticker": "MSFT",
+            "shares": 100,
+            "currency": "USD"
+          },
+          {
+            "ticker": "GOOGL",
+            "shares": 80,
             "currency": "USD"
           }
         ]
@@ -102,7 +106,6 @@
           {
             "ticker": "FXAIX",
             "shares": 1200.00,
-            "price": 165.40,
             "currency": "USD"
           }
         ]
