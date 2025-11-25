@@ -17,9 +17,23 @@
         </header>
 
         <section id="accounts-grid-section">
-            <h2>Accounts & Holdings</h2>
+            <h2>Investment Accounts</h2>
             <div class="grid-container">
                 <table id="holdings-grid">
+                    <thead>
+                        <!-- Headers will be generated dynamically -->
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be generated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="bank-accounts-section">
+            <h2>Bank Accounts</h2>
+            <div class="grid-container">
+                <table id="bank-accounts-grid">
                     <thead>
                         <!-- Headers will be generated dynamically -->
                     </thead>
@@ -88,16 +102,30 @@
         function renderDashboard() {
             if (!assetsData) return;
 
-            renderGrid();
+            const allAccounts = assetsData.accounts || [];
+            const bankTypes = ['checking', 'savings', 'hysa', 'cd', 'mortgage', 'credit card'];
+            
+            const bankAccounts = allAccounts.filter(acc => bankTypes.includes(acc.type.toLowerCase()));
+            const investmentAccounts = allAccounts.filter(acc => !bankTypes.includes(acc.type.toLowerCase()));
+
+            renderGrid('holdings-grid', investmentAccounts);
+            renderGrid('bank-accounts-grid', bankAccounts);
+
             renderOtherAssets();
             calculateNetWorth();
         }
 
-        function renderGrid() {
-            const accounts = assetsData.accounts || [];
-            const gridTable = document.getElementById('holdings-grid');
+        function renderGrid(tableId, accounts) {
+            const gridTable = document.getElementById(tableId);
+            if (!gridTable) return;
             const thead = gridTable.querySelector('thead');
             const tbody = gridTable.querySelector('tbody');
+
+            if (!accounts || accounts.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td>No accounts</td></tr>';
+                return;
+            }
 
             // 1. Identify all unique tickers/holdings across all accounts
             const allHoldings = new Set();
@@ -115,11 +143,15 @@
             });
 
             // 2. Build Header Row
+            const isBank = tableId === 'bank-accounts-grid';
             let headerHtml = '<tr><th>Holding</th>';
             accounts.forEach(acc => {
                 headerHtml += `<th>${acc.name}<br><span class="account-type">${acc.type}</span></th>`;
             });
-            headerHtml += '<th>Last Price</th><th>Change</th><th>Change %</th><th>Total Value</th></tr>';
+            if (!isBank) {
+                headerHtml += '<th>Last Price</th><th>Change</th><th>Change %</th><th>Time</th><th>Source</th>';
+            }
+            headerHtml += '<th>Total Value</th></tr>';
             thead.innerHTML = headerHtml;
 
             // 3. Build Rows
@@ -176,18 +208,24 @@
                 });
 
                 // Add Last Price, Change, Change % columns
-                const priceData = currentPrices[ticker] || {};
-                const price = priceData.price || 0;
-                const change = priceData.change || 0;
-                const changePct = priceData.change_percent || '0%';
-                const changeClass = parseFloat(change) >= 0 ? 'positive' : 'negative';
+                if (!isBank) {
+                    const priceData = currentPrices[ticker] || {};
+                    const price = priceData.price || 0;
+                    const change = priceData.change || 0;
+                    const changePct = priceData.change_percent || '0%';
+                    const changeClass = parseFloat(change) >= 0 ? 'positive' : 'negative';
+                    const time = priceData.time ? new Date(priceData.time).toLocaleString() : '-';
+                    const source = priceData.source || '-';
 
-                if (ticker === 'CASH') {
-                    rowHtml += `<td>-</td><td>-</td><td>-</td>`;
-                } else {
-                    rowHtml += `<td>${formatCurrency(price)}</td>`;
-                    rowHtml += `<td class="${changeClass}">${change}</td>`;
-                    rowHtml += `<td class="${changeClass}">${changePct}</td>`;
+                    if (ticker === 'CASH') {
+                        rowHtml += `<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
+                    } else {
+                        rowHtml += `<td>${formatCurrency(price)}</td>`;
+                        rowHtml += `<td class="${changeClass}">${change}</td>`;
+                        rowHtml += `<td class="${changeClass}">${changePct}</td>`;
+                        rowHtml += `<td>${time}</td>`;
+                        rowHtml += `<td>${source}</td>`;
+                    }
                 }
 
                 rowHtml += `<td class="row-total">${formatCurrency(rowTotalValue)}</td></tr>`;
@@ -196,6 +234,7 @@
 
             // Add Account Totals Row
             let totalRowHtml = '<tr class="total-row"><td>ACCOUNT TOTALS</td>';
+            let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
                 if (acc.holdings) {
@@ -213,9 +252,13 @@
                         });
                     }
                 }
+                grandTotal += accTotal;
                 totalRowHtml += `<td>${formatCurrency(accTotal)}</td>`;
             });
-            totalRowHtml += '<td></td><td></td><td></td><td></td></tr>'; // Empty cells for Price, Change, Change %, Total Value
+            if (!isBank) {
+                totalRowHtml += '<td></td><td></td><td></td><td></td><td></td>';
+            }
+            totalRowHtml += `<td>${formatCurrency(grandTotal)}</td></tr>`;
 
             bodyHtml += totalRowHtml;
             tbody.innerHTML = bodyHtml;
