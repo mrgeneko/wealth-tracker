@@ -181,7 +181,7 @@
                         const cash = (ticker === 'CASH' && acc.holdings.cash) ? acc.holdings.cash : null;
 
                         if (stock) {
-                            const price = currentPrices[ticker]?.price || stock.price;
+                            const price = currentPrices[ticker]?.price || 0;
                             const val = stock.shares * price;
                             holdingValue = val;
                             cellContent = `
@@ -190,7 +190,7 @@
                                     <span class="value">${formatNumber(val)}</span>
                                 </div>`;
                         } else if (bond) {
-                            const price = currentPrices[ticker]?.price || bond.price;
+                            const price = currentPrices[ticker]?.price || 0;
                             // Bond value calculation depends on par value, usually price is % of par (100) or actual price.
                             // Assuming price is actual price per unit for simplicity here, or standard bond pricing.
                             // If price is e.g. 96.50 (percent), and par is 1000, value is shares * 1000 * (price/100).
@@ -246,13 +246,13 @@
                     if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                     if (acc.holdings.stocks) {
                         acc.holdings.stocks.forEach(s => {
-                            const price = currentPrices[s.ticker]?.price || s.price;
+                            const price = currentPrices[s.ticker]?.price || 0;
                             accTotal += s.shares * price;
                         });
                     }
                     if (acc.holdings.bonds) {
                         acc.holdings.bonds.forEach(b => {
-                            const price = currentPrices[b.ticker]?.price || b.price;
+                            const price = currentPrices[b.ticker]?.price || 0;
                             accTotal += (b.shares * price) / 100;
                         });
                     }
@@ -315,13 +315,13 @@
                         if (acc.holdings.cash) total += acc.holdings.cash.value;
                         if (acc.holdings.stocks) {
                             acc.holdings.stocks.forEach(s => {
-                                const price = currentPrices[s.ticker]?.price || s.price;
+                                const price = currentPrices[s.ticker]?.price || 0;
                                 total += s.shares * price;
                             });
                         }
                         if (acc.holdings.bonds) {
                             acc.holdings.bonds.forEach(b => {
-                                const price = currentPrices[b.ticker]?.price || b.price;
+                                const price = currentPrices[b.ticker]?.price || 0;
                                 total += (b.shares * price) / 100;
                             });
                         }
