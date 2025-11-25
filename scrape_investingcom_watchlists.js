@@ -197,6 +197,8 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 					const data = {
 						key: rowData["symbol"],
 						last_price: rowData["last"],
+						price_change_decimal: rowData["chg"],
+						price_change_percent: rowData["chgpercent"],
 						source: "investing",
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString(),

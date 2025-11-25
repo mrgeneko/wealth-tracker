@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wealth Tracker Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Wealth Tracker Dashboard</h1>
+            <div id="net-worth-display" class="net-worth">
+                Total Net Worth: <span id="total-net-worth">Loading...</span>
+            </div>
+        </header>
+
+        <section id="accounts-grid-section">
+            <h2>Accounts & Holdings</h2>
+            <div class="grid-container">
+                <table id="holdings-grid">
+                    <thead>
+                        <!-- Headers will be generated dynamically -->
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be generated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="other-assets-section">
+            <div class="split-view">
+                <div class="asset-card">
+                    <h3>Real Estate</h3>
+                    <ul id="real-estate-list"></ul>
+                    <div class="subtotal">Total: <span id="real-estate-total">0.00</span></div>
+                </div>
+                <div class="asset-card">
+                    <h3>Vehicles</h3>
+                    <ul id="vehicles-list"></ul>
+                    <div class="subtotal">Total: <span id="vehicles-total">0.00</span></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const socket = io();
+        let assetsData = null;
+        let currentPrices = {};
+
+        // Fetch assets structure
+        async function fetchAssets() {
+            try {
+                const response = await fetch('/api/assets');
+                assetsData = await response.json();
+                renderDashboard();
+            } catch (error) {
+                console.error('Error fetching assets:', error);
+            }
+        }
+
+        // Listen for price updates
+        socket.on('price_update', (prices) => {
+            console.log('Received price update', prices);
+            currentPrices = prices;
+            if (assetsData) {
+                renderDashboard();
+            }
+        });
+
+        // Listen for assets updates
+        socket.on('assets_update', (assets) => {
+            console.log('Received assets update');
+            assetsData = assets;
+            renderDashboard();
+        });
+
+        function formatCurrency(value, currency = 'USD') {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currency
+            }).format(value);
+        }
+
+        function renderDashboard() {
+            if (!assetsData) return;
+
+            renderGrid();
+            renderOtherAssets();
+            calculateNetWorth();
+        }
+
+        function renderGrid() {
+            const accounts = assetsData.accounts || [];
+            const gridTable = document.getElementById('holdings-grid');
+            const thead = gridTable.querySelector('thead');
+            const tbody = gridTable.querySelector('tbody');
+
+            // 1. Identify all unique tickers/holdings across all accounts
+            const allHoldings = new Set();
+            accounts.forEach(acc => {
+                if (acc.holdings) {
+                    if (acc.holdings.stocks) acc.holdings.stocks.forEach(s => allHoldings.add(s.ticker));
+                    if (acc.holdings.bonds) acc.holdings.bonds.forEach(b => allHoldings.add(b.ticker));
+                    if (acc.holdings.cash) allHoldings.add('CASH');
+                }
+            });
+            const sortedHoldings = Array.from(allHoldings).sort((a, b) => {
+                if (a === 'CASH') return 1;
+                if (b === 'CASH') return -1;
+                return a.localeCompare(b);
+            });
+
+            // 2. Build Header Row
+            let headerHtml = '<tr><th>Holding</th>';
+            accounts.forEach(acc => {
+                headerHtml += `<th>${acc.name}<br><span class="account-type">${acc.type}</span></th>`;
+            });
+            headerHtml += '<th>Last Price</th><th>Change</th><th>Change %</th><th>Total Value</th></tr>';
+            thead.innerHTML = headerHtml;
+
+            // 3. Build Rows
+            let bodyHtml = '';
+            
+            sortedHoldings.forEach(ticker => {
+                let rowHtml = `<tr><td class="ticker-cell">${ticker}</td>`;
+                let rowTotalValue = 0;
+
+                accounts.forEach(acc => {
+                    let cellContent = '-';
+                    let holdingValue = 0;
+
+                    if (acc.holdings) {
+                        // Check for Stock
+                        const stock = acc.holdings.stocks?.find(s => s.ticker === ticker);
+                        // Check for Bond
+                        const bond = acc.holdings.bonds?.find(b => b.ticker === ticker);
+                        // Check for Cash
+                        const cash = (ticker === 'CASH' && acc.holdings.cash) ? acc.holdings.cash : null;
+
+                        if (stock) {
+                            const price = currentPrices[ticker]?.price || stock.price;
+                            const val = stock.shares * price;
+                            holdingValue = val;
+                            cellContent = `
+                                <div class="cell-data">
+                                    <span class="shares">${stock.shares} sh</span>
+                                    <span class="value">${formatCurrency(val, stock.currency)}</span>
+                                    <span class="price-info">@ ${formatCurrency(price, stock.currency)}</span>
+                                </div>`;
+                        } else if (bond) {
+                            const price = currentPrices[ticker]?.price || bond.price;
+                            // Bond value calculation depends on par value, usually price is % of par (100) or actual price.
+                            // Assuming price is actual price per unit for simplicity here, or standard bond pricing.
+                            // If price is e.g. 96.50 (percent), and par is 1000, value is shares * 1000 * (price/100).
+                            // Let's assume 'shares' is 'quantity' and 'price' is 'price per unit' for this example.
+                            const val = (bond.shares * price) / 100.00; 
+                            holdingValue = val;
+                            cellContent = `
+                                <div class="cell-data">
+                                    <span class="shares">${bond.shares} units</span>
+                                    <span class="value">${formatCurrency(val, bond.currency)}</span>
+                                    <span class="price-info">@ ${formatCurrency(price, bond.currency)}</span>
+                                </div>`;
+                        } else if (cash) {
+                            holdingValue = cash.value;
+                            cellContent = `<span class="value cash">${formatCurrency(cash.value, cash.currency)}</span>`;
+                        }
+                    }
+
+                    rowTotalValue += holdingValue;
+                    rowHtml += `<td>${cellContent}</td>`;
+                });
+
+                // Add Last Price, Change, Change % columns
+                const priceData = currentPrices[ticker] || {};
+                const price = priceData.price || 0;
+                const change = priceData.change || 0;
+                const changePct = priceData.change_percent || '0%';
+                const changeClass = parseFloat(change) >= 0 ? 'positive' : 'negative';
+
+                if (ticker === 'CASH') {
+                    rowHtml += `<td>-</td><td>-</td><td>-</td>`;
+                } else {
+                    rowHtml += `<td>${formatCurrency(price)}</td>`;
+                    rowHtml += `<td class="${changeClass}">${change}</td>`;
+                    rowHtml += `<td class="${changeClass}">${changePct}</td>`;
+                }
+
+                rowHtml += `<td class="row-total">${formatCurrency(rowTotalValue)}</td></tr>`;
+                bodyHtml += rowHtml;
+            });
+
+            // Add Account Totals Row
+            let totalRowHtml = '<tr class="total-row"><td>ACCOUNT TOTALS</td>';
+            accounts.forEach(acc => {
+                let accTotal = 0;
+                if (acc.holdings) {
+                    if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                    if (acc.holdings.stocks) {
+                        acc.holdings.stocks.forEach(s => {
+                            const price = currentPrices[s.ticker]?.price || s.price;
+                            accTotal += s.shares * price;
+                        });
+                    }
+                    if (acc.holdings.bonds) {
+                        acc.holdings.bonds.forEach(b => {
+                            const price = currentPrices[b.ticker]?.price || b.price;
+                            accTotal += (b.shares * price) / 100;
+                        });
+                    }
+                }
+                totalRowHtml += `<td>${formatCurrency(accTotal)}</td>`;
+            });
+            totalRowHtml += '<td></td><td></td><td></td><td></td></tr>'; // Empty cells for Price, Change, Change %, Total Value
+
+            bodyHtml += totalRowHtml;
+            tbody.innerHTML = bodyHtml;
+        }
+
+        function renderOtherAssets() {
+            // Real Estate
+            const reList = document.getElementById('real-estate-list');
+            let reTotal = 0;
+            let reHtml = '';
+            if (assetsData.real_estate) {
+                assetsData.real_estate.forEach(item => {
+                    reTotal += item.value;
+                    reHtml += `<li><span class="desc">${item.description}</span> <span class="val">${formatCurrency(item.value, item.currency)}</span></li>`;
+                });
+            }
+            reList.innerHTML = reHtml;
+            document.getElementById('real-estate-total').textContent = formatCurrency(reTotal);
+
+            // Vehicles
+            const vList = document.getElementById('vehicles-list');
+            let vTotal = 0;
+            let vHtml = '';
+            if (assetsData.vehicles) {
+                assetsData.vehicles.forEach(item => {
+                    vTotal += item.value;
+                    vHtml += `<li><span class="desc">${item.description}</span> <span class="val">${formatCurrency(item.value, item.currency)}</span></li>`;
+                });
+            }
+            vList.innerHTML = vHtml;
+            document.getElementById('vehicles-total').textContent = formatCurrency(vTotal);
+        }
+
+        function calculateNetWorth() {
+            let total = 0;
+            
+            // Real Estate
+            if (assetsData.real_estate) {
+                assetsData.real_estate.forEach(i => total += i.value);
+            }
+            // Vehicles
+            if (assetsData.vehicles) {
+                assetsData.vehicles.forEach(i => total += i.value);
+            }
+            // Accounts
+            if (assetsData.accounts) {
+                assetsData.accounts.forEach(acc => {
+                    if (acc.holdings) {
+                        if (acc.holdings.cash) total += acc.holdings.cash.value;
+                        if (acc.holdings.stocks) {
+                            acc.holdings.stocks.forEach(s => {
+                                const price = currentPrices[s.ticker]?.price || s.price;
+                                total += s.shares * price;
+                            });
+                        }
+                        if (acc.holdings.bonds) {
+                            acc.holdings.bonds.forEach(b => {
+                                const price = currentPrices[b.ticker]?.price || b.price;
+                                total += (b.shares * price) / 100;
+                            });
+                        }
+                    }
+                });
+            }
+
+            document.getElementById('total-net-worth').textContent = formatCurrency(total);
+        }
+
+        // Initial load
+        fetchAssets();
+    </script>
+</body>
+</html>

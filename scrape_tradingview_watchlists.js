@@ -435,6 +435,7 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
                 // Cell 3: Volume (optional)
                 
                 const lastPriceStr = $(cells[0]).find('.value-dCK2c9ft').text().trim();
+                const chgPctStr = $(cells[1]).find('.value-dCK2c9ft').text().trim();
                 const chgStr = $(cells[2]).find('.value-dCK2c9ft').text().trim();
 
                 const lastPrice = cleanNumber(lastPriceStr);
@@ -454,6 +455,8 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
                     const data = {
                         key: symbol,
                         last_price: lastPrice,
+                        price_change_decimal: chgStr,
+                        price_change_percent: chgPctStr,
                         source: "tradingview",
                         previous_close_price: prevClose,
                         capture_time: new Date().toISOString(),
