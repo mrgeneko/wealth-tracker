@@ -56,19 +56,16 @@
           {
             "ticker": "AAPL",
             "shares": 150,
-            "price": 189.50,
             "currency": "USD"
           },
           {
             "ticker": "NVDA",
             "shares": 50,
-            "price": 485.00,
             "currency": "USD"
           },
           {
             "ticker": "VOO",
             "shares": 200,
-            "price": 435.20,
             "currency": "USD"
           }
         ],
@@ -78,7 +75,6 @@
             "maturity_date": "2033-05-15",
             "coupon": 3.375,
             "shares": 100,
-            "price": 96.50,
             "currency": "USD"
           }
         ]
