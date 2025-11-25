@@ -99,11 +99,18 @@
             }).format(value);
         }
 
+        function formatNumber(value) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value);
+        }
+
         function renderDashboard() {
             if (!assetsData) return;
 
             const allAccounts = assetsData.accounts || [];
-            const bankTypes = ['checking', 'savings', 'hysa', 'cd', 'mortgage', 'credit card'];
+            const bankTypes = ['checking', 'savings', 'hysa', 'cd', 'mortgage', 'credit card', 'money market'];
             
             const bankAccounts = allAccounts.filter(acc => bankTypes.includes(acc.type.toLowerCase()));
             const investmentAccounts = allAccounts.filter(acc => !bankTypes.includes(acc.type.toLowerCase()));
@@ -180,8 +187,7 @@
                             cellContent = `
                                 <div class="cell-data">
                                     <span class="shares">${stock.shares} sh</span>
-                                    <span class="value">${formatCurrency(val, stock.currency)}</span>
-                                    <span class="price-info">@ ${formatCurrency(price, stock.currency)}</span>
+                                    <span class="value">${formatNumber(val)}</span>
                                 </div>`;
                         } else if (bond) {
                             const price = currentPrices[ticker]?.price || bond.price;
@@ -194,12 +200,11 @@
                             cellContent = `
                                 <div class="cell-data">
                                     <span class="shares">${bond.shares} units</span>
-                                    <span class="value">${formatCurrency(val, bond.currency)}</span>
-                                    <span class="price-info">@ ${formatCurrency(price, bond.currency)}</span>
+                                    <span class="value">${formatNumber(val)}</span>
                                 </div>`;
                         } else if (cash) {
                             holdingValue = cash.value;
-                            cellContent = `<span class="value cash">${formatCurrency(cash.value, cash.currency)}</span>`;
+                            cellContent = `<span class="value cash">${formatNumber(cash.value)}</span>`;
                         }
                     }
 
@@ -228,7 +233,7 @@
                     }
                 }
 
-                rowHtml += `<td class="row-total">${formatCurrency(rowTotalValue)}</td></tr>`;
+                rowHtml += `<td class="row-total">${formatNumber(rowTotalValue)}</td></tr>`;
                 bodyHtml += rowHtml;
             });
 
@@ -253,12 +258,12 @@
                     }
                 }
                 grandTotal += accTotal;
-                totalRowHtml += `<td>${formatCurrency(accTotal)}</td>`;
+                totalRowHtml += `<td>${formatNumber(accTotal)}</td>`;
             });
             if (!isBank) {
                 totalRowHtml += '<td></td><td></td><td></td><td></td><td></td>';
             }
-            totalRowHtml += `<td>${formatCurrency(grandTotal)}</td></tr>`;
+            totalRowHtml += `<td>${formatNumber(grandTotal)}</td></tr>`;
 
             bodyHtml += totalRowHtml;
             tbody.innerHTML = bodyHtml;
