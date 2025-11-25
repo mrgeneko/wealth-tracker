@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
+const basicAuth = require('express-basic-auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +15,17 @@ const io = socketIo(server);
 const PORT = process.env.PORT || 3001;
 // Path to assets file - adjust relative to where you run the script
 const ASSETS_FILE = path.join(__dirname, '../assets_liabilities.json');
+
+// Basic Auth Configuration
+const AUTH_USER = process.env.BASIC_AUTH_USER || 'admin';
+const AUTH_PASS = process.env.BASIC_AUTH_PASSWORD || 'admin';
+
+// Apply Basic Auth middleware
+app.use(basicAuth({
+    users: { [AUTH_USER]: AUTH_PASS },
+    challenge: true,
+    realm: 'Wealth Tracker Dashboard'
+}));
 
 // Kafka Configuration
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
