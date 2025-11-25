@@ -27,6 +27,24 @@ services:
         resources:
           limits:
             memory: 8g
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: wealth-tracker-dashboard
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: price_data
+      KAFKA_GROUP_ID: dashboard-group
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./assets_liabilities.json:/assets_liabilities.json:ro
+
   mysql:
     image: mysql:8.0
     container_name: wealth-tracker-mysql
