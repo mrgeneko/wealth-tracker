@@ -4,6 +4,7 @@ body {
     color: #333;
     margin: 0;
     padding: 20px;
+    font-size: 0.75rem;
 }
 
 .container {
@@ -22,10 +23,10 @@ header {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-h1 { margin: 0; font-size: 1.0rem; }
+h1 { margin: 0; font-size: 0.85rem; }
 
 .net-worth {
-    font-size: 1.0rem;
+    font-size: 0.85rem;
     font-weight: bold;
     color: #2c3e50;
 }
@@ -38,7 +39,7 @@ section {
     margin-bottom: 20px;
 }
 
-h2, h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+h2, h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 0.8rem; }
 
 /* Grid Table */
 .grid-container {
@@ -52,10 +53,10 @@ table {
 }
 
 th, td {
-    padding: 8px;
+    padding: 6px;
     text-align: right;
     border-bottom: 1px solid #eee;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
 }
 
 th {
@@ -76,7 +77,7 @@ th:first-child, td:first-child {
 th:first-child { background-color: #f8f9fa; z-index: 2; }
 
 .account-type {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     color: #666;
     font-weight: normal;
     text-transform: uppercase;
@@ -86,16 +87,25 @@ th:first-child { background-color: #f8f9fa; z-index: 2; }
     color: #2980b9;
 }
 
+.time-cell {
+    font-size: 0.55rem;
+    color: #7f8c8d;
+}
+
+.source-cell {
+    color: #7f8c8d;
+}
+
 .cell-data {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
 }
 
-.shares { color: #7f8c8d; font-size: 0.7rem; }
+.shares { color: #7f8c8d; font-size: 0.6rem; }
 .value { font-weight: 600; }
-.price-info { color: #95a5a6; font-size: 0.65rem; }
+.price-info { color: #95a5a6; font-size: 0.55rem; }
 .cash { color: #27ae60; font-weight: bold; }
 
 .row-total {
@@ -124,15 +134,16 @@ th:first-child { background-color: #f8f9fa; z-index: 2; }
 .asset-card li {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
+    padding: 6px 0;
     border-bottom: 1px solid #f1f1f1;
+    font-size: 0.7rem;
 }
 
 .subtotal {
     margin-top: 15px;
     text-align: right;
     font-weight: bold;
-    font-size: 1.1rem;
+    font-size: 0.85rem;
 }
 
 @media (max-width: 768px) {
@@ -161,9 +172,9 @@ th:first-child { background-color: #f8f9fa; z-index: 2; }
 }
 
 .flash-positive {
-    animation: flash-green 1.5s ease-out;
+    animation: flash-green 2s ease-out;
 }
 
 .flash-negative {
-    animation: flash-red 1.5s ease-out;
+    animation: flash-red 2s ease-out;
 }

@@ -65,7 +65,7 @@
         let assetsData = null;
         let currentPrices = {};
         let previousPrices = {}; // Track previous prices for flash effect
-        let changedTickers = new Set(); // Track which tickers just changed
+        let activeFlashes = {}; // Track active flash states: { ticker: { flashClass, endTime } }
 
         // Fetch assets structure
         async function fetchAssets() {
@@ -82,8 +82,8 @@
         socket.on('price_update', (prices) => {
             console.log('Received price update', prices);
             
-            // Detect which tickers changed
-            changedTickers.clear();
+            // Detect which tickers changed and queue flash effects
+            const now = Date.now();
             for (const ticker in prices) {
                 const prev = previousPrices[ticker];
                 const curr = prices[ticker];
@@ -94,7 +94,13 @@
                         prev.change_percent !== curr.change_percent ||
                         prev.time !== curr.time ||
                         prev.source !== curr.source) {
-                        changedTickers.add(ticker);
+                        // Queue a new flash for this ticker
+                        const change = curr.change || 0;
+                        const flashClass = parseFloat(change) >= 0 ? 'flash-positive' : 'flash-negative';
+                        activeFlashes[ticker] = {
+                            flashClass: flashClass,
+                            endTime: now + 2000
+                        };
                     }
                 }
             }
@@ -105,33 +111,52 @@
             
             if (assetsData) {
                 renderDashboard();
-                // Apply flash effect to changed tickers
-                applyFlashEffect();
+                // Apply flash effects after DOM update
+                requestAnimationFrame(() => {
+                    applyFlashEffects();
+                });
             }
         });
 
-        function applyFlashEffect() {
-            changedTickers.forEach(ticker => {
+        function applyFlashEffects() {
+            const now = Date.now();
+            
+            // Apply all active flashes
+            for (const ticker in activeFlashes) {
+                const flash = activeFlashes[ticker];
+                
+                // Check if flash has expired
+                if (now >= flash.endTime) {
+                    delete activeFlashes[ticker];
+                    continue;
+                }
+                
                 const priceCell = document.querySelector(`[data-price-cell="${ticker}"]`);
                 if (priceCell) {
-                    const change = currentPrices[ticker]?.change || 0;
-                    const flashClass = parseFloat(change) >= 0 ? 'flash-positive' : 'flash-negative';
-                    
-                    // Remove any existing flash class
+                    // Remove any existing flash class first
                     priceCell.classList.remove('flash-positive', 'flash-negative');
                     
                     // Force reflow to restart animation
                     void priceCell.offsetWidth;
                     
                     // Add flash class
-                    priceCell.classList.add(flashClass);
-                    
-                    // Remove flash class after animation completes
-                    setTimeout(() => {
-                        priceCell.classList.remove(flashClass);
-                    }, 1500);
+                    priceCell.classList.add(flash.flashClass);
                 }
-            });
+            }
+            
+            // Schedule cleanup of expired flashes
+            setTimeout(() => {
+                const now = Date.now();
+                for (const ticker in activeFlashes) {
+                    if (now >= activeFlashes[ticker].endTime) {
+                        delete activeFlashes[ticker];
+                        const priceCell = document.querySelector(`[data-price-cell="${ticker}"]`);
+                        if (priceCell) {
+                            priceCell.classList.remove('flash-positive', 'flash-negative');
+                        }
+                    }
+                }
+            }, 2100);
         }
 
         // Listen for assets updates
@@ -205,17 +230,20 @@
                 headerHtml += `<th>${acc.name}<br><span class="account-type">${acc.type}</span></th>`;
             });
             if (!isBank) {
-                headerHtml += '<th>Last Price</th><th>Change</th><th>Change %</th><th>Time</th><th>Source</th>';
+                headerHtml += '<th>Last Price</th><th>Change</th><th>Change %</th><th>Time</th><th>Source</th><th>Value Change</th>';
             }
             headerHtml += '<th>Total Value</th></tr>';
             thead.innerHTML = headerHtml;
 
             // 3. Build Rows
             let bodyHtml = '';
+            let totalValueChange = 0; // Track total value change across all holdings
             
             sortedHoldings.forEach(ticker => {
                 let rowHtml = `<tr><td class="ticker-cell">${ticker}</td>`;
                 let rowTotalValue = 0;
+                let rowTotalShares = 0; // Track total shares for this ticker across all accounts
+                let isBond = false;
 
                 accounts.forEach(acc => {
                     let cellContent = '-';
@@ -233,6 +261,7 @@
                             const price = currentPrices[ticker]?.price || 0;
                             const val = stock.shares * price;
                             holdingValue = val;
+                            rowTotalShares += stock.shares;
                             cellContent = `
                                 <div class="cell-data">
                                     <span class="shares">${stock.shares} sh</span>
@@ -246,6 +275,8 @@
                             // Let's assume 'shares' is 'quantity' and 'price' is 'price per unit' for this example.
                             const val = (bond.shares * price) / 100.00; 
                             holdingValue = val;
+                            rowTotalShares += bond.shares;
+                            isBond = true;
                             cellContent = `
                                 <div class="cell-data">
                                     <span class="shares">${bond.shares} units</span>
@@ -261,24 +292,31 @@
                     rowHtml += `<td>${cellContent}</td>`;
                 });
 
-                // Add Last Price, Change, Change % columns
+                // Add Last Price, Change, Change %, Value Change columns
                 if (!isBank) {
                     const priceData = currentPrices[ticker] || {};
                     const price = priceData.price || 0;
-                    const change = priceData.change || 0;
+                    const change = parseFloat(priceData.change) || 0;
                     const changePct = priceData.change_percent || '0%';
-                    const changeClass = parseFloat(change) >= 0 ? 'positive' : 'negative';
+                    const changeClass = change >= 0 ? 'positive' : 'negative';
                     const time = priceData.time ? new Date(priceData.time).toLocaleString() : '-';
                     const source = priceData.source || '-';
 
                     if (ticker === 'CASH') {
-                        rowHtml += `<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
+                        rowHtml += `<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
                     } else {
-                        rowHtml += `<td data-price-cell="${ticker}">${formatCurrency(price)}</td>`;
+                        // Calculate value change: total shares * price change
+                        // For bonds, divide by 100 like we do for value
+                        const valueChange = isBond ? (rowTotalShares * change) / 100 : rowTotalShares * change;
+                        totalValueChange += valueChange;
+                        const valueChangeClass = valueChange >= 0 ? 'positive' : 'negative';
+                        
+                        rowHtml += `<td data-price-cell="${ticker}">${formatNumber(price)}</td>`;
                         rowHtml += `<td class="${changeClass}">${change}</td>`;
                         rowHtml += `<td class="${changeClass}">${changePct}</td>`;
-                        rowHtml += `<td>${time}</td>`;
-                        rowHtml += `<td>${source}</td>`;
+                        rowHtml += `<td class="time-cell">${time}</td>`;
+                        rowHtml += `<td class="source-cell">${source}</td>`;
+                        rowHtml += `<td class="${valueChangeClass}">${formatNumber(valueChange)}</td>`;
                     }
                 }
 
@@ -310,7 +348,8 @@
                 totalRowHtml += `<td>${formatNumber(accTotal)}</td>`;
             });
             if (!isBank) {
-                totalRowHtml += '<td></td><td></td><td></td><td></td><td></td>';
+                const totalValueChangeClass = totalValueChange >= 0 ? 'positive' : 'negative';
+                totalRowHtml += `<td></td><td></td><td></td><td></td><td></td><td class="${totalValueChangeClass}">${formatNumber(totalValueChange)}</td>`;
             }
             totalRowHtml += `<td>${formatNumber(grandTotal)}</td></tr>`;
 
