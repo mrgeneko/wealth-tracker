@@ -29,7 +29,6 @@
   },
   "cnbc": {
     "name": "cnbc",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -39,7 +38,6 @@
   },
   "fintel": {
     "name": "fintel",
-    "download": "singlefile",
     "has_realtime": false,
     "has_pre_market": false,
     "has_after_hours": false,
@@ -49,7 +47,6 @@
   },
   "google": {
     "name": "google",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -59,7 +56,6 @@
   },
   "investing": {
     "name": "investing",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -69,7 +65,6 @@
   },
   "marketbeat": {
     "name": "marketbeat",
-    "download": "singlefile",
     "has_realtime": false,
     "has_pre_market": false,
     "has_after_hours": false,
@@ -79,7 +74,6 @@
   },
   "moomoo": {
     "name": "moomoo",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -89,7 +83,6 @@
   },
   "nasdaq": {
     "name": "nasdaq",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -99,7 +92,6 @@
   },
   "robinhood": {
     "name": "robinhood",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -109,7 +101,6 @@
   },
   "stockanalysis": {
     "name": "stockanalysis",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -119,7 +110,6 @@
   },
   "stocktwits": {
     "name": "stocktwits",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -129,7 +119,6 @@
   },
   "tradingview": {
     "name": "tradingview",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -139,7 +128,6 @@
   },
   "webull": {
     "name": "webull",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -149,7 +137,6 @@
   },
   "wsj": {
     "name": "wsj",
-    "download": "singlefile",
     "has_realtime": false,
     "has_pre_market": false,
     "has_after_hours": false,
@@ -159,7 +146,6 @@
   },
   "ycharts": {
     "name": "ycharts",
-    "download": "singlefile",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,
@@ -169,7 +155,6 @@
   },
   "yahoo": {
     "name": "yahoo",
-    "download": "yfinance",
     "has_realtime": true,
     "has_pre_market": true,
     "has_after_hours": true,

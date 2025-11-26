@@ -2,7 +2,7 @@ services:
   scrapers:
       build:
         context: .
-        dockerfile: Dockerfile.scrapers
+        dockerfile: docker/Dockerfile.scrapers
       platform: linux/amd64
       container_name: wealth-tracker-scrapers
       environment:
@@ -52,7 +52,7 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./assets_liabilities.json:/assets_liabilities.json:ro
+      - ./config/assets_liabilities.json:/assets_liabilities.json:ro
 
   mysql:
     image: mysql:8.0
@@ -107,7 +107,7 @@ services:
   kafka-consumer:
     build:
       context: .
-      dockerfile: Dockerfile.consumer
+      dockerfile: docker/Dockerfile.consumer
     container_name: wealth-tracker-kafka-consumer
     depends_on:
       - kafka
@@ -123,27 +123,6 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
     # command can be omitted if set in Dockerfile
 
-  singlefile:
-    image: capsulecode/singlefile:latest
-    container_name: wealth-tracker-singlefile
-    volumes:
-      - /Users/gene/wealth_tracker_logs:/usr/src/app/out
-
-  parse-investing:
-    build:
-      context: .
-      dockerfile: Dockerfile.parse_investing
-    container_name: wealth-tracker-parse-investing
-    volumes:
-      - /Users/gene/wealth_tracker_logs:/usr/src/app/logs
-    depends_on:
-      - kafka
-      - mysql
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      # Add other needed env vars here
-    command: ["bash", "parse_investing_com_html.sh"]
-      
   log-rotator:
     image: alpine:3.19
     container_name: wealth-tracker-log-rotator
