@@ -24,6 +24,7 @@ const { scrapeMoomoo } = require('./scrape_moomoo');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
 const { scrapeRobinhood } = require('./scrape_robinhood');
 const { scrapeStockAnalysis } = require('./scrape_stockanalysis');
+const { scrapeStocktwits } = require('./scrape_stocktwits');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeWSJ } = require('./scrape_wsj');
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
@@ -37,6 +38,7 @@ const scraperMap = {
 	'nasdaq': scrapeNasdaq,
     'robinhood': scrapeRobinhood,
 	'stockanalysis': scrapeStockAnalysis,
+    'stocktwits': scrapeStocktwits,
     'ycharts': scrapeYCharts,
 	'webull': scrapeWebull,
     'wsj': scrapeWSJ

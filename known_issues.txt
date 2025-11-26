@@ -1,0 +1,8 @@
+1. during regular trading hours, an update from cnbc for SCHG displayed
+as after-hours
+
+
+TODO:
+create intraday history of total net worth and draw a graph
+add crud from web page, history of assets over time.
+should there be multiple 'logins'?
