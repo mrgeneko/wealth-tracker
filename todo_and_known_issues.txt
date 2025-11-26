@@ -1,10 +1,17 @@
 1. during regular trading hours, an update from cnbc for SCHG displayed
 as after-hours
 2. switching between multiple watchlists on investing.com is broken
-
+3. changing the healthcheck port to 3002 didn't seem to work
 TODO:
+symbols assume US stock markets. how to handle other exchanges?
+change scrapers to work with ticker without url where possible
+create demo assets_liabilities (without need for investing.com watchlist).
 create intraday history of total net worth and draw a graph
 add crud from web page, history of assets over time.
+when new ticker added from web, need a way to retrieve pricing,
+   potentially send price from web to mysql table, or scraper daemon
+export data from web?
+
 should there be multiple 'logins'?
 
 
