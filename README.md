@@ -83,6 +83,10 @@ Defines the securities to track and their data sources.
 - **Update**: Edit the file on your host machine.
 - **Apply**: The scraper daemon automatically reloads this file when it changes. No restart needed.
 
+**Note on Data vs. Config Directories:**
+- `/usr/src/app/data` (Runtime/Persistent): This is the "live" folder where the application looks for configuration. It is mounted from your host (e.g., `~/wealth_tracker_data`), so changes persist across container restarts.
+- `/usr/src/app/config` (Template/Default): This directory inside the container holds the default configuration files copied during the build. If `config.json` is missing from the `data` folder at startup, the entrypoint script copies the default one from `config` to `data` to ensure the app can start.
+
 ### 3. Dashboard Assets (`assets_liabilities.json`)
 Defines the accounts and hierarchy displayed on the dashboard.
 - **Location**: Project root (`./assets_liabilities.json`).
