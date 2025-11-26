@@ -121,6 +121,14 @@ th:first-child { background-color: #252525; z-index: 2; }
     color: #fff;
 }
 
+.total-row td.positive {
+    color: #2ecc71;
+}
+
+.total-row td.negative {
+    color: #e74c3c;
+}
+
 /* Other Assets */
 .split-view {
     display: grid;
