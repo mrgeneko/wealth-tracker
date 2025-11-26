@@ -234,6 +234,31 @@
             calculateNetWorth();
         }
 
+        let currentSort = { column: 'ticker', direction: 'asc' };
+
+        function handleSort(column) {
+            if (currentSort.column === column) {
+                if (column === 'ticker') {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    if (currentSort.direction === 'desc') {
+                        currentSort.direction = 'asc';
+                    } else {
+                        currentSort.column = 'ticker';
+                        currentSort.direction = 'asc';
+                    }
+                }
+            } else {
+                currentSort.column = column;
+                if (column === 'ticker') {
+                    currentSort.direction = 'asc';
+                } else {
+                    currentSort.direction = 'desc';
+                }
+            }
+            renderDashboard();
+        }
+
         function renderGrid(tableId, accounts) {
             const gridTable = document.getElementById(tableId);
             if (!gridTable) return;
@@ -255,32 +280,106 @@
                     if (acc.holdings.cash) allHoldings.add('CASH');
                 }
             });
-            const sortedHoldings = Array.from(allHoldings).sort((a, b) => {
-                if (a === 'CASH') return 1;
-                if (b === 'CASH') return -1;
-                return a.localeCompare(b);
+
+            // Prepare data for sorting
+            let rowsData = Array.from(allHoldings).map(ticker => {
+                let rowTotalValue = 0;
+                let rowTotalShares = 0;
+                let isBond = false;
+                
+                accounts.forEach(acc => {
+                    if (acc.holdings) {
+                        const stock = acc.holdings.stocks?.find(s => s.ticker === ticker);
+                        const bond = acc.holdings.bonds?.find(b => b.ticker === ticker);
+                        const cash = (ticker === 'CASH' && acc.holdings.cash) ? acc.holdings.cash : null;
+
+                        if (stock) {
+                            const price = currentPrices[ticker]?.price || 0;
+                            rowTotalValue += stock.shares * price;
+                            rowTotalShares += stock.shares;
+                        } else if (bond) {
+                            const price = currentPrices[ticker]?.price || 0;
+                            rowTotalValue += (bond.shares * price) / 100.00;
+                            rowTotalShares += bond.shares;
+                            isBond = true;
+                        } else if (cash) {
+                            rowTotalValue += cash.value;
+                        }
+                    }
+                });
+
+                const priceData = currentPrices[ticker] || {};
+                const change = parseFloat(priceData.change) || 0;
+                const changePctStr = priceData.change_percent || '0%';
+                const changePct = parseFloat(changePctStr.replace('%', '')) || 0;
+                
+                let valueChange = 0;
+                if (ticker !== 'CASH') {
+                     valueChange = isBond ? (rowTotalShares * change) / 100 : rowTotalShares * change;
+                }
+
+                return {
+                    ticker,
+                    totalValue: rowTotalValue,
+                    changePercent: changePct,
+                    valueChange: valueChange
+                };
+            });
+
+            // Sort rowsData if this is the investment table
+            const isInvestmentTable = tableId === 'holdings-grid';
+            
+            rowsData.sort((a, b) => {
+                if (a.ticker === 'CASH') return 1;
+                if (b.ticker === 'CASH') return -1;
+
+                if (!isInvestmentTable) {
+                     return a.ticker.localeCompare(b.ticker);
+                }
+
+                let valA = a[currentSort.column];
+                let valB = b[currentSort.column];
+                
+                if (currentSort.column === 'ticker') {
+                    return currentSort.direction === 'asc' 
+                        ? valA.localeCompare(valB) 
+                        : valB.localeCompare(valA);
+                }
+
+                return currentSort.direction === 'asc' ? valA - valB : valB - valA;
             });
 
             // 2. Build Header Row
             const isBank = tableId === 'bank-accounts-grid';
-            let headerHtml = '<tr><th>Holding</th>';
+            
+            const getSortHeader = (col, label) => {
+                if (!isInvestmentTable) return `<th>${label}</th>`;
+                let arrow = '';
+                if (currentSort.column === col) {
+                    arrow = currentSort.direction === 'asc' ? ' ▲' : ' ▼';
+                }
+                return `<th onclick="handleSort('${col}')" style="cursor:pointer; user-select: none;">${label}${arrow}</th>`;
+            };
+
+            let headerHtml = `<tr>${getSortHeader('ticker', 'Ticker')}`;
             accounts.forEach(acc => {
                 headerHtml += `<th>${acc.name}<br><span class="account-type">${acc.type}</span></th>`;
             });
             if (!isBank) {
-                headerHtml += '<th>Last Price</th><th>Change</th><th>Change %</th><th>Time</th><th>Source</th><th>Value Change</th>';
+                headerHtml += `<th>Last Price</th><th>Change</th>${getSortHeader('changePercent', 'Change %')}<th>Time</th><th>Source</th>${getSortHeader('valueChange', 'Value Change')}`;
             }
-            headerHtml += '<th>Total Value</th></tr>';
+            headerHtml += `${getSortHeader('totalValue', 'Total Value')}</tr>`;
             thead.innerHTML = headerHtml;
 
             // 3. Build Rows
             let bodyHtml = '';
-            let totalValueChange = 0; // Track total value change across all holdings
+            let totalValueChange = 0; 
             
-            sortedHoldings.forEach(ticker => {
+            rowsData.forEach(row => {
+                const ticker = row.ticker;
                 let rowHtml = `<tr><td class="ticker-cell">${ticker}</td>`;
                 let rowTotalValue = 0;
-                let rowTotalShares = 0; // Track total shares for this ticker across all accounts
+                let rowTotalShares = 0; 
                 let isBond = false;
 
                 accounts.forEach(acc => {
@@ -288,11 +387,8 @@
                     let holdingValue = 0;
 
                     if (acc.holdings) {
-                        // Check for Stock
                         const stock = acc.holdings.stocks?.find(s => s.ticker === ticker);
-                        // Check for Bond
                         const bond = acc.holdings.bonds?.find(b => b.ticker === ticker);
-                        // Check for Cash
                         const cash = (ticker === 'CASH' && acc.holdings.cash) ? acc.holdings.cash : null;
 
                         if (stock) {
@@ -307,10 +403,6 @@
                                 </div>`;
                         } else if (bond) {
                             const price = currentPrices[ticker]?.price || 0;
-                            // Bond value calculation depends on par value, usually price is % of par (100) or actual price.
-                            // Assuming price is actual price per unit for simplicity here, or standard bond pricing.
-                            // If price is e.g. 96.50 (percent), and par is 1000, value is shares * 1000 * (price/100).
-                            // Let's assume 'shares' is 'quantity' and 'price' is 'price per unit' for this example.
                             const val = (bond.shares * price) / 100.00; 
                             holdingValue = val;
                             rowTotalShares += bond.shares;
@@ -330,7 +422,6 @@
                     rowHtml += `<td>${cellContent}</td>`;
                 });
 
-                // Add Last Price, Change, Change %, Value Change columns
                 if (!isBank) {
                     const priceData = currentPrices[ticker] || {};
                     const price = priceData.price || 0;
@@ -343,8 +434,6 @@
                     if (ticker === 'CASH') {
                         rowHtml += `<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
                     } else {
-                        // Calculate value change: total shares * price change
-                        // For bonds, divide by 100 like we do for value
                         const valueChange = isBond ? (rowTotalShares * change) / 100 : rowTotalShares * change;
                         totalValueChange += valueChange;
                         const valueChangeClass = valueChange >= 0 ? 'positive' : 'negative';
