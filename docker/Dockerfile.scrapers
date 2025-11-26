@@ -26,7 +26,7 @@ EXPOSE 5901
 
 
 # Copy unified entrypoint only (cron and lock script removed)
-COPY entrypoint_unified.sh /usr/local/bin/entrypoint_unified.sh
+COPY docker/entrypoint_unified.sh /usr/local/bin/entrypoint_unified.sh
 RUN chmod +x /usr/local/bin/entrypoint_unified.sh
 
 # Use the unified entrypoint

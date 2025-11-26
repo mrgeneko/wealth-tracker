@@ -2,9 +2,9 @@
   "name": "wealth-tracker-scrapers",
   "version": "1.0.0",
   "description": "web scraping via Chrome automation",
-  "main": "scrape_security_data.js",
+  "main": "scrapers/scrape_security_data.js",
   "scripts": {
-    "start": "node scrape_security_data.js"
+    "start": "node scrapers/scrape_security_data.js"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
