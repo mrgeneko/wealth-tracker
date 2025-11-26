@@ -113,11 +113,11 @@ mkdir -p /usr/src/app/data || true
 # If the mounted data dir doesn't include a config.json, populate it from the image
 # copy of `config.json` (if present). This makes first-run on a fresh host easier.
 if [ ! -f /usr/src/app/data/config.json ]; then
-  if [ -f /usr/src/app/config.json ]; then
-    echo "[DEBUG] /usr/src/app/data/config.json missing — copying default from /usr/src/app/config.json"
-    cp /usr/src/app/config.json /usr/src/app/data/config.json || echo "[WARN] failed to copy default config to /usr/src/app/data/config.json"
+  if [ -f /usr/src/app/config/config.json ]; then
+    echo "[DEBUG] /usr/src/app/data/config.json missing — copying default from /usr/src/app/config/config.json"
+    cp /usr/src/app/config/config.json /usr/src/app/data/config.json || echo "[WARN] failed to copy default config to /usr/src/app/data/config.json"
   else
-    echo "[WARN] No default config found at /usr/src/app/config.json to populate /usr/src/app/data/config.json"
+    echo "[WARN] No default config found at /usr/src/app/config/config.json to populate /usr/src/app/data/config.json"
   fi
 else
   echo "[DEBUG] /usr/src/app/data/config.json already present; leaving intact."
@@ -126,4 +126,4 @@ fi
 echo "[DEBUG] Executing scrape_security_data as PID 1 (exec)..."
 # Exec will replace this shell with the Node process, ensuring Docker SIGTERM/SIGINT
 # are delivered directly to Node and its handlers (graceful shutdown will run).
-exec node /usr/src/app/scrape_security_data.js
+exec node /usr/src/app/scrapers/scrape_security_data.js

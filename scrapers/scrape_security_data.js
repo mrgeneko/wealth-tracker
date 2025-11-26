@@ -68,6 +68,18 @@ function loadScraperAttributes() {
 		try { logDebug('Loaded/updated scraper attributes (mtime=' + _cachedMtime + ')'); } catch (e) {}
 		return _cachedAttrs;
 	} catch (e) {
+		// Fallback: try loading from config/config.json if data/config.json fails
+		try {
+			const fallbackPath = path.join('/usr/src/app', 'config', 'config.json');
+			if (fs.existsSync(fallbackPath)) {
+				const txt = fs.readFileSync(fallbackPath, 'utf8');
+				const parsed = JSON.parse(txt);
+				_cachedAttrs = parsed || {};
+				try { logDebug('Loaded scraper attributes from fallback path'); } catch (e) {}
+				return _cachedAttrs;
+			}
+		} catch (e2) {}
+		
 		try { logDebug('Failed to read/parse scraper attributes: ' + (e && e.message ? e.message : e)); } catch (e2) { console.error('Failed to read/parse scraper attributes', e); }
 		return _cachedAttrs || {};
 	}
