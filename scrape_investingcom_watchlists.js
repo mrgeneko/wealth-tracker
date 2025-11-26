@@ -66,7 +66,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 	const investingPassword = process.env.INVESTING_PASSWORD;
 	try {
 		logDebug('Using createPreparedPage (reuse investing tab if present)');
-		logDebug(`outputDir: ${outputDir}`);
+		//logDebug(`outputDir: ${outputDir}`);
 		const page = await createPreparedPage(browser, {
 			reuseIfUrlMatches: /investing\.com/,
 			url: investingUrl,
@@ -194,18 +194,29 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						}
 					}
 
+					// Calculate extended hours price change from extended_hours_price and previous_close_price
+					let extendedHoursChange = null;
+					const extHoursPrice = parseFloat(String(rowData["extended_hours"] || '').replace(/[$,]/g, ''));
+					const prevClose = parseFloat(String(rowData["prev"] || '').replace(/[$,]/g, ''));
+					if (!isNaN(extHoursPrice) && !isNaN(prevClose) && prevClose !== 0) {
+						extendedHoursChange = (extHoursPrice - prevClose).toFixed(2);
+					}
+
 					const data = {
 						key: rowData["symbol"],
 						last_price: rowData["last"],
 						price_change_decimal: rowData["chg"],
 						price_change_percent: rowData["chgpercent"],
+						extended_hours_price: rowData["extended_hours"] || null,
+						extended_hours_change: extendedHoursChange,
+						extended_hours_change_percent: rowData["extended_hours_percent"] || null,
 						source: "investing",
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString(),
 						last_price_quote_time: qTime
 					};
 					dataObjects.push(data);
-					logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
+					//logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
 				} else {
 					logDebug(`Row ${i} missing critical columns (symbol/last): ${JSON.stringify(rowData)}`);
 				}
