@@ -33,6 +33,7 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
     container_name: wealth-tracker-dashboard
+    restart: unless-stopped
     depends_on:
       - kafka
       - mysql
