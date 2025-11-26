@@ -148,3 +148,22 @@ th:first-child { background-color: #f8f9fa; z-index: 2; }
     color: #c0392b;
     font-weight: 600;
 }
+
+/* Flash effect for price updates */
+@keyframes flash-green {
+    0% { background-color: #27ae60; }
+    100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+    0% { background-color: #c0392b; }
+    100% { background-color: transparent; }
+}
+
+.flash-positive {
+    animation: flash-green 1.5s ease-out;
+}
+
+.flash-negative {
+    animation: flash-red 1.5s ease-out;
+}

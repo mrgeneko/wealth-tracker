@@ -64,6 +64,8 @@
         const socket = io();
         let assetsData = null;
         let currentPrices = {};
+        let previousPrices = {}; // Track previous prices for flash effect
+        let changedTickers = new Set(); // Track which tickers just changed
 
         // Fetch assets structure
         async function fetchAssets() {
@@ -79,11 +81,58 @@
         // Listen for price updates
         socket.on('price_update', (prices) => {
             console.log('Received price update', prices);
+            
+            // Detect which tickers changed
+            changedTickers.clear();
+            for (const ticker in prices) {
+                const prev = previousPrices[ticker];
+                const curr = prices[ticker];
+                if (prev) {
+                    // Check if any relevant field changed
+                    if (prev.price !== curr.price || 
+                        prev.change !== curr.change || 
+                        prev.change_percent !== curr.change_percent ||
+                        prev.time !== curr.time ||
+                        prev.source !== curr.source) {
+                        changedTickers.add(ticker);
+                    }
+                }
+            }
+            
+            // Store previous prices before updating
+            previousPrices = JSON.parse(JSON.stringify(currentPrices));
             currentPrices = prices;
+            
             if (assetsData) {
                 renderDashboard();
+                // Apply flash effect to changed tickers
+                applyFlashEffect();
             }
         });
+
+        function applyFlashEffect() {
+            changedTickers.forEach(ticker => {
+                const priceCell = document.querySelector(`[data-price-cell="${ticker}"]`);
+                if (priceCell) {
+                    const change = currentPrices[ticker]?.change || 0;
+                    const flashClass = parseFloat(change) >= 0 ? 'flash-positive' : 'flash-negative';
+                    
+                    // Remove any existing flash class
+                    priceCell.classList.remove('flash-positive', 'flash-negative');
+                    
+                    // Force reflow to restart animation
+                    void priceCell.offsetWidth;
+                    
+                    // Add flash class
+                    priceCell.classList.add(flashClass);
+                    
+                    // Remove flash class after animation completes
+                    setTimeout(() => {
+                        priceCell.classList.remove(flashClass);
+                    }, 1500);
+                }
+            });
+        }
 
         // Listen for assets updates
         socket.on('assets_update', (assets) => {
@@ -225,7 +274,7 @@
                     if (ticker === 'CASH') {
                         rowHtml += `<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
                     } else {
-                        rowHtml += `<td>${formatCurrency(price)}</td>`;
+                        rowHtml += `<td data-price-cell="${ticker}">${formatCurrency(price)}</td>`;
                         rowHtml += `<td class="${changeClass}">${change}</td>`;
                         rowHtml += `<td class="${changeClass}">${changePct}</td>`;
                         rowHtml += `<td>${time}</td>`;
