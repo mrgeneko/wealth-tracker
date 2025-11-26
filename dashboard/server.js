@@ -104,24 +104,66 @@ setInterval(loadAssets, 30000);
 loadAssets();
 
 // Helper to update cache from price data object
+// Supports extended hours pricing (pre-market, after-hours)
 function updatePriceCache(item) {
-    if (item.key && item.last_price) {
-        // Clean price string (remove $ and commas)
-        const priceVal = parseFloat(String(item.last_price).replace(/[$,]/g, ''));
-        
-        if (!isNaN(priceVal)) {
-            priceCache[item.key] = {
-                price: priceVal,
-                change: item.price_change_decimal,
-                change_percent: item.price_change_percent,
-                currency: 'USD', // Defaulting to USD as scrapers seem to be US-centric mostly
-                time: item.capture_time || new Date().toISOString(),
-                source: item.source
-            };
-            return true;
-        }
+    if (!item.key) return false;
+    
+    // Determine the best price to use
+    // Prefer extended hours prices during pre/post market
+    let price = 0;
+    let priceSource = 'regular';
+    
+    // Check for pre-market price first
+    if (item.pre_market_price && parseFloat(String(item.pre_market_price).replace(/[$,]/g, '')) > 0) {
+        price = parseFloat(String(item.pre_market_price).replace(/[$,]/g, ''));
+        priceSource = 'pre-market';
     }
-    return false;
+    // Then check for after-hours price
+    else if (item.after_hours_price && parseFloat(String(item.after_hours_price).replace(/[$,]/g, '')) > 0) {
+        price = parseFloat(String(item.after_hours_price).replace(/[$,]/g, ''));
+        priceSource = 'after-hours';
+    }
+    // Then check for extended hours (generic)
+    else if (item.extended_hours_price && parseFloat(String(item.extended_hours_price).replace(/[$,]/g, '')) > 0) {
+        price = parseFloat(String(item.extended_hours_price).replace(/[$,]/g, ''));
+        priceSource = 'extended';
+    }
+    // Fall back to regular last price
+    else if (item.last_price) {
+        price = parseFloat(String(item.last_price).replace(/[$,]/g, ''));
+        priceSource = 'regular';
+    }
+    
+    if (isNaN(price) || price === 0) return false;
+    
+    // Determine the best change values based on price source
+    let changeDecimal = 0;
+    let changePercent = '0%';
+    
+    if (priceSource === 'pre-market' && item.pre_market_change) {
+        changeDecimal = parseFloat(item.pre_market_change) || 0;
+        changePercent = item.pre_market_change_percent || '0%';
+    } else if (priceSource === 'after-hours' && item.after_hours_change) {
+        changeDecimal = parseFloat(item.after_hours_change) || 0;
+        changePercent = item.after_hours_change_percent || '0%';
+    } else if (priceSource === 'extended' && item.extended_hours_change) {
+        changeDecimal = parseFloat(item.extended_hours_change) || 0;
+        changePercent = item.extended_hours_change_percent || '0%';
+    } else {
+        changeDecimal = parseFloat(item.price_change_decimal) || 0;
+        changePercent = item.price_change_percent || '0%';
+    }
+    
+    priceCache[item.key] = {
+        price: price,
+        change: changeDecimal,
+        change_percent: changePercent,
+        currency: 'USD',
+        time: item.capture_time || new Date().toISOString(),
+        source: item.source ? `${item.source} (${priceSource})` : priceSource
+    };
+    
+    return true;
 }
 
 // Kafka Consumer Setup
