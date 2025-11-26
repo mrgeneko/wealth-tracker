@@ -426,7 +426,8 @@
                     const priceData = currentPrices[ticker] || {};
                     const price = priceData.price || 0;
                     const change = parseFloat(priceData.change) || 0;
-                    const changePct = priceData.change_percent || '0%';
+                    const changePctStr = priceData.change_percent || '0%';
+                    const changePctVal = parseFloat(changePctStr.replace('%', '')) || 0;
                     const changeClass = change >= 0 ? 'positive' : 'negative';
                     const time = priceData.time ? new Date(priceData.time).toLocaleString() : '-';
                     const source = priceData.source || '-';
@@ -438,9 +439,12 @@
                         totalValueChange += valueChange;
                         const valueChangeClass = valueChange >= 0 ? 'positive' : 'negative';
                         
+                        const displayChange = (change > 0 ? '+' : '') + change.toFixed(3);
+                        const displayChangePct = (changePctVal > 0 ? '+' : '') + changePctVal.toFixed(2) + '%';
+
                         rowHtml += `<td data-price-cell="${ticker}">${formatNumber(price)}</td>`;
-                        rowHtml += `<td class="${changeClass}">${change}</td>`;
-                        rowHtml += `<td class="${changeClass}">${changePct}</td>`;
+                        rowHtml += `<td class="${changeClass}">${displayChange}</td>`;
+                        rowHtml += `<td class="${changeClass}">${displayChangePct}</td>`;
                         rowHtml += `<td class="time-cell">${time}</td>`;
                         rowHtml += `<td class="source-cell">${source}</td>`;
                         rowHtml += `<td class="${valueChangeClass}">${formatNumber(valueChange)}</td>`;
