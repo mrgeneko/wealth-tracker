@@ -28,9 +28,9 @@ while true; do
     LIST_FILE="/tmp/files_to_archive_${TIMESTAMP}.txt"
     
     # Find files to archive (relative paths)
-    # We look for .log, .json, .html older than ARCHIVE_AGE_MIN minutes
+    # We look for .log, .json, .html, .png older than ARCHIVE_AGE_MIN minutes
     if cd "$LOG_DIR"; then
-        find . -maxdepth 1 -type f \( -name '*.log' -o -name '*.json' -o -name '*.html' \) -mmin +$ARCHIVE_AGE_MIN | sed 's|^\./||' > "$LIST_FILE"
+        find . -maxdepth 1 -type f \( -name '*.log' -o -name '*.json' -o -name '*.html' -o -name '*.png' \) -mmin +$ARCHIVE_AGE_MIN | sed 's|^\./||' > "$LIST_FILE"
         
         if [ -s "$LIST_FILE" ]; then
             echo "[rotate-logs] Archiving $(wc -l < "$LIST_FILE") files into $ARCHIVE_NAME"
