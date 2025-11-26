@@ -72,6 +72,8 @@ async function fetchInitialPrices() {
                     time: row.capture_time,
                     source: row.source
                 };
+            } else {
+                console.warn(`Invalid price for ${row.ticker}: ${row.price}`);
             }
         });
         
