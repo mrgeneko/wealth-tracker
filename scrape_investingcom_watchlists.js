@@ -139,7 +139,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			await page.waitForSelector(tabSelector, { visible: true, timeout: 5000 });
 			await page.click(tabSelector);
 			logDebug(`Clicked the tab with title="${watchlist.key}".`);
-			await new Promise(resolve => setTimeout(resolve, 4000));
+			await new Promise(resolve => setTimeout(resolve, 5000));
 		} catch (e) {
 			logDebug(`Tab with title="${watchlist.key}" not found or not clickable: ` + e.message);
 		}
