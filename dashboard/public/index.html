@@ -16,7 +16,14 @@
             </div>
         </header>
 
-        <section id="accounts-grid-section">
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'accounts')">Accounts</button>
+            <button class="tab-button" onclick="openTab(event, 'historical')">Historical Values</button>
+            <button class="tab-button" onclick="openTab(event, 'projections')">Projections</button>
+        </div>
+
+        <div id="accounts" class="tab-content active">
+            <section id="accounts-grid-section">
             <h2>Investment Accounts</h2>
             <div class="grid-container">
                 <table id="holdings-grid">
@@ -58,9 +65,40 @@
                 </div>
             </div>
         </section>
+        </div>
+
+        <div id="historical" class="tab-content">
+            <section>
+                <h2>Historical Values</h2>
+                <p>Coming soon...</p>
+            </section>
+        </div>
+
+        <div id="projections" class="tab-content">
+            <section>
+                <h2>Projections</h2>
+                <p>Coming soon...</p>
+            </section>
+        </div>
     </div>
 
     <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+                tabcontent[i].classList.remove("active");
+            }
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.className += " active";
+        }
+
         const socket = io();
         let assetsData = null;
         let currentPrices = {};
