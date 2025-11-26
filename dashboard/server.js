@@ -113,25 +113,55 @@ function updatePriceCache(item) {
     let price = 0;
     let priceSource = 'regular';
     
-    // Check for pre-market price first
-    if (item.pre_market_price && parseFloat(String(item.pre_market_price).replace(/[$,]/g, '')) > 0) {
-        price = parseFloat(String(item.pre_market_price).replace(/[$,]/g, ''));
-        priceSource = 'pre-market';
-    }
-    // Then check for after-hours price
-    else if (item.after_hours_price && parseFloat(String(item.after_hours_price).replace(/[$,]/g, '')) > 0) {
-        price = parseFloat(String(item.after_hours_price).replace(/[$,]/g, ''));
-        priceSource = 'after-hours';
-    }
-    // Then check for extended hours (generic)
-    else if (item.extended_hours_price && parseFloat(String(item.extended_hours_price).replace(/[$,]/g, '')) > 0) {
-        price = parseFloat(String(item.extended_hours_price).replace(/[$,]/g, ''));
-        priceSource = 'extended';
-    }
-    // Fall back to regular last price
-    else if (item.last_price) {
+    // Helper to check if a time is within regular market hours (Mon-Fri 9:30-16:00 ET)
+    const isRegularHours = (dateObj) => {
+        try {
+            const nyString = dateObj.toLocaleString("en-US", {timeZone: "America/New_York"});
+            const nyDate = new Date(nyString);
+            const day = nyDate.getDay();
+            const hour = nyDate.getHours();
+            const minute = nyDate.getMinutes();
+            const timeInMinutes = hour * 60 + minute;
+            // Mon (1) to Fri (5), 9:30 (570) to 16:00 (960)
+            return (day >= 1 && day <= 5) && (timeInMinutes >= 570 && timeInMinutes < 960);
+        } catch (e) {
+            return false;
+        }
+    };
+
+    const now = new Date();
+    const quoteTime = item.last_price_quote_time ? new Date(item.last_price_quote_time) : null;
+    const preferRegular = isRegularHours(now) && quoteTime && isRegularHours(quoteTime);
+    let foundPrice = false;
+
+    // If in regular session, try regular price first
+    if (preferRegular && item.last_price && parseFloat(String(item.last_price).replace(/[$,]/g, '')) > 0) {
         price = parseFloat(String(item.last_price).replace(/[$,]/g, ''));
         priceSource = 'regular';
+        foundPrice = true;
+    }
+
+    if (!foundPrice) {
+        // Check for pre-market price first
+        if (item.pre_market_price && parseFloat(String(item.pre_market_price).replace(/[$,]/g, '')) > 0) {
+            price = parseFloat(String(item.pre_market_price).replace(/[$,]/g, ''));
+            priceSource = 'pre-market';
+        }
+        // Then check for after-hours price
+        else if (item.after_hours_price && parseFloat(String(item.after_hours_price).replace(/[$,]/g, '')) > 0) {
+            price = parseFloat(String(item.after_hours_price).replace(/[$,]/g, ''));
+            priceSource = 'after-hours';
+        }
+        // Then check for extended hours (generic)
+        else if (item.extended_hours_price && parseFloat(String(item.extended_hours_price).replace(/[$,]/g, '')) > 0) {
+            price = parseFloat(String(item.extended_hours_price).replace(/[$,]/g, ''));
+            priceSource = 'extended';
+        }
+        // Fall back to regular last price
+        else if (item.last_price) {
+            price = parseFloat(String(item.last_price).replace(/[$,]/g, ''));
+            priceSource = 'regular';
+        }
     }
     
     if (isNaN(price) || price === 0) return false;
