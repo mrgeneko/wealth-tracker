@@ -55,6 +55,43 @@ To stop and remove all compose services:
 ```bash
 docker compose down
 ```
+
+## Docker Desktop Setup
+If you are using Docker Desktop, you can manage the application through the GUI:
+
+1. **Start the Stack**: Open a terminal in the project directory and run:
+   ```bash
+   docker compose up -d
+   ```
+2. **View in Dashboard**: Open the Docker Desktop Dashboard. You will see a `wealth-tracker` application group.
+3. **Inspect Containers**: Click on the `wealth-tracker` group to expand it. You will see services like `scrapers`, `dashboard`, `kafka`, `mysql`, etc.
+4. **View Logs**: Click on any container (e.g., `wealth-tracker-scrapers`) to view its live logs. This is equivalent to running `docker logs -f <container_name>`.
+5. **Access Terminal**: To run commands inside a container, click the "Terminal" or "Exec" tab in the container view. This is useful for debugging or checking files inside the container.
+6. **Control Stack**: Use the Play/Stop/Restart buttons in the dashboard to manage the entire application or individual services.
+
+---
+## Managing Configuration
+
+### 1. Environment Variables (`.env`)
+The `.env` file in the project root contains secrets and environment settings (e.g., database passwords).
+- **Update**: Edit `.env` in the project root.
+- **Apply**: Run `docker compose up -d` to recreate containers with new values.
+
+### 2. Scraper Configuration (`config.json`)
+Defines the securities to track and their data sources.
+- **Location**: Mapped from your host data directory (e.g., `~/wealth_tracker_data/config.json`) to `/usr/src/app/data/config.json` inside the container.
+- **Update**: Edit the file on your host machine.
+- **Apply**: The scraper daemon automatically reloads this file when it changes. No restart needed.
+
+### 3. Dashboard Assets (`assets_liabilities.json`)
+Defines the accounts and hierarchy displayed on the dashboard.
+- **Location**: Project root (`./assets_liabilities.json`).
+- **Update**: Edit the file to modify accounts or manual balances.
+- **Apply**: Restart the dashboard container.
+  ```bash
+  docker compose restart dashboard
+  ```
+
 ---
 ## Scraper Daemon (behavior)
 - The scrapers container runs `node /usr/src/app/scrape_security_data.js` as PID 1 (via `entrypoint_unified.sh`).
