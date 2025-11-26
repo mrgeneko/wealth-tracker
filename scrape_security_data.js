@@ -570,6 +570,76 @@ async function runCycle(browser, outputDir) {
 	logDebug('Cycle complete.');
 }
 
+function getDynamicCycleInterval(attrs) {
+    const now = new Date();
+    // Use New York time for market hours
+    const nyTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+    const day = nyTime.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const hour = nyTime.getHours();
+    const minute = nyTime.getMinutes();
+    const timeInMinutes = hour * 60 + minute;
+
+    // Defaults based on user request
+    const defaults = {
+        regular_trading_seconds: 15,
+        pre_market_seconds: 60,
+        after_hours_seconds: 60,
+        overnight_weekday_seconds: 20 * 60,
+        weekend_seconds: 30 * 60
+    };
+
+    const settings = (attrs && attrs.cycle_intervals) ? attrs.cycle_intervals : {};
+    const regularSec = settings.regular_trading_seconds || defaults.regular_trading_seconds;
+    const preMarketSec = settings.pre_market_seconds || defaults.pre_market_seconds;
+    const afterHoursSec = settings.after_hours_seconds || defaults.after_hours_seconds;
+    const overnightSec = settings.overnight_weekday_seconds || defaults.overnight_weekday_seconds;
+    const weekendSec = settings.weekend_seconds || defaults.weekend_seconds;
+
+    // Helper for ranges
+    const isTueFri = day >= 2 && day <= 5;
+    const isMonThu = day >= 1 && day <= 4;
+
+    // Weekend Rule: Fri 20:30 to Mon 04:00
+    if (day === 6 || day === 0) return weekendSec * 1000; // Sat, Sun
+    if (day === 5 && timeInMinutes >= (20 * 60 + 30)) return weekendSec * 1000; // Fri >= 20:30
+    if (day === 1 && timeInMinutes < 4 * 60) return weekendSec * 1000; // Mon < 04:00
+
+    // Weekday Logic (Mon 04:00 to Fri 20:30)
+    
+    // Pre-market: Mon-Fri 04:00 - 09:30
+    if (timeInMinutes >= 4 * 60 && timeInMinutes < 9 * 60 + 30) {
+        return preMarketSec * 1000;
+    }
+
+    // Regular: Mon-Fri 09:30 - 16:00
+    if (timeInMinutes >= 9 * 60 + 30 && timeInMinutes < 16 * 60) {
+        return regularSec * 1000;
+    }
+
+    // After-hours: Mon-Fri 16:00 - 20:00
+    if (timeInMinutes >= 16 * 60 && timeInMinutes < 20 * 60) {
+        return afterHoursSec * 1000;
+    }
+
+    // Overnight Weekdays: 8:00pm to 4:00AM (Mon night to Fri morning)
+    // Tue-Fri < 04:00
+    if (isTueFri && timeInMinutes < 4 * 60) {
+        return overnightSec * 1000;
+    }
+    // Mon-Thu >= 20:00
+    if (isMonThu && timeInMinutes >= 20 * 60) {
+        return overnightSec * 1000;
+    }
+    
+    // Gap check: Fri 20:00 - 20:30 (Treat as overnight/after-hours gap)
+    if (day === 5 && timeInMinutes >= 20 * 60 && timeInMinutes < 20 * 60 + 30) {
+        return overnightSec * 1000;
+    }
+
+    // Fallback
+    return 60000;
+}
+
 async function daemon() {
 	const outputDir = '/usr/src/app/logs';
 	logDebug(version);
@@ -715,7 +785,17 @@ async function daemon() {
 		} catch (e) {
 			// ignore heartbeat errors
 		}
-		await new Promise(r => setTimeout(r, 60000)); // sleep 60s between cycles
+        
+        // Calculate dynamic sleep interval
+        let sleepMs = 60000;
+        try {
+            const attrs = loadScraperAttributes();
+            sleepMs = getDynamicCycleInterval(attrs);
+            logDebug(`Dynamic cycle interval: ${sleepMs/1000}s`);
+        } catch (e) {
+            logDebug('Error calculating dynamic interval: ' + e);
+        }
+		await new Promise(r => setTimeout(r, sleepMs)); // sleep dynamic interval between cycles
 	}
 }
 
