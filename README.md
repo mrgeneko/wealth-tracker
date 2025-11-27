@@ -129,10 +129,17 @@ Heartbeat messages look like:
 
 ### Health endpoint
 
-- The daemon exposes a small HTTP health endpoint on `HEALTH_PORT` (default `3000`). If you expose the port in `docker-compose.yml`, you can query it from the host:
+- The daemon exposes a small HTTP health endpoint on `HEALTH_PORT` (default `3000`). If you expose the port in `docker-compose.yml`, you can query it from the host.
+- **Note**: The root path `/` returns 404 Not Found. You must use one of the specific paths below:
+  - `/health`: Returns JSON status including uptime, last cycle status, and basic metrics.
+  - `/metrics`: Returns Prometheus-formatted metrics (if `METRICS_ENABLED=true`).
 
 ```bash
-curl http://localhost:3000/health
+# Check health status
+curl http://localhost:3002/health
+
+# Check metrics (if enabled)
+curl http://localhost:3002/metrics
 ```
 
 - Example `docker-compose.yml` snippet to expose the port and set the env var:
@@ -142,9 +149,9 @@ services:
 	scrapers:
 		ports:
 			- "5901:5901"
-			- "3000:3000"
+			- "3002:3002"
 		environment:
-			HEALTH_PORT: "3000"
+			HEALTH_PORT: "3002"
 ```
 ---
 ## Important Environment Variables
