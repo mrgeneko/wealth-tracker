@@ -64,10 +64,13 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 	}
 	const investingEmail = process.env.INVESTING_EMAIL;
 	const investingPassword = process.env.INVESTING_PASSWORD;
+	const dateTimeString = getDateTimeString();
+	const safeWatchlistKey = sanitizeForFilename(watchlist.key);
+	let page;
+
 	try {
 		logDebug('Using createPreparedPage (reuse investing tab if present)');
-		//logDebug(`outputDir: ${outputDir}`);
-		const page = await createPreparedPage(browser, {
+		page = await createPreparedPage(browser, {
 			reuseIfUrlMatches: /investing\.com/,
 			url: investingUrl,
 			downloadPath: outputDir,
@@ -75,10 +78,9 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			timeout: 15000,
 			attachCounters: true,
 			gotoRetries: 3,
-			// do not force a reload of an existing tab by default; keep existing session
 			reloadExisting: false
 		});
-		// Ensure we have standard page error handlers
+
 		try {
 			page.on('pageerror', (err) => {
 				if (!isSuppressedPageError(err)) {
@@ -88,8 +90,10 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			page.on('error', (err) => {
 				logDebug(`[BROWSER ERROR] ${err && err.stack ? err.stack : err}`);
 			});
-		} catch (e) { /* ignore if page closed or events not supported */ }
-		try { await page.bringToFront(); } catch (e) { /* ignore */ }
+		} catch (e) { /* ignore */ }
+
+		await page.bringToFront();
+
 		let needsLogin = false;
 		try {
 			logDebug('Checking for login form...');
@@ -99,41 +103,27 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 		} catch (e) {
 			logDebug('No login form detected, likely already logged in.');
 		}
+
 		if (needsLogin) {
 			logDebug('Typing email and password...');
 			await page.type('#loginFormUser_email', investingEmail, { delay: 50 });
 			await page.type('#loginForm_password', investingPassword, { delay: 50 });
-			logDebug('Sending Enter key to submit login form...');
 			await page.keyboard.press('Enter');
 			logDebug('Waiting for My Watchlist heading or Summary tab after login...');
-			try {
-				await Promise.race([
-					page.waitForSelector('h1', { timeout: 10000 }).then(async h1 => {
-						const text = await page.evaluate(el => el.textContent, h1);
-						if (!text.includes('My Watchlist')) throw new Error('h1 does not contain My Watchlist');
-					}),
-					page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
-				]);
-				logDebug('Login form submitted, My Watchlist heading or Summary tab found.');
-			} catch (e) {
-				logDebug('Login post-submit wait failed: ' + e.message);
-				throw e;
-			}
-		}
-		logDebug('Waiting for My Watchlist heading or Summary tab...');
-		try {
 			await Promise.race([
-				page.waitForSelector('h1', { timeout: 10000 }).then(async h1 => {
-					const text = await page.evaluate(el => el.textContent, h1);
-					if (!text.includes('My Watchlist')) throw new Error('h1 does not contain My Watchlist');
-				}),
+				page.waitForSelector('h1:contains("My Watchlist")', { timeout: 10000 }),
 				page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
 			]);
-			logDebug('FOUND My Watchlist heading or Summary tab...');
-		} catch (e) {
-			logDebug('Wait for My Watchlist heading/Summary tab failed: ' + e.message);
-			throw e;
+			logDebug('Login successful.');
 		}
+
+		logDebug('Waiting for My Watchlist heading or Summary tab...');
+		await Promise.race([
+			page.waitForSelector('h1:contains("My Watchlist")', { timeout: 10000 }),
+			page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
+		]);
+		logDebug('On watchlist page.');
+
 		try {
 			const tabSelector = `li[title="${watchlist.key}"]`;
 			await page.waitForSelector(tabSelector, { visible: true, timeout: 5000 });
@@ -143,58 +133,39 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 		} catch (e) {
 			logDebug(`Tab with title="${watchlist.key}" not found or not clickable: ` + e.message);
 		}
+
 		logDebug('Waiting for watchlist table to load...');
-		try {
-			await page.waitForSelector('[id^="tbody_overview_"]', { timeout: 7000 });
-			logDebug('Watchlist table loaded. Extracting HTML...');
-		} catch (e) {
-			logDebug('Watchlist table did not load: ' + e.message);
-			throw e;
-		}
-		const tableHtml = await page.$eval('[id^="tbody_overview_"]', el => el.outerHTML);
-		const safeWatchlistKey = sanitizeForFilename(watchlist.key);
-		const htmlOutPath = `/usr/src/app/logs/${getDateTimeString()}.investingcom_watchlist.${safeWatchlistKey}.html`;
-		const fullPageHtml = await page.content();
-		require('fs').writeFileSync(htmlOutPath, fullPageHtml, 'utf-8');
-		logDebug('Parsing full page HTML for stock table...');
+		await page.waitForSelector('[id^="tbody_overview_"]', { timeout: 7000 });
+		logDebug('Watchlist table loaded.');
+
+		const snapshotBase = require('path').join(outputDir, `${dateTimeString}.investingcom_watchlist.${safeWatchlistKey}`);
+		const fullPageHtml = await savePageSnapshot(page, snapshotBase);
+		logDebug(`Saved snapshot to ${snapshotBase}`);
+
 		const cheerio = require('cheerio');
 		const $ = cheerio.load(fullPageHtml);
-		const requiredColumns = [
-			"symbol", "exchange", "last", "bid", "ask", "extended_hours", "extended_hours_percent",
-			"open", "prev", "high", "low", "chg", "chgpercent", "vol", "next_earning", "time"
-		];
+		const requiredColumns = ["symbol", "exchange", "last", "bid", "ask", "extended_hours", "extended_hours_percent", "open", "prev", "high", "low", "chg", "chgpercent", "vol", "next_earning", "time"];
 		const table = $('[id^="tbody_overview_"]').first();
-		logDebug('Table found: ' + (table.length > 0));
-		const securities = [];
 		const dataObjects = [];
-		if (table.length === 0) {
-			logDebug("No table found in the HTML.");
-		} else {
+
+		if (table.length) {
 			table.find('tr').each((i, row) => {
 				const rowData = {};
 				$(row).find('td').each((j, col) => {
 					const columnName = $(col).attr('data-column-name');
 					if (requiredColumns.includes(columnName)) {
 						rowData[columnName] = $(col).text().trim();
-						if (columnName === 'time') {
-							rowData['time_value'] = $(col).attr('data-value');
-						}
+						if (columnName === 'time') rowData['time_value'] = $(col).attr('data-value');
 					}
 				});
-				// Check if we have at least some critical columns, not necessarily all
-				// Some rows might be missing extended_hours or next_earning
+
 				if (rowData["symbol"] && rowData["last"]) {
-					securities.push(rowData);
-					
 					let qTime = parseToIso(rowData["time"]);
 					if (rowData["time_value"]) {
 						const ts = parseInt(rowData["time_value"], 10);
-						if (!isNaN(ts)) {
-							qTime = new Date(ts * 1000).toISOString();
-						}
+						if (!isNaN(ts)) qTime = new Date(ts * 1000).toISOString();
 					}
 
-					// Calculate extended hours price change from extended_hours_price and previous_close_price
 					let extendedHoursChange = null;
 					const extHoursPrice = parseFloat(String(rowData["extended_hours"] || '').replace(/[$,]/g, ''));
 					const prevClose = parseFloat(String(rowData["prev"] || '').replace(/[$,]/g, ''));
@@ -202,7 +173,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						extendedHoursChange = (extHoursPrice - prevClose).toFixed(2);
 					}
 
-					const data = {
+					dataObjects.push({
 						key: rowData["symbol"],
 						last_price: rowData["last"],
 						price_change_decimal: rowData["chg"],
@@ -214,18 +185,18 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString(),
 						last_price_quote_time: qTime
-					};
-					dataObjects.push(data);
-					//logDebug(`Data object for row ${i}: ${JSON.stringify(data)}`);
-				} else {
-					logDebug(`Row ${i} missing critical columns (symbol/last): ${JSON.stringify(rowData)}`);
+					});
 				}
 			});
 			logDebug(`Total valid stock rows found: ${dataObjects.length}`);
+		} else {
+			logDebug("No table found in the HTML.");
 		}
-		const outPath = require('path').join(outputDir, `${getDateTimeString()}.investingcom_watchlist.${safeWatchlistKey}.json`);
+
+		const outPath = require('path').join(outputDir, `${dateTimeString}.investingcom_watchlist.${safeWatchlistKey}.json`);
 		require('fs').writeFileSync(outPath, JSON.stringify(dataObjects, null, 2), 'utf-8');
 		logDebug(`Parsed data written to ${outPath}`);
+
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
 		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
 		for (const sec of dataObjects) {
@@ -233,19 +204,16 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 		}
 	} catch (err) {
 		logDebug('Error in scrapeInvestingComWatchlist: ' + err);
-		if (err.stack) {
-			const stackLine = err.stack.split('\n')[1];
-			console.error('Occurred at:', stackLine.trim());
-		}
-		// Attempt to save a diagnostic snapshot for later analysis
+		if (err.stack) console.error('Occurred at:', err.stack.split('\n')[1].trim());
+
 		try {
-			if (typeof savePageSnapshot === 'function' && typeof page !== 'undefined' && page) {
-				const base = `/usr/src/app/logs/${getDateTimeString()}.investingcom_login_failure`;
+			if (page) {
+				const base = require('path').join(outputDir, `${dateTimeString}.investingcom_login_failure`);
 				await savePageSnapshot(page, base);
 				logDebug('Wrote diagnostic snapshot to ' + base + '.*');
 			}
 		} catch (snapErr) {
-			logDebug('Failed to write diagnostic snapshot: ' + (snapErr && snapErr.message ? snapErr.message : snapErr));
+			logDebug('Failed to write diagnostic snapshot: ' + snapErr.message);
 		}
 	}
 }
