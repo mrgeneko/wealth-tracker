@@ -71,41 +71,50 @@ const priceCache = {};
 let assetsCache = null;
 
 async function fetchInitialPrices() {
-    try {
-        console.log(`Connecting to MySQL at ${MYSQL_HOST}:${MYSQL_PORT}...`);
-        const connection = await mysql.createConnection({
-            host: MYSQL_HOST,
-            port: MYSQL_PORT,
-            user: MYSQL_USER,
-            password: MYSQL_PASSWORD,
-            database: MYSQL_DATABASE
-        });
+    let retries = 5;
+    while (retries > 0) {
+        try {
+            console.log(`Connecting to MySQL at ${MYSQL_HOST}:${MYSQL_PORT} (Attempt ${6 - retries}/5)...`);
+            const connection = await mysql.createConnection({
+                host: MYSQL_HOST,
+                port: MYSQL_PORT,
+                user: MYSQL_USER,
+                password: MYSQL_PASSWORD,
+                database: MYSQL_DATABASE
+            });
 
-        const [rows] = await connection.execute('SELECT * FROM latest_prices');
-        console.log(`Loaded ${rows.length} prices from MySQL`);
+            const [rows] = await connection.execute('SELECT * FROM latest_prices');
+            console.log(`Loaded ${rows.length} prices from MySQL`);
 
-        rows.forEach(row => {
-            // row.price is likely a string or number depending on driver config, ensure float
-            const priceVal = parseFloat(row.price);
-            if (!isNaN(priceVal)) {
-                priceCache[row.ticker] = {
-                    price: priceVal,
-                    change: row.change_decimal ? parseFloat(row.change_decimal) : null,
-                    change_percent: row.change_percent,
-                    currency: 'USD',
-                    time: row.capture_time,
-                    source: row.source
-                };
-            } else {
-                console.warn(`Invalid price for ${row.ticker}: ${row.price}`);
+            rows.forEach(row => {
+                // row.price is likely a string or number depending on driver config, ensure float
+                const priceVal = parseFloat(row.price);
+                if (!isNaN(priceVal)) {
+                    priceCache[row.ticker] = {
+                        price: priceVal,
+                        change: row.change_decimal ? parseFloat(row.change_decimal) : null,
+                        change_percent: row.change_percent,
+                        currency: 'USD',
+                        time: row.capture_time,
+                        source: row.source
+                    };
+                } else {
+                    console.warn(`Invalid price for ${row.ticker}: ${row.price}`);
+                }
+            });
+            
+            await connection.end();
+            return; // Success
+        } catch (err) {
+            console.error(`Error fetching initial prices from MySQL: ${err.message}`);
+            retries--;
+            if (retries > 0) {
+                console.log('Retrying in 5 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
             }
-        });
-        
-        await connection.end();
-    } catch (err) {
-        console.error('Error fetching initial prices from MySQL:', err.message);
-        // Don't crash, just continue with empty cache
+        }
     }
+    console.error('Failed to fetch initial prices after multiple attempts. Continuing with empty cache.');
 }
 
 function loadAssets() {

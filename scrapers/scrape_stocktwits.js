@@ -31,6 +31,7 @@ function cleanNumberText(s) {
 async function scrapeStocktwits(browser, security, outputDir) {
   let page = null;
   let data = {};
+  const dateTimeString = getDateTimeString();
   try {
     const url = security.stocktwits || security.stocktwitsUrl;
     if (!url) {
@@ -39,7 +40,7 @@ async function scrapeStocktwits(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open Stocktwits: ${url}`);
-    const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.stocktwits`);
+    const snapshotBase = path.join(outputDir, `${dateTimeString}.${ticker}.stocktwits`);
     const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
     page = await createPreparedPage(browser, pageOpts);
     logDebug('Page loaded. Extracting HTML...');
@@ -56,7 +57,7 @@ async function scrapeStocktwits(browser, security, outputDir) {
     } catch (kafkaErr) { logDebug('Kafka publish error (Stocktwits): ' + kafkaErr); }
 
     try {
-      const jsonFileName = `${getDateTimeString()}.${ticker}.stocktwits.json`;
+      const jsonFileName = `${dateTimeString}.${ticker}.stocktwits.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved Stocktwits JSON to ${jsonFilePath}`);
