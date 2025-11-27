@@ -8,6 +8,7 @@ const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, sa
 async function scrapeMarketBeat(browser, security, outputDir) {
     let page = null;
     let data = {};
+    const dateTimeString = getDateTimeString();
     try {
         const url = security.marketbeat || security.marketbeatUrl;
         if (!url) {
@@ -16,7 +17,7 @@ async function scrapeMarketBeat(browser, security, outputDir) {
         }
         const ticker = sanitizeForFilename(security.key);
         logDebug(`Security: ${ticker}   open MarketBeat: ${url}`);
-        const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.marketbeat`);
+        const snapshotBase = path.join(outputDir, `${dateTimeString}.${ticker}.marketbeat`);
         const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
         page = await createPreparedPage(browser, pageOpts);
         logDebug('Page loaded. Extracting HTML...');
@@ -33,7 +34,7 @@ async function scrapeMarketBeat(browser, security, outputDir) {
         } catch (kafkaErr) { logDebug('Kafka publish error (MarketBeat): ' + kafkaErr); }
 
         try {
-            const jsonFileName = `${getDateTimeString()}.${ticker}.marketbeat.json`;
+            const jsonFileName = `${dateTimeString}.${ticker}.marketbeat.json`;
             const jsonFilePath = path.join(outputDir, jsonFileName);
             fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
             logDebug(`Saved MarketBeat JSON to ${jsonFilePath}`);

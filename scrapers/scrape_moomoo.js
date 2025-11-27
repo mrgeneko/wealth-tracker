@@ -8,6 +8,7 @@ const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, sa
 async function scrapeMoomoo(browser, security, outputDir) {
     let page = null;
     let data = {};
+    const dateTimeString = getDateTimeString();
     try {
         const url = security.moomoo || security.moomooUrl;
         if (!url) {
@@ -16,7 +17,7 @@ async function scrapeMoomoo(browser, security, outputDir) {
         }
         const ticker = sanitizeForFilename(security.key);
         logDebug(`Security: ${ticker}   open Moomoo: ${url}`);
-        const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.moomoo`);
+        const snapshotBase = path.join(outputDir, `${dateTimeString}.${ticker}.moomoo`);
         const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
         page = await createPreparedPage(browser, pageOpts);
         logDebug('Page loaded. Extracting HTML...');
@@ -33,7 +34,7 @@ async function scrapeMoomoo(browser, security, outputDir) {
         } catch (kafkaErr) { logDebug('Kafka publish error (Moomoo): ' + kafkaErr); }
 
         try {
-            const jsonFileName = `${getDateTimeString()}.${ticker}.moomoo.json`;
+            const jsonFileName = `${dateTimeString}.${ticker}.moomoo.json`;
             const jsonFilePath = path.join(outputDir, jsonFileName);
             fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
             logDebug(`Saved Moomoo JSON to ${jsonFilePath}`);

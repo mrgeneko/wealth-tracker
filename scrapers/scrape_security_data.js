@@ -34,7 +34,7 @@ const scraperMap = {
     'cnbc': scrapeCNBC,
     'google': scrapeGoogle,
     'marketbeat': scrapeMarketBeat,
-    'moomoo': scrapeMoomoo,
+    //'moomoo': scrapeMoomoo,
 	'nasdaq': scrapeNasdaq,
     'robinhood': scrapeRobinhood,
 	'stockanalysis': scrapeStockAnalysis,

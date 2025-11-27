@@ -28,6 +28,7 @@ function cleanNumberText(s) {
 async function scrapeRobinhood(browser, security, outputDir) {
   let page = null;
   let data = {};
+  const dateTimeString = getDateTimeString();
   try {
     const url = security.robinhood || security.robinhoodUrl;
     if (!url) {
@@ -36,7 +37,7 @@ async function scrapeRobinhood(browser, security, outputDir) {
     }
     const ticker = sanitizeForFilename(security.key);
     logDebug(`Security: ${ticker}   open Robinhood: ${url}`);
-    const snapshotBase = path.join(outputDir, `${getDateTimeString()}.${ticker}.robinhood`);
+    const snapshotBase = path.join(outputDir, `${dateTimeString}.${ticker}.robinhood`);
     const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
     page = await createPreparedPage(browser, pageOpts);
     logDebug('Page loaded. Extracting HTML...');
@@ -53,7 +54,7 @@ async function scrapeRobinhood(browser, security, outputDir) {
     } catch (kafkaErr) { logDebug('Kafka publish error (Robinhood): ' + kafkaErr); }
 
     try {
-      const jsonFileName = `${getDateTimeString()}.${ticker}.robinhood.json`;
+      const jsonFileName = `${dateTimeString}.${ticker}.robinhood.json`;
       const jsonFilePath = path.join(outputDir, jsonFileName);
       fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
       logDebug(`Saved Robinhood JSON to ${jsonFilePath}`);
