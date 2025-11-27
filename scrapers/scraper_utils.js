@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { DateTime } = require('luxon');
+const { getExchange } = require('./exchange_registry');
 
 function sanitizeForFilename(str) {
     return String(str).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -511,6 +512,122 @@ async function savePageSnapshot(page, basePath) {
     }
 }
 
+function getConstructibleUrls(ticker) {
+    if (!ticker) return [];
+    
+    // Normalize ticker: ensure uppercase and use dot separator for these domains
+    // e.g. BRK-B -> BRK.B
+    const normalizedTicker = String(ticker).toUpperCase().replace(/-/g, '.');
+    const exchange = getExchange(ticker);
+    
+    const urls = [
+        { source: 'cnbc', url: `https://www.cnbc.com/quotes/${normalizedTicker}` },
+        { source: 'moomoo', url: `https://www.moomoo.com/stock/${normalizedTicker}-US` },
+        { source: 'robinhood', url: `https://robinhood.com/us/en/stocks/${normalizedTicker}/` },
+        { source: 'stocktwits', url: `https://stocktwits.com/symbol/${normalizedTicker}` },
+        { source: 'ycharts', url: `https://ycharts.com/companies/${normalizedTicker}` }
+    ];
+
+    if (exchange) {
+        // Add exchange-dependent URLs
+        if (exchange === 'NASDAQ') {
+            urls.push({ source: 'nasdaq', url: `https://www.nasdaq.com/market-activity/stocks/${normalizedTicker.toLowerCase()}` });
+            urls.push({ source: 'marketbeat', url: `https://www.marketbeat.com/stocks/NASDAQ/${normalizedTicker}/` });
+            urls.push({ source: 'tradingview', url: `https://www.tradingview.com/symbols/NASDAQ-${normalizedTicker}/` });
+            urls.push({ source: 'google', url: `https://www.google.com/finance/quote/${normalizedTicker}:NASDAQ` });
+        } else if (exchange === 'NYSE') {
+            urls.push({ source: 'marketbeat', url: `https://www.marketbeat.com/stocks/NYSE/${normalizedTicker}/` });
+            urls.push({ source: 'tradingview', url: `https://www.tradingview.com/symbols/NYSE-${normalizedTicker}/` });
+            urls.push({ source: 'google', url: `https://www.google.com/finance/quote/${normalizedTicker}:NYSE` });
+        }
+    }
+
+    return urls;
+}
+
+/**
+ * Performs a Google search to find a specific URL for a ticker on a given site.
+ * Useful for sites where the URL cannot be easily constructed (e.g. uses slugs).
+ * 
+ * @param {object} browser - Puppeteer browser instance
+ * @param {string} ticker - The stock ticker (e.g. 'AAPL')
+ * @param {string} siteUrlPrefix - The site path to search within (e.g. 'investing.com/equities')
+ * @returns {Promise<string|null>} - The found URL or null
+ */
+async function findUrlViaGoogleSearch(browser, ticker, siteUrlPrefix) {
+    if (!browser || !ticker || !siteUrlPrefix) return null;
+
+    // Clean prefix for site: operator (remove protocol)
+    const cleanPrefix = siteUrlPrefix.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+    const query = `site:${cleanPrefix} ${ticker}`;
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    
+    let page = null;
+    try {
+        page = await browser.newPage();
+        // Use standard user agent to avoid immediate blocking
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        logDebug(`Searching Google for ${ticker} on ${cleanPrefix}...`);
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        
+        // Wait for results container (generic selector for Google results)
+        try {
+            // Wait for the search results container or the specific result class
+            await page.waitForSelector('div.g', { timeout: 5000 });
+        } catch (e) {
+            // Check for CAPTCHA
+            const isCaptcha = await page.evaluate(() => {
+                return document.body.innerText.includes('unusual traffic') || 
+                       document.querySelector('iframe[src*="recaptcha"]') !== null ||
+                       document.querySelector('#captcha-form') !== null;
+            });
+
+            if (isCaptcha) {
+                logDebug('CAPTCHA detected! Please solve it manually in the browser window.');
+                // Wait a long time for user to solve it
+                try {
+                    await page.waitForSelector('div.g', { timeout: 120000 }); // 2 minutes
+                } catch (timeoutErr) {
+                    logDebug('Timed out waiting for CAPTCHA solution.');
+                    return null;
+                }
+            } else {
+                logDebug('Google search selector (div.g) not found or timeout. Saving snapshot...');
+                await savePageSnapshot(page, path.join(path.dirname(getTimestampedLogPath()), 'google_search_fail'));
+                return null;
+            }
+        }
+
+        // Extract first valid link that contains the prefix
+        const href = await page.evaluate((prefix) => {
+            // Select all anchors in search results (div.g a)
+            const anchors = Array.from(document.querySelectorAll('div.g a'));
+            for (const a of anchors) {
+                // Check if href includes the prefix (ignoring protocol)
+                // prefix is like "investing.com/equities"
+                if (a.href && a.href.includes(prefix)) {
+                    return a.href;
+                }
+            }
+            return null;
+        }, cleanPrefix);
+
+        if (href) {
+            logDebug(`Found URL: ${href}`);
+        } else {
+            logDebug('No matching URL found in search results.');
+        }
+
+        return href;
+    } catch (e) {
+        logDebug(`Error searching Google for ${ticker} on ${siteUrlPrefix}: ${e.message}`);
+        return null;
+    } finally {
+        if (page) await page.close();
+    }
+}
+
 module.exports = {
     sanitizeForFilename,
     getDateTimeString,
@@ -526,7 +643,9 @@ module.exports = {
     isWeekday,
     isPreMarketSession,
     isRegularTradingSession,
-    isAfterHoursSession
+    isAfterHoursSession,
+    getConstructibleUrls,
+    findUrlViaGoogleSearch
 };
 
 // Export helpers for page setup and snapshots
