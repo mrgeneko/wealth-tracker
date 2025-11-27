@@ -96,6 +96,26 @@ Defines the accounts and hierarchy displayed on the dashboard.
   docker compose restart dashboard
   ```
 
+### 4. Dashboard HTTPS Configuration
+The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `dashboard/certs/`. If found, it starts an HTTPS server; otherwise, it falls back to HTTP.
+
+**Development (Self-Signed):**
+Generate a self-signed certificate using OpenSSL:
+```bash
+mkdir -p dashboard/certs
+openssl req -nodes -new -x509 -keyout dashboard/certs/server.key -out dashboard/certs/server.crt -days 365
+```
+When prompted, you can enter `US` for Country Name and any value for Organization Name.
+
+**Production:**
+Obtain a certificate from a trusted Certificate Authority (CA) like Let's Encrypt. Place the private key as `dashboard/certs/server.key` and the certificate chain as `dashboard/certs/server.crt`.
+
+**Apply:**
+Rebuild the dashboard container to copy the new certificates:
+```bash
+docker compose up -d --build dashboard
+```
+
 ---
 ## Scraper Daemon (behavior)
 - The scrapers container runs `node /usr/src/app/scrape_security_data.js` as PID 1 (via `entrypoint_unified.sh`).

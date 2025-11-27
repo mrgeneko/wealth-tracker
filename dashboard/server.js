@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const socketIo = require('socket.io');
 const { Kafka } = require('kafkajs');
 const fs = require('fs');
@@ -9,7 +10,30 @@ const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
 
 const app = express();
-const server = http.createServer(app);
+
+// Load SSL Certificates if available
+const keyPath = path.join(__dirname, 'certs', 'server.key');
+const certPath = path.join(__dirname, 'certs', 'server.crt');
+let server;
+let protocol = 'http';
+
+if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    try {
+        const privateKey = fs.readFileSync(keyPath, 'utf8');
+        const certificate = fs.readFileSync(certPath, 'utf8');
+        const credentials = { key: privateKey, cert: certificate };
+        server = https.createServer(credentials, app);
+        protocol = 'https';
+        console.log('SSL certificates found. Starting HTTPS server.');
+    } catch (e) {
+        console.error('Error loading SSL certificates:', e);
+        console.log('Falling back to HTTP.');
+        server = http.createServer(app);
+    }
+} else {
+    console.log('SSL certificates not found. Starting HTTP server.');
+    server = http.createServer(app);
+}
 const io = socketIo(server);
 
 const PORT = process.env.PORT || 3001;
@@ -269,7 +293,7 @@ io.on('connection', (socket) => {
 
 // Start
 server.listen(PORT, async () => {
-    console.log(`Dashboard server running on http://localhost:${PORT}`);
+    console.log(`Dashboard server running on ${protocol}://localhost:${PORT}`);
     await fetchInitialPrices();
     startKafkaConsumer();
 });
