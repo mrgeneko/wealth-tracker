@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { DateTime } = require('luxon');
+const { getExchange } = require('./exchange_registry');
 
 function sanitizeForFilename(str) {
     return String(str).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -511,6 +512,39 @@ async function savePageSnapshot(page, basePath) {
     }
 }
 
+function getConstructibleUrls(ticker) {
+    if (!ticker) return [];
+    
+    // Normalize ticker: ensure uppercase and use dot separator for these domains
+    // e.g. BRK-B -> BRK.B
+    const normalizedTicker = String(ticker).toUpperCase().replace(/-/g, '.');
+    const exchange = getExchange(ticker);
+    
+    const urls = [
+        { source: 'cnbc', url: `https://www.cnbc.com/quotes/${normalizedTicker}` },
+        { source: 'moomoo', url: `https://www.moomoo.com/stock/${normalizedTicker}-US` },
+        { source: 'robinhood', url: `https://robinhood.com/us/en/stocks/${normalizedTicker}/` },
+        { source: 'stocktwits', url: `https://stocktwits.com/symbol/${normalizedTicker}` },
+        { source: 'ycharts', url: `https://ycharts.com/companies/${normalizedTicker}` }
+    ];
+
+    if (exchange) {
+        // Add exchange-dependent URLs
+        if (exchange === 'NASDAQ') {
+            urls.push({ source: 'nasdaq', url: `https://www.nasdaq.com/market-activity/stocks/${normalizedTicker.toLowerCase()}` });
+            urls.push({ source: 'marketbeat', url: `https://www.marketbeat.com/stocks/NASDAQ/${normalizedTicker}/` });
+            urls.push({ source: 'tradingview', url: `https://www.tradingview.com/symbols/NASDAQ-${normalizedTicker}/` });
+            urls.push({ source: 'google', url: `https://www.google.com/finance/quote/${normalizedTicker}:NASDAQ` });
+        } else if (exchange === 'NYSE') {
+            urls.push({ source: 'marketbeat', url: `https://www.marketbeat.com/stocks/NYSE/${normalizedTicker}/` });
+            urls.push({ source: 'tradingview', url: `https://www.tradingview.com/symbols/NYSE-${normalizedTicker}/` });
+            urls.push({ source: 'google', url: `https://www.google.com/finance/quote/${normalizedTicker}:NYSE` });
+        }
+    }
+
+    return urls;
+}
+
 module.exports = {
     sanitizeForFilename,
     getDateTimeString,
@@ -526,7 +560,8 @@ module.exports = {
     isWeekday,
     isPreMarketSession,
     isRegularTradingSession,
-    isAfterHoursSession
+    isAfterHoursSession,
+    getConstructibleUrls
 };
 
 // Export helpers for page setup and snapshots
