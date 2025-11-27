@@ -102,7 +102,40 @@ Defines the accounts and hierarchy displayed on the dashboard.
 - The scraper maintains a single Puppeteer browser instance and runs scrape cycles in an internal loop (no cron required).
 - Scraped records are published to Kafka using the configured brokers and topic.
 - Logs are written to the mounted logs directory (host: `/Users/gene/wealth_tracker_logs` mapped to container `/usr/src/app/logs`) and also written to stdout so `docker logs` shows them.
-Note: Operational details (heartbeat interval, graceful shutdown behavior, and troubleshooting steps) are documented in `DAEMON.md`.
+---
+## Scraper Daemon: Operational Notes
+
+The scrapers run as a long-lived daemon inside the `scrapers` container. Key operational notes:
+
+- The container runs `node /usr/src/app/scrape_security_data.js` as PID 1 (via `entrypoint_unified.sh`), so Docker signals (SIGTERM/SIGINT) are delivered directly to the Node process.
+- To stop the scraper gracefully run:
+
+```bash
+docker compose stop scrapers
+```
+
+This sends SIGTERM to the Node process; the daemon attempts to close the Puppeteer browser and flush shutdown messages to logs/stdout before exiting.
+
+- You can view logs with:
+
+```bash
+docker logs --tail 200 wealth-tracker-scrapers
+```
+
+### Heartbeat
+
+The daemon emits a heartbeat message periodically so external monitors can detect liveness. By default the interval is 5 minutes. To change it, set the `HEARTBEAT_INTERVAL_MINUTES` environment variable for the `scrapers` service in `docker-compose.yml`.
+
+Example (5-minute heartbeat):
+
+```yaml
+services:
+	scrapers:
+		environment:
+			HEARTBEAT_INTERVAL_MINUTES: 5
+```
+
+Heartbeat messages appear in both the scraper log files under `/usr/src/app/logs` and in `docker logs` output as lines starting with `HEARTBEAT: daemon alive`.
 ### Graceful shutdown
 - `docker compose stop scrapers` sends SIGTERM to the Node PID 1; the daemon traps SIGTERM/SIGINT, closes the Puppeteer browser, flushes shutdown messages to stdout and file logs, and exits.
 - You should see shutdown messages in `docker logs` similar to:
