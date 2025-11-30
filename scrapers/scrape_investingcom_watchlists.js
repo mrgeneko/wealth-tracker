@@ -111,7 +111,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			await page.keyboard.press('Enter');
 			logDebug('Waiting for My Watchlist heading or Summary tab after login...');
 			await Promise.race([
-				page.waitForSelector('h1:contains("My Watchlist")', { timeout: 10000 }),
+				page.waitForSelector('h1::-p-text("My Watchlist")', { timeout: 10000 }),
 				page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
 			]);
 			logDebug('Login successful.');
@@ -119,7 +119,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 
 		logDebug('Waiting for My Watchlist heading or Summary tab...');
 		await Promise.race([
-			page.waitForSelector('h1:contains("My Watchlist")', { timeout: 10000 }),
+			page.waitForSelector('h1::-p-text("My Watchlist")', { timeout: 10000 }),
 			page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
 		]);
 		logDebug('On watchlist page.');

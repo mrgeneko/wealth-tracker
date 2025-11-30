@@ -141,7 +141,7 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
             logDebug('Login required. Attempting to log in...');
             try {
                 await new Promise(r => setTimeout(r, 1000));
-                const emailButton = await page.waitForSelector('button span.label-vyj6fJ_4:contains("Email")', { timeout: 5000 });
+                const emailButton = await page.waitForSelector('button span.label-vyj6fJ_4::-p-text("Email")', { timeout: 5000 });
                 await emailButton.click();
 
                 await page.type('input[name="username"]', tvEmail, { delay: 50 });
