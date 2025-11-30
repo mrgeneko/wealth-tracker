@@ -275,3 +275,50 @@ If you need to revert to scheduled runs instead of the daemon, let me know and I
 PRs are welcome. When working on scrapers locally prefer building the scrapers image and running via Docker Compose for a consistent environment.
 ---
 If you want more operational features (health endpoint, metrics, or structured JSON logs), tell me which one and I can add it as a follow-up change.
+
+---
+## Updating an Existing Docker Installation
+
+To update your wealth-tracker deployment to the latest code or configuration, follow these steps:
+
+1. **Pull the Latest Code**
+   - If you cloned the repository with git, run:
+     ```bash
+     git pull origin main
+     # Or switch to the desired branch/tag
+     git checkout <branch-or-tag>
+     ```
+
+2. **Rebuild Docker Images**
+   - If the code or dependencies have changed, rebuild the affected images:
+     ```bash
+     docker compose build
+     # Or rebuild only a specific service (e.g., scrapers):
+     docker compose build scrapers
+     ```
+
+3. **Restart Services**
+   - Restart the updated containers to apply changes:
+     ```bash
+     docker compose up -d
+     # Or restart a specific service:
+     docker compose up -d scrapers
+     ```
+
+4. **(Optional) Prune Old Images**
+   - To free disk space, remove unused images:
+     ```bash
+     docker image prune -f
+     ```
+
+5. **Verify Update**
+   - Check that containers are running the new version:
+     ```bash
+     docker compose ps
+     docker logs -f wealth-tracker-scrapers
+     ```
+
+**Note:**
+- If you updated configuration files (e.g., `.env`, `config.json`), most changes are picked up automatically, but some may require a container restart.
+- If you updated the database schema, run any required migration scripts before restarting services.
+- For Docker Desktop, you can also use the GUI to rebuild and restart containers.
