@@ -352,7 +352,7 @@
     "type": "stock",
     "scrape_group": "c",
     "ticker_yahoo": "GOOGL",
-    "google": "https://www.google.com/finance/quote/GOOGL:NASDAQ",
+    "google": "https://www.google.com/finance/beta/quote/GOOGL:NASDAQ",
     "robinhood": "https://robinhood.com/us/en/stocks/GOOGL/",
     "stocktwits": "https://stocktwits.com/symbol/GOOGL"
   },
