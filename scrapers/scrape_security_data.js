@@ -289,6 +289,29 @@ async function ensureBrowser() {
 		if (launchError) logDebug('[LAUNCH ERROR DETAILS] ' + launchError.stack);
 		throw new Error('Could not connect to or launch Chrome.');
 	}
+	// Attach monitoring handlers to detect disconnects/target destroys and log them.
+	try {
+		if (browser && typeof browser.on === 'function') {
+			browser.on('disconnected', () => {
+				logDebug('[BROWSER EVENT] browser disconnected');
+				// Clear globalBrowser so callers know it's no longer usable
+				try { globalBrowser = null; } catch (e) {}
+			});
+			browser.on('targetdestroyed', (target) => {
+				try {
+					const turl = target && target.url ? target.url() : '<unknown>';
+					logDebug(`[BROWSER EVENT] target destroyed: ${turl}`);
+				} catch (e) {
+					logDebug('[BROWSER EVENT] target destroyed (failed to get url)');
+				}
+			});
+			browser.on('targetcreated', (target) => {
+				try { logDebug('[BROWSER EVENT] target created: ' + (target.url ? target.url() : '<unknown>')); } catch (e) {}
+			});
+		}
+	} catch (e) {
+		logDebug('Failed to attach browser event handlers: ' + (e && e.message ? e.message : e));
+	}
 	return browser;
 }
 
@@ -586,6 +609,7 @@ async function runCycle(browser, outputDir) {
 
 function getDynamicCycleInterval(attrs) {
     const now = new Date();
+
     // Use New York time for market hours
     const nyTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
     const day = nyTime.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -805,6 +829,8 @@ async function daemon() {
         try {
             const attrs = loadScraperAttributes();
             sleepMs = getDynamicCycleInterval(attrs);
+			// FOR TESTING 
+			// sleepMs = 500;
             logDebug(`Dynamic cycle interval: ${sleepMs/1000}s`);
         } catch (e) {
             logDebug('Error calculating dynamic interval: ' + e);
