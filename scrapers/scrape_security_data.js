@@ -588,6 +588,12 @@ async function runCycle(browser, outputDir) {
                         isTypeSupported = false;
                     }
 
+                    // Skip source if explicitly disabled in config
+                    if (sourceConfig && sourceConfig.enabled === false) {
+                        logDebug(`Skipping disabled source: ${sourceName}`);
+                        continue;
+                    }
+
                     if (securityUrl && securityUrl.startsWith('http') && isTypeSupported) {
                         try {
                             logDebug(`Scraping ${security.key} with ${sourceName}`);
@@ -830,7 +836,7 @@ async function daemon() {
             const attrs = loadScraperAttributes();
             sleepMs = getDynamicCycleInterval(attrs);
 			// FOR TESTING 
-			// sleepMs = 500;
+			sleepMs = 500;
             logDebug(`Dynamic cycle interval: ${sleepMs/1000}s`);
         } catch (e) {
             logDebug('Error calculating dynamic interval: ' + e);
