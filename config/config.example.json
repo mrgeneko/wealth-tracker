@@ -1,4 +1,5 @@
 {
+{
   "single_security_mode": "round_robin",
   "scrape_groups": {
     "investing_watchlists": { "interval": 3, "enabled": true },
@@ -232,7 +233,7 @@
     "ticker_robinhood": "BRK.B",
     "webull": "https://www.webull.com/quote/nyse-brk-b",
     "reuters": "https://www.reuters.com/markets/companies/BRKb/",
-    "google": "https://www.google.com/finance/beta/quote/BRK.B:NYSE",
+    "google": "https://www.google.com/finance/quote/BRK.B:NYSE",
     "investing": "https://www.investing.com/equities/berkshire-hathaway",
     "financecharts": "https://www.financecharts.com/stocks/BRK-B",
     "robinhood": "https://robinhood.com/us/en/stocks/BRK.B/",
@@ -351,7 +352,7 @@
     "type": "stock",
     "scrape_group": "c",
     "ticker_yahoo": "GOOGL",
-    "google": "https://www.google.com/finance/beta/quote/GOOGL:NASDAQ",
+    "google": "https://www.google.com/finance/quote/GOOGL:NASDAQ",
     "robinhood": "https://robinhood.com/us/en/stocks/GOOGL/",
     "stocktwits": "https://stocktwits.com/symbol/GOOGL"
   },
