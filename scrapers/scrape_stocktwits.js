@@ -160,7 +160,19 @@ function parseStocktwitsHtml(html, security) {
         
         // Price is often in a header with class containing 'SymbolHeader_price'
         // Example: <span class="SymbolHeader_price__3_2_O">135.58</span>
-        const priceEl = $('[class*="SymbolHeader_price"]');
+        // Also check for simple h1 + span structure if class names are obfuscated
+        let priceEl = $('[class*="SymbolHeader_price"]');
+        if (!priceEl.length) {
+             // Fallback: Look for the large price text near the H1 symbol
+             // The HTML shows: <div><h1>BRK.B ...</h1> ... <span>$514.38</span> ... </div>
+             // Often the price is the first large number after the H1
+             // Or look for a span with text starting with '$' inside the main header area
+             const potentialPrice = $('span').filter((i, el) => /^\$\d{1,3}(?:,\d{3})*(?:\.\d+)?$/.test($(el).text().trim())).first();
+             if (potentialPrice.length) {
+                 priceEl = potentialPrice;
+             }
+        }
+
         if (priceEl.length) {
             last_price = cleanNumberText(priceEl.first().text());
         }

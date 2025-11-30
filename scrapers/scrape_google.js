@@ -106,6 +106,25 @@ async function scrapeGoogle(browser, security, outputDir) {
 				if (ext_price.length) {
 					if (ext_hours_section.text().startsWith('After Hours')) {
 						after_hours_price = ext_price.text().replace('$', '').replace(',', '').trim();
+						const ah_text = ext_hours_section.text();
+						// Format: After Hours: $110.51 (0.00072%) +0.00080
+						const match = ah_text.match(/\(([+\-]?[\d.]+)%\)\s*([+\-]?[\d.]+)/);
+						if (match) {
+							let percent_str = match[1];
+							let change_str = match[2];
+							after_hours_change_decimal = change_str;
+							
+							let percent_val = parseFloat(percent_str);
+							// If percent string didn't have a sign, apply sign from change
+							if (!percent_str.startsWith('+') && !percent_str.startsWith('-')) {
+								if (change_str.startsWith('-')) {
+									percent_val = -Math.abs(percent_val);
+								} else {
+									percent_val = Math.abs(percent_val);
+								}
+							}
+							after_hours_change_percent = percent_val.toString();
+						}
 					} else if (ext_hours_section.text().startsWith('Pre-market')) {
 						pre_market_price = ext_price.text().replace('$', '').replace(',', '').trim();
 						let preMarketChangeElem = $('span.P2Luy.Ebnabc.DnMTof');
