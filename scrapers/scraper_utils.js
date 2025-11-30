@@ -420,15 +420,33 @@ function reportMetrics(thresholds = { navFail: 5, reqFail: 10 }, logPath) {
 async function setupCDPSession(page, downloadPath) {
     if (!downloadPath) return;
     try {
-        const client = await page.target().createCDPSession();
-        await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath });
-        // In some environments Chrome enforces certificate transparency checks
-        // which can cause net::ERR_CERTIFICATE_TRANSPARENCY_REQUIRED when navigating.
-        // Enable ignoring certificate errors via the Security domain for this session.
-        try {
-            await client.send('Security.setIgnoreCertificateErrors', { ignore: true });
-        } catch (secErr) {
-            logDebug('Security.setIgnoreCertificateErrors failed: ' + (secErr && secErr.message ? secErr.message : secErr));
+        // Attempt to create a CDP session with retries. In unstable environments
+        // the page or session may close unexpectedly; handle that gracefully.
+        let client = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+        while (attempts < maxAttempts) {
+            attempts += 1;
+            try {
+                if (page.isClosed && page.isClosed()) throw new Error('page is closed');
+                client = await page.target().createCDPSession();
+                await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath });
+                // In some environments Chrome enforces certificate transparency checks
+                // which can cause net::ERR_CERTIFICATE_TRANSPARENCY_REQUIRED when navigating.
+                // Enable ignoring certificate errors via the Security domain for this session.
+                try {
+                    await client.send('Security.setIgnoreCertificateErrors', { ignore: true });
+                } catch (secErr) {
+                    logDebug('Security.setIgnoreCertificateErrors failed: ' + (secErr && secErr.message ? secErr.message : secErr));
+                }
+                // success
+                break;
+            } catch (e) {
+                logDebug(`setupCDPSession attempt ${attempts} failed: ${e && e.message ? e.message : e}`);
+                try { if (client && client.detach) client.detach(); } catch (err) {}
+                if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 500 * attempts));
+                else throw new Error('Failed to setup CDP session: ' + (e && e.message ? e.message : e));
+            }
         }
     } catch (e) {
         logDebug('Failed to set download behavior/CDP setup: ' + (e && e.message ? e.message : e));
@@ -464,11 +482,17 @@ async function createPreparedPage(browser, opts = {}) {
                 if (reuseIfUrlMatches instanceof RegExp) matched = reuseIfUrlMatches.test(u);
                 else if (typeof reuseIfUrlMatches === 'string') matched = u.includes(reuseIfUrlMatches);
                 if (matched) {
-                    // Attach counters and best-effort setup
-                    if (attachCounters) await attachRequestFailureCounters(p, { suppressionPatterns: opts.suppressionPatterns });
-                    try { await p.setUserAgent(userAgent); } catch (e) { /* ignore */ }
-                    try { await p.setViewport(viewport); } catch (e) { /* ignore */ }
-                    try { await p.bringToFront(); } catch (e) { /* ignore */ }
+                    // Skip closed pages
+                    try { if (p.isClosed && p.isClosed()) { logDebug('Skipped reuse of closed page'); continue; } } catch (e) {}
+
+                    // Attach counters and best-effort setup; guard each operation so a failing page doesn't abort the entire flow
+                    if (attachCounters) {
+                        try { await attachRequestFailureCounters(p, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) { logDebug('attachRequestFailureCounters failed: ' + (e && e.message ? e.message : e)); }
+                    }
+                    try { await p.setUserAgent(userAgent); } catch (e) { logDebug('setUserAgent on reused page failed: ' + (e && e.message ? e.message : e)); }
+                    try { await p.setViewport(viewport); } catch (e) { logDebug('setViewport on reused page failed: ' + (e && e.message ? e.message : e)); }
+                    try { await p.bringToFront(); } catch (e) { logDebug('bringToFront on reused page failed: ' + (e && e.message ? e.message : e)); }
+
                     if (reloadExisting && url) {
                         try {
                             await gotoWithRetries(p, url, { waitUntil, timeout }, gotoRetries);
@@ -477,7 +501,9 @@ async function createPreparedPage(browser, opts = {}) {
                         }
                     }
                     // Ensure download behavior / certificate ignore applied for reused page if requested
-                    await setupCDPSession(p, downloadPath);
+                    try { await setupCDPSession(p, downloadPath); } catch (e) { logDebug('setupCDPSession failed on reused page: ' + (e && e.message ? e.message : e)); }
+                    // Final check that page is still open
+                    try { if (p.isClosed && p.isClosed()) { logDebug('Reused page closed after setup, skipping'); continue; } } catch (e) {}
                     return p;
                 }
             }
@@ -488,13 +514,15 @@ async function createPreparedPage(browser, opts = {}) {
 
     // No reusable page found, create a new one
     const page = await browser.newPage();
-    if (attachCounters) await attachRequestFailureCounters(page, { suppressionPatterns: opts.suppressionPatterns });
-    try { await page.setUserAgent(userAgent); } catch (e) { /* ignore */ }
-    try { await page.setViewport(viewport); } catch (e) { /* ignore */ }
-    if (url) {
-        await gotoWithRetries(page, url, { waitUntil, timeout }, gotoRetries);
+    if (attachCounters) {
+        try { await attachRequestFailureCounters(page, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) { logDebug('attachRequestFailureCounters failed on new page: ' + (e && e.message ? e.message : e)); }
     }
-    await setupCDPSession(page, downloadPath);
+    try { await page.setUserAgent(userAgent); } catch (e) { logDebug('setUserAgent on new page failed: ' + (e && e.message ? e.message : e)); }
+    try { await page.setViewport(viewport); } catch (e) { logDebug('setViewport on new page failed: ' + (e && e.message ? e.message : e)); }
+    if (url) {
+        try { await gotoWithRetries(page, url, { waitUntil, timeout }, gotoRetries); } catch (e) { logDebug('gotoWithRetries on new page failed: ' + (e && e.message ? e.message : e)); }
+    }
+    try { await setupCDPSession(page, downloadPath); } catch (e) { logDebug('setupCDPSession failed on new page: ' + (e && e.message ? e.message : e)); }
     return page;
 }
 
