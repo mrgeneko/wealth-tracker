@@ -15,3 +15,4 @@ run_scrape_nasdaq.js
 docker_chrome_profile/
 logs/
 assets_liabilities.json
+config.json
