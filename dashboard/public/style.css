@@ -233,3 +233,63 @@ th:first-child { background-color: #252525; z-index: 2; }
     from {opacity: 0;}
     to {opacity: 1;}
 }
+
+/* Modal */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 100; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.6); 
+}
+
+.modal-content {
+    background-color: #1e1e1e;
+    margin: 5% auto; 
+    padding: 20px;
+    border: 1px solid #333;
+    width: 80%; 
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+}
+
+.close-modal {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: #fff;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.log-row {
+    cursor: pointer;
+}
+.log-row:hover {
+    background-color: #333;
+}
+
+.refresh-icon {
+    float: right;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 0.8rem;
+    color: #aaa;
+    transition: color 0.3s, transform 0.3s;
+    user-select: none;
+}
+
+.refresh-icon:hover {
+    color: #fff;
+    transform: rotate(180deg);
+}
