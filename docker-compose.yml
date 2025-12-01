@@ -18,8 +18,8 @@ services:
         YAHOO_MAX_RETRIES: "4"
         YAHOO_BACKOFF_BASE_MS: "1000"
       volumes:
-        - /Users/gene/wealth_tracker/logs:/usr/src/app/logs
-        - /Users/gene/wealth_tracker/data:/usr/src/app/data
+        - ./logs:/usr/src/app/logs
+        - ./data:/usr/src/app/data
       ports:
         - "5901:5901"
         - "3002:3002"
@@ -50,7 +50,7 @@ services:
       BASIC_AUTH_USER: ${BASIC_AUTH_USER}
       BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD}
     volumes:
-      - /Users/gene/wealth_tracker/logs:/usr/src/app/logs
+      - ./logs:/usr/src/app/logs
       - ./config/assets_liabilities.json:/assets_liabilities.json:ro
     ports:
       - "3001:3001"
@@ -65,7 +65,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - /Users/gene/wealth_tracker/mysql:/var/lib/mysql
+      - ./mysql:/var/lib/mysql
     ports:
       - "3306:3306"
     healthcheck:
@@ -131,7 +131,7 @@ services:
     container_name: wealth-tracker-log-rotator
     restart: unless-stopped
     volumes:
-      - /Users/gene/wealth_tracker/logs:/usr/src/app/logs
+      - ./logs:/usr/src/app/logs
       - ./scripts/rotate-logs.sh:/usr/local/bin/rotate-logs.sh:ro
     entrypoint: ["sh", "/usr/local/bin/rotate-logs.sh", "/usr/src/app/logs", "7", "1", "300"]
     healthcheck:
