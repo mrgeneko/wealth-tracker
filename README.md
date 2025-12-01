@@ -87,14 +87,17 @@ Defines the securities to track and their data sources.
 - `/usr/src/app/data` (Runtime/Persistent): This is the "live" folder where the application looks for configuration. It is mounted from your host (e.g., `~/wealth_tracker_data`), so changes persist across container restarts.
 - `/usr/src/app/config` (Template/Default): This directory inside the container holds the default configuration files copied during the build. If `config.json` is missing from the `data` folder at startup, the entrypoint script copies the default one from `config` to `data` to ensure the app can start.
 
-### 3. Dashboard Assets (`assets_liabilities.json`)
-Defines the accounts and hierarchy displayed on the dashboard.
-- **Location**: Project root (`./assets_liabilities.json`).
-- **Update**: Edit the file to modify accounts or manual balances.
-- **Apply**: Restart the dashboard container.
-  ```bash
-  docker compose restart dashboard
-  ```
+### 3. Dashboard Assets (Database Driven)
+The dashboard now reads asset data (accounts, positions, real estate, vehicles) from the **MySQL database**. 
+
+- **Primary Source**: MySQL database (`wealth-tracker-mysql` container).
+- **Management**: 
+    - **API**: Use the dashboard API endpoints (`/api/accounts`, `/api/positions`, etc.) to manage data.
+    - **Re-Sync (Reset)**: To reset the database and re-import data from `config/assets_liabilities.json`, run the migration script:
+      ```bash
+      npm run migrate
+      ```
+      *Warning: This will DELETE all existing data in the `accounts`, `positions`, and `fixed_assets` tables and re-populate them from the JSON file.*
 
 ### 4. Dashboard HTTPS Configuration
 The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `dashboard/certs/`. If found, it starts an HTTPS server; otherwise, it falls back to HTTP.
@@ -322,3 +325,42 @@ To update your wealth-tracker deployment to the latest code or configuration, fo
 - If you updated configuration files (e.g., `.env`, `config.json`), most changes are picked up automatically, but some may require a container restart.
 - If you updated the database schema, run any required migration scripts before restarting services.
 - For Docker Desktop, you can also use the GUI to rebuild and restart containers.
+
+---
+
+## Database Schema
+
+The project uses a MySQL database to store asset and portfolio information.
+
+### Tables
+
+#### `accounts`
+Stores information about bank and investment accounts.
+- `id`: Primary Key
+- `name`: Account name (e.g., "Chase Checking")
+- `type`: Account type (e.g., "checking", "roth ira")
+- `category`: 'bank' or 'investment'
+- `display_order`: Integer for sorting in the UI
+- `currency`: Default 'USD'
+
+#### `positions`
+Stores individual holdings within an account.
+- `id`: Primary Key
+- `account_id`: Foreign Key to `accounts`
+- `symbol`: Ticker symbol (e.g., "AAPL", "CASH")
+- `quantity`: Number of shares or amount
+- `type`: 'stock', 'etf', 'bond', 'cash', 'crypto', 'other'
+- `exchange`: Stock exchange (optional)
+- `currency`: Trading currency
+- `maturity_date`: For bonds
+- `coupon`: For bonds
+
+#### `fixed_assets`
+Stores non-financial assets like real estate and vehicles.
+- `id`: Primary Key
+- `name`: Description of the asset
+- `type`: 'real_estate', 'vehicle', 'other'
+- `value`: Estimated value
+- `currency`: Valuation currency
+- `display_order`: Integer for sorting
+
