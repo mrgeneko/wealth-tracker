@@ -73,6 +73,16 @@
     "has_stock_prices": true,
     "has_previous_close": false
   },
+  "marketwatch": {
+    "name": "marketwatch",
+    "has_realtime": true,
+    "has_pre_market": true,
+    "has_after_hours": false,
+    "has_bond_prices": true,
+    "has_stock_prices": true,
+    "has_previous_close": true,
+    "enabled": false
+  },
   "moomoo": {
     "name": "moomoo",
     "has_realtime": true,
