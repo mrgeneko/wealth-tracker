@@ -4,7 +4,8 @@
   "description": "web scraping via Chrome automation",
   "main": "scrapers/scrape_security_data.js",
   "scripts": {
-    "start": "node scrapers/scrape_security_data.js"
+    "start": "node scrapers/scrape_security_data.js",
+    "migrate": "node scripts/migrate_assets_to_mysql.js"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
