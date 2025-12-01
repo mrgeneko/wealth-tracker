@@ -67,6 +67,39 @@
             background-color: transparent !important;
             z-index: auto !important;
         }
+
+        /* Icon Button */
+        .icon-btn {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 10px;
+            color: #0d6efd;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 36px;
+            width: 36px;
+            border-radius: 50%;
+            transition: background-color 0.3s;
+        }
+
+        .icon-btn:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+        }
+
+        .plus-icon {
+            font-weight: bold;
+            line-height: 1;
+            display: inline-block;
+            transition: transform 0.3s;
+        }
+
+        .icon-btn:hover .plus-icon {
+            transform: scale(1.2);
+        }
     </style>
 </head>
 <body>
@@ -84,8 +117,12 @@
         <div id="Accounts" class="tab-content" style="display: block;">
             <!-- Investment Accounts -->
             <div class="section-header">
-                <h2>Investment Accounts</h2>
-                <button class="btn btn-primary" onclick="openAccountModal('investment')">Add Account</button>
+                <h2 style="display: flex; align-items: center; gap: 10px;">
+                    <span>Investment Accounts</span>
+                    <button class="icon-btn" title="Add Account" onclick="openAccountModal('investment')">
+                        <span class="plus-icon">+</span>
+                    </button>
+                </h2>
             </div>
             <table id="investment-grid">
                 <thead></thead>
@@ -94,8 +131,12 @@
 
             <!-- Bank Accounts -->
             <div class="section-header">
-                <h2>Bank Accounts</h2>
-                <button class="btn btn-primary" onclick="openAccountModal('bank')">Add Account</button>
+                <h2 style="display: flex; align-items: center; gap: 10px;">
+                    <span>Bank Accounts</span>
+                    <button class="icon-btn" title="Add Account" onclick="openAccountModal('bank')">
+                        <span class="plus-icon">+</span>
+                    </button>
+                </h2>
             </div>
             <table id="bank-grid">
                 <thead></thead>
@@ -104,8 +145,12 @@
 
             <!-- Fixed Assets -->
             <div class="section-header">
-                <h2>Fixed Assets</h2>
-                <button class="btn btn-primary" onclick="openAssetModal()">Add Asset</button>
+                <h2 style="display: flex; align-items: center; gap: 10px;">
+                    <span>Fixed Assets</span>
+                    <button class="icon-btn" title="Add Asset" onclick="openAssetModal()">
+                        <span class="plus-icon">+</span>
+                    </button>
+                </h2>
             </div>
             <table id="asset-grid">
                 <thead></thead>
