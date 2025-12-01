@@ -55,17 +55,17 @@
         "stocks": [
           {
             "ticker": "AAPL",
-            "shares": 150,
+            "quantity": 150,
             "currency": "USD"
           },
           {
             "ticker": "NVDA",
-            "shares": 50,
+            "quantity": 50,
             "currency": "USD"
           },
           {
             "ticker": "VOO",
-            "shares": 200,
+            "quantity": 200,
             "currency": "USD"
           }
         ],
@@ -74,7 +74,7 @@
             "ticker": "US10Y",
             "maturity_date": "2033-05-15",
             "coupon": 3.375,
-            "shares": 100,
+            "quantity": 100,
             "currency": "USD"
           }
         ]
@@ -87,12 +87,12 @@
         "stocks": [
           {
             "ticker": "MSFT",
-            "shares": 100,
+            "quantity": 100,
             "currency": "USD"
           },
           {
             "ticker": "GOOGL",
-            "shares": 80,
+            "quantity": 80,
             "currency": "USD"
           }
         ]
@@ -105,7 +105,7 @@
         "stocks": [
           {
             "ticker": "FXAIX",
-            "shares": 1200.00,
+            "quantity": 1200.00,
             "currency": "USD"
           }
         ]
