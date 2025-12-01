@@ -155,7 +155,7 @@ async function migrate() {
                         for (const stock of acc.holdings.stocks) {
                             await connection.execute(
                                 'INSERT INTO positions (account_id, symbol, type, quantity, currency, exchange) VALUES (?, ?, ?, ?, ?, ?)',
-                                [accountId, stock.ticker, 'stock', stock.shares, stock.currency || 'USD', null] // Exchange is null initially
+                                [accountId, stock.ticker, 'stock', stock.quantity, stock.currency || 'USD', null] // Exchange is null initially
                             );
                         }
                     }
@@ -165,7 +165,7 @@ async function migrate() {
                         for (const bond of acc.holdings.bonds) {
                             await connection.execute(
                                 'INSERT INTO positions (account_id, symbol, type, quantity, currency, maturity_date, coupon) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                                [accountId, bond.ticker, 'bond', bond.shares, bond.currency || 'USD', bond.maturity_date, bond.coupon]
+                                [accountId, bond.ticker, 'bond', bond.quantity, bond.currency || 'USD', bond.maturity_date, bond.coupon]
                             );
                         }
                     }
