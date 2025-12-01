@@ -51,6 +51,9 @@ app.use(basicAuth({
     realm: 'Wealth Tracker Dashboard'
 }));
 
+app.use(cors());
+app.use(express.json());
+
 // Kafka Configuration
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
 const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'price_data';
@@ -117,18 +120,95 @@ async function fetchInitialPrices() {
     console.error('Failed to fetch initial prices after multiple attempts. Continuing with empty cache.');
 }
 
-function loadAssets() {
-    if (fs.existsSync(ASSETS_FILE)) {
-        try {
-            const data = fs.readFileSync(ASSETS_FILE, 'utf8');
-            const parsed = JSON.parse(data);
-            if (JSON.stringify(parsed) !== JSON.stringify(assetsCache)) {
-                console.log('Assets updated, broadcasting to clients');
-                assetsCache = parsed;
-                io.emit('assets_update', assetsCache);
+const pool = mysql.createPool({
+    host: process.env.MYSQL_HOST,
+    port: process.env.MYSQL_PORT,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
+
+async function fetchAssetsFromDB() {
+    try {
+        const [accounts] = await pool.query('SELECT * FROM accounts ORDER BY display_order');
+        const [positions] = await pool.query('SELECT * FROM positions');
+        const [fixedAssets] = await pool.query('SELECT * FROM fixed_assets ORDER BY display_order');
+
+        const result = {
+            real_estate: [],
+            vehicles: [],
+            accounts: []
+        };
+
+        // Process Fixed Assets
+        for (const asset of fixedAssets) {
+            const item = {
+                description: asset.name,
+                value: parseFloat(asset.value),
+                currency: asset.currency
+            };
+            if (asset.type === 'real_estate') {
+                result.real_estate.push(item);
+            } else if (asset.type === 'vehicle') {
+                result.vehicles.push(item);
             }
-        } catch (e) {
-            console.error('Failed to read assets file:', e.message);
+        }
+
+        // Process Accounts
+        for (const acc of accounts) {
+            const accountObj = {
+                name: acc.name,
+                type: acc.type,
+                holdings: {
+                    cash: null,
+                    stocks: [],
+                    bonds: []
+                }
+            };
+
+            const accPositions = positions.filter(p => p.account_id === acc.id);
+            
+            for (const pos of accPositions) {
+                if (pos.type === 'cash') {
+                    accountObj.holdings.cash = {
+                        value: parseFloat(pos.quantity),
+                        currency: pos.currency
+                    };
+                } else if (pos.type === 'bond') {
+                    accountObj.holdings.bonds.push({
+                        ticker: pos.symbol,
+                        shares: parseFloat(pos.quantity)
+                    });
+                } else {
+                    // Stocks, ETFs, Crypto, etc.
+                    accountObj.holdings.stocks.push({
+                        ticker: pos.symbol,
+                        shares: parseFloat(pos.quantity)
+                    });
+                }
+            }
+            
+            result.accounts.push(accountObj);
+        }
+
+        return result;
+
+    } catch (err) {
+        console.error('Error fetching assets from DB:', err);
+        return null;
+    }
+}
+
+async function loadAssets() {
+    const data = await fetchAssetsFromDB();
+    if (data) {
+        if (JSON.stringify(data) !== JSON.stringify(assetsCache)) {
+            console.log('Assets updated from DB, broadcasting to clients');
+            assetsCache = data;
+            io.emit('assets_update', assetsCache);
         }
     }
 }
@@ -272,20 +352,17 @@ async function startKafkaConsumer() {
 }
 
 // API to get assets
-app.get('/api/assets', (req, res) => {
+app.get('/api/assets', async (req, res) => {
     if (assetsCache) {
         res.json(assetsCache);
         return;
     }
-    if (fs.existsSync(ASSETS_FILE)) {
-        try {
-            const data = fs.readFileSync(ASSETS_FILE, 'utf8');
-            res.json(JSON.parse(data));
-        } catch (e) {
-            res.status(500).json({ error: 'Failed to parse assets file' });
-        }
+    const data = await fetchAssetsFromDB();
+    if (data) {
+        assetsCache = data;
+        res.json(data);
     } else {
-        res.status(404).json({ error: 'Assets file not found' });
+        res.status(500).json({ error: 'Failed to fetch assets' });
     }
 });
 
@@ -338,6 +415,135 @@ app.get('/api/logs/:filename', async (req, res) => {
     } catch (error) {
         console.error('Error reading log file:', error);
         res.status(500).json({ error: 'Failed to read log file' });
+    }
+});
+
+// CRUD Endpoints
+
+// Accounts
+app.post('/api/accounts', async (req, res) => {
+    const { name, type, category, currency, display_order } = req.body;
+    try {
+        const [result] = await pool.execute(
+            'INSERT INTO accounts (name, type, category, currency, display_order) VALUES (?, ?, ?, ?, ?)',
+            [name, type, category, currency || 'USD', display_order || 0]
+        );
+        assetsCache = null;
+        loadAssets();
+        res.json({ id: result.insertId, ...req.body });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/accounts/:id', async (req, res) => {
+    const { name, type, category, currency, display_order } = req.body;
+    try {
+        await pool.execute(
+            'UPDATE accounts SET name=?, type=?, category=?, currency=?, display_order=? WHERE id=?',
+            [name, type, category, currency, display_order, req.params.id]
+        );
+        assetsCache = null;
+        loadAssets();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/accounts/:id', async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM positions WHERE account_id=?', [req.params.id]);
+        await pool.execute('DELETE FROM accounts WHERE id=?', [req.params.id]);
+        assetsCache = null;
+        loadAssets();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Positions
+app.post('/api/positions', async (req, res) => {
+    const { account_id, symbol, type, quantity, currency } = req.body;
+    try {
+        const [result] = await pool.execute(
+            'INSERT INTO positions (account_id, symbol, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
+            [account_id, symbol, type, quantity, currency || 'USD']
+        );
+        assetsCache = null;
+        loadAssets();
+        res.json({ id: result.insertId, ...req.body });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/positions/:id', async (req, res) => {
+    const { symbol, type, quantity, currency } = req.body;
+    try {
+        await pool.execute(
+            'UPDATE positions SET symbol=?, type=?, quantity=?, currency=? WHERE id=?',
+            [symbol, type, quantity, currency, req.params.id]
+        );
+        assetsCache = null;
+        loadAssets();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/positions/:id', async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM positions WHERE id=?', [req.params.id]);
+        assetsCache = null;
+        loadAssets();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Fixed Assets
+app.post('/api/fixed_assets', async (req, res) => {
+    const { name, type, value, currency, display_order } = req.body;
+    try {
+        const [result] = await pool.execute(
+            'INSERT INTO fixed_assets (name, type, value, currency, display_order) VALUES (?, ?, ?, ?, ?)',
+            [name, type, value, currency || 'USD', display_order || 0]
+        );
+        assetsCache = null;
+        loadAssets();
+        res.json({ id: result.insertId, ...req.body });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/fixed_assets/:id', async (req, res) => {
+    const { name, type, value, currency, display_order } = req.body;
+    try {
+        await pool.execute(
+            'UPDATE fixed_assets SET name=?, type=?, value=?, currency=?, display_order=? WHERE id=?',
+            [name, type, value, currency, display_order, req.params.id]
+        );
+        assetsCache = null;
+        loadAssets();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/fixed_assets/:id', async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM fixed_assets WHERE id=?', [req.params.id]);
+        assetsCache = null;
+        loadAssets();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
