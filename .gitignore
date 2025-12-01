@@ -12,3 +12,6 @@ mysql/*
 data/*
 assets_liabilities.json
 config.json
+20251*.json
+20251*.png
+20251*.html
