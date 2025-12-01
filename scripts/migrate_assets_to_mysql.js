@@ -85,11 +85,12 @@ async function migrate() {
 
         // 2. Migrate Data
 
-        // Clear existing data to avoid duplicates if run multiple times (optional, but good for dev)
-        // await connection.execute('DELETE FROM positions');
-        // await connection.execute('DELETE FROM accounts');
-        // await connection.execute('DELETE FROM fixed_assets');
-        // console.log('Cleared existing data.');
+        // Clear existing data to avoid duplicates if run multiple times
+        console.log('Clearing existing data...');
+        await connection.execute('DELETE FROM positions');
+        await connection.execute('DELETE FROM accounts');
+        await connection.execute('DELETE FROM fixed_assets');
+        console.log('Cleared existing data.');
 
         // Migrate Fixed Assets (Real Estate)
         if (assetsData.real_estate) {
