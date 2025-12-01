@@ -289,6 +289,58 @@ app.get('/api/assets', (req, res) => {
     }
 });
 
+const LOGS_DIR = '/usr/src/app/logs';
+
+app.get('/api/logs', async (req, res) => {
+    try {
+        if (!fs.existsSync(LOGS_DIR)) {
+             return res.json([]);
+        }
+        const files = await fs.promises.readdir(LOGS_DIR);
+        const fileStats = await Promise.all(files.map(async (file) => {
+            const filePath = path.join(LOGS_DIR, file);
+            const stats = await fs.promises.stat(filePath);
+            return {
+                name: file,
+                timestamp: stats.mtime,
+                size: stats.size
+            };
+        }));
+        
+        // Sort by timestamp descending (most recent first)
+        fileStats.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        res.json(fileStats);
+    } catch (error) {
+        console.error('Error reading logs directory:', error);
+        res.status(500).json({ error: 'Failed to list logs' });
+    }
+});
+
+app.get('/api/logs/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        // Basic security check to prevent directory traversal
+        if (filename.includes('..') || filename.includes('/')) {
+            return res.status(400).json({ error: 'Invalid filename' });
+        }
+        
+        const filePath = path.join(LOGS_DIR, filename);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+        
+        if (filename.endsWith('.gz')) {
+            res.download(filePath);
+        } else {
+            res.sendFile(filePath);
+        }
+    } catch (error) {
+        console.error('Error reading log file:', error);
+        res.status(500).json({ error: 'Failed to read log file' });
+    }
+});
+
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('Client connected');
