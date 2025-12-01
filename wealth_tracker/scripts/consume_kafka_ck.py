@@ -10,7 +10,8 @@ import json
 import logging
 import signal
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 from confluent_kafka import Consumer, KafkaException
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -84,42 +85,92 @@ def process_message(data):
     logging.info(f"Processing message: {data}")
     
     ticker = data.get('key')
-    last_price = data.get('last_price')
-    
-    if not ticker or last_price is None:
-        logging.warning("Skipping message missing key or last_price")
+    if not ticker:
+        logging.warning("Skipping message missing key")
         return
 
-    # Clean price
-    try:
-        price_val = float(str(last_price).replace('$', '').replace(',', ''))
-    except ValueError:
-        logging.warning(f"Invalid price format for {ticker}: {last_price}")
-        return
-
-    change_decimal = data.get('price_change_decimal')
-    change_percent = data.get('price_change_percent')
-    source = data.get('source')
-    capture_time = data.get('capture_time')
-
-    # Clean change_decimal if present
-    if change_decimal:
+    # Helper to clean price strings
+    def clean_val(v):
+        if v is None: return 0.0
         try:
-            change_decimal = float(str(change_decimal).replace('$', '').replace(',', ''))
+            return float(str(v).replace('$', '').replace(',', ''))
         except ValueError:
-            change_decimal = None
+            return 0.0
+
+    # Helper to check regular hours
+    def is_regular_hours(dt):
+        if not dt: return False
+        et_tz = ZoneInfo('America/New_York')
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+        dt_et = dt.astimezone(et_tz)
+        if dt_et.weekday() >= 5: return False # Sat/Sun
+        t = dt_et.time()
+        return time(9, 30) <= t < time(16, 0)
 
     # Parse capture_time
-    if capture_time:
+    capture_time_str = data.get('capture_time') or data.get('last_price_quote_time')
+    capture_time = datetime.now(ZoneInfo('UTC'))
+    if capture_time_str:
         try:
-            # Handle ISO format with Z
-            capture_time = capture_time.replace('Z', '+00:00')
-            capture_time = datetime.fromisoformat(capture_time)
+            capture_time = datetime.fromisoformat(capture_time_str.replace('Z', '+00:00'))
         except ValueError:
-            logging.warning(f"Could not parse capture_time: {capture_time}, using NOW()")
-            capture_time = datetime.now()
+            pass
+
+    now = datetime.now(ZoneInfo('UTC'))
+    prefer_regular = is_regular_hours(now) and is_regular_hours(capture_time)
+
+    last_price = clean_val(data.get('last_price'))
+    pre_market = clean_val(data.get('pre_market_price'))
+    after_hours = clean_val(data.get('after_hours_price'))
+    extended = clean_val(data.get('extended_hours_price'))
+
+    price_val = 0.0
+    price_source = 'regular'
+    found = False
+
+    if prefer_regular and last_price > 0:
+        price_val = last_price
+        price_source = 'regular'
+        found = True
+    
+    if not found:
+        if pre_market > 0:
+            price_val = pre_market
+            price_source = 'pre-market'
+        elif after_hours > 0:
+            price_val = after_hours
+            price_source = 'after-hours'
+        elif extended > 0:
+            price_val = extended
+            price_source = 'extended'
+        elif last_price > 0:
+            price_val = last_price
+            price_source = 'regular'
+
+    if price_val == 0:
+        logging.warning(f"No valid price found for {ticker}")
+        return
+
+    # Determine change values
+    change_decimal = 0.0
+    change_percent = '0%'
+    
+    if price_source == 'pre-market':
+        change_decimal = clean_val(data.get('pre_market_change'))
+        change_percent = data.get('pre_market_change_percent') or '0%'
+    elif price_source == 'after-hours':
+        change_decimal = clean_val(data.get('after_hours_change'))
+        change_percent = data.get('after_hours_change_percent') or '0%'
+    elif price_source == 'extended':
+        change_decimal = clean_val(data.get('extended_hours_change'))
+        change_percent = data.get('extended_hours_change_percent') or '0%'
     else:
-        capture_time = datetime.now()
+        change_decimal = clean_val(data.get('price_change_decimal'))
+        change_percent = data.get('price_change_percent') or '0%'
+
+    base_source = data.get('source', 'unknown')
+    final_source = f"{base_source} ({price_source})" if base_source else price_source
 
     conn = get_db_connection()
     if conn:
@@ -135,18 +186,13 @@ def process_message(data):
                     source = VALUES(source),
                     capture_time = VALUES(capture_time)
             """
-            # Convert ISO string to MySQL datetime format if needed, or let MySQL handle it if it's standard ISO
-            # Python's mysql-connector handles datetime objects well, but string ISO usually works too.
-            # If capture_time is missing, use NOW()
-            
-            vals = (ticker, price_val, change_decimal, change_percent, source, capture_time)
+            vals = (ticker, price_val, change_decimal, change_percent, final_source, capture_time)
             cursor.execute(sql, vals)
             conn.commit()
             cursor.close()
-            logging.info(f"Upserted {ticker} to DB")
+            logging.info(f"Upserted {ticker} to DB: {price_val} ({final_source})")
         except Exception as e:
             logging.error(f"Error writing to DB: {e}")
-            # Force reconnection on next attempt if it was a connection issue
             global db_conn
             try:
                 db_conn.close()

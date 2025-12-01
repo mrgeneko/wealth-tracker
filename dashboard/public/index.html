@@ -2,133 +2,733 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wealth Tracker Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; }
+        h1, h2 { color: #ffffff; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* Grid Styles */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #1e1e1e; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        th, td { padding: 10px; border: 1px solid #333; text-align: right; color: #e0e0e0; }
+        th { background-color: #2d2d2d; font-weight: bold; text-align: center; color: #ffffff; }
+        td:first-child, th:first-child { text-align: left; }
+        
+        /* Buttons */
+        .btn { padding: 8px 12px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px; }
+        .btn-primary { background-color: #0d6efd; color: white; }
+        .btn-primary:hover { background-color: #0b5ed7; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-danger:hover { background-color: #bb2d3b; }
+        
+        /* Section Headers */
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; margin-bottom: 10px; }
+        
+        /* Modals */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); }
+        .modal-content { background-color: #2d2d2d; margin: 10% auto; padding: 20px; border: 1px solid #444; width: 400px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); color: #e0e0e0; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: white; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #e0e0e0; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #555; border-radius: 4px; background-color: #333; color: #fff; }
+        
+        /* Clickable Cells */
+        .clickable-cell { cursor: pointer; color: #6ea8fe; text-decoration: none; display: block; width: 100%; height: 100%; }
+        .clickable-cell:hover { text-decoration: underline; background-color: #2c3e50; }
+        .edit-icon { font-size: 0.8em; margin-left: 5px; color: #888; visibility: hidden; }
+        .clickable-cell:hover .edit-icon { visibility: visible; }
+        
+        .row-total { font-weight: bold; background-color: #252525; }
+        .total-row td { font-weight: bold; background-color: #333; border-top: 2px solid #555; }
+        
+        .positive { color: #4caf50; }
+        .negative { color: #f44336; }
+
+        /* Tabs */
+        .tab { overflow: hidden; border-bottom: 1px solid #444; margin-bottom: 20px; }
+        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; transition: 0.3s; font-size: 17px; color: #aaa; }
+        .tab button:hover { background-color: #333; color: white; }
+        .tab button.active { background-color: #2d2d2d; color: white; border-bottom: 2px solid #0d6efd; }
+        .tab-content { display: none; animation: fadeEffect 1s; }
+        @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
+
+        /* Log Table Overrides */
+        #log-table th:first-child, 
+        #log-table td:first-child {
+            position: static !important;
+            background-color: transparent !important;
+            z-index: auto !important;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Wealth Tracker Dashboard</h1>
-            <div id="net-worth-display" class="net-worth">
-                Total Net Worth: <span id="total-net-worth">Loading...</span>
-            </div>
-        </header>
+        <h1>Wealth Tracker Dashboard</h1>
+        <div id="last-updated" style="color: #aaa; font-size: 0.9em; margin-bottom: 20px;"></div>
 
-        <div class="tabs">
-            <button class="tab-button active" onclick="openTab(event, 'accounts')">Accounts</button>
-            <button class="tab-button" onclick="openTab(event, 'historical')">Historical Values</button>
-            <button class="tab-button" onclick="openTab(event, 'projections')">Projections</button>
-            <button class="tab-button" onclick="openTab(event, 'logs')">Logs</button>
+        <div class="tab">
+            <button class="tablinks active" onclick="openTab(event, 'Accounts')">Accounts</button>
+            <button class="tablinks" onclick="openTab(event, 'Historical')">Historical Values</button>
+            <button class="tablinks" onclick="openTab(event, 'Projections')">Projections</button>
+            <button class="tablinks" onclick="openTab(event, 'Logs')">Logs</button>
         </div>
 
-        <div id="accounts" class="tab-content active">
-            <section id="accounts-grid-section">
-            <h2>Investment Accounts</h2>
-            <div class="grid-container">
-                <table id="holdings-grid">
-                    <thead>
-                        <!-- Headers will be generated dynamically -->
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be generated dynamically -->
-                    </tbody>
-                </table>
+        <div id="Accounts" class="tab-content" style="display: block;">
+            <!-- Investment Accounts -->
+            <div class="section-header">
+                <h2>Investment Accounts</h2>
+                <button class="btn btn-primary" onclick="openAccountModal('investment')">Add Account</button>
             </div>
-        </section>
+            <table id="investment-grid">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
 
-        <section id="bank-accounts-section">
-            <h2>Bank Accounts</h2>
-            <div class="grid-container">
-                <table id="bank-accounts-grid">
-                    <thead>
-                        <!-- Headers will be generated dynamically -->
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be generated dynamically -->
-                    </tbody>
-                </table>
+            <!-- Bank Accounts -->
+            <div class="section-header">
+                <h2>Bank Accounts</h2>
+                <button class="btn btn-primary" onclick="openAccountModal('bank')">Add Account</button>
             </div>
-        </section>
+            <table id="bank-grid">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
 
-        <section id="other-assets-section">
-            <div class="split-view">
-                <div class="asset-card">
-                    <h3>Real Estate</h3>
-                    <ul id="real-estate-list"></ul>
-                    <div class="subtotal">Total: <span id="real-estate-total">0.00</span></div>
-                </div>
-                <div class="asset-card">
-                    <h3>Vehicles</h3>
-                    <ul id="vehicles-list"></ul>
-                    <div class="subtotal">Total: <span id="vehicles-total">0.00</span></div>
-                </div>
+            <!-- Fixed Assets -->
+            <div class="section-header">
+                <h2>Fixed Assets</h2>
+                <button class="btn btn-primary" onclick="openAssetModal()">Add Asset</button>
             </div>
-        </section>
+            <table id="asset-grid">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+
+            <div id="total-net-worth" style="font-size: 1.5em; font-weight: bold; margin-top: 30px; margin-bottom: 20px;"></div>
         </div>
 
-        <div id="historical" class="tab-content">
-            <section>
-                <h2>Historical Values</h2>
-                <p>Coming soon...</p>
-            </section>
+        <div id="Historical" class="tab-content">
+            <h2>Historical Values</h2>
+            <p>Historical data visualization coming soon.</p>
         </div>
 
-        <div id="projections" class="tab-content">
-            <section>
-                <h2>Projections</h2>
-                <p>Coming soon...</p>
-            </section>
+        <div id="Projections" class="tab-content">
+            <h2>Projections</h2>
+            <p>Future wealth projections coming soon.</p>
         </div>
 
-        <div id="logs" class="tab-content">
-            <section>
-                <h2>System Logs <span class="refresh-icon" onclick="fetchLogs()" title="Refresh">↻</span></h2>
-                <div class="grid-container">
-                    <table id="logs-grid">
+        <div id="Logs" class="tab-content">
+            <h2>System Logs</h2>
+            <div id="logs-container" style="display: flex; height: 600px; border: 1px solid #444;">
+                <div id="log-list-pane" style="width: 50%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
+                    <table id="log-table" style="width: 100%; font-size: 0.8em; table-layout: fixed;">
                         <thead>
                             <tr>
-                                <th style="text-align: left">File Name</th>
-                                <th>Timestamp</th>
-                                <th>Size</th>
+                                <th id="col-file" style="text-align: left; padding: 5px; position: relative;">File</th>
+                                <th id="col-time" style="text-align: left; padding: 5px; width: 132px; white-space: nowrap;">Time</th>
+                                <th id="col-size" style="text-align: right; padding: 5px; width: 70px; white-space: nowrap;">Size</th>
                             </tr>
                         </thead>
-                        <tbody id="logs-table-body">
-                            <!-- Log files will be populated here -->
-                        </tbody>
+                        <tbody id="log-list"></tbody>
                     </table>
                 </div>
-            </section>
-            
-            <!-- Log Viewer Modal -->
-            <div id="log-viewer-modal" class="modal" style="display: none;">
-                <div class="modal-content">
-                    <span class="close-modal" onclick="closeLogViewer()">&times;</span>
-                    <h3 id="log-viewer-title">Log File</h3>
-                    <pre id="log-viewer-content" style="background: #1e1e1e; padding: 10px; overflow: auto; max-height: 70vh; color: #ccc;"></pre>
+                <div id="pane-resizer" style="width: 5px; cursor: col-resize; background-color: #444; user-select: none; z-index: 10;"></div>
+                <div id="log-viewer-pane" style="flex: 1; min-width: 150px; overflow-y: auto; padding: 10px; background: #121212; font-family: monospace; white-space: pre-wrap;">
+                    Select a log file to view...
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Account Modal -->
+    <div id="accountModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('accountModal')">&times;</span>
+            <h2 id="accountModalTitle">Add Account</h2>
+            <form id="accountForm">
+                <input type="hidden" id="accId">
+                <input type="hidden" id="accCategory">
+                <div class="form-group">
+                    <label for="accName">Account Name</label>
+                    <input type="text" id="accName" required>
+                </div>
+                <div class="form-group">
+                    <label for="accType">Type</label>
+                    <input type="text" id="accType" placeholder="e.g., 401k, Roth IRA, Checking">
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-danger" id="btnDeleteAccount" style="display:none;" onclick="deleteAccount()">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Position Modal -->
+    <div id="positionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('positionModal')">&times;</span>
+            <h2 id="positionModalTitle">Edit Position</h2>
+            <form id="positionForm">
+                <input type="hidden" id="posId">
+                <input type="hidden" id="posAccountId">
+                <div class="form-group">
+                    <label for="posSymbol">Symbol</label>
+                    <input type="text" id="posSymbol" required>
+                </div>
+                <div class="form-group">
+                    <label for="posType">Type</label>
+                    <select id="posType">
+                        <option value="stock">Stock</option>
+                        <option value="etf">ETF</option>
+                        <option value="bond">Bond</option>
+                        <option value="cash">Cash</option>
+                        <option value="crypto">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="posQuantity">Quantity / Value</label>
+                    <input type="number" step="any" id="posQuantity" required>
+                    <small style="color: #aaa;">For Cash, enter the total value.</small>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-danger" id="btnDeletePosition" style="display:none;" onclick="deletePosition()">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Asset Modal -->
+    <div id="assetModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('assetModal')">&times;</span>
+            <h2 id="assetModalTitle">Add Asset</h2>
+            <form id="assetForm">
+                <input type="hidden" id="assetId">
+                <div class="form-group">
+                    <label for="assetName">Name</label>
+                    <input type="text" id="assetName" required>
+                </div>
+                <div class="form-group">
+                    <label for="assetType">Type</label>
+                    <select id="assetType">
+                        <option value="real_estate">Real Estate</option>
+                        <option value="vehicle">Vehicle</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="assetValue">Value</label>
+                    <input type="number" step="any" id="assetValue" required>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-danger" id="btnDeleteAsset" style="display:none;" onclick="deleteAsset()">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        const socket = io();
+        let currentPrices = {};
+        let lastAssetsData = null;
+
+        // --- Socket.IO Listeners ---
+        socket.on('price_update', (data) => {
+            console.log('Price update received');
+            currentPrices = data;
+            if (lastAssetsData) renderAll();
+        });
+
+        socket.on('assets_update', (data) => {
+            console.log('Assets update received');
+            fetchAssets();
+        });
+
+        // --- Data Fetching ---
+        async function fetchAssets() {
+            try {
+                const response = await fetch('/api/assets');
+                const data = await response.json();
+                lastAssetsData = data;
+                renderAll();
+            } catch (error) {
+                console.error('Error fetching assets:', error);
+            }
+        }
+
+        // --- Rendering ---
+        function renderAll() {
+            if (!lastAssetsData) return;
+
+            // Filter accounts
+            const investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
+            const bankAccounts = lastAssetsData.accounts.filter(a => a.category === 'bank');
+            
+            // Combine fixed assets
+            const fixedAssets = [
+                ...(lastAssetsData.real_estate || []).map(a => ({...a, type: 'real_estate'})),
+                ...(lastAssetsData.vehicles || []).map(a => ({...a, type: 'vehicle'}))
+            ];
+
+            renderInvestmentGrid('investment-grid', investmentAccounts);
+            renderBankGrid('bank-grid', bankAccounts);
+            renderAssetGrid('asset-grid', fixedAssets);
+
+            // Calculate Net Worth
+            let netWorth = 0;
+            // Add fixed assets
+            fixedAssets.forEach(a => netWorth += a.value);
+            // Add accounts (calculated in render functions, but we can re-calc here or grab from DOM)
+            // Let's re-calc for accuracy
+            lastAssetsData.accounts.forEach(acc => {
+                if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
+                acc.holdings.stocks.forEach(p => {
+                    const price = currentPrices[p.symbol]?.price || 0;
+                    netWorth += p.quantity * price;
+                });
+                acc.holdings.bonds.forEach(p => {
+                    // Assuming bonds are valued at face value or quantity for now if no price
+                    // Or if we have a price source for bonds
+                    netWorth += p.quantity; 
+                });
+            });
+
+            document.getElementById('total-net-worth').innerText = `Total Net Worth: $${formatNumber(netWorth)}`;
+            document.getElementById('last-updated').innerText = `Last Updated: ${new Date().toLocaleString()}`;
+        }
+
+        function renderInvestmentGrid(tableId, accounts) {
+            const gridTable = document.getElementById(tableId);
+            const thead = gridTable.querySelector('thead');
+            const tbody = gridTable.querySelector('tbody');
+
+            if (!accounts || accounts.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td>No accounts found. Add one to get started.</td></tr>';
+                return;
+            }
+
+            // Collect all unique symbols
+            const allSymbols = new Set();
+            accounts.forEach(acc => {
+                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.symbol));
+                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.symbol));
+            });
+            const sortedSymbols = Array.from(allSymbols).sort();
+
+            // Header
+            let headerHtml = '<tr><th style="text-align: left">Symbol</th>';
+            accounts.forEach(acc => {
+                const accJson = escapeHtml(JSON.stringify(acc));
+                const accType = acc.type ? acc.type.toUpperCase() : '';
+                headerHtml += `<th style="text-align: center"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><small style="font-weight: normal; color: #aaa;">${accType}</small> <span class="edit-icon">✎</span></span></th>`;
+            });
+            headerHtml += '<th>Price</th><th>Change</th><th>Change %</th><th>Time</th><th>Source</th><th>Value Change</th><th>Total</th></tr>';
+            thead.innerHTML = headerHtml;
+
+            let bodyHtml = '';
+            let grandTotalValueChange = 0;
+
+            // Symbol Rows
+            sortedSymbols.forEach(sym => {
+                let price = 0;
+                let changePct = '0%';
+                let changeVal = 0;
+                let timeStr = '-';
+                let sourceStr = '-';
+                let color = '#e0e0e0';
+                
+                if (currentPrices[sym]) {
+                    price = currentPrices[sym].price;
+                    changePct = currentPrices[sym].change_percent || '0%';
+                    changeVal = currentPrices[sym].change || 0;
+                    
+                    if (currentPrices[sym].time) {
+                        const d = new Date(currentPrices[sym].time);
+                        if (!isNaN(d.getTime())) {
+                            timeStr = d.toLocaleString();
+                        } else {
+                            timeStr = currentPrices[sym].time;
+                        }
+                    }
+                    
+                    sourceStr = currentPrices[sym].source || '-';
+                    if (changeVal > 0) color = '#4caf50';
+                    if (changeVal < 0) color = '#f44336';
+                }
+
+                let rowHtml = `<tr><td style="text-align: left; font-weight: bold;">${sym}</td>`;
+                
+                let symTotalValue = 0;
+                let symTotalValueChange = 0;
+
+                accounts.forEach(acc => {
+                    // Find position in stocks or bonds
+                    let pos = acc.holdings.stocks.find(p => p.symbol === sym);
+                    let isBond = false;
+                    if (!pos) {
+                        pos = acc.holdings.bonds.find(p => p.symbol === sym);
+                        if (pos) isBond = true;
+                    }
+                    
+                    if (pos) {
+                        let calcPrice = price;
+                        let calcChange = changeVal;
+                        if (isBond) {
+                            calcPrice = price / 100.0;
+                            calcChange = changeVal / 100.0;
+                        }
+                        
+                        const value = pos.quantity * calcPrice;
+                        symTotalValue += value;
+                        symTotalValueChange += pos.quantity * calcChange;
+                        const posType = isBond ? 'bond' : 'stock';
+                        const posData = { id: pos.id, account_id: acc.id, symbol: pos.symbol, type: posType, quantity: pos.quantity };
+                        const posJson = escapeHtml(JSON.stringify(posData));
+                        rowHtml += `<td><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
+                    } else {
+                        const addPosData = { account_id: acc.id, symbol: sym, type: 'stock', quantity: 0 };
+                        const addPosJson = escapeHtml(JSON.stringify(addPosData));
+                        rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
+                    }
+                });
+                
+                rowHtml += `<td>${formatNumber(price)}</td>`;
+                rowHtml += `<td style="color: ${color}">${formatNumber(changeVal)}</td>`;
+                rowHtml += `<td style="color: ${color}">${changePct}</td>`;
+                rowHtml += `<td style="font-size: 0.8em; color: #aaa;">${timeStr}</td>`;
+                rowHtml += `<td style="font-size: 0.8em; color: #aaa;">${sourceStr}</td>`;
+                grandTotalValueChange += symTotalValueChange;
+                rowHtml += `<td style="color: ${color}">${formatNumber(symTotalValueChange)}</td>`;
+                rowHtml += `<td class="row-total">${formatNumber(symTotalValue, 0)}</td></tr>`;
+                bodyHtml += rowHtml;
+            });
+
+            // Cash Row
+            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td>';
+            let totalCash = 0;
+            accounts.forEach(acc => {
+                let cashVal = 0;
+                let cashPos = acc.holdings.cash;
+                if (cashPos) {
+                    cashVal = cashPos.value;
+                    const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: cashVal };
+                    const posJson = escapeHtml(JSON.stringify(posData));
+                    cashRowHtml += `<td><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(cashVal)}</span></td>`;
+                } else {
+                    const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0 };
+                    const posJson = escapeHtml(JSON.stringify(posData));
+                    cashRowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${posJson})">+</span></td>`;
+                }
+                totalCash += cashVal;
+            });
+            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+            cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
+            bodyHtml += cashRowHtml;
+
+            // Account Totals
+            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td>';
+            let grandTotal = 0;
+            accounts.forEach(acc => {
+                let accTotal = 0;
+                if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                acc.holdings.stocks.forEach(p => {
+                    const price = currentPrices[p.symbol]?.price || 0;
+                    accTotal += p.quantity * price;
+                });
+                acc.holdings.bonds.forEach(p => accTotal += p.quantity); // Assuming face value for bonds if no price
+                grandTotal += accTotal;
+                totalRowHtml += `<td>${formatNumber(accTotal)}</td>`;
+            });
+            let totalChangeColor = '#e0e0e0';
+            if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
+            if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
+
+            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td>';
+            totalRowHtml += `<td style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
+            totalRowHtml += `<td>${formatNumber(grandTotal, 0)}</td></tr>`;
+            bodyHtml += totalRowHtml;
+
+            // Add Position Buttons
+            let addRowHtml = '<tr><td></td>';
+            accounts.forEach(acc => {
+                 const addPosData = { account_id: acc.id, symbol: '', type: 'stock', quantity: 0 };
+                 const addPosJson = escapeHtml(JSON.stringify(addPosData));
+                 addRowHtml += `<td style="text-align: center;"><button class="btn btn-primary" style="padding: 2px 8px; font-size: 0.8em;" onclick="openPositionModal(${addPosJson})">Add Pos</button></td>`;
+            });
+            addRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+            bodyHtml += addRowHtml;
+
+            tbody.innerHTML = bodyHtml;
+        }
+
+        function renderBankGrid(tableId, accounts) {
+            const gridTable = document.getElementById(tableId);
+            const thead = gridTable.querySelector('thead');
+            const tbody = gridTable.querySelector('tbody');
+
+            if (!accounts || accounts.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td>No bank accounts found.</td></tr>';
+                return;
+            }
+
+            thead.innerHTML = `<tr>
+                <th style="text-align: left">Account Name</th>
+                <th style="text-align: left">Type</th>
+                <th>Value</th>
+            </tr>`;
+
+            let bodyHtml = '';
+            let total = 0;
+
+            accounts.forEach(acc => {
+                let val = 0;
+                let cashPos = acc.holdings.cash;
+                if (cashPos) val = cashPos.value;
+                total += val;
+
+                const accJson = escapeHtml(JSON.stringify(acc));
+                
+                let valCell = '';
+                if (cashPos) {
+                    const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: val };
+                    const posJson = escapeHtml(JSON.stringify(posData));
+                    valCell = `<span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(val)} <span class="edit-icon">✎</span></span>`;
+                } else {
+                    const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0 };
+                    const posJson = escapeHtml(JSON.stringify(posData));
+                    valCell = `<span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(0)} <span class="edit-icon">✎</span></span>`;
+                }
+
+                bodyHtml += `<tr>
+                    <td><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name} <span class="edit-icon">✎</span></span></td>
+                    <td style="text-align: left">${acc.type}</td>
+                    <td>${valCell}</td>
+                </tr>`;
+            });
+
+            bodyHtml += `<tr class="total-row"><td colspan="2">TOTAL</td><td>${formatNumber(total)}</td></tr>`;
+            tbody.innerHTML = bodyHtml;
+        }
+
+        function renderAssetGrid(tableId, assets) {
+            const gridTable = document.getElementById(tableId);
+            const thead = gridTable.querySelector('thead');
+            const tbody = gridTable.querySelector('tbody');
+
+            if (!assets || assets.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td>No fixed assets found.</td></tr>';
+                return;
+            }
+
+            thead.innerHTML = `<tr>
+                <th style="text-align: left">Name</th>
+                <th style="text-align: left">Type</th>
+                <th>Value</th>
+            </tr>`;
+
+            let bodyHtml = '';
+            let total = 0;
+
+            assets.forEach(asset => {
+                total += asset.value;
+                const assetJson = escapeHtml(JSON.stringify(asset));
+                bodyHtml += `<tr>
+                    <td><span class="clickable-cell" onclick="openAssetModal(${assetJson})">${asset.description || asset.name} <span class="edit-icon">✎</span></span></td>
+                    <td style="text-align: left">${asset.type}</td>
+                    <td>${formatNumber(asset.value)}</td>
+                </tr>`;
+            });
+
+            bodyHtml += `<tr class="total-row"><td colspan="2">TOTAL</td><td>${formatNumber(total)}</td></tr>`;
+            tbody.innerHTML = bodyHtml;
+        }
+
+        // --- Helpers ---
+        function formatNumber(num, decimals = 2) {
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/"/g, '&quot;');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = "none";
+            }
+        }
+
+        // --- Modal Logic ---
+        
+        // Account
+        function openAccountModal(category, account = null) {
+            const modal = document.getElementById('accountModal');
+            const form = document.getElementById('accountForm');
+            form.reset();
+            document.getElementById('accId').value = '';
+            document.getElementById('accCategory').value = category || '';
+            document.getElementById('btnDeleteAccount').style.display = 'none';
+            document.getElementById('accountModalTitle').innerText = 'Add Account';
+
+            if (account) {
+                document.getElementById('accountModalTitle').innerText = 'Edit Account';
+                document.getElementById('accId').value = account.id;
+                document.getElementById('accName').value = account.name;
+                document.getElementById('accType').value = account.type;
+                document.getElementById('accCategory').value = account.category;
+                document.getElementById('btnDeleteAccount').style.display = 'block';
+            }
+            modal.style.display = 'block';
+        }
+
+        document.getElementById('accountForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('accId').value;
+            const body = {
+                name: document.getElementById('accName').value,
+                type: document.getElementById('accType').value,
+                category: document.getElementById('accCategory').value
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/accounts/${id}` : '/api/accounts';
+
+            await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            closeModal('accountModal');
+            fetchAssets();
+        };
+
+        async function deleteAccount() {
+            const id = document.getElementById('accId').value;
+            if (!confirm('Delete this account?')) return;
+            await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+            closeModal('accountModal');
+            fetchAssets();
+        }
+
+        // Position
+        function openPositionModal(pos) {
+            const modal = document.getElementById('positionModal');
+            const form = document.getElementById('positionForm');
+            form.reset();
+            document.getElementById('posId').value = '';
+            document.getElementById('btnDeletePosition').style.display = 'none';
+            document.getElementById('positionModalTitle').innerText = 'Add Position';
+
+            document.getElementById('posAccountId').value = pos.account_id;
+            document.getElementById('posSymbol').value = pos.symbol;
+            document.getElementById('posType').value = pos.type;
+            document.getElementById('posQuantity').value = pos.quantity;
+
+            if (pos.id) {
+                document.getElementById('positionModalTitle').innerText = 'Edit Position';
+                document.getElementById('posId').value = pos.id;
+                document.getElementById('btnDeletePosition').style.display = 'block';
+            }
+            modal.style.display = 'block';
+        }
+
+        document.getElementById('positionForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('posId').value;
+            const body = {
+                account_id: document.getElementById('posAccountId').value,
+                symbol: document.getElementById('posSymbol').value,
+                type: document.getElementById('posType').value,
+                quantity: document.getElementById('posQuantity').value
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/positions/${id}` : '/api/positions';
+
+            await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            closeModal('positionModal');
+            fetchAssets();
+        };
+
+        async function deletePosition() {
+            const id = document.getElementById('posId').value;
+            if (!confirm('Delete this position?')) return;
+            await fetch(`/api/positions/${id}`, { method: 'DELETE' });
+            closeModal('positionModal');
+            fetchAssets();
+        }
+
+        // Asset
+        function openAssetModal(asset = null) {
+            const modal = document.getElementById('assetModal');
+            const form = document.getElementById('assetForm');
+            form.reset();
+            document.getElementById('assetId').value = '';
+            document.getElementById('btnDeleteAsset').style.display = 'none';
+            document.getElementById('assetModalTitle').innerText = 'Add Asset';
+
+            if (asset) {
+                document.getElementById('assetModalTitle').innerText = 'Edit Asset';
+                document.getElementById('assetId').value = asset.id;
+                document.getElementById('assetName').value = asset.description || asset.name;
+                document.getElementById('assetType').value = asset.type;
+                document.getElementById('assetValue').value = asset.value;
+                document.getElementById('btnDeleteAsset').style.display = 'block';
+            }
+            modal.style.display = 'block';
+        }
+
+        document.getElementById('assetForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('assetId').value;
+            const body = {
+                name: document.getElementById('assetName').value,
+                type: document.getElementById('assetType').value,
+                value: document.getElementById('assetValue').value
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/fixed_assets/${id}` : '/api/fixed_assets';
+
+            await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            closeModal('assetModal');
+            fetchAssets();
+        };
+
+        async function deleteAsset() {
+            const id = document.getElementById('assetId').value;
+            if (!confirm('Delete this asset?')) return;
+            await fetch(`/api/fixed_assets/${id}`, { method: 'DELETE' });
+            closeModal('assetModal');
+            fetchAssets();
+        }
+
+        // --- Tabs & Logs ---
         function openTab(evt, tabName) {
             var i, tabcontent, tablinks;
             tabcontent = document.getElementsByClassName("tab-content");
             for (i = 0; i < tabcontent.length; i++) {
                 tabcontent[i].style.display = "none";
-                tabcontent[i].classList.remove("active");
             }
-            tablinks = document.getElementsByClassName("tab-button");
+            tablinks = document.getElementsByClassName("tablinks");
             for (i = 0; i < tablinks.length; i++) {
                 tablinks[i].className = tablinks[i].className.replace(" active", "");
             }
             document.getElementById(tabName).style.display = "block";
-            document.getElementById(tabName).classList.add("active");
             evt.currentTarget.className += " active";
 
-            if (tabName === 'logs') {
+            if (tabName === 'Logs') {
                 fetchLogs();
             }
         }
@@ -136,578 +736,153 @@
         async function fetchLogs() {
             try {
                 const response = await fetch('/api/logs');
-                const logs = await response.json();
-                renderLogs(logs);
+                const files = await response.json();
+                const tbody = document.getElementById('log-list');
+                tbody.innerHTML = '';
+                files.forEach(file => {
+                    const tr = document.createElement('tr');
+                    tr.style.cursor = 'pointer';
+                    tr.onclick = () => viewLog(file.name);
+                    tr.onmouseover = () => tr.style.backgroundColor = '#333';
+                    tr.onmouseout = () => tr.style.backgroundColor = 'transparent';
+
+                    const date = new Date(file.timestamp).toLocaleString();
+                    const size = (file.size / 1024).toFixed(1) + ' KB';
+
+                    tr.innerHTML = `
+                        <td style="padding: 5px; border-bottom: 1px solid #333; word-break: break-all;">${file.name}</td>
+                        <td style="padding: 5px; border-bottom: 1px solid #333;">${date}</td>
+                        <td style="padding: 5px; border-bottom: 1px solid #333; text-align: right;">${size}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
             } catch (error) {
                 console.error('Error fetching logs:', error);
             }
         }
 
-        function renderLogs(logs) {
-            const tbody = document.getElementById('logs-table-body');
-            tbody.innerHTML = '';
-            
-            if (!logs || logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3">No logs found</td></tr>';
-                return;
-            }
-
-            logs.forEach(log => {
-                const date = new Date(log.timestamp).toLocaleString();
-                const size = (log.size / 1024).toFixed(2) + ' KB';
-                
-                const tr = document.createElement('tr');
-                
-                // Check if file should be clickable
-                const isIgnored = log.name === '.DS_Store';
-                const isGzip = log.name.endsWith('.gz');
-                
-                if (!isIgnored) {
-                    tr.className = 'log-row';
-                    if (isGzip) {
-                        tr.onclick = () => window.location.href = '/api/logs/' + log.name;
-                    } else {
-                        tr.onclick = () => viewLog(log.name);
-                    }
-                }
-                
-                const nameColor = !isIgnored ? '#5dade2' : '#aaa';
-                
-                tr.innerHTML = `
-                    <td style="text-align: left; color: ${nameColor};">${log.name}</td>
-                    <td>${date}</td>
-                    <td>${size}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
         async function viewLog(filename) {
             try {
-                const response = await fetch('/api/logs/' + filename);
-                const content = await response.text();
-                
-                document.getElementById('log-viewer-title').textContent = filename;
-                document.getElementById('log-viewer-content').textContent = content;
-                document.getElementById('log-viewer-modal').style.display = 'block';
-            } catch (error) {
-                console.error('Error fetching log content:', error);
-            }
-        }
-
-        function closeLogViewer() {
-            document.getElementById('log-viewer-modal').style.display = 'none';
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('log-viewer-modal');
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
-
-        const socket = io();
-        let assetsData = null;
-        let currentPrices = {};
-        let previousPrices = {}; // Track previous prices for flash effect
-        let activeFlashes = {}; // Track active flash states: { ticker: { flashClass, endTime } }
-
-        // Fetch assets structure
-        async function fetchAssets() {
-            try {
-                const response = await fetch('/api/assets');
-                assetsData = await response.json();
-                renderDashboard();
-            } catch (error) {
-                console.error('Error fetching assets:', error);
-            }
-        }
-
-        // Listen for price updates
-        socket.on('price_update', (prices) => {
-            console.log('Received price update', prices);
-            
-            // Detect which tickers changed and queue flash effects
-            const now = Date.now();
-            for (const ticker in prices) {
-                const prev = previousPrices[ticker];
-                const curr = prices[ticker];
-                if (prev) {
-                    // Check if any relevant field changed
-                    if (prev.price !== curr.price || 
-                        prev.change !== curr.change || 
-                        prev.change_percent !== curr.change_percent ||
-                        prev.time !== curr.time ||
-                        prev.source !== curr.source) {
-                        // Queue a new flash for this ticker
-                        const change = curr.change || 0;
-                        const flashClass = parseFloat(change) >= 0 ? 'flash-positive' : 'flash-negative';
-                        activeFlashes[ticker] = {
-                            flashClass: flashClass,
-                            endTime: now + 2000
-                        };
-                    }
-                }
-            }
-            
-            // Store previous prices before updating
-            previousPrices = JSON.parse(JSON.stringify(currentPrices));
-            currentPrices = prices;
-            
-            if (assetsData) {
-                renderDashboard();
-                // Apply flash effects after DOM update
-                requestAnimationFrame(() => {
-                    applyFlashEffects();
-                });
-            }
-        });
-
-        function applyFlashEffects() {
-            const now = Date.now();
-            
-            // Apply all active flashes
-            for (const ticker in activeFlashes) {
-                const flash = activeFlashes[ticker];
-                
-                // Check if flash has expired
-                if (now >= flash.endTime) {
-                    delete activeFlashes[ticker];
-                    continue;
-                }
-                
-                const priceCell = document.querySelector(`[data-price-cell="${ticker}"]`);
-                if (priceCell) {
-                    // Remove any existing flash class first
-                    priceCell.classList.remove('flash-positive', 'flash-negative');
-                    
-                    // Force reflow to restart animation
-                    void priceCell.offsetWidth;
-                    
-                    // Add flash class
-                    priceCell.classList.add(flash.flashClass);
-                }
-            }
-            
-            // Schedule cleanup of expired flashes
-            setTimeout(() => {
-                const now = Date.now();
-                for (const ticker in activeFlashes) {
-                    if (now >= activeFlashes[ticker].endTime) {
-                        delete activeFlashes[ticker];
-                        const priceCell = document.querySelector(`[data-price-cell="${ticker}"]`);
-                        if (priceCell) {
-                            priceCell.classList.remove('flash-positive', 'flash-negative');
-                        }
-                    }
-                }
-            }, 2100);
-        }
-
-        // Listen for assets updates
-        socket.on('assets_update', (assets) => {
-            console.log('Received assets update');
-            assetsData = assets;
-            renderDashboard();
-        });
-
-        function formatCurrency(value, currency = 'USD') {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: currency
-            }).format(value);
-        }
-
-        function formatNumber(value) {
-            return new Intl.NumberFormat('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }).format(value);
-        }
-
-        function renderDashboard() {
-            if (!assetsData) return;
-
-            const allAccounts = assetsData.accounts || [];
-            const bankTypes = ['checking', 'savings', 'hysa', 'cd', 'mortgage', 'credit card', 'money market'];
-            
-            const bankAccounts = allAccounts.filter(acc => bankTypes.includes(acc.type.toLowerCase()));
-            const investmentAccounts = allAccounts.filter(acc => !bankTypes.includes(acc.type.toLowerCase()));
-
-            renderGrid('holdings-grid', investmentAccounts);
-            renderBankGrid('bank-accounts-grid', bankAccounts);
-
-            renderOtherAssets();
-            calculateNetWorth();
-        }
-
-        let currentSort = { column: 'ticker', direction: 'asc' };
-
-        function handleSort(column) {
-            if (currentSort.column === column) {
-                if (column === 'ticker') {
-                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                const response = await fetch(`/api/logs/${filename}`);
+                if (filename.endsWith('.json')) {
+                    const data = await response.json();
+                    document.getElementById('log-viewer').innerText = JSON.stringify(data, null, 2);
                 } else {
-                    if (currentSort.direction === 'desc') {
-                        currentSort.direction = 'asc';
-                    } else {
-                        currentSort.column = 'ticker';
-                        currentSort.direction = 'asc';
-                    }
+                    const text = await response.text();
+                    document.getElementById('log-viewer').innerText = text;
                 }
-            } else {
-                currentSort.column = column;
-                if (column === 'ticker') {
-                    currentSort.direction = 'asc';
-                } else {
-                    currentSort.direction = 'desc';
-                }
+            } catch (error) {
+                document.getElementById('log-viewer').innerText = 'Error loading file: ' + error;
             }
-            renderDashboard();
         }
 
-        function renderBankGrid(tableId, accounts) {
-            const gridTable = document.getElementById(tableId);
-            if (!gridTable) return;
-            const thead = gridTable.querySelector('thead');
-            const tbody = gridTable.querySelector('tbody');
+        // --- Resizing Logic ---
 
-            if (!accounts || accounts.length === 0) {
-                thead.innerHTML = '';
-                tbody.innerHTML = '<tr><td>No accounts</td></tr>';
-                return;
-            }
+        // 1. Split Pane Resizer
+        const paneResizer = document.getElementById('pane-resizer');
+        const leftPane = document.getElementById('log-list-pane');
+        const rightPane = document.getElementById('log-viewer-pane');
+        const logsContainer = document.getElementById('logs-container');
 
-            let headerHtml = `<tr>
-                <th>Account</th>
-                <th style="text-align: left">Type</th>
-                <th>Value</th>
-            </tr>`;
-            thead.innerHTML = headerHtml;
+        if (paneResizer) {
+            let x = 0;
+            let leftWidth = 0;
 
-            let bodyHtml = '';
-            let grandTotal = 0;
+            const onMouseDownPane = function(e) {
+                x = e.clientX;
+                leftWidth = leftPane.getBoundingClientRect().width;
 
-            accounts.forEach(acc => {
-                let cashValue = 0;
-                if (acc.holdings && acc.holdings.cash) {
-                    cashValue = acc.holdings.cash.value;
-                }
+                document.addEventListener('mousemove', onMouseMovePane);
+                document.addEventListener('mouseup', onMouseUpPane);
                 
-                let totalValue = cashValue; 
-                grandTotal += totalValue;
-
-                bodyHtml += `<tr>
-                    <td>${acc.name}</td>
-                    <td style="text-align: left"><span class="account-type">${acc.type}</span></td>
-                    <td class="row-total">${formatNumber(totalValue)}</td>
-                </tr>`;
-            });
-
-            // Total Row
-            bodyHtml += `<tr class="total-row">
-                <td colspan="2">TOTALS</td>
-                <td>${formatNumber(grandTotal)}</td>
-            </tr>`;
-
-            tbody.innerHTML = bodyHtml;
-        }
-
-        function renderGrid(tableId, accounts) {
-            const gridTable = document.getElementById(tableId);
-            if (!gridTable) return;
-            const thead = gridTable.querySelector('thead');
-            const tbody = gridTable.querySelector('tbody');
-
-            if (!accounts || accounts.length === 0) {
-                thead.innerHTML = '';
-                tbody.innerHTML = '<tr><td>No accounts</td></tr>';
-                return;
-            }
-
-            // 1. Identify all unique tickers/holdings across all accounts
-            const allHoldings = new Set();
-            accounts.forEach(acc => {
-                if (acc.holdings) {
-                    if (acc.holdings.stocks) acc.holdings.stocks.forEach(s => allHoldings.add(s.ticker));
-                    if (acc.holdings.bonds) acc.holdings.bonds.forEach(b => allHoldings.add(b.ticker));
-                    if (acc.holdings.cash) allHoldings.add('CASH');
-                }
-            });
-
-            // Prepare data for sorting
-            let rowsData = Array.from(allHoldings).map(ticker => {
-                let rowTotalValue = 0;
-                let rowTotalShares = 0;
-                let isBond = false;
-                
-                accounts.forEach(acc => {
-                    if (acc.holdings) {
-                        const stock = acc.holdings.stocks?.find(s => s.ticker === ticker);
-                        const bond = acc.holdings.bonds?.find(b => b.ticker === ticker);
-                        const cash = (ticker === 'CASH' && acc.holdings.cash) ? acc.holdings.cash : null;
-
-                        if (stock) {
-                            const price = currentPrices[ticker]?.price || 0;
-                            rowTotalValue += stock.shares * price;
-                            rowTotalShares += stock.shares;
-                        } else if (bond) {
-                            const price = currentPrices[ticker]?.price || 0;
-                            rowTotalValue += (bond.shares * price) / 100.00;
-                            rowTotalShares += bond.shares;
-                            isBond = true;
-                        } else if (cash) {
-                            rowTotalValue += cash.value;
-                        }
-                    }
-                });
-
-                const priceData = currentPrices[ticker] || {};
-                const change = parseFloat(priceData.change) || 0;
-                const changePctStr = priceData.change_percent || '0%';
-                const changePct = parseFloat(changePctStr.replace('%', '')) || 0;
-                
-                let valueChange = 0;
-                if (ticker !== 'CASH') {
-                     valueChange = isBond ? (rowTotalShares * change) / 100 : rowTotalShares * change;
-                }
-
-                return {
-                    ticker,
-                    totalValue: rowTotalValue,
-                    changePercent: changePct,
-                    valueChange: valueChange
-                };
-            });
-
-            // Sort rowsData if this is the investment table
-            const isInvestmentTable = tableId === 'holdings-grid';
-            
-            rowsData.sort((a, b) => {
-                if (a.ticker === 'CASH') return 1;
-                if (b.ticker === 'CASH') return -1;
-
-                if (!isInvestmentTable) {
-                     return a.ticker.localeCompare(b.ticker);
-                }
-
-                let valA = a[currentSort.column];
-                let valB = b[currentSort.column];
-                
-                if (currentSort.column === 'ticker') {
-                    return currentSort.direction === 'asc' 
-                        ? valA.localeCompare(valB) 
-                        : valB.localeCompare(valA);
-                }
-
-                return currentSort.direction === 'asc' ? valA - valB : valB - valA;
-            });
-
-            // 2. Build Header Row
-            const isBank = tableId === 'bank-accounts-grid';
-            
-            const getSortHeader = (col, label) => {
-                if (!isInvestmentTable) return `<th>${label}</th>`;
-                let arrow = '';
-                if (currentSort.column === col) {
-                    arrow = currentSort.direction === 'asc' ? ' ▲' : ' ▼';
-                }
-                return `<th onclick="handleSort('${col}')" style="cursor:pointer; user-select: none;">${label}${arrow}</th>`;
+                // Visual feedback
+                paneResizer.style.backgroundColor = '#666';
             };
 
-            let headerHtml = `<tr>${getSortHeader('ticker', 'Ticker')}`;
-            accounts.forEach(acc => {
-                headerHtml += `<th>${acc.name}<br><span class="account-type">${acc.type}</span></th>`;
-            });
-            if (!isBank) {
-                headerHtml += `<th>Last Price</th><th>Change</th>${getSortHeader('changePercent', 'Change %')}<th>Time</th><th>Source</th>${getSortHeader('valueChange', 'Value Change')}`;
-            }
-            headerHtml += `${getSortHeader('totalValue', 'Total Value')}</tr>`;
-            thead.innerHTML = headerHtml;
-
-            // 3. Build Rows
-            let bodyHtml = '';
-            let totalValueChange = 0; 
-            
-            rowsData.forEach(row => {
-                const ticker = row.ticker;
-                let rowHtml = `<tr><td class="ticker-cell">${ticker}</td>`;
-                let rowTotalValue = 0;
-                let rowTotalShares = 0; 
-                let isBond = false;
-
-                accounts.forEach(acc => {
-                    let cellContent = '-';
-                    let holdingValue = 0;
-
-                    if (acc.holdings) {
-                        const stock = acc.holdings.stocks?.find(s => s.ticker === ticker);
-                        const bond = acc.holdings.bonds?.find(b => b.ticker === ticker);
-                        const cash = (ticker === 'CASH' && acc.holdings.cash) ? acc.holdings.cash : null;
-
-                        if (stock) {
-                            const price = currentPrices[ticker]?.price || 0;
-                            const val = stock.shares * price;
-                            holdingValue = val;
-                            rowTotalShares += stock.shares;
-                            cellContent = `
-                                <div class="cell-data">
-                                    <span class="shares">${stock.shares} sh</span>
-                                    <span class="value">${formatNumber(val)}</span>
-                                </div>`;
-                        } else if (bond) {
-                            const price = currentPrices[ticker]?.price || 0;
-                            const val = (bond.shares * price) / 100.00; 
-                            holdingValue = val;
-                            rowTotalShares += bond.shares;
-                            isBond = true;
-                            cellContent = `
-                                <div class="cell-data">
-                                    <span class="shares">${bond.shares} units</span>
-                                    <span class="value">${formatNumber(val)}</span>
-                                </div>`;
-                        } else if (cash) {
-                            holdingValue = cash.value;
-                            cellContent = `<span class="value cash">${formatNumber(cash.value)}</span>`;
-                        }
-                    }
-
-                    rowTotalValue += holdingValue;
-                    rowHtml += `<td>${cellContent}</td>`;
-                });
-
-                if (!isBank) {
-                    const priceData = currentPrices[ticker] || {};
-                    const price = priceData.price || 0;
-                    const change = parseFloat(priceData.change) || 0;
-                    const changePctStr = priceData.change_percent || '0%';
-                    const changePctVal = parseFloat(changePctStr.replace('%', '')) || 0;
-                    const changeClass = change >= 0 ? 'positive' : 'negative';
-                    const time = priceData.time ? new Date(priceData.time).toLocaleString() : '-';
-                    const source = priceData.source || '-';
-
-                    if (ticker === 'CASH') {
-                        rowHtml += `<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
-                    } else {
-                        const valueChange = isBond ? (rowTotalShares * change) / 100 : rowTotalShares * change;
-                        totalValueChange += valueChange;
-                        const valueChangeClass = valueChange >= 0 ? 'positive' : 'negative';
-                        
-                        const displayChange = (change > 0 ? '+' : '') + change.toFixed(3);
-                        const displayChangePct = (changePctVal > 0 ? '+' : '') + changePctVal.toFixed(2) + '%';
-
-                        rowHtml += `<td data-price-cell="${ticker}">${formatNumber(price)}</td>`;
-                        rowHtml += `<td class="${changeClass}">${displayChange}</td>`;
-                        rowHtml += `<td class="${changeClass}">${displayChangePct}</td>`;
-                        rowHtml += `<td class="time-cell">${time}</td>`;
-                        rowHtml += `<td class="source-cell">${source}</td>`;
-                        rowHtml += `<td class="${valueChangeClass}">${formatNumber(valueChange)}</td>`;
-                    }
+            const onMouseMovePane = function(e) {
+                const dx = e.clientX - x;
+                const containerWidth = logsContainer.getBoundingClientRect().width;
+                const newLeftWidth = ((leftWidth + dx) / containerWidth) * 100;
+                
+                // Limits (10% to 90%)
+                if (newLeftWidth > 10 && newLeftWidth < 90) {
+                    leftPane.style.width = `${newLeftWidth}%`;
                 }
 
-                rowHtml += `<td class="row-total">${formatNumber(rowTotalValue)}</td></tr>`;
-                bodyHtml += rowHtml;
-            });
+                document.body.style.cursor = 'col-resize';
+                leftPane.style.userSelect = 'none';
+                leftPane.style.pointerEvents = 'none';
+                rightPane.style.userSelect = 'none';
+                rightPane.style.pointerEvents = 'none';
+            };
 
-            // Add Account Totals Row
-            let totalRowHtml = '<tr class="total-row"><td>ACCOUNT TOTALS</td>';
-            let grandTotal = 0;
-            accounts.forEach(acc => {
-                let accTotal = 0;
-                if (acc.holdings) {
-                    if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
-                    if (acc.holdings.stocks) {
-                        acc.holdings.stocks.forEach(s => {
-                            const price = currentPrices[s.ticker]?.price || 0;
-                            accTotal += s.shares * price;
-                        });
-                    }
-                    if (acc.holdings.bonds) {
-                        acc.holdings.bonds.forEach(b => {
-                            const price = currentPrices[b.ticker]?.price || 0;
-                            accTotal += (b.shares * price) / 100;
-                        });
-                    }
-                }
-                grandTotal += accTotal;
-                totalRowHtml += `<td>${formatNumber(accTotal)}</td>`;
-            });
-            if (!isBank) {
-                const totalValueChangeClass = totalValueChange >= 0 ? 'positive' : 'negative';
-                totalRowHtml += `<td></td><td></td><td></td><td></td><td></td><td class="${totalValueChangeClass}">${formatNumber(totalValueChange)}</td>`;
-            }
-            totalRowHtml += `<td>${formatNumber(grandTotal)}</td></tr>`;
+            const onMouseUpPane = function() {
+                document.removeEventListener('mousemove', onMouseMovePane);
+                document.removeEventListener('mouseup', onMouseUpPane);
+                
+                document.body.style.cursor = 'default';
+                leftPane.style.removeProperty('user-select');
+                leftPane.style.removeProperty('pointer-events');
+                rightPane.style.removeProperty('user-select');
+                rightPane.style.removeProperty('pointer-events');
+                paneResizer.style.backgroundColor = '#444';
+            };
 
-            bodyHtml += totalRowHtml;
-            tbody.innerHTML = bodyHtml;
+            paneResizer.addEventListener('mousedown', onMouseDownPane);
         }
 
-        function renderOtherAssets() {
-            // Real Estate
-            const reList = document.getElementById('real-estate-list');
-            let reTotal = 0;
-            let reHtml = '';
-            if (assetsData.real_estate) {
-                assetsData.real_estate.forEach(item => {
-                    reTotal += item.value;
-                    reHtml += `<li><span class="desc">${item.description}</span> <span class="val">${formatCurrency(item.value, item.currency)}</span></li>`;
-                });
-            }
-            reList.innerHTML = reHtml;
-            document.getElementById('real-estate-total').textContent = formatCurrency(reTotal);
+        // 2. Table Column Resizer
+        function createResizableColumn(col, resizer) {
+            let x = 0;
+            let w = 0;
 
-            // Vehicles
-            const vList = document.getElementById('vehicles-list');
-            let vTotal = 0;
-            let vHtml = '';
-            if (assetsData.vehicles) {
-                assetsData.vehicles.forEach(item => {
-                    vTotal += item.value;
-                    vHtml += `<li><span class="desc">${item.description}</span> <span class="val">${formatCurrency(item.value, item.currency)}</span></li>`;
-                });
-            }
-            vList.innerHTML = vHtml;
-            document.getElementById('vehicles-total').textContent = formatCurrency(vTotal);
+            const onMouseDownCol = function(e) {
+                e.stopPropagation(); // Prevent bubbling
+                x = e.clientX;
+                w = col.getBoundingClientRect().width;
+
+                document.addEventListener('mousemove', onMouseMoveCol);
+                document.addEventListener('mouseup', onMouseUpCol);
+                resizer.style.backgroundColor = '#888';
+            };
+
+            const onMouseMoveCol = function(e) {
+                const dx = e.clientX - x;
+                // Set width in pixels to override percentage
+                col.style.width = `${w + dx}px`;
+            };
+
+            const onMouseUpCol = function() {
+                document.removeEventListener('mousemove', onMouseMoveCol);
+                document.removeEventListener('mouseup', onMouseUpCol);
+                resizer.style.backgroundColor = '#555';
+            };
+
+            resizer.addEventListener('mousedown', onMouseDownCol);
         }
 
-        function calculateNetWorth() {
-            let total = 0;
-            
-            // Real Estate
-            if (assetsData.real_estate) {
-                assetsData.real_estate.forEach(i => total += i.value);
+        // Initialize column resizers
+        ['col-file'].forEach(id => {
+            const th = document.getElementById(id);
+            if (th) {
+                const resizer = document.createElement('div');
+                resizer.style.width = '5px';
+                resizer.style.height = '100%';
+                resizer.style.position = 'absolute';
+                resizer.style.top = '0';
+                resizer.style.right = '0';
+                resizer.style.cursor = 'col-resize';
+                resizer.style.backgroundColor = '#555'; // Visible handle
+                resizer.style.userSelect = 'none';
+                resizer.style.zIndex = '5';
+                
+                th.appendChild(resizer);
+                createResizableColumn(th, resizer);
             }
-            // Vehicles
-            if (assetsData.vehicles) {
-                assetsData.vehicles.forEach(i => total += i.value);
-            }
-            // Accounts
-            if (assetsData.accounts) {
-                assetsData.accounts.forEach(acc => {
-                    if (acc.holdings) {
-                        if (acc.holdings.cash) total += acc.holdings.cash.value;
-                        if (acc.holdings.stocks) {
-                            acc.holdings.stocks.forEach(s => {
-                                const price = currentPrices[s.ticker]?.price || 0;
-                                total += s.shares * price;
-                            });
-                        }
-                        if (acc.holdings.bonds) {
-                            acc.holdings.bonds.forEach(b => {
-                                const price = currentPrices[b.ticker]?.price || 0;
-                                total += (b.shares * price) / 100;
-                            });
-                        }
-                    }
-                });
-            }
+        });
 
-            document.getElementById('total-net-worth').textContent = formatCurrency(total);
-        }
-
-        // Initial load
-        fetchAssets();
+        // Init
+        window.onload = fetchAssets;
     </script>
 </body>
 </html>
