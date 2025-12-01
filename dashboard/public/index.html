@@ -228,7 +228,7 @@
             const investmentAccounts = allAccounts.filter(acc => !bankTypes.includes(acc.type.toLowerCase()));
 
             renderGrid('holdings-grid', investmentAccounts);
-            renderGrid('bank-accounts-grid', bankAccounts);
+            renderBankGrid('bank-accounts-grid', bankAccounts);
 
             renderOtherAssets();
             calculateNetWorth();
@@ -257,6 +257,53 @@
                 }
             }
             renderDashboard();
+        }
+
+        function renderBankGrid(tableId, accounts) {
+            const gridTable = document.getElementById(tableId);
+            if (!gridTable) return;
+            const thead = gridTable.querySelector('thead');
+            const tbody = gridTable.querySelector('tbody');
+
+            if (!accounts || accounts.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td>No accounts</td></tr>';
+                return;
+            }
+
+            let headerHtml = `<tr>
+                <th>Account</th>
+                <th style="text-align: left">Type</th>
+                <th>Value</th>
+            </tr>`;
+            thead.innerHTML = headerHtml;
+
+            let bodyHtml = '';
+            let grandTotal = 0;
+
+            accounts.forEach(acc => {
+                let cashValue = 0;
+                if (acc.holdings && acc.holdings.cash) {
+                    cashValue = acc.holdings.cash.value;
+                }
+                
+                let totalValue = cashValue; 
+                grandTotal += totalValue;
+
+                bodyHtml += `<tr>
+                    <td>${acc.name}</td>
+                    <td style="text-align: left"><span class="account-type">${acc.type}</span></td>
+                    <td class="row-total">${formatNumber(totalValue)}</td>
+                </tr>`;
+            });
+
+            // Total Row
+            bodyHtml += `<tr class="total-row">
+                <td colspan="2">TOTALS</td>
+                <td>${formatNumber(grandTotal)}</td>
+            </tr>`;
+
+            tbody.innerHTML = bodyHtml;
         }
 
         function renderGrid(tableId, accounts) {
