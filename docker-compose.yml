@@ -49,10 +49,11 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       BASIC_AUTH_USER: ${BASIC_AUTH_USER}
       BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD}
+    volumes:
+      - /Users/gene/wealth_tracker/logs:/usr/src/app/logs
+      - ./config/assets_liabilities.json:/assets_liabilities.json:ro
     ports:
       - "3001:3001"
-    volumes:
-      - ./config/assets_liabilities.json:/assets_liabilities.json:ro
 
   mysql:
     image: mysql:8.0
