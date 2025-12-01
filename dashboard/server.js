@@ -146,6 +146,7 @@ async function fetchAssetsFromDB() {
         // Process Fixed Assets
         for (const asset of fixedAssets) {
             const item = {
+                id: asset.id,
                 description: asset.name,
                 value: parseFloat(asset.value),
                 currency: asset.currency
@@ -160,8 +161,10 @@ async function fetchAssetsFromDB() {
         // Process Accounts
         for (const acc of accounts) {
             const accountObj = {
+                id: acc.id,
                 name: acc.name,
                 type: acc.type,
+                category: acc.category,
                 holdings: {
                     cash: null,
                     stocks: [],
@@ -174,19 +177,22 @@ async function fetchAssetsFromDB() {
             for (const pos of accPositions) {
                 if (pos.type === 'cash') {
                     accountObj.holdings.cash = {
+                        id: pos.id,
                         value: parseFloat(pos.quantity),
                         currency: pos.currency
                     };
                 } else if (pos.type === 'bond') {
                     accountObj.holdings.bonds.push({
-                        ticker: pos.symbol,
-                        shares: parseFloat(pos.quantity)
+                        id: pos.id,
+                        symbol: pos.symbol,
+                        quantity: parseFloat(pos.quantity)
                     });
                 } else {
                     // Stocks, ETFs, Crypto, etc.
                     accountObj.holdings.stocks.push({
-                        ticker: pos.symbol,
-                        shares: parseFloat(pos.quantity)
+                        id: pos.id,
+                        symbol: pos.symbol,
+                        quantity: parseFloat(pos.quantity)
                     });
                 }
             }
