@@ -21,6 +21,7 @@ const { scrapeWebullWatchlists } = require('./scrape_webull_watchlists');
 const { scrapeCNBC } = require('./scrape_cnbc');
 const { scrapeMarketBeat } = require('./scrape_marketbeat');
 const { scrapeMoomoo } = require('./scrape_moomoo');
+const { scrapeMarketWatch } = require('./scrape_marketwatch');
 const { scrapeNasdaq } = require('./scrape_nasdaq');
 const { scrapeRobinhood } = require('./scrape_robinhood');
 const { scrapeStockAnalysis } = require('./scrape_stockanalysis');
@@ -34,6 +35,7 @@ const scraperMap = {
     'cnbc': scrapeCNBC,
     'google': scrapeGoogle,
     'marketbeat': scrapeMarketBeat,
+    //'marketwatch': scrapeMarketWatch,
     //'moomoo': scrapeMoomoo,
 	'nasdaq': scrapeNasdaq,
     'robinhood': scrapeRobinhood,
