@@ -127,6 +127,96 @@ let lastCycleError = null;
 let lastCycleDurationMs = null;
 const startTime = Date.now();
 
+// Browser health tracking
+let browserLaunchTime = null;
+let consecutiveProtocolTimeouts = 0;
+const MAX_PROTOCOL_TIMEOUTS = 3; // Restart browser after this many consecutive protocol timeouts
+const BROWSER_MAX_AGE_MS = 4 * 60 * 60 * 1000; // Restart browser every 4 hours
+let browserNeedsRestart = false;
+
+// Check if error message indicates a protocol timeout
+function isProtocolTimeoutError(errorMsg) {
+	if (!errorMsg) return false;
+	const msg = String(errorMsg).toLowerCase();
+	return msg.includes('timed out') && (
+		msg.includes('protocol') ||
+		msg.includes('network.') ||
+		msg.includes('emulation.') ||
+		msg.includes('runtime.') ||
+		msg.includes('page.') ||
+		msg.includes('cdp') ||
+		msg.includes('increase the')
+	);
+}
+
+// Check if browser needs restart (age or health issues)
+function shouldRestartBrowser() {
+	// Check if flagged for restart
+	if (browserNeedsRestart) {
+		logDebug('Browser flagged for restart');
+		return true;
+	}
+	// Check browser age
+	if (browserLaunchTime && (Date.now() - browserLaunchTime) > BROWSER_MAX_AGE_MS) {
+		logDebug(`Browser age (${Math.round((Date.now() - browserLaunchTime) / 60000)}min) exceeds max age (${BROWSER_MAX_AGE_MS / 60000}min)`);
+		return true;
+	}
+	// Check consecutive protocol timeouts
+	if (consecutiveProtocolTimeouts >= MAX_PROTOCOL_TIMEOUTS) {
+		logDebug(`Consecutive protocol timeouts (${consecutiveProtocolTimeouts}) >= threshold (${MAX_PROTOCOL_TIMEOUTS})`);
+		return true;
+	}
+	return false;
+}
+
+// Record a protocol timeout error
+function recordProtocolTimeout() {
+	consecutiveProtocolTimeouts++;
+	logDebug(`Protocol timeout recorded (count: ${consecutiveProtocolTimeouts}/${MAX_PROTOCOL_TIMEOUTS})`);
+	if (consecutiveProtocolTimeouts >= MAX_PROTOCOL_TIMEOUTS) {
+		browserNeedsRestart = true;
+	}
+}
+
+// Reset protocol timeout counter (call after successful operation)
+function resetProtocolTimeoutCounter() {
+	if (consecutiveProtocolTimeouts > 0) {
+		logDebug(`Resetting protocol timeout counter (was ${consecutiveProtocolTimeouts})`);
+		consecutiveProtocolTimeouts = 0;
+	}
+}
+
+// Restart the browser
+async function restartBrowser() {
+	logDebug('Attempting browser restart...');
+	try {
+		if (globalBrowser) {
+			try {
+				await globalBrowser.close();
+				logDebug('Old browser closed');
+			} catch (e) {
+				logDebug('Error closing old browser: ' + (e && e.message ? e.message : e));
+			}
+		}
+	} catch (e) {
+		logDebug('Error during browser close attempt: ' + (e && e.message ? e.message : e));
+	}
+	
+	// Reset state
+	globalBrowser = null;
+	browserNeedsRestart = false;
+	consecutiveProtocolTimeouts = 0;
+	
+	// Wait a moment for Chrome to fully exit
+	await new Promise(r => setTimeout(r, 2000));
+	
+	// Launch new browser
+	const newBrowser = await ensureBrowser();
+	globalBrowser = newBrowser;
+	logDebug('Browser restarted successfully');
+	return newBrowser;
+}
+
 // Health server
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || '3000', 10);
 let healthServer = null;
@@ -197,8 +287,12 @@ async function ensureBrowser() {
 			req.on('error', reject);
 			req.on('timeout', () => { req.destroy(); reject(new Error('Timeout connecting to Chrome')); });
 		});
-		browser = await puppeteerExtra.connect({ browserWSEndpoint: wsEndpoint });
+		browser = await puppeteerExtra.connect({ 
+			browserWSEndpoint: wsEndpoint,
+			protocolTimeout: 180000 // 3 minute timeout for CDP protocol calls
+		});
 		connected = true;
+		browserLaunchTime = Date.now();
 		logDebug('Connected to existing Chrome instance at ' + debugUrl);
 	} catch (err) {
 		connectError = err;
@@ -233,6 +327,7 @@ async function ensureBrowser() {
 			browser = await puppeteerExtra.launch({
 				headless: false,
 				executablePath: '/opt/google/chrome/chrome',
+				protocolTimeout: 180000, // 3 minute timeout for CDP protocol calls
 				args: [
 					'--no-sandbox',
 					'--disable-gpu',
@@ -256,6 +351,7 @@ async function ensureBrowser() {
 					CHROME_DISABLE_UPDATE: '1'
 				}
 			});
+			browserLaunchTime = Date.now();
 			logDebug('Launched new Chrome instance.');
 		} catch (err) {
 			launchError = err;
@@ -267,6 +363,7 @@ async function ensureBrowser() {
 					browser = await puppeteerExtra.launch({
 						headless: true,
 						executablePath: '/opt/google/chrome/chrome',
+						protocolTimeout: 180000, // 3 minute timeout for CDP protocol calls
 						args: [
 							'--no-sandbox',
 							'--disable-gpu',
@@ -277,6 +374,7 @@ async function ensureBrowser() {
 						],
 						env: { ...process.env, CHROME_DISABLE_UPDATE: '1' }
 					});
+					browserLaunchTime = Date.now();
 					logDebug('Headless Chrome fallback launched.');
 				} catch (headlessErr) {
 					logDebug('[LAUNCH ERROR] Headless fallback failed: ' + (headlessErr && headlessErr.message ? headlessErr.message : headlessErr));
@@ -793,6 +891,19 @@ async function daemon() {
 	while (true) {
 		let cycleStart = null;
 		try {
+			// Check if browser needs restart before cycle
+			if (shouldRestartBrowser()) {
+				logDebug('Browser restart needed before cycle');
+				try {
+					browser = await restartBrowser();
+				} catch (restartErr) {
+					logDebug('Browser restart failed: ' + (restartErr && restartErr.message ? restartErr.message : restartErr));
+					// Wait before retrying
+					await new Promise(r => setTimeout(r, 5000));
+					continue;
+				}
+			}
+			
 			lastCycleStatus = 'running';
 			lastCycleError = null;
 			// reset per-cycle metrics so each cycle reports its own counts
@@ -802,6 +913,8 @@ async function daemon() {
 			lastCycleAt = Date.now();
 			lastCycleDurationMs = Date.now() - cycleStart;
 			lastCycleStatus = 'ok';
+			// Successful cycle - reset protocol timeout counter
+			resetProtocolTimeoutCounter();
 			// report navigation/request metrics and alert if thresholds exceeded
 			try {
 				const thresholds = { navFail: parseInt(process.env.NAV_FAIL_THRESHOLD || '5', 10), reqFail: parseInt(process.env.REQ_FAIL_THRESHOLD || '10', 10) };
@@ -814,10 +927,17 @@ async function daemon() {
 			// set duration even on error
 			try { lastCycleDurationMs = Date.now() - (typeof cycleStart === 'number' ? cycleStart : Date.now()); } catch (err) { lastCycleDurationMs = null; }
 			logDebug('Fatal error in cycle: ' + e);
+			
+			// Check if this was a protocol timeout error
+			if (isProtocolTimeoutError(lastCycleError)) {
+				recordProtocolTimeout();
+			}
+			
 			try {
 				const thresholds = { navFail: parseInt(process.env.NAV_FAIL_THRESHOLD || '5', 10), reqFail: parseInt(process.env.REQ_FAIL_THRESHOLD || '10', 10) };
 				reportMetrics(thresholds, debugLogPath);
 			} catch (e2) { logDebug('Error reporting metrics after failure: ' + e2); }
+		}
 		}
 		// Emit heartbeat if interval elapsed
 		try {
