@@ -938,7 +938,6 @@ async function daemon() {
 				reportMetrics(thresholds, debugLogPath);
 			} catch (e2) { logDebug('Error reporting metrics after failure: ' + e2); }
 		}
-		}
 		// Emit heartbeat if interval elapsed
 		try {
 			const now = Date.now();
