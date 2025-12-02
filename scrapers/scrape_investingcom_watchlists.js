@@ -175,16 +175,16 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 
 					dataObjects.push({
 						key: rowData["symbol"],
-						last_price: rowData["last"],
-						price_change_decimal: rowData["chg"],
-						price_change_percent: rowData["chgpercent"],
+						regular_last_price: rowData["last"],
+						regular_change_decimal: rowData["chg"],
+						regular_change_percent: rowData["chgpercent"],
 						extended_hours_price: rowData["extended_hours"] || null,
 						extended_hours_change: extendedHoursChange,
 						extended_hours_change_percent: rowData["extended_hours_percent"] || null,
 						source: "investing",
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString(),
-						last_price_quote_time: qTime
+						regular_last_price_quote_time: qTime
 					});
 				}
 			});

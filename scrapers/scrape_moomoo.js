@@ -49,9 +49,9 @@ function parseMoomooHtml(html, security) {
     const $ = cheerio.load(html || '');
     const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
 
-    let last_price = '';
-    let price_change_decimal = '';
-    let price_change_percent = '';
+    let regular_last_price = '';
+    let regular_change_decimal = '';
+    let regular_change_percent = '';
     let previous_close_price = '';
     let quote_time = '';
 
@@ -60,26 +60,26 @@ function parseMoomooHtml(html, security) {
         const priceEl = $('.stock-data .price');
         if (priceEl.length) {
             const priceText = priceEl.text().trim();
-            last_price = cleanNumberText(priceText);
+            regular_last_price = cleanNumberText(priceText);
         }
 
         // Change: .stock-data .change-price
         const changePriceEl = $('.stock-data .change-price');
         if (changePriceEl.length) {
             const changeText = changePriceEl.text().trim();
-            price_change_decimal = parseFloat(changeText);
+            regular_change_decimal = parseFloat(changeText);
         }
 
         // Percent: .stock-data .change-ratio
         const changeRatioEl = $('.stock-data .change-ratio');
         if (changeRatioEl.length) {
             const ratioText = changeRatioEl.text().trim().replace('%', '');
-            price_change_percent = parseFloat(ratioText);
+            regular_change_percent = parseFloat(ratioText);
         }
 
         // Calculate previous close
-        if (last_price && !isNaN(price_change_decimal)) {
-            const prev = parseFloat(last_price) - price_change_decimal;
+        if (regular_last_price && !isNaN(regular_change_decimal)) {
+            const prev = parseFloat(regular_last_price) - regular_change_decimal;
             previous_close_price = prev.toFixed(3); // Moomoo seems to use 3 decimals
         }
 
@@ -100,9 +100,9 @@ function parseMoomooHtml(html, security) {
 
     return {
         key: ticker,
-        last_price: last_price || '',
-        price_change_decimal: price_change_decimal || '',
-        price_change_percent: price_change_percent || '',
+        regular_last_price: regular_last_price || '',
+        regular_change_decimal: regular_change_decimal || '',
+        regular_change_percent: regular_change_percent || '',
         previous_close_price: previous_close_price || '',
         source: 'moomoo',
         capture_time: new Date().toISOString(),
