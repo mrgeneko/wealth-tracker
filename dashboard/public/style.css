@@ -315,3 +315,11 @@ th:first-child { background-color: #252525; z-index: 2; }
     display: inline-block;
     vertical-align: middle;
 }
+
+/* Disable sticky first column for Bank and Asset grids */
+#bank-grid th:first-child, #bank-grid td:first-child,
+#asset-grid th:first-child, #asset-grid td:first-child {
+    position: static;
+    background-color: transparent;
+    z-index: auto;
+}
