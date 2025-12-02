@@ -79,9 +79,9 @@ async function scrapeNasdaq(browser, security, outputDir) {
         logDebug('Calling Nasdaq API to supplement parsed HTML for ' + ticker);
         const apiData = await fetchNasdaqApi(ticker);
         // merge only missing fields
-        data.last_price = data.last_price || apiData.last_price || '';
-        data.price_change_decimal = data.price_change_decimal || apiData.price_change_decimal || '';
-        data.price_change_percent = data.price_change_percent || apiData.price_change_percent || '';
+        data.regular_last_price = data.regular_last_price || apiData.regular_last_price || '';
+        data.regular_change_decimal = data.regular_change_decimal || apiData.regular_change_decimal || '';
+        data.regular_change_percent = data.regular_change_percent || apiData.regular_change_percent || '';
         data.previous_close_price = data.previous_close_price || apiData.previous_close_price || '';
         data.after_hours_price = data.after_hours_price || apiData.after_hours_price || '';
         data.after_hours_change_decimal = data.after_hours_change_decimal || apiData.after_hours_change_decimal || '';
@@ -128,9 +128,9 @@ async function scrapeNasdaq(browser, security, outputDir) {
           
           const result = parseNasdaqHtml(html || await page.content(), { key: ticker });
           // merge parsed page values (prefer page values when present)
-          data.last_price = result.last_price || data.last_price || '';
-          data.price_change_decimal = result.price_change_decimal || data.price_change_decimal || '';
-          data.price_change_percent = result.price_change_percent || data.price_change_percent || '';
+          data.regular_last_price = result.regular_last_price || data.regular_last_price || '';
+          data.regular_change_decimal = result.regular_change_decimal || data.regular_change_decimal || '';
+          data.regular_change_percent = result.regular_change_percent || data.regular_change_percent || '';
           data.previous_close_price = result.previous_close_price || data.previous_close_price || '';
           data.after_hours_price = result.after_hours_price || data.after_hours_price || '';
           data.after_hours_change_decimal = result.after_hours_change_decimal || data.after_hours_change_decimal || '';
@@ -170,9 +170,9 @@ function parseNasdaqHtml(html, security) {
   const $ = cheerio.load(html || '');
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
 
-  let last_price = '';
-  let price_change_decimal = '';
-  let price_change_percent = '';
+  let regular_last_price = '';
+  let regular_change_decimal = '';
+  let regular_change_percent = '';
   let previous_close_price = '';
   let after_hours_price = '';
   let after_hours_change_decimal = '';
@@ -192,9 +192,9 @@ function parseNasdaqHtml(html, security) {
           const o = JSON.parse(initMatch[1]);
           if (o && o.page && o.page.props && o.page.props.initialState && o.page.props.initialState.quote) {
             const qd = o.page.props.initialState.quote;
-            if (qd.last) last_price = cleanNumberText(qd.last);
-            if (qd.change) price_change_decimal = cleanNumberText(qd.change);
-            if (qd.changePercent) price_change_percent = String(qd.changePercent);
+            if (qd.last) regular_last_price = cleanNumberText(qd.last);
+            if (qd.change) regular_change_decimal = cleanNumberText(qd.change);
+            if (qd.changePercent) regular_change_percent = String(qd.changePercent);
             if (qd.previousClose) previous_close_price = cleanNumberText(qd.previousClose);
             if (qd.extended && qd.extended.last) after_hours_price = cleanNumberText(qd.extended.last);
             if (qd.extended && qd.extended.change) after_hours_change_decimal = cleanNumberText(qd.extended.change);
@@ -205,8 +205,8 @@ function parseNasdaqHtml(html, security) {
             if (qd.lastTradeTime) quote_time = parseToIso(qd.lastTradeTime);
           } else if (o && o.quote && o.quote.last) {
             const qd = o.quote;
-            if (qd.last) last_price = cleanNumberText(qd.last);
-            if (qd.change) price_change_decimal = cleanNumberText(qd.change);
+            if (qd.last) regular_last_price = cleanNumberText(qd.last);
+            if (qd.change) regular_change_decimal = cleanNumberText(qd.change);
           }
         } catch (e) {
           // ignore JSON parse errors
@@ -217,18 +217,18 @@ function parseNasdaqHtml(html, security) {
     }
 
     // 2) Prefer specific Nasdaq selectors if present
-    if (!last_price) {
+    if (!regular_last_price) {
       const headerPrice = $('[class*="symbol-page-header__pricing-price"], [class*="qwidget-dollar"] , [class*="quote-header__price"]').first();
-      if (headerPrice && headerPrice.length) last_price = cleanNumberText(headerPrice.text());
+      if (headerPrice && headerPrice.length) regular_last_price = cleanNumberText(headerPrice.text());
     }
-    if (!price_change_decimal || !price_change_percent) {
+    if (!regular_change_decimal || !regular_change_percent) {
       const headerChange = $('[class*="symbol-page-header__pricing-change"], [class*="qwidget-change"], [class*="quote-header__change"]').first();
       if (headerChange && headerChange.length) {
         const txt = headerChange.text().replace(/\s+/g,' ').trim();
         const m = txt.match(/([+-]?[0-9,.]+)\s*\(?([+-]?[0-9,.]+%?)?\)?/);
         if (m) {
-          price_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
-          price_change_percent = m[2] ? String(m[2]).replace(/\s/g,'') : '';
+          regular_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
+          regular_change_percent = m[2] ? String(m[2]).replace(/\s/g,'') : '';
         }
       }
     }
@@ -300,9 +300,9 @@ function parseNasdaqHtml(html, security) {
 
   return {
     key: ticker,
-    last_price: last_price || '',
-    price_change_decimal: price_change_decimal || '',
-    price_change_percent: price_change_percent || '',
+    regular_last_price: regular_last_price || '',
+    regular_change_decimal: regular_change_decimal || '',
+    regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',
@@ -317,7 +317,7 @@ async function fetchNasdaqApi(symbol) {
   // Use Nasdaq public API endpoints to fetch info and summary. Try fetch first, then curl fallback.
   const headers = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json, text/plain, */*' };
   const out = {
-    last_price: '', price_change_decimal: '', price_change_percent: '', previous_close_price: '',
+    regular_last_price: '', regular_change_decimal: '', regular_change_percent: '', previous_close_price: '',
     after_hours_price: '', after_hours_change_decimal: '', after_hours_change_percent: '',
     pre_market_price: '', pre_market_price_change_decimal: '', pre_market_price_change_percent: '',
     quote_time: '', market_status: ''
@@ -337,9 +337,9 @@ async function fetchNasdaqApi(symbol) {
     const prevClean = cleanNumberText(prev);
     
     if (lp || prevClean) {
-      out.last_price = lp;
-      out.price_change_decimal = cleanNumberText(primary.netChange);
-      out.price_change_percent = primary.percentageChange || '';
+      out.regular_last_price = lp;
+      out.regular_change_decimal = cleanNumberText(primary.netChange);
+      out.regular_change_percent = primary.percentageChange || '';
       out.previous_close_price = prevClean;
       out.quote_time = parseToIso(primary.lastTradeTimestamp || '');
       out.market_status = marketStatusTop;
@@ -374,16 +374,16 @@ async function fetchNasdaqApi(symbol) {
         
         if ((!out.after_hours_price || out.after_hours_price === '') && isAfterHours) {
           logDebug(`nasdaq api: marketStatus indicates after-hours (${marketStatusTop || primary.marketStatus}), setting after_hours from primary`);
-          out.after_hours_price = out.after_hours_price || out.last_price;
-          out.after_hours_change_decimal = out.after_hours_change_decimal || out.price_change_decimal;
-          out.after_hours_change_percent = out.after_hours_change_percent || out.price_change_percent;
+          out.after_hours_price = out.after_hours_price || out.regular_last_price;
+          out.after_hours_change_decimal = out.after_hours_change_decimal || out.regular_change_decimal;
+          out.after_hours_change_percent = out.after_hours_change_percent || out.regular_change_percent;
         }
         if ((!out.pre_market_price || out.pre_market_price === '') && isPreMarket) {
           logDebug(`nasdaq api: marketStatus indicates pre-market (${marketStatusTop || primary.marketStatus}), populating pre_market fields`);
           const pm = primary.preMarket || primary.pre_market || {};
-          out.pre_market_price = out.pre_market_price || cleanNumberText(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.last_price || cleanNumberText(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
-          out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || cleanNumberText(pm.change || pm.netChange || pm.changeAmount) || out.price_change_decimal || cleanNumberText(primary.netChange || primary.change);
-          out.pre_market_price_change_percent = out.pre_market_price_change_percent || (pm.changePercent || pm.percentageChange || out.price_change_percent || primary.percentageChange || primary.changePercent || '');
+          out.pre_market_price = out.pre_market_price || cleanNumberText(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.regular_last_price || cleanNumberText(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
+          out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || cleanNumberText(pm.change || pm.netChange || pm.changeAmount) || out.regular_change_decimal || cleanNumberText(primary.netChange || primary.change);
+          out.pre_market_price_change_percent = out.pre_market_price_change_percent || (pm.changePercent || pm.percentageChange || out.regular_change_percent || primary.percentageChange || primary.changePercent || '');
         }
       } catch (e) { /* ignore */ }
       
