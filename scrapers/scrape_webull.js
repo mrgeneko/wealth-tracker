@@ -51,7 +51,7 @@ async function scrapeWebull(browser, security, outputDir) {
         let pre_market_price = '';
         let pre_market_price_change_decimal = '';
         let pre_market_price_change_percent = '';
-        let quote_time = '';
+        let regular_quote_time = '';
 
         // Detect bond or stock by presence of 'YIELD' and 'MATURITY' in HTML
         // Note: This logic is largely redundant as both branches use the same JSON extraction logic
@@ -88,7 +88,7 @@ async function scrapeWebull(browser, security, outputDir) {
                                 }
 
                                 if (rt.tradeTime) {
-                                    quote_time = parseToIso(rt.tradeTime);
+                                    regular_quote_time = parseToIso(rt.tradeTime);
                                 }
                                 foundJson = true;
                             }
@@ -152,6 +152,7 @@ async function scrapeWebull(browser, security, outputDir) {
             regular_last_price,
             regular_change_decimal,
             regular_change_percent,
+            regular_quote_time,
             after_hours_price,
             after_hours_change_decimal,
             after_hours_change_percent,
@@ -161,8 +162,7 @@ async function scrapeWebull(browser, security, outputDir) {
             pre_market_price_change_percent,
             previous_close_price,
             source: 'webull',
-            capture_time: new Date().toISOString(),
-            quote_time
+            capture_time: new Date().toISOString()
         };
 
         logDebug('Webull data: ' + JSON.stringify(data));

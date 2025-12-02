@@ -198,7 +198,7 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
                     source: "tradingview",
                     previous_close_price: prevClose,
                     capture_time: new Date().toISOString(),
-                    quote_time: new Date().toISOString()
+                    regular_quote_time: new Date().toISOString()
                 });
             }
         });

@@ -77,7 +77,7 @@ function parseStocktwitsHtml(html, security) {
   let after_hours_price = '';
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
-  let quote_time = '';
+  let regular_quote_time = '';
 
   try {
     // 1. Try to find the embedded JSON data first (most reliable)
@@ -146,7 +146,7 @@ function parseStocktwitsHtml(html, security) {
             
             // Time
             const dt = extractVal('DateTime'); // "2025-11-26 09:42:08"
-            if (dt) quote_time = dt;
+            if (dt) regular_quote_time = dt;
             
         } catch (e) {
             logDebug('Error parsing Stocktwits JSON snippet: ' + e);
@@ -205,7 +205,7 @@ function parseStocktwitsHtml(html, security) {
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'stocktwits',
     capture_time: new Date().toISOString(),
-    quote_time: parseToIso(quote_time) || ''
+    regular_quote_time: parseToIso(regular_quote_time) || ''
   };
 }
 
