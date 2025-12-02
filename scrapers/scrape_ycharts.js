@@ -51,14 +51,14 @@ async function scrapeYCharts(browser, security, outputDir) {
             const priceEl = document.querySelector('.index-rank-value');
             const changeContainer = document.querySelector('.index-change');
             const infoEl = document.querySelector('.index-info');
-            
-            let last_price = '';
-            let price_change_decimal = '';
-            let price_change_percent = '';
+
+            let regular_last_price = '';
+            let regular_change_decimal = '';
+            let regular_change_percent = '';
             let last_price_quote_time = '';
 
             if (priceEl) {
-                last_price = priceEl.innerText.trim().replace(/[,\s]/g, '');
+                regular_last_price = priceEl.innerText.trim().replace(/[,\s]/g, '');
             }
 
             if (infoEl) {
@@ -73,38 +73,34 @@ async function scrapeYCharts(browser, security, outputDir) {
                 // Try to find specific value elements first (handling positive and negative classes)
                 const valEls = changeContainer.querySelectorAll('.valPos, .valNeg');
                 if (valEls.length >= 2) {
-                    price_change_decimal = valEls[0].innerText.trim().replace(/[,\s]/g, '').replace(/^\+/, '');
-                    price_change_percent = valEls[1].innerText.trim().replace(/\s/g, '');
+                    regular_change_decimal = valEls[0].innerText.trim().replace(/[,\s]/g, '').replace(/^\+/, '');
+                    regular_change_percent = valEls[1].innerText.trim().replace(/\s/g, '');
                 } else {
                     // Fallback: Parse the full text content
                     // Expected format: "+13.27 (+2.25%)" or "-1.23 (-0.50%)"
                     const text = changeContainer.innerText.trim();
-                    // Regex to capture: number (change) and number% (percent)
                     // Matches: start, optional sign, digits, dot, digits, space, (, optional sign, digits, dot, digits, %, )
                     const match = text.match(/([+-]?[\d,]+\.?\d*)\s*\(\s*([+-]?[\d,]+\.?\d*%)\s*\)/);
                     if (match) {
-                        price_change_decimal = match[1].replace(/[,\s]/g, '').replace(/^\+/, '');
-                        price_change_percent = match[2].replace(/\s/g, '');
+                        regular_change_decimal = match[1].replace(/[,\s]/g, '').replace(/^\+/, '');
+                        regular_change_percent = match[2].replace(/\s/g, '');
                     }
                 }
             }
 
             return {
                 key: ticker,
-                last_price: last_price || '',
+                regular_last_price: regular_last_price || '',
                 last_price_quote_time: last_price_quote_time || '',
-                price_change_decimal: price_change_decimal || '',
-                price_change_percent: price_change_percent || '',
+                regular_change_decimal: regular_change_decimal || '',
+                regular_change_percent: regular_change_percent || '',
                 previous_close_price: '', // Not currently extracted
                 pre_market_price: '',
                 pre_market_price_change_decimal: '',
                 pre_market_price_change_percent: '',
                 pre_market_price_quote_time: '',
                 after_hours_price: '',
-                after_hours_change_decimal: '',
                 after_hours_change_percent: '',
-                after_hours_price_quote_time: '',
-                source: 'ycharts',
                 quote_time: ''
             };
         }, ticker);

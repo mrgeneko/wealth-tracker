@@ -128,9 +128,9 @@ function mapYahooQuoteToData(quote, securityKey) {
   
   return {
     key: sanitizeForFilename(securityKey),
-    last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
-    price_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
-    price_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
+    regular_last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
+    regular_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
+    regular_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
     previous_close_price: (p.regularMarketPreviousClose != null) ? String(p.regularMarketPreviousClose) : '',
     after_hours_price: (p.postMarketPrice != null) ? String(p.postMarketPrice) : '',
     after_hours_change_decimal: (p.postMarketChange != null) ? String(p.postMarketChange) : '',

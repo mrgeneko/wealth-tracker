@@ -40,9 +40,9 @@ async function scrapeWebull(browser, security, outputDir) {
         const $ = cheerio.load(html);
         //logDebug('webull html:' + html);
 
-        let last_price = '';
-        let price_change_decimal = '';
-        let price_change_percent = '';
+        let regular_last_price = '';
+        let regular_change_decimal = '';
+        let regular_change_percent = '';
         let previous_close_price = '';
         let after_hours_price = '';
         let pre_market_price = '';
@@ -71,9 +71,9 @@ async function scrapeWebull(browser, security, outputDir) {
                             const tickerObj = state.tickerMap[tickerKeys[0]];
                             if (tickerObj.tickerRT) {
                                 const rt = tickerObj.tickerRT;
-                                last_price = rt.close || '';
-                                price_change_decimal = rt.change || '';
-                                price_change_percent = rt.changeRatio || '';
+                                regular_last_price = rt.close || '';
+                                regular_change_decimal = rt.change || '';
+                                regular_change_percent = rt.changeRatio || '';
                                 previous_close_price = rt.preClose || '';
                                 
                                 // Bond pages typically don't have pre/after market data in the same way
@@ -104,9 +104,9 @@ async function scrapeWebull(browser, security, outputDir) {
 
         data = {
             key: ticker,
-            last_price,
-            price_change_decimal,
-            price_change_percent,
+            regular_last_price,
+            regular_change_decimal,
+            regular_change_percent,
             after_hours_price,
             pre_market_price,
             pre_market_price_change_decimal,

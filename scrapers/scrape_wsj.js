@@ -107,14 +107,14 @@ async function scrapeWSJ(browser, security, outputDir) {
     if (html) logDebug(`Saved WSJ snapshot base ${snapshotBase}`);
 
     const $ = cheerio.load(html || '');
-    let last_price = cleanNumberText($('[data-field="Last"] .WSJTheme--last--3M1ny').first().text().trim() || $('[data-field="Last"] [class*="last"]').first().text().trim());
-    let price_change_decimal = cleanNumberText($('[data-field="Change"] .WSJTheme--change--2oFqg').first().text().trim() || $('[data-field="Change"] [class*="change"]').first().text().trim());
-    let price_change_percent = cleanNumberText($('[data-field="PercentChange"] .WSJTheme--percentChange--2aLrj').first().text().trim() || $('[data-field="PercentChange"] [class*="percentChange"]').first().text().trim());
+    let regular_last_price = cleanNumberText($('[data-field="Last"] .WSJTheme--last--3M1ny').first().text().trim() || $('[data-field="Last"] [class*="last"]').first().text().trim());
+    let regular_change_decimal = cleanNumberText($('[data-field="Change"] .WSJTheme--change--2oFqg').first().text().trim() || $('[data-field="Change"] [class*="change"]').first().text().trim());
+    let regular_change_percent = cleanNumberText($('[data-field="PercentChange"] .WSJTheme--percentChange--2aLrj').first().text().trim() || $('[data-field="PercentChange"] [class*="percentChange"]').first().text().trim());
     let previous_close_price = cleanNumberText($('[data-field="PrevClose"] .WSJTheme--prevClose--1Hk8a').first().text().trim() || $('[data-field="PrevClose"] [class*="prevClose"]').first().text().trim());
     let quote_time = parseToIso($('[data-field="Time"] .WSJTheme--timestamp--1o1tF').first().text().trim() || $('[data-field="Time"] [class*="timestamp"]').first().text().trim());
 
-    if (!last_price) {
-      last_price = cleanNumberText($('span:contains("Last")').parent().find('span').last().text().trim());
+    if (!regular_last_price) {
+      regular_last_price = cleanNumberText($('span:contains("Last")').parent().find('span').last().text().trim());
     }
     if (!previous_close_price) {
       previous_close_price = cleanNumberText($('span:contains("Previous Close")').parent().find('span').last().text().trim());
@@ -122,9 +122,9 @@ async function scrapeWSJ(browser, security, outputDir) {
 
     data = {
       key: ticker,
-      last_price: last_price || '',
-      price_change_decimal: price_change_decimal || '',
-      price_change_percent: price_change_percent || '',
+      regular_last_price: regular_last_price || '',
+      regular_change_decimal: regular_change_decimal || '',
+      regular_change_percent: regular_change_percent || '',
       previous_close_price: previous_close_price || '',
       after_hours_price: '',
       after_hours_change_decimal: '',

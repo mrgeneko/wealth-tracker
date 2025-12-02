@@ -251,13 +251,13 @@ function updatePriceCache(item) {
     };
 
     const now = new Date();
-    const quoteTime = item.last_price_quote_time ? new Date(item.last_price_quote_time) : null;
+    const quoteTime = item.regular_last_price_quote_time ? new Date(item.regular_last_price_quote_time) : null;
     const preferRegular = isRegularHours(now) && quoteTime && isRegularHours(quoteTime);
     let foundPrice = false;
 
     // If in regular session, try regular price first
-    if (preferRegular && item.last_price && parseFloat(String(item.last_price).replace(/[$,]/g, '')) > 0) {
-        price = parseFloat(String(item.last_price).replace(/[$,]/g, ''));
+    if (preferRegular && item.regular_last_price && parseFloat(String(item.regular_last_price).replace(/[$,]/g, '')) > 0) {
+        price = parseFloat(String(item.regular_last_price).replace(/[$,]/g, ''));
         priceSource = 'regular';
         foundPrice = true;
     }
@@ -279,8 +279,8 @@ function updatePriceCache(item) {
             priceSource = 'extended';
         }
         // Fall back to regular last price
-        else if (item.last_price) {
-            price = parseFloat(String(item.last_price).replace(/[$,]/g, ''));
+        else if (item.regular_last_price) {
+            price = parseFloat(String(item.regular_last_price).replace(/[$,]/g, ''));
             priceSource = 'regular';
         }
     }
@@ -301,8 +301,8 @@ function updatePriceCache(item) {
         changeDecimal = parseFloat(item.extended_hours_change) || 0;
         changePercent = item.extended_hours_change_percent || '0%';
     } else {
-        changeDecimal = parseFloat(item.price_change_decimal) || 0;
-        changePercent = item.price_change_percent || '0%';
+        changeDecimal = parseFloat(item.regular_change_decimal) || 0;
+        changePercent = item.regular_change_percent || '0%';
     }
     
     priceCache[item.key] = {

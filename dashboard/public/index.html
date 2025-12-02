@@ -530,7 +530,7 @@
             accounts.forEach(acc => {
                 const accJson = escapeHtml(JSON.stringify(acc));
                 const accType = acc.type ? acc.type.toUpperCase() : '';
-                headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><small style="font-weight: normal; color: #aaa;">${accType}</small> <span class="edit-icon">✎</span></span></th>`;
+                headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><span class='account-type'>${accType}</span> <span class="edit-icon">✎</span></span></th>`;
             });
             headerHtml += `<th>Prev Close</th><th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;

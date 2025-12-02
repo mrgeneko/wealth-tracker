@@ -1,7 +1,3 @@
-1. during regular trading hours, an update from cnbc for SCHG displayed
-as after-hours
-2. switching between multiple watchlists on investing.com is broken
-
 TODO:
 0. Use https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/treasury-securities-auctions-data
 to determine treasury listing
@@ -10,7 +6,7 @@ https://stockanalysis.com/list/nyseamerican-stocks/
 https://stockanalysis.com/list/sp-500-stocks/
 
 1. symbols assume US stock markets. how to handle other exchanges?
-2. change scrapers to work with ticker without url where possible
+2. change scrapers to work with ticker without url where possible (partially done)
 3. create demo assets_liabilities (without need for investing.com watchlist).
 4. can some single quote pages be left open and monitored?
 5. create intraday history of total net worth and draw a graph

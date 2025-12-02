@@ -109,7 +109,7 @@ def process_message(data):
         return time(9, 30) <= t < time(16, 0)
 
     # Parse capture_time
-    capture_time_str = data.get('capture_time') or data.get('last_price_quote_time')
+    capture_time_str = data.get('capture_time') or data.get('regular_last_price_quote_time')
     capture_time = datetime.now(ZoneInfo('UTC'))
     if capture_time_str:
         try:
@@ -120,7 +120,7 @@ def process_message(data):
     now = datetime.now(ZoneInfo('UTC'))
     prefer_regular = is_regular_hours(now) and is_regular_hours(capture_time)
 
-    last_price = clean_val(data.get('last_price'))
+    regular_last_price = clean_val(data.get('regular_last_price'))
     pre_market = clean_val(data.get('pre_market_price'))
     after_hours = clean_val(data.get('after_hours_price'))
     extended = clean_val(data.get('extended_hours_price'))
@@ -129,8 +129,8 @@ def process_message(data):
     price_source = 'regular'
     found = False
 
-    if prefer_regular and last_price > 0:
-        price_val = last_price
+    if prefer_regular and regular_last_price > 0:
+        price_val = regular_last_price
         price_source = 'regular'
         found = True
     
@@ -144,8 +144,8 @@ def process_message(data):
         elif extended > 0:
             price_val = extended
             price_source = 'extended'
-        elif last_price > 0:
-            price_val = last_price
+        elif regular_last_price > 0:
+            price_val = regular_last_price
             price_source = 'regular'
 
     if price_val == 0:
@@ -166,8 +166,8 @@ def process_message(data):
         change_decimal = clean_val(data.get('extended_hours_change'))
         change_percent = data.get('extended_hours_change_percent') or '0%'
     else:
-        change_decimal = clean_val(data.get('price_change_decimal'))
-        change_percent = data.get('price_change_percent') or '0%'
+        change_decimal = clean_val(data.get('regular_change_decimal'))
+        change_percent = data.get('regular_change_percent') or '0%'
 
     base_source = data.get('source', 'unknown')
     final_source = f"{base_source} ({price_source})" if base_source else price_source

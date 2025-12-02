@@ -141,9 +141,9 @@ function parseMarketWatchHtml(html, security) {
 
   const data = {
     key: ticker,
-    last_price: '',
-    price_change_decimal: '',
-    price_change_percent: '',
+    regular_last_price: '',
+    regular_change_decimal: '',
+    regular_change_percent: '',
     previous_close_price: '',
     after_hours_price: '',
     after_hours_change_decimal: '',
@@ -162,9 +162,9 @@ function parseMarketWatchHtml(html, security) {
     const priceChangePercent = getMeta('priceChangePercent'); // "-0.48%"
     const quoteTime = getMeta('quoteTime'); // "Dec 1, 2025 12:26 p.m. EST"
 
-    if (price) data.last_price = cleanNumberText(price);
-    if (priceChange) data.price_change_decimal = cleanNumberText(priceChange);
-    if (priceChangePercent) data.price_change_percent = cleanNumberText(priceChangePercent);
+    if (price) data.regular_last_price = cleanNumberText(price);
+    if (priceChange) data.regular_change_decimal = cleanNumberText(priceChange);
+    if (priceChangePercent) data.regular_change_percent = cleanNumberText(priceChangePercent);
     if (quoteTime) data.quote_time = parseToIso(quoteTime);
 
     // Previous Close
