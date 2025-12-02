@@ -240,7 +240,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="posQuantity">Quantity / Value</label>
+                    <label for="posQuantity">Quantity</label>
                     <input type="number" step="any" id="posQuantity" required>
                     <small style="color: #aaa;">For Cash, enter the total value.</small>
                 </div>
@@ -808,16 +808,22 @@
 
         async function viewLog(filename) {
             try {
-                const response = await fetch(`/api/logs/${filename}`);
-                if (filename.endsWith('.json')) {
-                    const data = await response.json();
-                    document.getElementById('log-viewer').innerText = JSON.stringify(data, null, 2);
+                const viewer = document.getElementById('log-viewer-pane');
+                if (filename.toLowerCase().endsWith('.png')) {
+                    // Display image
+                    viewer.innerHTML = `<img src="/api/logs/${encodeURIComponent(filename)}" alt="${filename}" style="max-width:100%; max-height:80vh; display:block; margin:auto; background:#222; border-radius:8px;" />`;
                 } else {
-                    const text = await response.text();
-                    document.getElementById('log-viewer').innerText = text;
+                    const response = await fetch(`/api/logs/${filename}`);
+                    if (filename.endsWith('.json')) {
+                        const data = await response.json();
+                        viewer.innerText = JSON.stringify(data, null, 2);
+                    } else {
+                        const text = await response.text();
+                        viewer.innerText = text;
+                    }
                 }
             } catch (error) {
-                document.getElementById('log-viewer').innerText = 'Error loading file: ' + error;
+                document.getElementById('log-viewer-pane').innerText = 'Error loading file: ' + error;
             }
         }
 
