@@ -1,4 +1,4 @@
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 const { DateTime } = require('luxon');
 
@@ -214,6 +214,11 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 			}
 		} catch (snapErr) {
 			logDebug('Failed to write diagnostic snapshot: ' + snapErr.message);
+		}
+		
+		// Re-throw protocol timeout errors so the main daemon can trigger browser restart
+		if (isProtocolTimeoutError(err)) {
+			throw err;
 		}
 	}
 }
