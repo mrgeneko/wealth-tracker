@@ -532,7 +532,7 @@
                 const accType = acc.type ? acc.type.toUpperCase() : '';
                 headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><small style="font-weight: normal; color: #aaa;">${accType}</small> <span class="edit-icon">✎</span></span></th>`;
             });
-            headerHtml += `<th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
+            headerHtml += `<th>Prev Close</th><th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;
 
             let bodyHtml = '';
@@ -545,6 +545,7 @@
                 let price = 0;
                 let changePct = '0%';
                 let changeVal = 0;
+                let prevClose = 0;
                 let timeStr = '-';
                 let sourceStr = '-';
                 let color = '#e0e0e0';
@@ -553,6 +554,7 @@
                     price = currentPrices[sym].price;
                     changePct = currentPrices[sym].change_percent || '0%';
                     changeVal = currentPrices[sym].change || 0;
+                    prevClose = price - changeVal;
                     
                     if (currentPrices[sym].time) {
                         const d = new Date(currentPrices[sym].time);
@@ -613,6 +615,7 @@
                 rowInfo.valueChange = symTotalValueChange;
                 rowInfo.total = symTotalValue;
                 
+                rowHtml += `<td>${formatNumber(prevClose)}</td>`;
                 rowHtml += `<td>${formatNumber(price)}</td>`;
                 rowHtml += `<td style="color: ${color}">${formatNumber(changeVal)}</td>`;
                 rowHtml += `<td style="color: ${color}">${changePct}</td>`;
@@ -662,7 +665,7 @@
                 }
                 totalCash += cashVal;
             });
-            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
 
@@ -684,7 +687,7 @@
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
-            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td>';
+            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td>';
             totalRowHtml += `<td style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
             totalRowHtml += `<td>${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
