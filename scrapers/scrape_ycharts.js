@@ -55,7 +55,7 @@ async function scrapeYCharts(browser, security, outputDir) {
             let regular_last_price = '';
             let regular_change_decimal = '';
             let regular_change_percent = '';
-            let last_price_quote_time = '';
+            let regular_quote_time = '';
 
             if (priceEl) {
                 regular_last_price = priceEl.innerText.trim().replace(/[,\s]/g, '');
@@ -65,7 +65,7 @@ async function scrapeYCharts(browser, security, outputDir) {
                 // Format: "USD | NASDAQ | Nov 24, 12:09"
                 const parts = infoEl.innerText.split('|');
                 if (parts.length > 0) {
-                    last_price_quote_time = parts[parts.length - 1].trim();
+                    regular_quote_time = parts[parts.length - 1].trim();
                 }
             }
 
@@ -91,7 +91,7 @@ async function scrapeYCharts(browser, security, outputDir) {
             return {
                 key: ticker,
                 regular_last_price: regular_last_price || '',
-                last_price_quote_time: last_price_quote_time || '',
+                regular_quote_time: regular_quote_time || '',
                 regular_change_decimal: regular_change_decimal || '',
                 regular_change_percent: regular_change_percent || '',
                 previous_close_price: '', // Not currently extracted
@@ -101,13 +101,12 @@ async function scrapeYCharts(browser, security, outputDir) {
                 pre_market_price_quote_time: '',
                 after_hours_price: '',
                 after_hours_change_percent: '',
-                quote_time: ''
             };
         }, ticker);
 
         const data = {
             ...extractedData,
-            last_price_quote_time: parseToIso(extractedData.last_price_quote_time),
+            regular_quote_time: parseToIso(extractedData.regular_quote_time),
             capture_time: new Date().toISOString()
         };
 

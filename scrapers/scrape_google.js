@@ -167,24 +167,22 @@ async function scrapeGoogle(browser, security, outputDir) {
 				}
 			}
 			// Extract quote time (e.g., 'Nov 14, 8:00:00 PM GMT-5')
-			let quote_time = '';
+			let regular_quote_time = '';
 			const time_regex = /([A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2}:\d{2}\s*[AP]M\s*GMT[+-]\d+)/;
 			const body_text = $('body').text();
-			const match = body_text.match(time_regex);
+			let match = body_text.match(time_regex);
 			if (match) {
-				quote_time = match[1];
+				regular_quote_time = match[1];
 			}
-			if (!quote_time) {
+			if (!regular_quote_time) {
 				$('[class], span, div').each((i, el) => {
 					const t = $(el).text();
 					if (/GMT[+-]\d+/.test(t) && /\d{1,2}:\d{2}:\d{2}/.test(t)) {
-						quote_time = t.trim();
+						regular_quote_time = t.trim();
 						return false;
 					}
 				});
 			}
-			// Use a local variable instead of globalThis to avoid side effects across concurrent scrapes
-			var local_quote_time = quote_time;
 		} catch (extractErr) {
 			logDebug('Error extracting Google Finance data: ' + extractErr);
 		}
@@ -201,7 +199,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"pre_market_price_change_percent": pre_market_price_change_percent,
 			source: 'google_finance',
 			capture_time: new Date().toISOString(),
-			quote_time: typeof local_quote_time !== 'undefined' ? parseToIso(local_quote_time) : ''
+			regular_quote_time: typeof regular_quote_time !== 'undefined' ? parseToIso(regular_quote_time) : ''
 		};
 
 		logDebug('Google Finance data: ' + JSON.stringify(data));
