@@ -45,6 +45,9 @@ async function scrapeWebull(browser, security, outputDir) {
         let regular_change_percent = '';
         let previous_close_price = '';
         let after_hours_price = '';
+        let after_hours_change_decimal = '';
+        let after_hours_change_percent = '';
+        let after_hours_price_quote_time = '';
         let pre_market_price = '';
         let pre_market_price_change_decimal = '';
         let pre_market_price_change_percent = '';
@@ -101,6 +104,48 @@ async function scrapeWebull(browser, security, outputDir) {
             logDebug('Webull embedded JSON not found or parse failed; fields left empty.');
         }
 
+        // Fallback/Supplement with HTML parsing for After Hours if missing
+        if (!after_hours_price) {
+            try {
+                // Look for "After Hours:" text
+                // Structure: <div>After Hours: <span>256.06 -0.03 -0.01%</span> 16:38 12/02 EST</div>
+                const afterHoursLabel = $('div:contains("After Hours:")').last();
+                if (afterHoursLabel.length) {
+                    const span = afterHoursLabel.find('span');
+                    if (span.length) {
+                        const valText = span.text().trim(); // "256.06 -0.03 -0.01%"
+                        const parts = valText.split(/\s+/);
+                        if (parts.length >= 3) {
+                            after_hours_price = parts[0];
+                            after_hours_change_decimal = parts[1];
+                            after_hours_change_percent = parts[2];
+                        } else if (parts.length >= 1) {
+                            after_hours_price = parts[0];
+                        }
+                    }
+                    
+                    // Time extraction: text after the span
+                    const fullText = afterHoursLabel.text(); // "After Hours: 256.06 -0.03 -0.01% 16:38 12/02 EST"
+                    const spanText = span.text();
+                    const afterSpan = fullText.split(spanText)[1];
+                    if (afterSpan) {
+                        const timeText = afterSpan.trim(); // "16:38 12/02 EST"
+                        // Parse "16:38 12/02 EST"
+                        const cleanTime = timeText.replace(/(EST|EDT)/, '').trim();
+                        const dt = DateTime.fromFormat(cleanTime, "HH:mm MM/dd", { zone: 'America/New_York' });
+                        if (dt.isValid) {
+                            // Set year to current year as it's missing in the string
+                            const now = DateTime.now().setZone('America/New_York');
+                            const finalDt = dt.set({ year: now.year });
+                            after_hours_price_quote_time = finalDt.toUTC().toISO();
+                        }
+                    }
+                }
+            } catch (e) {
+                logDebug('Error parsing Webull HTML for After Hours: ' + e);
+            }
+        }
+
 
         data = {
             key: ticker,
@@ -108,6 +153,9 @@ async function scrapeWebull(browser, security, outputDir) {
             regular_change_decimal,
             regular_change_percent,
             after_hours_price,
+            after_hours_change_decimal,
+            after_hours_change_percent,
+            after_hours_price_quote_time,
             pre_market_price,
             pre_market_price_change_decimal,
             pre_market_price_change_percent,
