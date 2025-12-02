@@ -60,9 +60,9 @@ async function scrapeGoogle(browser, security, outputDir) {
 		
 		const $ = cheerio.load(html);
 		// Extract main price
-		let last_price = '';
-		let price_change_decimal = '';
-		let price_change_percent = '';
+		let regular_last_price = '';
+		let regular_change_decimal = '';
+		let regular_change_percent = '';
 		let previous_close_price = '';
 		let after_hours_price = '';
 		let pre_market_price = '';
@@ -72,7 +72,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 			const main_element = $('[class="Gfxi4"]').first();
 			const price_element = main_element.find('[class="YMlKec fxKbKc"]').first();
 			if (price_element.length) {
-				last_price = price_element.text().replace('$', '').replace(',', '');
+				regular_last_price = price_element.text().replace('$', '').replace(',', '');
 			}
 			// Previous close
 			const prev_close_label = $('div').filter((i, el) => $(el).text().trim().toLowerCase() === 'previous close').first();
@@ -91,11 +91,11 @@ async function scrapeGoogle(browser, security, outputDir) {
 				const change_text = change_element.text();
 				if (change_text.startsWith('+') || change_text.startsWith('-')) {
 					const parts = change_text.split(' ');
-					price_change_decimal = parts[0];
+					regular_change_decimal = parts[0];
 					// Percent is in a sibling span with class JwB6zf
 					const percent_element = main_element.find('[class="JwB6zf"]').first();
 					if (percent_element.length) {
-						price_change_percent = (change_text[0] || '') + percent_element.text();
+						regular_change_percent = (change_text[0] || '') + percent_element.text();
 					}
 				}
 			}
@@ -191,9 +191,9 @@ async function scrapeGoogle(browser, security, outputDir) {
 
 		data = {
 			"key" : ticker,
-			"last_price" : last_price,
-			"price_change_decimal" : price_change_decimal,
-			"price_change_percent" : price_change_percent,
+			"regular_last_price" : regular_last_price,
+			"regular_change_decimal" : regular_change_decimal,
+			"regular_change_percent" : regular_change_percent,
 			"previous_close_price" : previous_close_price,
 			"after_hours_price" : after_hours_price,
 			"pre_market_price" : pre_market_price,

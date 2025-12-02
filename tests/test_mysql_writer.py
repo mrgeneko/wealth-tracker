@@ -11,7 +11,7 @@ def test_write_price_data_to_mysql_inserts_and_closes():
     mock_conn.is_connected.return_value = True
 
     with patch("wealth_tracker.write_price_data_to_mysql.mysql.connector.connect", return_value=mock_conn):
-        rows = [{"k": "MYSQL-TEST-1", "last_price": "10.01", "source": "e2e-test"}]
+        rows = [{"k": "MYSQL-TEST-1", "regular_last_price": "10.01", "source": "e2e-test"}]
         write_price_data_to_mysql(rows, "host", "user", "pw", "db", "price_data_test2")
 
     # Verify an INSERT was executed

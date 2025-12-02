@@ -69,9 +69,9 @@ function parseRobinhoodHtml(html, security) {
   const $ = cheerio.load(html || '');
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
 
-  let last_price = '';
-  let price_change_decimal = '';
-  let price_change_percent = '';
+  let regular_last_price = '';
+  let regular_change_decimal = '';
+  let regular_change_percent = '';
   let previous_close_price = '';
   let after_hours_price = '';
   let after_hours_change_decimal = '';
@@ -92,7 +92,7 @@ function parseRobinhoodHtml(html, security) {
           const quote = jsonData.props.pageProps.quote;
           
           if (quote.last_trade_price) {
-            last_price = cleanNumberText(quote.last_trade_price);
+            regular_last_price = cleanNumberText(quote.last_trade_price);
           }
           
           if (quote.previous_close) {
@@ -104,19 +104,19 @@ function parseRobinhoodHtml(html, security) {
           }
           
           // Calculate changes if not explicitly provided
-          if (last_price && previous_close_price) {
-            const current = parseFloat(last_price);
+          if (regular_last_price && previous_close_price) {
+            const current = parseFloat(regular_last_price);
             const prev = parseFloat(previous_close_price);
             const diff = current - prev;
-            price_change_decimal = diff.toFixed(2);
-            price_change_percent = ((diff / prev) * 100).toFixed(2) + '%';
+            regular_change_decimal = diff.toFixed(2);
+            regular_change_percent = ((diff / prev) * 100).toFixed(2) + '%';
           }
           
           // Calculate after hours changes
           // Usually after hours change is relative to the close price (last_trade_price)
-          if (after_hours_price && last_price) {
+          if (after_hours_price && regular_last_price) {
             const ah = parseFloat(after_hours_price);
-            const close = parseFloat(last_price);
+            const close = parseFloat(regular_last_price);
             const diff = ah - close;
             after_hours_change_decimal = diff.toFixed(2);
             after_hours_change_percent = ((diff / close) * 100).toFixed(2) + '%';
@@ -152,9 +152,9 @@ function parseRobinhoodHtml(html, security) {
 
   return {
     key: ticker,
-    last_price: last_price || '',
-    price_change_decimal: price_change_decimal || '',
-    price_change_percent: price_change_percent || '',
+    regular_last_price: regular_last_price || '',
+    regular_change_decimal: regular_change_decimal || '',
+    regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',

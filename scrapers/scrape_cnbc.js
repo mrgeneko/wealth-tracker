@@ -84,9 +84,9 @@ function parseCNBCHtml(html, security) {
 
   const data = {
     key: ticker,
-    last_price: '',
-    price_change_decimal: '',
-    price_change_percent: '',
+    regular_last_price: '',
+    regular_change_decimal: '',
+    regular_change_percent: '',
     previous_close_price: '',
     after_hours_price: '',
     after_hours_change_decimal: '',
@@ -105,9 +105,9 @@ function parseCNBCHtml(html, security) {
         const sObj = JSON.parse(sMatch[1]);
         const quoteData = sObj?.quote?.data?.[0];
         if (quoteData) {
-          data.last_price = cleanNumberText(quoteData.last);
-          data.price_change_decimal = cleanNumberText(quoteData.change);
-          data.price_change_percent = cleanNumberText(quoteData.change_pct);
+          data.regular_last_price = cleanNumberText(quoteData.last);
+          data.regular_change_decimal = cleanNumberText(quoteData.change);
+          data.regular_change_percent = cleanNumberText(quoteData.change_pct);
           data.previous_close_price = cleanNumberText(quoteData.previous_day_closing);
           data.quote_time = parseToIso(quoteData.last_timedate);
 
@@ -126,7 +126,7 @@ function parseCNBCHtml(html, security) {
     }
 
     // --- Step 2: Fallback to HTML scraping for any missing data ---
-    if (!data.last_price || !data.price_change_decimal) {
+    if (!data.regular_last_price || !data.regular_change_decimal) {
       logDebug(`Falling back to HTML scrape for ${ticker}`);
 
       const getValue = (selectors) => {
@@ -144,8 +144,8 @@ function parseCNBCHtml(html, security) {
         return { dec: cleanNumberText(m[1]).replace(/^\+/, ''), pct: m[2] ? String(m[2]).replace(/\s/g, '') : '' };
       }
 
-      if (!data.last_price) {
-        data.last_price = cleanNumberText(getValue([
+      if (!data.regular_last_price) {
+        data.regular_last_price = cleanNumberText(getValue([
           '.QuoteStrip-lastPrice',
           '[data-field="last"]',
           '[data-field="price"]',
@@ -154,14 +154,14 @@ function parseCNBCHtml(html, security) {
         ]));
       }
       
-      if (!data.price_change_decimal) {
+      if (!data.regular_change_decimal) {
         const changeText = getValue([
           '.QuoteStrip-changeUp', '.QuoteStrip-changeDown', '.QuoteStrip-unchanged',
           '.QuoteHeader-changeUp', '.QuoteHeader-changeDown', '.QuoteHeader-unchanged',
         ]);
         const parsedChange = parseChangeText(changeText);
-        data.price_change_decimal = parsedChange.dec || '';
-        data.price_change_percent = parsedChange.pct || '';
+        data.regular_change_decimal = parsedChange.dec || '';
+        data.regular_change_percent = parsedChange.pct || '';
       }
       
       if (!data.previous_close_price) {

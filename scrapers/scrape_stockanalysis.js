@@ -71,15 +71,15 @@ function parseStockAnalysisHtml(html, security) {
   const $ = cheerio.load(html || '');
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
   
-  let last_price = '';
+  let regular_last_price = '';
   let last_price_quote_time = '';
   let previous_close_price = '';
   let pre_market_price = '';
   let pre_market_price_change_decimal = '';
   let pre_market_price_change_percent = '';
   let pre_market_price_quote_time = '';
-  let price_change_decimal = '';
-  let price_change_percent = '';
+  let regular_change_decimal = '';
+  let regular_change_percent = '';
   let after_hours_price = '';
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
@@ -88,7 +88,7 @@ function parseStockAnalysisHtml(html, security) {
   try {
     const mainPriceEl = $('[class*="text-4xl"]').first();
     if (mainPriceEl && mainPriceEl.length) {
-      last_price = cleanNumberText(mainPriceEl.text());
+      regular_last_price = cleanNumberText(mainPriceEl.text());
       // Extract last_price_quote_time
       // Look for sibling div with "At close:"
       const timeContainer = mainPriceEl.parent().find('div').filter((i, el) => $(el).text().includes('At close:')).first();
@@ -142,8 +142,8 @@ function parseStockAnalysisHtml(html, security) {
       if (changeText) {
         const m = changeText.match(changeRegex);
         if (m) {
-          price_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
-          price_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
+          regular_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
+          regular_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
         }
       }
     } catch (e) { /* ignore change extraction errors */ }
@@ -269,10 +269,10 @@ function parseStockAnalysisHtml(html, security) {
 
   return {
     key: ticker,
-    last_price: last_price || '',
+    regular_last_price: regular_last_price || '',
     last_price_quote_time: last_price_quote_time || '',
-    price_change_decimal: price_change_decimal || '',
-    price_change_percent: price_change_percent || '',
+    regular_change_decimal: regular_change_decimal || '',
+    regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',
     pre_market_price: pre_market_price || '',
     pre_market_price_change_decimal: pre_market_price_change_decimal || '',

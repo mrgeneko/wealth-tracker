@@ -70,9 +70,9 @@ async function scrapeStocktwits(browser, security, outputDir) {
 
 function parseStocktwitsHtml(html, security) {
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
-  let last_price = '';
-  let price_change_decimal = '';
-  let price_change_percent = '';
+  let regular_last_price = '';
+  let regular_change_decimal = '';
+  let regular_change_percent = '';
   let previous_close_price = '';
   let after_hours_price = '';
   let after_hours_change_decimal = '';
@@ -131,9 +131,9 @@ function parseStocktwitsHtml(html, security) {
                 return '';
             };
 
-            last_price = cleanNumberText(extractVal('Last'));
-            price_change_decimal = cleanNumberText(extractVal('Change'));
-            price_change_percent = cleanNumberText(extractVal('PercentChange'));
+            regular_last_price = cleanNumberText(extractVal('Last'));
+            regular_change_decimal = cleanNumberText(extractVal('Change'));
+            regular_change_percent = cleanNumberText(extractVal('PercentChange'));
             previous_close_price = cleanNumberText(extractVal('PreviousClose'));
             
             // Extended hours
@@ -174,19 +174,19 @@ function parseStocktwitsHtml(html, security) {
         }
 
         if (priceEl.length) {
-            last_price = cleanNumberText(priceEl.first().text());
+          regular_last_price = cleanNumberText(priceEl.first().text());
         }
         
         // Change
         // Example: <span class="SymbolHeader_change__...">+3.13 (+1.76%)</span>
         const changeEl = $('[class*="SymbolHeader_change"]');
         if (changeEl.length) {
-            const txt = changeEl.first().text();
-            const m = txt.match(/([+-]?[0-9.,]+)\s*(?:\(?\s*([+-]?[0-9.,]+%?)\s*\)?)?/);
-            if (m) {
-                price_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
-                price_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
-            }
+          const txt = changeEl.first().text();
+          const m = txt.match(/([+-]?[0-9.,]+)\s*(?:\(?\s*([+-]?[0-9.,]+%?)\s*\)?)?/);
+          if (m) {
+            regular_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
+            regular_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
+          }
         }
     }
 
@@ -196,9 +196,9 @@ function parseStocktwitsHtml(html, security) {
 
   return {
     key: ticker,
-    last_price: last_price || '',
-    price_change_decimal: price_change_decimal || '',
-    price_change_percent: price_change_percent || '',
+    regular_last_price: regular_last_price || '',
+    regular_change_decimal: regular_change_decimal || '',
+    regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',
