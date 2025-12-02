@@ -445,9 +445,23 @@ app.post('/api/accounts', async (req, res) => {
 app.put('/api/accounts/:id', async (req, res) => {
     const { name, type, category, currency, display_order } = req.body;
     try {
+        // Build dynamic update query to only update provided fields
+        const updates = [];
+        const params = [];
+        if (name !== undefined) { updates.push('name=?'); params.push(name); }
+        if (type !== undefined) { updates.push('type=?'); params.push(type); }
+        if (category !== undefined) { updates.push('category=?'); params.push(category); }
+        if (currency !== undefined) { updates.push('currency=?'); params.push(currency); }
+        if (display_order !== undefined) { updates.push('display_order=?'); params.push(display_order); }
+        
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+        
+        params.push(req.params.id);
         await pool.execute(
-            'UPDATE accounts SET name=?, type=?, category=?, currency=?, display_order=? WHERE id=?',
-            [name, type, category, currency, display_order, req.params.id]
+            `UPDATE accounts SET ${updates.join(', ')} WHERE id=?`,
+            params
         );
         assetsCache = null;
         loadAssets();
