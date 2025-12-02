@@ -217,7 +217,7 @@
         <div id="Logs" class="tab-content">
             <h2>System Logs</h2>
             <div id="logs-container" style="display: flex; height: 600px; border: 1px solid #444;">
-                <div id="log-list-pane" style="width: 50%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
+                <div id="log-list-pane" style="width: 27.5%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
                     <table id="log-table" style="width: 100%; font-size: 0.8em; table-layout: fixed;">
                         <thead>
                             <tr>
@@ -596,8 +596,8 @@
                 rowHtml += `<td>${formatNumber(price)}</td>`;
                 rowHtml += `<td style="color: ${color}">${formatNumber(changeVal)}</td>`;
                 rowHtml += `<td style="color: ${color}">${changePct}</td>`;
-                rowHtml += `<td style="font-size: 0.75em; color: #888;">${timeStr}</td>`;
-                rowHtml += `<td style="font-size: 0.75em; color: #888;">${sourceStr}</td>`;
+                rowHtml += `<td style="font-size: 0.50em; color: #888;">${timeStr}</td>`;
+                rowHtml += `<td style="font-size: 0.50em; color: #888;">${sourceStr}</td>`;
                 grandTotalValueChange += symTotalValueChange;
                 rowHtml += `<td style="color: ${color}">${formatNumber(symTotalValueChange)}</td>`;
                 rowHtml += `<td class="row-total">${formatNumber(symTotalValue, 0)}</td></tr>`;
