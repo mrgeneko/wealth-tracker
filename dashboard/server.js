@@ -490,7 +490,7 @@ app.put('/api/positions/:id', async (req, res) => {
     try {
         await pool.execute(
             'UPDATE positions SET symbol=?, type=?, quantity=?, currency=? WHERE id=?',
-            [symbol, type, quantity, currency, req.params.id]
+            [symbol, type, quantity, currency || 'USD', req.params.id]
         );
         assetsCache = null;
         loadAssets();
