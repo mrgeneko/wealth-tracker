@@ -414,6 +414,7 @@
         
         // --- Sorting State ---
         let investmentGridSort = { column: 'symbol', direction: 'asc' };
+        let accountOrder = [];
 
         // --- Socket.IO Listeners ---
         socket.on('price_update', (data) => {
@@ -444,7 +445,26 @@
             if (!lastAssetsData) return;
 
             // Filter accounts
-            const investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
+            let investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
+            
+            // Initialize or update accountOrder
+            if (accountOrder.length === 0) {
+                accountOrder = investmentAccounts.map(a => a.id);
+            } else {
+                const currentIds = new Set(investmentAccounts.map(a => a.id));
+                accountOrder = accountOrder.filter(id => currentIds.has(id));
+                investmentAccounts.forEach(a => {
+                    if (!accountOrder.includes(a.id)) accountOrder.push(a.id);
+                });
+            }
+            
+            // Sort investmentAccounts based on accountOrder
+            investmentAccounts.sort((a, b) => {
+                const idxA = accountOrder.findIndex(id => String(id) === String(a.id));
+                const idxB = accountOrder.findIndex(id => String(id) === String(b.id));
+                return idxA - idxB;
+            });
+
             const bankAccounts = lastAssetsData.accounts.filter(a => a.category === 'bank');
             
             // Combine fixed assets
@@ -510,7 +530,7 @@
             accounts.forEach(acc => {
                 const accJson = escapeHtml(JSON.stringify(acc));
                 const accType = acc.type ? acc.type.toUpperCase() : '';
-                headerHtml += `<th style="text-align: center"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><small style="font-weight: normal; color: #aaa;">${accType}</small> <span class="edit-icon">✎</span></span></th>`;
+                headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><small style="font-weight: normal; color: #aaa;">${accType}</small> <span class="edit-icon">✎</span></span></th>`;
             });
             headerHtml += `<th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;
@@ -768,6 +788,50 @@
 
             bodyHtml += `<tr class="total-row"><td colspan="2">TOTAL</td><td>${formatNumber(total)}</td></tr>`;
             tbody.innerHTML = bodyHtml;
+        }
+
+        // --- Drag and Drop for Columns ---
+        function dragStart(ev, id) {
+            ev.dataTransfer.setData("text/plain", id);
+            ev.dataTransfer.effectAllowed = "move";
+        }
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drop(ev, targetId) {
+            ev.preventDefault();
+            const draggedId = ev.dataTransfer.getData("text/plain");
+            if (String(draggedId) === String(targetId)) return;
+
+            const fromIndex = accountOrder.findIndex(id => String(id) === String(draggedId));
+            const toIndex = accountOrder.findIndex(id => String(id) === String(targetId));
+
+            if (fromIndex > -1 && toIndex > -1) {
+                const [movedItem] = accountOrder.splice(fromIndex, 1);
+                accountOrder.splice(toIndex, 0, movedItem);
+                renderAll();
+                saveAccountOrder();
+            }
+        }
+
+        async function saveAccountOrder() {
+            // Update display_order for all accounts in the new order
+            const updates = accountOrder.map((id, index) => {
+                return fetch(`/api/accounts/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ display_order: index })
+                });
+            });
+            
+            try {
+                await Promise.all(updates);
+                console.log('Account order saved');
+            } catch (err) {
+                console.error('Error saving account order:', err);
+            }
         }
 
         // --- Helpers ---
