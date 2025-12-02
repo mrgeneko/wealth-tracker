@@ -193,6 +193,18 @@
         </div>
     </div>
 
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content" style="width: 350px;">
+            <h2 id="confirmModalTitle">Confirm</h2>
+            <p id="confirmModalMessage" style="margin-bottom: 20px;"></p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('confirmModal')">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalOk">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Account Modal -->
     <div id="accountModal" class="modal">
         <div class="modal-content">
@@ -225,19 +237,21 @@
             <form id="positionForm">
                 <input type="hidden" id="posId">
                 <input type="hidden" id="posAccountId">
-                <div class="form-group">
+                <div class="form-group" id="posSymbolGroup">
                     <label for="posSymbol">Symbol</label>
                     <input type="text" id="posSymbol" required>
                 </div>
                 <div class="form-group">
-                    <label for="posType">Type</label>
-                    <select id="posType">
-                        <option value="stock">Stock</option>
-                        <option value="etf">ETF</option>
-                        <option value="bond">Bond</option>
-                        <option value="cash">Cash</option>
-                        <option value="crypto">Crypto</option>
-                    </select>
+                    <div id="posTypeGroup">
+                        <label for="posType">Type</label>
+                        <select id="posType">
+                            <option value="stock">Stock</option>
+                            <option value="etf">ETF</option>
+                            <option value="bond">Bond</option>
+                            <option value="cash">Cash</option>
+                            <option value="crypto">Crypto</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="posQuantity">Quantity</label>
@@ -548,11 +562,11 @@
                 
                 let valCell = '';
                 if (cashPos) {
-                    const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: val };
+                    const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: val, isBankAccount: true };
                     const posJson = escapeHtml(JSON.stringify(posData));
                     valCell = `<span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(val)} <span class="edit-icon">✎</span></span>`;
                 } else {
-                    const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0 };
+                    const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0, isBankAccount: true };
                     const posJson = escapeHtml(JSON.stringify(posData));
                     valCell = `<span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(0)} <span class="edit-icon">✎</span></span>`;
                 }
@@ -594,7 +608,7 @@
                 bodyHtml += `<tr>
                     <td><span class="clickable-cell" onclick="openAssetModal(${assetJson})">${asset.description || asset.name} <span class="edit-icon">✎</span></span></td>
                     <td style="text-align: left">${asset.type}</td>
-                    <td>${formatNumber(asset.value)}</td>
+                    <td><span class="clickable-cell" onclick="openAssetModal(${assetJson})">${formatNumber(asset.value)} <span class="edit-icon">✎</span></span></td>
                 </tr>`;
             });
 
@@ -662,10 +676,42 @@
 
         async function deleteAccount() {
             const id = document.getElementById('accId').value;
-            if (!confirm('Delete this account?')) return;
-            await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
-            closeModal('accountModal');
-            fetchAssets();
+            showConfirmModal(
+                'Delete Account',
+                'All positions in this account will also be deleted. Are you sure?',
+                async () => {
+                    await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+                    closeModal('accountModal');
+                    fetchAssets();
+                }
+            );
+        }
+
+        function showConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirmModalTitle').innerText = title;
+            document.getElementById('confirmModalMessage').innerText = message;
+            const okBtn = document.getElementById('confirmModalOk');
+            // Hide any open modal (asset/account/position) before showing confirm
+            const modalsToHide = ['accountModal', 'positionModal', 'assetModal'];
+            let lastOpenModal = null;
+            for (const mid of modalsToHide) {
+                const m = document.getElementById(mid);
+                if (m && m.style.display === 'block') {
+                    m.style.display = 'none';
+                    lastOpenModal = mid;
+                }
+            }
+            okBtn.onclick = () => {
+                closeModal('confirmModal');
+                onConfirm();
+            };
+            // Restore the previous modal if cancel is clicked
+            const cancelBtn = document.querySelector('#confirmModal .btn:not(.btn-danger)');
+            cancelBtn.onclick = () => {
+                closeModal('confirmModal');
+                if (lastOpenModal) document.getElementById(lastOpenModal).style.display = 'block';
+            };
+            document.getElementById('confirmModal').style.display = 'block';
         }
 
         // Position
@@ -682,10 +728,18 @@
             document.getElementById('posType').value = pos.type;
             document.getElementById('posQuantity').value = pos.quantity;
 
+            // Determine if this is a bank account cash position
+            const isCash = pos.type === 'cash';
+            const isBankCash = isCash && pos.isBankAccount;
+            document.getElementById('posSymbolGroup').style.display = isCash ? 'none' : 'block';
+            document.getElementById('posSymbol').required = !isCash;
+            document.getElementById('posTypeGroup').style.display = isBankCash ? 'none' : 'block';
+            document.getElementById('posType').disabled = isCash;
+            document.getElementById('btnDeletePosition').style.display = isBankCash ? 'none' : (pos.id ? 'block' : 'none');
+
             if (pos.id) {
                 document.getElementById('positionModalTitle').innerText = 'Edit Position';
                 document.getElementById('posId').value = pos.id;
-                document.getElementById('btnDeletePosition').style.display = 'block';
             }
             modal.style.display = 'block';
         }
@@ -697,7 +751,8 @@
                 account_id: document.getElementById('posAccountId').value,
                 symbol: document.getElementById('posSymbol').value,
                 type: document.getElementById('posType').value,
-                quantity: document.getElementById('posQuantity').value
+                quantity: parseFloat(document.getElementById('posQuantity').value),
+                currency: 'USD'
             };
             const method = id ? 'PUT' : 'POST';
             const url = id ? `/api/positions/${id}` : '/api/positions';
@@ -741,7 +796,9 @@
             const body = {
                 name: document.getElementById('assetName').value,
                 type: document.getElementById('assetType').value,
-                value: document.getElementById('assetValue').value
+                value: parseFloat(document.getElementById('assetValue').value),
+                currency: 'USD',
+                display_order: 0
             };
             const method = id ? 'PUT' : 'POST';
             const url = id ? `/api/fixed_assets/${id}` : '/api/fixed_assets';
@@ -753,10 +810,15 @@
 
         async function deleteAsset() {
             const id = document.getElementById('assetId').value;
-            if (!confirm('Delete this asset?')) return;
-            await fetch(`/api/fixed_assets/${id}`, { method: 'DELETE' });
-            closeModal('assetModal');
-            fetchAssets();
+            showConfirmModal(
+                'Delete Asset',
+                'Are you sure you want to delete this asset?',
+                async () => {
+                    await fetch(`/api/fixed_assets/${id}`, { method: 'DELETE' });
+                    closeModal('assetModal');
+                    fetchAssets();
+                }
+            );
         }
 
         // --- Tabs & Logs ---
