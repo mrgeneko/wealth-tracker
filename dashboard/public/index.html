@@ -1,3 +1,38 @@
+    <!-- Add Symbol Modal -->
+    <div id="addSymbolModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addSymbolModal')">&times;</span>
+            <h2>Add Symbol</h2>
+            <form id="addSymbolForm">
+                <div class="form-group">
+                    <label for="newSymbol">Symbol</label>
+                    <input type="text" id="newSymbol" required maxlength="10" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
+                    <label for="newSymbolType">Type</label>
+                    <select id="newSymbolType">
+                        <option value="stock">Stock</option>
+                        <option value="etf">ETF</option>
+                        <option value="bond">Bond</option>
+                        <option value="crypto">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newSymbolAccount">Account</label>
+                    <select id="newSymbolAccount" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="newSymbolQuantity">Quantity</label>
+                    <input type="number" id="newSymbolQuantity" min="0" step="any" value="0" required>
+                </div>
+                <div id="addSymbolError" style="color: #f44336; margin-bottom: 10px; display: none;"></div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('addSymbolModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,6 +156,9 @@
                     <span>Investment Accounts</span>
                     <button class="icon-btn" title="Add Account" onclick="openAccountModal('investment')" style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
                         <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Account</span>
+                    </button>
+                    <button class="icon-btn" title="Add Symbol" onclick="openAddSymbolModal()" style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
+                        <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Symbol</span>
                     </button>
                 </h2>
             </div>
@@ -298,6 +336,72 @@
     </div>
 
     <script>
+
+
+                function openAddSymbolModal() {
+                    document.getElementById('addSymbolError').style.display = 'none';
+                    document.getElementById('addSymbolForm').reset();
+                    // Populate account dropdown
+                    const accountSelect = document.getElementById('newSymbolAccount');
+                    accountSelect.innerHTML = '';
+                    if (lastAssetsData && lastAssetsData.accounts) {
+                        const investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
+                        investmentAccounts.forEach(acc => {
+                            const opt = document.createElement('option');
+                            opt.value = acc.id;
+                            opt.textContent = acc.name + (acc.type ? ` (${acc.type})` : '');
+                            accountSelect.appendChild(opt);
+                        });
+                    }
+                    document.getElementById('addSymbolModal').style.display = 'block';
+                }
+
+                document.getElementById('addSymbolForm').onsubmit = async function(e) {
+                    e.preventDefault();
+                    const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+                    const type = document.getElementById('newSymbolType').value;
+                    const accountId = document.getElementById('newSymbolAccount').value;
+                    const quantity = parseFloat(document.getElementById('newSymbolQuantity').value);
+                    if (!symbol || !accountId || isNaN(quantity)) return;
+                    // Check if symbol already exists in this account
+                    let symbolExists = false;
+                    if (lastAssetsData && lastAssetsData.accounts) {
+                        const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
+                        if (acc) {
+                            acc.holdings.stocks.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
+                            acc.holdings.bonds.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
+                        }
+                    }
+                    if (symbolExists) {
+                        document.getElementById('addSymbolError').innerText = 'Symbol already exists in this account.';
+                        document.getElementById('addSymbolError').style.display = 'block';
+                        return;
+                    }
+                    // Add symbol to selected account with specified quantity
+                    try {
+                        let currency = 'USD';
+                        if (lastAssetsData && lastAssetsData.accounts) {
+                            const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
+                            if (acc && acc.currency) currency = acc.currency;
+                        }
+                        await fetch('/api/positions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                account_id: accountId,
+                                symbol,
+                                type,
+                                quantity,
+                                currency
+                            })
+                        });
+                        closeModal('addSymbolModal');
+                        fetchAssets();
+                    } catch (err) {
+                        document.getElementById('addSymbolError').innerText = 'Error adding symbol.';
+                        document.getElementById('addSymbolError').style.display = 'block';
+                    }
+                };
         const socket = io();
         let currentPrices = {};
         let lastAssetsData = null;
@@ -519,15 +623,7 @@
             totalRowHtml += `<td>${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
 
-            // Add Position Buttons
-            let addRowHtml = '<tr><td></td>';
-            accounts.forEach(acc => {
-                 const addPosData = { account_id: acc.id, symbol: '', type: 'stock', quantity: 0 };
-                 const addPosJson = escapeHtml(JSON.stringify(addPosData));
-                 addRowHtml += `<td style="text-align: center;"><button class="btn btn-primary" style="padding: 2px 8px; font-size: 0.8em;" onclick="openPositionModal(${addPosJson})">Add Pos</button></td>`;
-            });
-            addRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
-            bodyHtml += addRowHtml;
+              // Removed Add Position Buttons row
 
             tbody.innerHTML = bodyHtml;
         }
