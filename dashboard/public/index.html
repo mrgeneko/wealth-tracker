@@ -95,6 +95,12 @@
         .tab-content { display: none; animation: fadeEffect 1s; }
         @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
 
+        /* Sortable Headers */
+        .sortable-header { cursor: pointer; user-select: none; }
+        .sortable-header:hover { background-color: #3d3d3d; }
+        .sort-indicator { margin-left: 5px; font-size: 0.8em; color: #888; }
+        .sort-indicator.active { color: #0d6efd; }
+
         /* Log Table Overrides */
         #log-table th:first-child, 
         #log-table td:first-child {
@@ -211,7 +217,7 @@
         <div id="Logs" class="tab-content">
             <h2>System Logs</h2>
             <div id="logs-container" style="display: flex; height: 600px; border: 1px solid #444;">
-                <div id="log-list-pane" style="width: 50%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
+                <div id="log-list-pane" style="width: 27.5%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
                     <table id="log-table" style="width: 100%; font-size: 0.8em; table-layout: fixed;">
                         <thead>
                             <tr>
@@ -405,6 +411,9 @@
         const socket = io();
         let currentPrices = {};
         let lastAssetsData = null;
+        
+        // --- Sorting State ---
+        let investmentGridSort = { column: 'symbol', direction: 'asc' };
 
         // --- Socket.IO Listeners ---
         socket.on('price_update', (data) => {
@@ -490,21 +499,29 @@
             });
             const sortedSymbols = Array.from(allSymbols).sort();
 
-            // Header
-            let headerHtml = '<tr><th style="text-align: left">Symbol</th>';
+            // Header with sortable columns
+            const sortIndicator = (col) => {
+                if (investmentGridSort.column === col) {
+                    return `<span class="sort-indicator active">${investmentGridSort.direction === 'asc' ? '▲' : '▼'}</span>`;
+                }
+                return '<span class="sort-indicator">⇅</span>';
+            };
+            let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Symbol${sortIndicator('symbol')}</th>`;
             accounts.forEach(acc => {
                 const accJson = escapeHtml(JSON.stringify(acc));
                 const accType = acc.type ? acc.type.toUpperCase() : '';
                 headerHtml += `<th style="text-align: center"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><small style="font-weight: normal; color: #aaa;">${accType}</small> <span class="edit-icon">✎</span></span></th>`;
             });
-            headerHtml += '<th>Price</th><th>Change</th><th>Change %</th><th>Time</th><th>Source</th><th>Value Change</th><th>Total</th></tr>';
+            headerHtml += `<th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;
 
             let bodyHtml = '';
             let grandTotalValueChange = 0;
-
-            // Symbol Rows
+            
+            // Build row data for sorting
+            const rowData = [];
             sortedSymbols.forEach(sym => {
+                let rowInfo = { symbol: sym, changePct: 0, valueChange: 0, total: 0 };
                 let price = 0;
                 let changePct = '0%';
                 let changeVal = 0;
@@ -520,7 +537,7 @@
                     if (currentPrices[sym].time) {
                         const d = new Date(currentPrices[sym].time);
                         if (!isNaN(d.getTime())) {
-                            timeStr = d.toLocaleString();
+                            timeStr = d.toLocaleString().replace(',', '');
                         } else {
                             timeStr = currentPrices[sym].time;
                         }
@@ -567,15 +584,44 @@
                     }
                 });
                 
+                // Parse changePct to number for sorting
+                let changePctNum = 0;
+                if (changePct && changePct !== '0%') {
+                    changePctNum = parseFloat(changePct.replace('%', '').replace(',', '')) || 0;
+                }
+                rowInfo.changePct = changePctNum;
+                rowInfo.valueChange = symTotalValueChange;
+                rowInfo.total = symTotalValue;
+                
                 rowHtml += `<td>${formatNumber(price)}</td>`;
                 rowHtml += `<td style="color: ${color}">${formatNumber(changeVal)}</td>`;
                 rowHtml += `<td style="color: ${color}">${changePct}</td>`;
-                rowHtml += `<td style="font-size: 0.8em; color: #aaa;">${timeStr}</td>`;
-                rowHtml += `<td style="font-size: 0.8em; color: #aaa;">${sourceStr}</td>`;
+                rowHtml += `<td style="font-size: 0.50em; color: #888;">${timeStr}</td>`;
+                rowHtml += `<td style="font-size: 0.50em; color: #888;">${sourceStr}</td>`;
                 grandTotalValueChange += symTotalValueChange;
                 rowHtml += `<td style="color: ${color}">${formatNumber(symTotalValueChange)}</td>`;
                 rowHtml += `<td class="row-total">${formatNumber(symTotalValue, 0)}</td></tr>`;
-                bodyHtml += rowHtml;
+                
+                rowInfo.html = rowHtml;
+                rowData.push(rowInfo);
+            });
+            
+            // Sort rows based on current sort state
+            rowData.sort((a, b) => {
+                let aVal = a[investmentGridSort.column];
+                let bVal = b[investmentGridSort.column];
+                if (investmentGridSort.column === 'symbol') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                if (aVal < bVal) return investmentGridSort.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return investmentGridSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            // Build body HTML from sorted rows
+            rowData.forEach(row => {
+                bodyHtml += row.html;
             });
 
             // Cash Row
@@ -626,6 +672,18 @@
               // Removed Add Position Buttons row
 
             tbody.innerHTML = bodyHtml;
+        }
+
+        function sortInvestmentGrid(column) {
+            if (investmentGridSort.column === column) {
+                // Toggle direction
+                investmentGridSort.direction = investmentGridSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New column, default to ascending for symbol, descending for numbers
+                investmentGridSort.column = column;
+                investmentGridSort.direction = column === 'symbol' ? 'asc' : 'desc';
+            }
+            renderAll();
         }
 
         function renderBankGrid(tableId, accounts) {
