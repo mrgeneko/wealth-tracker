@@ -470,6 +470,25 @@ async function createPreparedPage(browser, opts = {}) {
         reloadExisting = false
     } = opts;
 
+    // Track protocol timeout errors
+    let protocolTimeoutCount = 0;
+    const MAX_PROTOCOL_TIMEOUTS_IN_SETUP = 2;
+
+    // Helper to check and track protocol timeouts
+    const checkProtocolTimeout = (e, operation) => {
+        const msg = e && e.message ? e.message : String(e);
+        if (isProtocolTimeoutError(msg)) {
+            protocolTimeoutCount++;
+            logDebug(`Protocol timeout in ${operation} (count: ${protocolTimeoutCount}/${MAX_PROTOCOL_TIMEOUTS_IN_SETUP})`);
+            if (protocolTimeoutCount >= MAX_PROTOCOL_TIMEOUTS_IN_SETUP) {
+                // Throw to signal browser needs restart
+                const err = new Error(`Multiple protocol timeouts detected (${protocolTimeoutCount}), browser may need restart`);
+                err.isProtocolTimeout = true;
+                throw err;
+            }
+        }
+    };
+
     // If reuseIfUrlMatches provided, try to find an existing page whose URL matches
     if (reuseIfUrlMatches) {
         try {
@@ -487,21 +506,37 @@ async function createPreparedPage(browser, opts = {}) {
 
                     // Attach counters and best-effort setup; guard each operation so a failing page doesn't abort the entire flow
                     if (attachCounters) {
-                        try { await attachRequestFailureCounters(p, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) { logDebug('attachRequestFailureCounters failed: ' + (e && e.message ? e.message : e)); }
+                        try { await attachRequestFailureCounters(p, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) { 
+                            logDebug('attachRequestFailureCounters failed: ' + (e && e.message ? e.message : e)); 
+                            checkProtocolTimeout(e, 'attachRequestFailureCounters');
+                        }
                     }
-                    try { await p.setUserAgent(userAgent); } catch (e) { logDebug('setUserAgent on reused page failed: ' + (e && e.message ? e.message : e)); }
-                    try { await p.setViewport(viewport); } catch (e) { logDebug('setViewport on reused page failed: ' + (e && e.message ? e.message : e)); }
-                    try { await p.bringToFront(); } catch (e) { logDebug('bringToFront on reused page failed: ' + (e && e.message ? e.message : e)); }
+                    try { await p.setUserAgent(userAgent); } catch (e) { 
+                        logDebug('setUserAgent on reused page failed: ' + (e && e.message ? e.message : e)); 
+                        checkProtocolTimeout(e, 'setUserAgent');
+                    }
+                    try { await p.setViewport(viewport); } catch (e) { 
+                        logDebug('setViewport on reused page failed: ' + (e && e.message ? e.message : e)); 
+                        checkProtocolTimeout(e, 'setViewport');
+                    }
+                    try { await p.bringToFront(); } catch (e) { 
+                        logDebug('bringToFront on reused page failed: ' + (e && e.message ? e.message : e)); 
+                        checkProtocolTimeout(e, 'bringToFront');
+                    }
 
                     if (reloadExisting && url) {
                         try {
                             await gotoWithRetries(p, url, { waitUntil, timeout }, gotoRetries);
                         } catch (e) {
                             logDebug('Reloading existing page failed: ' + (e && e.message ? e.message : e));
+                            checkProtocolTimeout(e, 'gotoWithRetries');
                         }
                     }
                     // Ensure download behavior / certificate ignore applied for reused page if requested
-                    try { await setupCDPSession(p, downloadPath); } catch (e) { logDebug('setupCDPSession failed on reused page: ' + (e && e.message ? e.message : e)); }
+                    try { await setupCDPSession(p, downloadPath); } catch (e) { 
+                        logDebug('setupCDPSession failed on reused page: ' + (e && e.message ? e.message : e)); 
+                        checkProtocolTimeout(e, 'setupCDPSession');
+                    }
                     // Final check that page is still open
                     try { if (p.isClosed && p.isClosed()) { logDebug('Reused page closed after setup, skipping'); continue; } } catch (e) {}
                     return p;
@@ -509,16 +544,27 @@ async function createPreparedPage(browser, opts = {}) {
             }
         } catch (e) {
             logDebug('Error while searching for existing pages: ' + (e && e.message ? e.message : e));
+            // Re-throw if it's a protocol timeout error we flagged
+            if (e.isProtocolTimeout) throw e;
         }
     }
 
     // No reusable page found, create a new one
     const page = await browser.newPage();
     if (attachCounters) {
-        try { await attachRequestFailureCounters(page, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) { logDebug('attachRequestFailureCounters failed on new page: ' + (e && e.message ? e.message : e)); }
+        try { await attachRequestFailureCounters(page, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) { 
+            logDebug('attachRequestFailureCounters failed on new page: ' + (e && e.message ? e.message : e)); 
+            checkProtocolTimeout(e, 'attachRequestFailureCounters');
+        }
     }
-    try { await page.setUserAgent(userAgent); } catch (e) { logDebug('setUserAgent on new page failed: ' + (e && e.message ? e.message : e)); }
-    try { await page.setViewport(viewport); } catch (e) { logDebug('setViewport on new page failed: ' + (e && e.message ? e.message : e)); }
+    try { await page.setUserAgent(userAgent); } catch (e) { 
+        logDebug('setUserAgent on new page failed: ' + (e && e.message ? e.message : e)); 
+        checkProtocolTimeout(e, 'setUserAgent');
+    }
+    try { await page.setViewport(viewport); } catch (e) { 
+        logDebug('setViewport on new page failed: ' + (e && e.message ? e.message : e)); 
+        checkProtocolTimeout(e, 'setViewport');
+    }
     if (url) {
         try { await gotoWithRetries(page, url, { waitUntil, timeout }, gotoRetries); } catch (e) { logDebug('gotoWithRetries on new page failed: ' + (e && e.message ? e.message : e)); }
     }
@@ -591,6 +637,23 @@ module.exports = {
     isAfterHoursSession,
     getConstructibleUrls
 };
+
+// Check if error message indicates a protocol timeout
+function isProtocolTimeoutError(errorMsg) {
+    if (!errorMsg) return false;
+    const msg = String(errorMsg).toLowerCase();
+    return msg.includes('timed out') && (
+        msg.includes('protocol') ||
+        msg.includes('network.') ||
+        msg.includes('emulation.') ||
+        msg.includes('runtime.') ||
+        msg.includes('page.') ||
+        msg.includes('cdp') ||
+        msg.includes('increase the')
+    );
+}
+
+module.exports.isProtocolTimeoutError = isProtocolTimeoutError;
 
 // Export helpers for page setup and snapshots
 module.exports.createPreparedPage = createPreparedPage;
