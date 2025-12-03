@@ -618,7 +618,7 @@
                 rowHtml += `<td>${formatNumber(prevClose)}</td>`;
                 rowHtml += `<td>${formatNumber(price)}</td>`;
                 rowHtml += `<td style="color: ${color}">${formatNumber(changeVal)}</td>`;
-                rowHtml += `<td style="color: ${color}">${changePct}</td>`;
+                rowHtml += `<td style="color: ${color}">${changePctNum.toFixed(3)}%</td>`;
                 rowHtml += `<td style="font-size: 0.50em; color: #888;">${timeStr}</td>`;
                 rowHtml += `<td style="font-size: 0.50em; color: #888;">${sourceStr}</td>`;
                 grandTotalValueChange += symTotalValueChange;
