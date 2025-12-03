@@ -53,7 +53,7 @@ function parseMarketBeatHtml(html, security) {
     let regular_change_decimal = '';
     let regular_change_percent = '';
     let previous_close_price = '';
-    let regular_quote_time = '';
+    let regular_time = '';
 
     try {
         // Price and Change are in the .price-info section
@@ -106,7 +106,7 @@ function parseMarketBeatHtml(html, security) {
         if (timeMatch) {
             // "09:30 AM Eastern"
             let timeStr = timeMatch[1].replace('Eastern', 'ET').trim();
-            regular_quote_time = parseToIso(timeStr);
+            regular_time = parseToIso(timeStr);
         }
 
     } catch (error) {
@@ -121,7 +121,7 @@ function parseMarketBeatHtml(html, security) {
         previous_close_price: previous_close_price || '',
         source: 'marketbeat',
         capture_time: new Date().toISOString(),
-        regular_quote_time: regular_quote_time || ''
+        regular_time: regular_time || ''
     };
 }
 

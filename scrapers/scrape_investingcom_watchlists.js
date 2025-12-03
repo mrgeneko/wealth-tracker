@@ -173,7 +173,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						extendedHoursChange = (extHoursPrice - prevClose).toFixed(2);
 					}
 
-					// Determine extended_hours_quote_time based on current time
+					// Determine extended_hours_time based on current time
 					let extendedHoursQuoteTime = null;
 					const now = DateTime.now().setZone('America/New_York');
 					const dayOfWeek = now.weekday; // 1 is Monday, 7 is Sunday
@@ -190,7 +190,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						if (isPreMarket || isAfterHours) {
 							extendedHoursQuoteTime = new Date().toISOString();
 						} else {
-							// From 8pm to 4am, extended_hours_quote_time may not be populated.
+							// From 8pm to 4am, extended_hours_time may not be populated.
 						}
 					}
 
@@ -199,11 +199,11 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						regular_last_price: rowData["last"],
 						regular_change_decimal: rowData["chg"],
 						regular_change_percent: rowData["chgpercent"],
-						regular_quote_time: qTime,
+						regular_time: qTime,
 						extended_hours_price: rowData["extended_hours"] || null,
 						extended_hours_change: extendedHoursChange,
 						extended_hours_change_percent: rowData["extended_hours_percent"] || null,
-						extended_hours_quote_time: extendedHoursQuoteTime,
+						extended_hours_time: extendedHoursQuoteTime,
 						source: "investing",
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString()
