@@ -53,7 +53,7 @@ function parseMoomooHtml(html, security) {
     let regular_change_decimal = '';
     let regular_change_percent = '';
     let previous_close_price = '';
-    let regular_quote_time = '';
+    let regular_time = '';
 
     try {
         // Price: .stock-data .price
@@ -91,7 +91,7 @@ function parseMoomooHtml(html, security) {
             // Remove "Trading " or other prefixes if present
             timeText = timeText.replace(/Trading\s+/i, '').replace(/Closed\s+/i, '').replace(/Pre-Market\s+/i, '').replace(/After-Hours\s+/i, '');
             // Now we expect "Nov 24 10:52 ET"
-            regular_quote_time = parseToIso(timeText);
+            regular_time = parseToIso(timeText);
         }
 
     } catch (error) {
@@ -106,7 +106,7 @@ function parseMoomooHtml(html, security) {
         previous_close_price: previous_close_price || '',
         source: 'moomoo',
         capture_time: new Date().toISOString(),
-        regular_quote_time: regular_quote_time || ''
+        regular_time: regular_time || ''
     };
 }
 
