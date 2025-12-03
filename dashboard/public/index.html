@@ -525,9 +525,9 @@
                 if (!newPriceData) return;
                 
                 let price = newPriceData.price;
-                let changeVal = newPriceData.change || 0;
-                let changePct = newPriceData.change_percent || '0%';
-                let prevClose = price - changeVal;
+                let prevClose = newPriceData.previous_close_price || 0;
+                let changeVal = price - prevClose;
+                let changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                 let timeStr = '-';
                 let sourceStr = newPriceData.source || '-';
                 
@@ -809,10 +809,10 @@
                 
                 if (currentPrices[sym]) {
                     price = currentPrices[sym].price;
-                    changePct = currentPrices[sym].change_percent || '0%';
-                    changeVal = currentPrices[sym].change || 0;
-                    prevClose = price - changeVal;
-                    console.log(`[PrevClose] ${sym}: price=${price}, changeVal=${changeVal}, prevClose=${prevClose}`);
+                    prevClose = currentPrices[sym].previous_close_price || 0;
+                    changeVal = price - prevClose;
+                    changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
+                    console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
                     
                     if (currentPrices[sym].time) {
                         const d = new Date(currentPrices[sym].time);

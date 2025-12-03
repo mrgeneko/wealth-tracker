@@ -95,8 +95,7 @@ async function fetchInitialPrices() {
                 if (!isNaN(priceVal)) {
                     priceCache[row.ticker] = {
                         price: priceVal,
-                        change: row.change_decimal ? parseFloat(row.change_decimal) : null,
-                        change_percent: row.change_percent,
+                        previous_close_price: row.previous_close_price ? parseFloat(row.previous_close_price) : null,
                         currency: 'USD',
                         time: row.capture_time,
                         source: row.source
@@ -287,28 +286,16 @@ function updatePriceCache(item) {
     
     if (isNaN(price) || price === 0) return false;
     
-    // Determine the best change values based on price source
-    let changeDecimal = 0;
-    let changePercent = '0%';
-    
-    if (priceSource === 'pre-market' && item.pre_market_change) {
-        changeDecimal = parseFloat(item.pre_market_change) || 0;
-        changePercent = item.pre_market_change_percent || '0%';
-    } else if (priceSource === 'after-hours' && item.after_hours_change) {
-        changeDecimal = parseFloat(item.after_hours_change) || 0;
-        changePercent = item.after_hours_change_percent || '0%';
-    } else if (priceSource === 'extended' && item.extended_hours_change) {
-        changeDecimal = parseFloat(item.extended_hours_change) || 0;
-        changePercent = item.extended_hours_change_percent || '0%';
-    } else {
-        changeDecimal = parseFloat(item.regular_change_decimal) || 0;
-        changePercent = item.regular_change_percent || '0%';
+    // Get previous close price
+    let previousClosePrice = null;
+    if (item.previous_close_price) {
+        previousClosePrice = parseFloat(String(item.previous_close_price).replace(/[$,]/g, ''));
+        if (isNaN(previousClosePrice)) previousClosePrice = null;
     }
     
     priceCache[item.key] = {
         price: price,
-        change: changeDecimal,
-        change_percent: changePercent,
+        previous_close_price: previousClosePrice,
         currency: 'USD',
         time: item.capture_time || new Date().toISOString(),
         source: item.source ? `${item.source} (${priceSource})` : priceSource
