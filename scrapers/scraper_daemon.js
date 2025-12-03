@@ -4,7 +4,8 @@ const version = 'VERSION:33'
 console.log(version);
 
 const { scrapeGoogle } = require('./scrape_google');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls } = require('./scraper_utils');
+const mysql = require('mysql2/promise');
 const puppeteer = require('puppeteer');
 const debugLogPath = getTimestampedLogPath();
 const path = require('path');
@@ -94,6 +95,38 @@ function getConfig(name) {
 	const lc = name.toLowerCase();
 	if (attrs[lc]) return attrs[lc];
 	return {};
+}
+
+// MySQL pool for querying positions
+let mysqlPool = null;
+
+function getMysqlPool() {
+	if (!mysqlPool) {
+		mysqlPool = mysql.createPool({
+			host: process.env.MYSQL_HOST || 'wealth-tracker-mysql',
+			port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+			user: process.env.MYSQL_USER || 'test',
+			password: process.env.MYSQL_PASSWORD || 'test',
+			database: process.env.MYSQL_DATABASE || 'testdb',
+			waitForConnections: true,
+			connectionLimit: 5,
+			queueLimit: 0
+		});
+	}
+	return mysqlPool;
+}
+
+async function fetchStockPositions() {
+	try {
+		const pool = getMysqlPool();
+		const [rows] = await pool.query(
+			"SELECT DISTINCT symbol FROM positions WHERE type IN ('stock', 'etf') AND symbol IS NOT NULL AND symbol != ''"
+		);
+		return rows.map(r => r.symbol);
+	} catch (e) {
+		logDebug('Error fetching stock positions from MySQL: ' + (e && e.message ? e.message : e));
+		return [];
+	}
 }
 
 function getScrapeGroupSettings(groupName, defaultMinutes = 5) {
@@ -732,6 +765,94 @@ async function runCycle(browser, outputDir) {
 	} else {
 		logDebug('Skipping URL scrape (interval not reached)');
 	}
+
+	// ======== STOCK POSITIONS (from MySQL) ===========
+	const stockPositionsName = 'stock_positions';
+	const stockPositionsMarker = path.join('/usr/src/app/logs/', `last.${stockPositionsName}.txt`);
+	const stockPositionsSettings = getScrapeGroupSettings(stockPositionsName, 30); // default 30 min
+	if (shouldRunTask(stockPositionsSettings, stockPositionsMarker)) {
+		logDebug('Begin stock_positions scrape');
+		
+		// Query MySQL for list of stock/etf positions
+		const positionSymbols = await fetchStockPositions();
+		logDebug(`Found ${positionSymbols.length} stock/etf positions in database: ${positionSymbols.join(', ')}`);
+		
+		if (positionSymbols.length > 0) {
+			// Use round robin through constructible URLs for each symbol
+			for (const symbol of positionSymbols) {
+				// Get list of potential sources using getConstructibleUrls
+				const constructibleUrls = getConstructibleUrls(symbol);
+				if (!constructibleUrls || constructibleUrls.length === 0) {
+					logDebug(`No constructible URLs for ${symbol}, skipping`);
+					continue;
+				}
+				
+				// Pick a random starting index for round robin
+				let currentIndex = Math.floor(Math.random() * constructibleUrls.length);
+				// constructibleUrls.length might be different for each position
+				let scraped = false;
+				const startIndex = currentIndex;
+				
+				do {
+					const urlInfo = constructibleUrls[currentIndex];
+					const sourceName = urlInfo.source;
+					const scraperFunc = scraperMap[sourceName];
+					
+					if (scraperFunc) {
+						const sourceConfig = getConfig(sourceName);
+						
+						// Skip source if explicitly disabled
+						if (sourceConfig && sourceConfig.enabled === false) {
+							logDebug(`Skipping disabled source: ${sourceName}`);
+							currentIndex = (currentIndex + 1) % constructibleUrls.length;
+							continue;
+						}
+						
+						// Check session validity
+						const isPre = isPreMarketSession();
+						const isReg = isRegularTradingSession();
+						const isPost = isAfterHoursSession();
+						const isWkday = isWeekday();
+						
+						const isValidSession = 
+							(isPre && sourceConfig.has_pre_market) ||
+							(isPost && sourceConfig.has_after_hours) ||
+							(isReg || !isWkday);
+						
+						// Check if source supports stock prices
+						if (sourceConfig.has_stock_prices !== false && isValidSession) {
+							try {
+								// Create a security object with the URL
+								const security = {
+									key: symbol,
+									type: 'stock',
+									[sourceName]: urlInfo.url
+								};
+								logDebug(`Scraping position ${symbol} with ${sourceName}: ${urlInfo.url}`);
+								const data = await scraperFunc(browser, security, outputDir);
+								logDebug(`${sourceName} scrape result for ${symbol}: ${JSON.stringify(data)}`);
+								scraped = true;
+								break; // Successfully scraped, move to next symbol
+							} catch (e) {
+								logDebug(`Error scraping ${symbol} with ${sourceName}: ${e.message}`);
+							}
+						}
+					}
+					
+					currentIndex = (currentIndex + 1) % constructibleUrls.length;
+				} while (currentIndex !== startIndex && !scraped);
+				
+				if (!scraped) {
+					logDebug(`Could not scrape ${symbol} with any available source`);
+				}
+				
+				await new Promise(r => setTimeout(r, 1000));
+			}
+		}
+	} else {
+		logDebug('Skipping stock_positions scrape (interval not reached or not enabled)');
+	}
+
 	logDebug('Cycle complete.');
 }
 
