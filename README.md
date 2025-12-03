@@ -294,6 +294,43 @@ The scraper daemon supports configurable scrape groups in `config.json`. Each gr
 The `stock_positions` and `bond_positions` groups dynamically query the database for your actual holdings, ensuring prices are fetched for securities you own without manual configuration.
 
 ---
+## US Treasury Securities Listings Scrape Group
+
+### Overview
+This group downloads the latest US Treasury Securities Auctions Data (bills, notes, bonds) from fiscaldata.treasury.gov. The data includes CUSIP, Security Type, Security Term, Auction Date, Issue Date, Maturity Date, and more.
+
+- **Script:** `scripts/update_treasury_listings.js`
+- **Output file:** `config/us-treasury-auctions.csv`
+- **Scrape group config:**
+  ```json
+  "us_treasury_listings": { "interval": 1440, "enabled": true }
+  ```
+- **Integration:** The scraper daemon runs this group on schedule, similar to other scrape groups.
+
+### How It Works
+- Uses Puppeteer to automate browser download (required because the CSV is generated client-side via blob URL).
+- The script checks if the new file is more than 5% smaller than the previous file. If so, it aborts the update and logs a warning to prevent accidental data loss.
+- On successful download, the previous file is backed up with a timestamp.
+
+### Safety Check Example
+If the new CSV file is significantly smaller than the previous one (by more than 5%), the update is aborted and a warning is logged:
+```
+WARNING: New file is 12.3% smaller than existing file
+  Old size: 123456 bytes, New size: 108234 bytes
+Aborting update to prevent data loss. Delete the old file manually if this is intentional.
+```
+
+### Manual Run
+To manually update the Treasury listings:
+```bash
+node scripts/update_treasury_listings.js
+```
+
+### Troubleshooting
+- If the script aborts due to file size reduction, review the downloaded file and delete the old file manually if the update is valid.
+- The script requires Puppeteer and Chrome; ensure dependencies are installed if running outside Docker.
+
+---
 ## Dashboard Features
 
 The dashboard provides real-time portfolio tracking with the following features:
