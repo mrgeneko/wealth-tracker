@@ -125,7 +125,9 @@ const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_
 function mapYahooQuoteToData(quote, securityKey) {
   const p = quote.price || quote || {};
   const qm = epochToMs(p.regularMarketTime);
-  
+  const afterHoursQuoteTime = epochToMs(p.postMarketTime);
+  const preMarketQuoteTime = epochToMs(p.preMarketTime);
+
   return {
     key: sanitizeForFilename(securityKey),
     regular_last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
@@ -136,9 +138,11 @@ function mapYahooQuoteToData(quote, securityKey) {
     after_hours_price: (p.postMarketPrice != null) ? String(p.postMarketPrice) : '',
     after_hours_change_decimal: (p.postMarketChange != null) ? String(p.postMarketChange) : '',
     after_hours_change_percent: (p.postMarketChangePercent != null) ? (String(p.postMarketChangePercent) + '%') : '',
+    after_hours_quote_time: afterHoursQuoteTime ? new Date(afterHoursQuoteTime).toISOString() : '',
     pre_market_price: (p.preMarketPrice != null) ? String(p.preMarketPrice) : '',
     pre_market_price_change_decimal: (p.preMarketChange != null) ? String(p.preMarketChange) : '',
     pre_market_price_change_percent: (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '',
+    pre_market_quote_time: preMarketQuoteTime ? new Date(preMarketQuoteTime).toISOString() : '',
     source: 'yahoo',
     capture_time: new Date().toISOString()
   };
