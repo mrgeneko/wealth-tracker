@@ -173,6 +173,27 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						extendedHoursChange = (extHoursPrice - prevClose).toFixed(2);
 					}
 
+					// Determine extended_hours_quote_time based on current time
+					let extendedHoursQuoteTime = null;
+					const now = DateTime.now().setZone('America/New_York');
+					const dayOfWeek = now.weekday; // 1 is Monday, 7 is Sunday
+					const hour = now.hour;
+					const minute = now.minute;
+
+					// Check if it's Monday through Friday (1-5)
+					if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+						// Pre-market: 4:00 AM to 9:30 AM
+						const isPreMarket = (hour > 4 || (hour === 4 && minute >= 0)) && (hour < 9 || (hour === 9 && minute < 30));
+						// After-hours: 4:00 PM to 8:00 PM
+						const isAfterHours = (hour >= 16 && hour < 20);
+
+						if (isPreMarket || isAfterHours) {
+							extendedHoursQuoteTime = new Date().toISOString();
+						} else {
+							// From 8pm to 4am, extended_hours_quote_time may not be populated.
+						}
+					}
+
 					dataObjects.push({
 						key: rowData["symbol"],
 						regular_last_price: rowData["last"],
@@ -182,6 +203,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						extended_hours_price: rowData["extended_hours"] || null,
 						extended_hours_change: extendedHoursChange,
 						extended_hours_change_percent: rowData["extended_hours_percent"] || null,
+						extended_hours_quote_time: extendedHoursQuoteTime,
 						source: "investing",
 						previous_close_price: rowData["prev"],
 						capture_time: new Date().toISOString()
