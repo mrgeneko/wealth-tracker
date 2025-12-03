@@ -120,9 +120,9 @@ async function fetchStockPositions() {
 	try {
 		const pool = getMysqlPool();
 		const [rows] = await pool.query(
-			"SELECT DISTINCT symbol FROM positions WHERE type IN ('stock', 'etf') AND symbol IS NOT NULL AND symbol != ''"
+			"SELECT DISTINCT symbol, type FROM positions WHERE type IN ('stock', 'etf') AND symbol IS NOT NULL AND symbol != ''"
 		);
-		return rows.map(r => r.symbol);
+		return rows.map(r => ({ symbol: r.symbol, type: r.type }));
 	} catch (e) {
 		logDebug('Error fetching stock positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -774,14 +774,15 @@ async function runCycle(browser, outputDir) {
 		logDebug('Begin stock_positions scrape');
 		
 		// Query MySQL for list of stock/etf positions
-		const positionSymbols = await fetchStockPositions();
-		logDebug(`Found ${positionSymbols.length} stock/etf positions in database: ${positionSymbols.join(', ')}`);
+		const positions = await fetchStockPositions();
+		logDebug(`Found ${positions.length} stock/etf positions in database: ${positions.map(p => p.symbol).join(', ')}`);
 		
-		if (positionSymbols.length > 0) {
-			// Use round robin through constructible URLs for each symbol
-			for (const symbol of positionSymbols) {
+		if (positions.length > 0) {
+			// Use round robin through constructible URLs for each position
+			for (const position of positions) {
+				const { symbol, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(symbol);
+				const constructibleUrls = getConstructibleUrls(symbol, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
 					logDebug(`No constructible URLs for ${symbol}, skipping`);
 					continue;
