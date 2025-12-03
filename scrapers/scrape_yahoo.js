@@ -360,7 +360,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         logDebug(`Yahoo batch: no quote returned for ${querySym}`);
         // still create empty results for each mapped security
         for (const sec of targets) {
-          const datum = { key: sanitizeForFilename(sec.key), source: 'yahoo_finance', error: 'no_quote' };
+          const datum = { key: sanitizeForFilename(sec.key), source: 'yahoo', error: 'no_quote' };
           results.push(datum);
         }
         continue;
@@ -379,7 +379,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         const data = Object.assign(
           { 
             key: sanitizeForFilename(sec.key), 
-            source: 'yahoo_finance', 
+            source: 'yahoo', 
             capture_time: new Date().toISOString() 
           }, 
           commonData

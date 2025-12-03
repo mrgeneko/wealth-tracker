@@ -215,7 +215,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"pre_market_price" : pre_market_price,
 			"pre_market_price_change_decimal": pre_market_price_change_decimal,
 			"pre_market_price_change_percent": pre_market_price_change_percent,
-			source: 'google_finance',
+			source: 'google',
 			capture_time: new Date().toISOString()
 		};
 
