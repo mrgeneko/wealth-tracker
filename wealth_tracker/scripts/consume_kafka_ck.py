@@ -66,9 +66,9 @@ def get_db_connection():
                 CREATE TABLE IF NOT EXISTS latest_prices (
                     ticker VARCHAR(50) PRIMARY KEY,
                     price DECIMAL(18, 4),
-                    change_decimal DECIMAL(18, 4),
-                    change_percent VARCHAR(20),
+                    previous_close_price DECIMAL(18, 4),
                     source VARCHAR(50),
+                    quote_time DATETIME,
                     capture_time DATETIME,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -152,22 +152,17 @@ def process_message(data):
         logging.warning(f"No valid price found for {ticker}")
         return
 
-    # Determine change values
-    change_decimal = 0.0
-    change_percent = '0%'
-    
-    if price_source == 'pre-market':
-        change_decimal = clean_val(data.get('pre_market_change'))
-        change_percent = data.get('pre_market_change_percent') or '0%'
-    elif price_source == 'after-hours':
-        change_decimal = clean_val(data.get('after_hours_change'))
-        change_percent = data.get('after_hours_change_percent') or '0%'
-    elif price_source == 'extended':
-        change_decimal = clean_val(data.get('extended_hours_change'))
-        change_percent = data.get('extended_hours_change_percent') or '0%'
-    else:
-        change_decimal = clean_val(data.get('regular_change_decimal'))
-        change_percent = data.get('regular_change_percent') or '0%'
+    # Get previous close price
+    previous_close_price = clean_val(data.get('previous_close_price'))
+
+    # Get quote_time (the time of the quote, not the capture time)
+    quote_time_str = data.get('regular_time') or data.get('quote_time') or data.get('regular_quote_time')
+    quote_time = None
+    if quote_time_str:
+        try:
+            quote_time = datetime.fromisoformat(quote_time_str.replace('Z', '+00:00'))
+        except ValueError:
+            quote_time = None
 
     base_source = data.get('source', 'unknown')
     final_source = f"{base_source} ({price_source})" if base_source else price_source
@@ -177,16 +172,16 @@ def process_message(data):
         try:
             cursor = conn.cursor()
             sql = """
-                INSERT INTO latest_prices (ticker, price, change_decimal, change_percent, source, capture_time)
+                INSERT INTO latest_prices (ticker, price, previous_close_price, source, quote_time, capture_time)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     price = VALUES(price),
-                    change_decimal = VALUES(change_decimal),
-                    change_percent = VALUES(change_percent),
+                    previous_close_price = VALUES(previous_close_price),
                     source = VALUES(source),
+                    quote_time = VALUES(quote_time),
                     capture_time = VALUES(capture_time)
             """
-            vals = (ticker, price_val, change_decimal, change_percent, final_source, capture_time)
+            vals = (ticker, price_val, previous_close_price if previous_close_price > 0 else None, final_source, quote_time, capture_time)
             cursor.execute(sql, vals)
             conn.commit()
             cursor.close()
