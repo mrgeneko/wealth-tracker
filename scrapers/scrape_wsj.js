@@ -111,7 +111,7 @@ async function scrapeWSJ(browser, security, outputDir) {
     let regular_change_decimal = cleanNumberText($('[data-field="Change"] .WSJTheme--change--2oFqg').first().text().trim() || $('[data-field="Change"] [class*="change"]').first().text().trim());
     let regular_change_percent = cleanNumberText($('[data-field="PercentChange"] .WSJTheme--percentChange--2aLrj').first().text().trim() || $('[data-field="PercentChange"] [class*="percentChange"]').first().text().trim());
     let previous_close_price = cleanNumberText($('[data-field="PrevClose"] .WSJTheme--prevClose--1Hk8a').first().text().trim() || $('[data-field="PrevClose"] [class*="prevClose"]').first().text().trim());
-    let quote_time = parseToIso($('[data-field="Time"] .WSJTheme--timestamp--1o1tF').first().text().trim() || $('[data-field="Time"] [class*="timestamp"]').first().text().trim());
+    let regular_quote_time = parseToIso($('[data-field="Time"] .WSJTheme--timestamp--1o1tF').first().text().trim() || $('[data-field="Time"] [class*="timestamp"]').first().text().trim());
 
     if (!regular_last_price) {
       regular_last_price = cleanNumberText($('span:contains("Last")').parent().find('span').last().text().trim());
@@ -131,7 +131,7 @@ async function scrapeWSJ(browser, security, outputDir) {
       after_hours_change_percent: '',
       source: 'wsj',
       capture_time: new Date().toISOString(),
-      quote_time: quote_time || ''
+      regular_quote_time: regular_quote_time || ''
     };
 
     logDebug('WSJ data: ' + JSON.stringify(data));

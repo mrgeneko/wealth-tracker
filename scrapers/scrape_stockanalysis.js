@@ -72,7 +72,7 @@ function parseStockAnalysisHtml(html, security) {
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
   
   let regular_last_price = '';
-  let last_price_quote_time = '';
+  let regular_quote_time = '';
   let previous_close_price = '';
   let pre_market_price = '';
   let pre_market_price_change_decimal = '';
@@ -89,12 +89,12 @@ function parseStockAnalysisHtml(html, security) {
     const mainPriceEl = $('[class*="text-4xl"]').first();
     if (mainPriceEl && mainPriceEl.length) {
       regular_last_price = cleanNumberText(mainPriceEl.text());
-      // Extract last_price_quote_time
+      // Extract regular_quote_time
       // Look for sibling div with "At close:"
       const timeContainer = mainPriceEl.parent().find('div').filter((i, el) => $(el).text().includes('At close:')).first();
       if (timeContainer && timeContainer.length) {
         const text = timeContainer.text().replace('At close:', '').trim();
-        if (text) last_price_quote_time = parseToIso(text);
+        if (text) regular_quote_time = parseToIso(text);
       }
     }
 
@@ -270,7 +270,7 @@ function parseStockAnalysisHtml(html, security) {
   return {
     key: ticker,
     regular_last_price: regular_last_price || '',
-    last_price_quote_time: last_price_quote_time || '',
+    regular_quote_time: regular_quote_time || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',

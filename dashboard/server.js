@@ -251,7 +251,7 @@ function updatePriceCache(item) {
     };
 
     const now = new Date();
-    const quoteTime = item.regular_last_price_quote_time ? new Date(item.regular_last_price_quote_time) : null;
+    const quoteTime = item.regular_quote_time ? new Date(item.regular_quote_time) : null;
     const preferRegular = isRegularHours(now) && quoteTime && isRegularHours(quoteTime);
     let foundPrice = false;
 

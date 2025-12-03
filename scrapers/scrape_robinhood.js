@@ -76,7 +76,7 @@ function parseRobinhoodHtml(html, security) {
   let after_hours_price = '';
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
-  let quote_time = '';
+  let regular_quote_time = '';
 
   try {
     // Try to parse the __NEXT_DATA__ script tag which contains the full state
@@ -124,9 +124,9 @@ function parseRobinhoodHtml(html, security) {
           
           // Timestamp
           if (quote.updated_at) {
-            quote_time = parseToIso(quote.updated_at);
+            regular_quote_time = parseToIso(quote.updated_at);
           } else if (quote.venue_last_trade_time) {
-            quote_time = parseToIso(quote.venue_last_trade_time);
+            regular_quote_time = parseToIso(quote.venue_last_trade_time);
           }
         }
       } catch (e) {
@@ -161,7 +161,7 @@ function parseRobinhoodHtml(html, security) {
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'robinhood',
     capture_time: new Date().toISOString(),
-    quote_time: quote_time || ''
+    regular_quote_time: regular_quote_time || ''
   };
 }
 

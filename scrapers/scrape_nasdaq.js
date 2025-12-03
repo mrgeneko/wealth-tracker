@@ -89,7 +89,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
         data.pre_market_price = data.pre_market_price || apiData.pre_market_price || '';
         data.pre_market_price_change_decimal = data.pre_market_price_change_decimal || apiData.pre_market_price_change_decimal || '';
         data.pre_market_price_change_percent = data.pre_market_price_change_percent || apiData.pre_market_price_change_percent || '';
-        data.quote_time = data.quote_time || apiData.quote_time || '';
+        data.regular_quote_time = data.regular_quote_time || apiData.regular_quote_time || apiData.quote_time || '';
         // If API reports market status and extended-session fields are still missing,
         // populate from primary API values when marketStatus indicates an extended session.
         try {
@@ -138,7 +138,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
           data.pre_market_price = result.pre_market_price || data.pre_market_price || '';
           data.pre_market_price_change_decimal = result.pre_market_price_change_decimal || data.pre_market_price_change_decimal || '';
           data.pre_market_price_change_percent = result.pre_market_price_change_percent || data.pre_market_price_change_percent || '';
-          data.quote_time = result.quote_time || data.quote_time || '';
+          data.regular_quote_time = result.regular_quote_time || data.regular_quote_time || result.quote_time || data.quote_time || '';
         } catch (e) { logDebug('Full page render fallback error: ' + e); }
       }
 
@@ -180,7 +180,7 @@ function parseNasdaqHtml(html, security) {
   let pre_market_price = '';
   let pre_market_change_decimal = '';
   let pre_market_change_percent = '';
-  let quote_time = '';
+  let regular_quote_time = '';
 
   try {
     // 1) Try embedded JSON common on Nasdaq pages
@@ -202,7 +202,7 @@ function parseNasdaqHtml(html, security) {
             if (qd.preMarket && qd.preMarket.last) pre_market_price = cleanNumberText(qd.preMarket.last);
             if (qd.preMarket && qd.preMarket.change) pre_market_change_decimal = cleanNumberText(qd.preMarket.change);
             if (qd.preMarket && qd.preMarket.changePercent) pre_market_change_percent = String(qd.preMarket.changePercent);
-            if (qd.lastTradeTime) quote_time = parseToIso(qd.lastTradeTime);
+            if (qd.lastTradeTime) regular_quote_time = parseToIso(qd.lastTradeTime);
           } else if (o && o.quote && o.quote.last) {
             const qd = o.quote;
             if (qd.last) regular_last_price = cleanNumberText(qd.last);
@@ -284,12 +284,12 @@ function parseNasdaqHtml(html, security) {
     }
 
     // quote_time: try common labels and time regex
-    if (!quote_time) {
+    if (!regular_quote_time) {
       const timeEl = $('*:contains("As of"), *:contains("Last")').filter((i,el)=> /As of|Last/.test($(el).text())).first();
       if (timeEl && timeEl.length) {
         const txt = timeEl.text().replace(/\s+/g,' ').trim();
         const m = txt.match(/([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM)(?:\s*[A-Z]{2,3})?)/i);
-        if (m) quote_time = parseToIso(m[1]);
+        if (m) regular_quote_time = parseToIso(m[1]);
       }
     }
 
@@ -303,13 +303,13 @@ function parseNasdaqHtml(html, security) {
     regular_last_price: regular_last_price || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',
+    regular_quote_time: regular_quote_time || '',
     previous_close_price: previous_close_price || '',
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'nasdaq',
-    capture_time: new Date().toISOString(),
-    quote_time: quote_time || ''
+    capture_time: new Date().toISOString()
   };
 }
 
@@ -320,7 +320,7 @@ async function fetchNasdaqApi(symbol) {
     regular_last_price: '', regular_change_decimal: '', regular_change_percent: '', previous_close_price: '',
     after_hours_price: '', after_hours_change_decimal: '', after_hours_change_percent: '',
     pre_market_price: '', pre_market_price_change_decimal: '', pre_market_price_change_percent: '',
-    quote_time: '', market_status: ''
+    regular_quote_time: '', market_status: ''
   };
   // Try several assetclass variants: stocks (or stock), etf, or no assetclass.
   const candidates = [ 'stock', 'stocks', 'etf', '' ];
@@ -341,7 +341,7 @@ async function fetchNasdaqApi(symbol) {
       out.regular_change_decimal = cleanNumberText(primary.netChange);
       out.regular_change_percent = primary.percentageChange || '';
       out.previous_close_price = prevClean;
-      out.quote_time = parseToIso(primary.lastTradeTimestamp || '');
+      out.regular_quote_time = parseToIso(primary.lastTradeTimestamp || '');
       out.market_status = marketStatusTop;
 
       // Try to extract after-hours / extended session data from common fields
