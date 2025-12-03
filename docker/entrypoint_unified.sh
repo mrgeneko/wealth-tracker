@@ -123,7 +123,7 @@ else
   echo "[DEBUG] /usr/src/app/data/config.json already present; leaving intact."
 fi
 
-echo "[DEBUG] Executing scrape_security_data as PID 1 (exec)..."
+echo "[DEBUG] Executing scraper_daemon as PID 1 (exec)..."
 # Exec will replace this shell with the Node process, ensuring Docker SIGTERM/SIGINT
 # are delivered directly to Node and its handlers (graceful shutdown will run).
-exec node /usr/src/app/scrapers/scrape_security_data.js
+exec node /usr/src/app/scrapers/scraper_daemon.js

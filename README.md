@@ -121,7 +121,7 @@ docker compose up -d --build dashboard
 
 ---
 ## Scraper Daemon (behavior)
-- The scrapers container runs `node /usr/src/app/scrape_security_data.js` as PID 1 (via `entrypoint_unified.sh`).
+- The scrapers container runs `node /usr/src/app/scrapers/scraper_daemon.js` as PID 1 (via `entrypoint_unified.sh`).
 - The scraper maintains a single Puppeteer browser instance and runs scrape cycles in an internal loop (no cron required).
 - Scraped records are published to Kafka using the configured brokers and topic.
 - Logs are written to the mounted logs directory (host: `/Users/gene/wealth_tracker_logs` mapped to container `/usr/src/app/logs`) and also written to stdout so `docker logs` shows them.
@@ -130,7 +130,7 @@ docker compose up -d --build dashboard
 
 The scrapers run as a long-lived daemon inside the `scrapers` container. Key operational notes:
 
-- The container runs `node /usr/src/app/scrape_security_data.js` as PID 1 (via `entrypoint_unified.sh`), so Docker signals (SIGTERM/SIGINT) are delivered directly to the Node process.
+- The container runs `node /usr/src/app/scrapers/scraper_daemon.js` as PID 1 (via `entrypoint_unified.sh`), so Docker signals (SIGTERM/SIGINT) are delivered directly to the Node process.
 - To stop the scraper gracefully run:
 
 ```bash
@@ -226,13 +226,13 @@ services:
 ---
 ## Logs & Data
 - Logs are saved in the container under `/usr/src/app/logs`. In this workspace they are typically mounted to your host at `/Users/gene/wealth_tracker_logs`.
-- Each run creates timestamped log files like `scrape_security_data.20251117_231700.log` and sidecar JSON/HTML files for scraped content.
+- Each run creates timestamped log files like `scraper_daemon.20251117_231700.log` and sidecar JSON/HTML files for scraped content.
 - Use `tail -f` on the most recent log file or `docker logs` for real-time output.
 If you need to inspect the latest log file inside the running container you can run:
 ```bash
 docker exec -it wealth-tracker-scrapers sh -c '\
-	LATEST=$(ls -1t /usr/src/app/logs/scrape_security_data*.log | head -n1) && \
-	echo "Latest: $LATEST" && tail -n 200 "$LATEST"'
+  LATEST=$(ls -1t /usr/src/app/logs/scraper_daemon*.log | head -n1) && \
+  echo "Latest: $LATEST" && tail -n 200 "$LATEST"'
 ```
 ---
 ## Database Schema
@@ -264,11 +264,11 @@ If you repeatedly see connection failures, rebuild the `scrapers` image and veri
 - Kafka connectivity:
 	- If you see DNS or connection errors for Kafka, ensure `KAFKA_BROKERS` points to the correct host:port and that the Kafka container is reachable from the scrapers container (compose network). For local compose this is usually `kafka:9092`.
 - Stale lock files / concurrency:
-	- This project uses a long-running daemon pattern instead of cron + lock scripts. The legacy `scrape_security_data_lock.sh` and cron-related files have been removed from the image. If you previously used cron, remove any external cron entries that run the scraper.
+  - This project uses a long-running daemon pattern instead of cron + lock scripts. The legacy `scrape_security_data_lock.sh` and cron-related files have been removed from the image. If you previously used cron, remove any external cron entries that run the scraper.
 If you need to revert to scheduled runs instead of the daemon, let me know and I can add a controlled external runner or health-check wrapper.
 ---
 ## Files of interest
-- `scrape_security_data.js` — main daemon that orchestrates scrapes and publishes to Kafka.
+- `scraper_daemon.js` — main daemon that orchestrates scrapes and publishes to Kafka.
 - `entrypoint_unified.sh` — container entrypoint that launches Node as PID 1.
 - `Dockerfile.scrapers` — build for the scrapers image.
 - `docker-compose.yml` — compose configuration for local development.
