@@ -283,21 +283,19 @@
                 <input type="hidden" id="posAccountId">
                 <div class="form-group" id="posSymbolGroup">
                     <label for="posSymbol">Symbol</label>
-                    <input type="text" id="posSymbol" required>
+                    <div id="posSymbolDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
                 </div>
                 <div class="form-group">
                     <div id="posTypeGroup">
                         <label for="posType">Type</label>
-                        <select id="posType">
-                            <option value="stock">Stock</option>
-                            <option value="etf">ETF</option>
-                            <option value="bond">Bond</option>
-                            <option value="cash">Cash</option>
-                            <option value="crypto">Crypto</option>
-                        </select>
+                        <div id="posTypeDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
                     </div>
                 </div>
                 <div class="form-group">
+                    <div id="posAccountGroup">
+                        <label for="posAccount">Account</label>
+                        <div id="posAccountDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
+                    </div>
                     <label for="posQuantity">Quantity</label>
                     <input type="number" step="any" id="posQuantity" required>
                     <small style="color: #aaa;">For Cash, enter the total value.</small>
@@ -879,7 +877,7 @@
                         
                         rowHtml += `<td id="${cellId}" class="${flashClass}"><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
                     } else {
-                        const addPosData = { account_id: acc.id, symbol: sym, type: 'stock', quantity: 0 };
+                        const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, type: 'stock', quantity: 0 };
                         const addPosJson = escapeHtml(JSON.stringify(addPosData));
                         rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
                     }
@@ -1310,17 +1308,24 @@
             document.getElementById('positionModalTitle').innerText = 'Add Position';
 
             document.getElementById('posAccountId').value = pos.account_id;
-            document.getElementById('posSymbol').value = pos.symbol;
-            document.getElementById('posType').value = pos.type;
             document.getElementById('posQuantity').value = pos.quantity;
 
-            // Determine if this is a bank account cash position
+            // Output-only fields
+            document.getElementById('posSymbolDisplay').textContent = pos.symbol;
+            document.getElementById('posTypeDisplay').textContent = (pos.type || '').charAt(0).toUpperCase() + (pos.type || '').slice(1);
+            // Use account_name if present, otherwise look up
+            let accountName = pos.account_name || '';
+            if (!accountName && window.lastAssetsData && window.lastAssetsData.accounts) {
+                const acc = window.lastAssetsData.accounts.find(a => String(a.id) === String(pos.account_id));
+                if (acc) accountName = acc.name;
+            }
+            document.getElementById('posAccountDisplay').textContent = accountName;
+
+            // Hide Symbol/Type fields for cash
             const isCash = pos.type === 'cash';
             const isBankCash = isCash && pos.isBankAccount;
             document.getElementById('posSymbolGroup').style.display = isCash ? 'none' : 'block';
-            document.getElementById('posSymbol').required = !isCash;
             document.getElementById('posTypeGroup').style.display = isBankCash ? 'none' : 'block';
-            document.getElementById('posType').disabled = isCash;
             document.getElementById('btnDeletePosition').style.display = isBankCash ? 'none' : (pos.id ? 'block' : 'none');
 
             if (pos.id) {
