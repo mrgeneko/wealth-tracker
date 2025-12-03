@@ -129,6 +129,19 @@ async function fetchStockPositions() {
 	}
 }
 
+async function fetchBondPositions() {
+	try {
+		const pool = getMysqlPool();
+		const [rows] = await pool.query(
+			"SELECT DISTINCT symbol, type FROM positions WHERE type = 'bond' AND symbol IS NOT NULL AND symbol != ''"
+		);
+		return rows.map(r => ({ symbol: r.symbol, type: r.type }));
+	} catch (e) {
+		logDebug('Error fetching bond positions from MySQL: ' + (e && e.message ? e.message : e));
+		return [];
+	}
+}
+
 function getScrapeGroupSettings(groupName, defaultMinutes = 5) {
 	const attrs = loadScraperAttributes();
 	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
@@ -852,6 +865,82 @@ async function runCycle(browser, outputDir) {
 		}
 	} else {
 		logDebug('Skipping stock_positions scrape (interval not reached or not enabled)');
+	}
+
+	// ======== BOND POSITIONS (from MySQL) ===========
+	const bondPositionsName = 'bond_positions';
+	const bondPositionsMarker = path.join('/usr/src/app/logs/', `last.${bondPositionsName}.txt`);
+	const bondPositionsSettings = getScrapeGroupSettings(bondPositionsName, 30); // default 30 min
+	if (shouldRunTask(bondPositionsSettings, bondPositionsMarker)) {
+		logDebug('Begin bond_positions scrape');
+		
+		// Query MySQL for list of bond positions
+		const bondPositions = await fetchBondPositions();
+		logDebug(`Found ${bondPositions.length} bond positions in database: ${bondPositions.map(p => p.symbol).join(', ')}`);
+		
+		if (bondPositions.length > 0) {
+			// Use round robin through constructible URLs for each bond position
+			for (const position of bondPositions) {
+				const { symbol, type } = position;
+				// Get list of potential sources using getConstructibleUrls
+				const constructibleUrls = getConstructibleUrls(symbol, type);
+				if (!constructibleUrls || constructibleUrls.length === 0) {
+					logDebug(`No constructible URLs for bond ${symbol}, skipping`);
+					continue;
+				}
+				
+				// Pick a random starting index for round robin
+				let currentIndex = Math.floor(Math.random() * constructibleUrls.length);
+				let scraped = false;
+				const startIndex = currentIndex;
+				
+				do {
+					const urlInfo = constructibleUrls[currentIndex];
+					const sourceName = urlInfo.source;
+					const scraperFunc = scraperMap[sourceName];
+					
+					if (scraperFunc) {
+						const sourceConfig = getConfig(sourceName);
+						
+						// Skip source if explicitly disabled
+						if (sourceConfig && sourceConfig.enabled === false) {
+							logDebug(`Skipping disabled source: ${sourceName}`);
+							currentIndex = (currentIndex + 1) % constructibleUrls.length;
+							continue;
+						}
+						
+						// Check if source supports bond prices
+						if (sourceConfig.has_bond_prices !== false) {
+							try {
+								// Create a security object with the URL
+								const security = {
+									key: symbol,
+									type: 'bond',
+									[sourceName]: urlInfo.url
+								};
+								logDebug(`Scraping bond ${symbol} with ${sourceName}: ${urlInfo.url}`);
+								const data = await scraperFunc(browser, security, outputDir);
+								logDebug(`${sourceName} scrape result for bond ${symbol}: ${JSON.stringify(data)}`);
+								scraped = true;
+								break; // Successfully scraped, move to next bond
+							} catch (e) {
+								logDebug(`Error scraping bond ${symbol} with ${sourceName}: ${e.message}`);
+							}
+						}
+					}
+					
+					currentIndex = (currentIndex + 1) % constructibleUrls.length;
+				} while (currentIndex !== startIndex && !scraped);
+				
+				if (!scraped) {
+					logDebug(`Could not scrape bond ${symbol} with any available source`);
+				}
+				
+				await new Promise(r => setTimeout(r, 1000));
+			}
+		}
+	} else {
+		logDebug('Skipping bond_positions scrape (interval not reached or not enabled)');
 	}
 
 	logDebug('Cycle complete.');
