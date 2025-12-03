@@ -182,12 +182,21 @@ th:first-child { background-color: #252525; z-index: 2; }
     100% { background-color: transparent; }
 }
 
+@keyframes flash-text-white {
+    0% { color: #ffffff; }
+    100% { color: #888888; }
+}
+
 .flash-positive {
     animation: flash-green 2s ease-out;
 }
 
 .flash-negative {
     animation: flash-red 2s ease-out;
+}
+
+.flash-text {
+    animation: flash-text-white 2s ease-out;
 }
 
 /* Tabs */
