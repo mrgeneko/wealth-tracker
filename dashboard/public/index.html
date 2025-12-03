@@ -411,6 +411,8 @@
         const socket = io();
         let currentPrices = {};
         let lastAssetsData = null;
+        let previousPrices = {}; // Store previous prices for comparison
+        let previousValues = {}; // Store previous values for comparison
         
         // --- Sorting State ---
         let investmentGridSort = { column: 'symbol', direction: 'asc' };
@@ -419,8 +421,13 @@
         // --- Socket.IO Listeners ---
         socket.on('price_update', (data) => {
             console.log('Price update received');
+            const oldPrices = { ...currentPrices };
             currentPrices = data;
-            if (lastAssetsData) renderAll();
+            
+            if (lastAssetsData) {
+                // Use in-place update for smoother animations
+                updateInvestmentGridInPlace('investment-grid', lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category), oldPrices);
+            }
         });
 
         socket.on('assets_update', (data) => {
@@ -473,7 +480,7 @@
                 ...(lastAssetsData.vehicles || []).map(a => ({...a, type: 'vehicle'}))
             ];
 
-            renderInvestmentGrid('investment-grid', investmentAccounts);
+            renderInvestmentGridWithFlashes('investment-grid', investmentAccounts, {});
             renderBankGrid('bank-grid', bankAccounts);
             renderAssetGrid('asset-grid', fixedAssets);
 
@@ -490,9 +497,9 @@
                     netWorth += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    // Assuming bonds are valued at face value or quantity for now if no price
-                    // Or if we have a price source for bonds
-                    netWorth += p.quantity; 
+                    const price = currentPrices[p.symbol]?.price || 0;
+                    // Bonds use price/100
+                    netWorth += p.quantity * (price / 100.0);
                 });
             });
 
@@ -500,7 +507,247 @@
             document.getElementById('last-updated').innerText = `Last Updated: ${new Date().toLocaleString()}`;
         }
 
+        // In-place update function for smooth animations
+        function updateInvestmentGridInPlace(tableId, accounts, oldPrices) {
+            if (!accounts || accounts.length === 0) return;
+            
+            // Collect all unique symbols
+            const allSymbols = new Set();
+            accounts.forEach(acc => {
+                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.symbol));
+                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.symbol));
+            });
+            
+            let grandTotalValueChange = 0;
+            
+            allSymbols.forEach(sym => {
+                const oldPriceData = oldPrices[sym];
+                const newPriceData = currentPrices[sym];
+                
+                if (!newPriceData) return;
+                
+                let price = newPriceData.price;
+                let changeVal = newPriceData.change || 0;
+                let changePct = newPriceData.change_percent || '0%';
+                let prevClose = price - changeVal;
+                let timeStr = '-';
+                let sourceStr = newPriceData.source || '-';
+                
+                if (newPriceData.time) {
+                    const d = new Date(newPriceData.time);
+                    if (!isNaN(d.getTime())) {
+                        timeStr = d.toLocaleString().replace(',', '');
+                    } else {
+                        timeStr = newPriceData.time;
+                    }
+                }
+                
+                let color = '#e0e0e0';
+                if (changeVal > 0) color = '#4caf50';
+                if (changeVal < 0) color = '#f44336';
+                
+                let changePctNum = 0;
+                if (changePct && changePct !== '0%') {
+                    changePctNum = parseFloat(changePct.replace('%', '').replace(',', '')) || 0;
+                }
+                
+                // Calculate totals for this symbol
+                let symTotalValue = 0;
+                let symTotalValueChange = 0;
+                
+                accounts.forEach(acc => {
+                    let pos = acc.holdings.stocks.find(p => p.symbol === sym);
+                    let isBond = false;
+                    if (!pos) {
+                        pos = acc.holdings.bonds.find(p => p.symbol === sym);
+                        if (pos) isBond = true;
+                    }
+                    
+                    if (pos) {
+                        let calcPrice = price;
+                        let calcChange = changeVal;
+                        if (isBond) {
+                            calcPrice = price / 100.0;
+                            calcChange = changeVal / 100.0;
+                        }
+                        
+                        const value = pos.quantity * calcPrice;
+                        symTotalValue += value;
+                        symTotalValueChange += pos.quantity * calcChange;
+                        
+                        // Update account cell in-place
+                        const cellId = `cell-${sym}-${acc.id}`;
+                        const cell = document.getElementById(cellId);
+                        if (cell) {
+                            const oldValue = previousValues[cellId] || 0;
+                            if (oldValue !== 0 && value !== oldValue) {
+                                applyFlash(cell, value > oldValue);
+                            }
+                            previousValues[cellId] = value;
+                            // Update cell content
+                            const clickableSpan = cell.querySelector('.clickable-cell');
+                            if (clickableSpan) {
+                                clickableSpan.innerHTML = `${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small>`;
+                            }
+                        }
+                    }
+                });
+                
+                grandTotalValueChange += symTotalValueChange;
+                
+                // Update price cell
+                const priceCell = document.getElementById(`price-${sym}`);
+                if (priceCell) {
+                    if (oldPriceData && oldPriceData.price !== 0 && price !== oldPriceData.price) {
+                        applyFlash(priceCell, price > oldPriceData.price);
+                    }
+                    priceCell.textContent = formatNumber(price);
+                }
+                
+                // Update change cell
+                const changeCell = document.getElementById(`change-${sym}`);
+                if (changeCell) {
+                    if (oldPriceData && oldPriceData.change !== undefined && changeVal !== oldPriceData.change) {
+                        applyFlash(changeCell, changeVal > oldPriceData.change);
+                    }
+                    changeCell.textContent = formatNumber(changeVal);
+                    changeCell.style.color = color;
+                }
+                
+                // Update change% cell
+                const changePctCell = document.getElementById(`changePct-${sym}`);
+                if (changePctCell) {
+                    if (oldPriceData) {
+                        const oldChangePctNum = parseFloat((oldPriceData.change_percent || '0%').replace('%', '').replace(',', '')) || 0;
+                        if (oldChangePctNum !== 0 && changePctNum !== oldChangePctNum) {
+                            applyFlash(changePctCell, changePctNum > oldChangePctNum);
+                        }
+                    }
+                    changePctCell.textContent = `${changePctNum.toFixed(3)}%`;
+                    changePctCell.style.color = color;
+                }
+                
+                // Update time cell (text flash)
+                const timeCell = document.getElementById(`time-${sym}`);
+                if (timeCell) {
+                    if (oldPriceData && oldPriceData.time !== newPriceData.time) {
+                        applyTextFlash(timeCell);
+                    }
+                    timeCell.textContent = timeStr;
+                }
+                
+                // Update source cell (text flash)
+                const sourceCell = document.getElementById(`source-${sym}`);
+                if (sourceCell) {
+                    if (oldPriceData && oldPriceData.source !== newPriceData.source) {
+                        applyTextFlash(sourceCell);
+                    }
+                    sourceCell.textContent = sourceStr;
+                }
+                
+                // Update value change cell
+                const valueChangeCell = document.getElementById(`valueChange-${sym}`);
+                if (valueChangeCell) {
+                    const oldValueChange = previousValues[`valueChange-${sym}`] || 0;
+                    if (oldValueChange !== 0 && symTotalValueChange !== oldValueChange) {
+                        applyFlash(valueChangeCell, symTotalValueChange > oldValueChange);
+                    }
+                    previousValues[`valueChange-${sym}`] = symTotalValueChange;
+                    valueChangeCell.textContent = formatNumber(symTotalValueChange);
+                    valueChangeCell.style.color = color;
+                }
+                
+                // Update total cell
+                const totalCell = document.getElementById(`total-${sym}`);
+                if (totalCell) {
+                    const oldTotal = previousValues[`total-${sym}`] || 0;
+                    if (oldTotal !== 0 && symTotalValue !== oldTotal) {
+                        applyFlash(totalCell, symTotalValue > oldTotal);
+                    }
+                    previousValues[`total-${sym}`] = symTotalValue;
+                    totalCell.textContent = formatNumber(symTotalValue, 0);
+                }
+            });
+            
+            // Calculate grand total for all accounts and update account totals
+            let grandTotal = 0;
+            accounts.forEach(acc => {
+                let accTotal = 0;
+                if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                acc.holdings.stocks.forEach(p => {
+                    const priceData = currentPrices[p.symbol];
+                    let price = priceData?.price || 0;
+                    accTotal += p.quantity * price;
+                });
+                acc.holdings.bonds.forEach(p => {
+                    const priceData = currentPrices[p.symbol];
+                    let price = priceData?.price || 0;
+                    // Bonds use price/100
+                    accTotal += p.quantity * (price / 100.0);
+                });
+                grandTotal += accTotal;
+                
+                // Update account total cell in Total row
+                const accTotalCell = document.getElementById(`total-row-acc-${acc.id}`);
+                if (accTotalCell) {
+                    accTotalCell.textContent = formatNumber(accTotal);
+                }
+            });
+            
+            // Update Total row Value Change cell
+            const totalRowValueChangeCell = document.getElementById('total-row-value-change');
+            if (totalRowValueChangeCell) {
+                let totalChangeColor = '#e0e0e0';
+                if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
+                if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
+                totalRowValueChangeCell.textContent = formatNumber(grandTotalValueChange);
+                totalRowValueChangeCell.style.color = totalChangeColor;
+            }
+            
+            // Update Total row Grand Total cell
+            const totalRowGrandTotalCell = document.getElementById('total-row-grand-total');
+            if (totalRowGrandTotalCell) {
+                totalRowGrandTotalCell.textContent = formatNumber(grandTotal, 0);
+            }
+            
+            // Update Total Net Worth (includes fixed assets and bank accounts)
+            let netWorth = grandTotal;
+            // Add fixed assets
+            if (lastAssetsData) {
+                (lastAssetsData.real_estate || []).forEach(a => netWorth += a.value);
+                (lastAssetsData.vehicles || []).forEach(a => netWorth += a.value);
+                // Add bank accounts
+                lastAssetsData.accounts.filter(a => a.category === 'bank').forEach(acc => {
+                    if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
+                });
+            }
+            document.getElementById('total-net-worth').innerText = `Total Net Worth: $${formatNumber(netWorth)}`;
+            
+            // Update last updated timestamp
+            document.getElementById('last-updated').innerText = `Last Updated: ${new Date().toLocaleString()}`;
+        }
+        
+        // Helper function to apply background flash animation
+        function applyFlash(element, isPositive) {
+            element.classList.remove('flash-positive', 'flash-negative');
+            // Force reflow to restart animation
+            void element.offsetWidth;
+            element.classList.add(isPositive ? 'flash-positive' : 'flash-negative');
+        }
+        
+        // Helper function to apply text flash animation
+        function applyTextFlash(element) {
+            element.classList.remove('flash-text');
+            // Force reflow to restart animation
+            void element.offsetWidth;
+            element.classList.add('flash-text');
+        }
+
         function renderInvestmentGrid(tableId, accounts) {
+            renderInvestmentGridWithFlashes(tableId, accounts, {});
+        }
+
+        function renderInvestmentGridWithFlashes(tableId, accounts, oldPrices) {
             const gridTable = document.getElementById(tableId);
             const thead = gridTable.querySelector('thead');
             const tbody = gridTable.querySelector('tbody');
@@ -598,13 +845,39 @@
                         const posType = isBond ? 'bond' : 'stock';
                         const posData = { id: pos.id, account_id: acc.id, symbol: pos.symbol, type: posType, quantity: pos.quantity };
                         const posJson = escapeHtml(JSON.stringify(posData));
-                        rowHtml += `<td><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
+                        
+                        // Check for value changes and apply flash animations
+                        const cellId = `cell-${sym}-${acc.id}`;
+                        let flashClass = '';
+                        
+                        // Check if this cell value has changed
+                        const oldValue = previousValues[cellId] || 0;
+                        const newValue = value;
+                        if (oldValue !== 0 && newValue !== oldValue) {
+                            flashClass = newValue > oldValue ? 'flash-positive' : 'flash-negative';
+                        }
+                        previousValues[cellId] = newValue;
+                        
+                        rowHtml += `<td id="${cellId}" class="${flashClass}"><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
                     } else {
                         const addPosData = { account_id: acc.id, symbol: sym, type: 'stock', quantity: 0 };
                         const addPosJson = escapeHtml(JSON.stringify(addPosData));
                         rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
                     }
                 });
+                
+                // Check for price changes and apply flash animations
+                const priceCellId = `price-${sym}`;
+                const oldPriceData = oldPrices[sym];
+                let priceFlashClass = '';
+                
+                if (oldPriceData && currentPrices[sym]) {
+                    const oldPrice = oldPriceData.price;
+                    const newPrice = currentPrices[sym].price;
+                    if (oldPrice !== 0 && newPrice !== oldPrice) {
+                        priceFlashClass = newPrice > oldPrice ? 'flash-positive' : 'flash-negative';
+                    }
+                }
                 
                 // Parse changePct to number for sorting
                 let changePctNum = 0;
@@ -616,14 +889,84 @@
                 rowInfo.total = symTotalValue;
                 
                 rowHtml += `<td>${formatNumber(prevClose)}</td>`;
-                rowHtml += `<td>${formatNumber(price)}</td>`;
-                rowHtml += `<td style="color: ${color}">${formatNumber(changeVal)}</td>`;
-                rowHtml += `<td style="color: ${color}">${changePctNum.toFixed(3)}%</td>`;
-                rowHtml += `<td style="font-size: 0.50em; color: #888;">${timeStr}</td>`;
-                rowHtml += `<td style="font-size: 0.50em; color: #888;">${sourceStr}</td>`;
+                rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
+                
+                // Check for change and change% column changes
+                const changeCellId = `change-${sym}`;
+                const changePctCellId = `changePct-${sym}`;
+                let changeFlashClass = '';
+                let changePctFlashClass = '';
+                
+                if (oldPriceData && currentPrices[sym]) {
+                    const oldChange = oldPriceData.change || 0;
+                    const newChange = changeVal;
+                    if (oldChange !== 0 && newChange !== oldChange) {
+                        changeFlashClass = newChange > oldChange ? 'flash-positive' : 'flash-negative';
+                    }
+                    
+                    const oldChangePct = oldPriceData.change_percent || '0%';
+                    const newChangePct = changePct;
+                    if (oldChangePct !== '0%' && newChangePct !== oldChangePct) {
+                        const oldChangePctNum = parseFloat(oldChangePct.replace('%', '').replace(',', '')) || 0;
+                        const newChangePctNum = changePctNum;
+                        if (oldChangePctNum !== 0 && newChangePctNum !== oldChangePctNum) {
+                            changePctFlashClass = newChangePctNum > oldChangePctNum ? 'flash-positive' : 'flash-negative';
+                        }
+                    }
+                }
+                
+                rowHtml += `<td id="${changeCellId}" class="${changeFlashClass}" style="color: ${color}">${formatNumber(changeVal)}</td>`;
+                rowHtml += `<td id="${changePctCellId}" class="${changePctFlashClass}" style="color: ${color}">${changePctNum.toFixed(3)}%</td>`;
+                
+                // Check for time and source changes (text flash)
+                const timeCellId = `time-${sym}`;
+                const sourceCellId = `source-${sym}`;
+                let timeFlashClass = '';
+                let sourceFlashClass = '';
+                
+                if (oldPriceData && currentPrices[sym]) {
+                    const oldTime = oldPriceData.time || '-';
+                    const newTime = timeStr;
+                    const oldSource = oldPriceData.source || '-';
+                    const newSource = sourceStr;
+                    
+                    if (oldTime !== newTime) {
+                        timeFlashClass = 'flash-text';
+                    }
+                    if (oldSource !== newSource) {
+                        sourceFlashClass = 'flash-text';
+                    }
+                }
+                
+                rowHtml += `<td id="${timeCellId}" class="${timeFlashClass}" style="font-size: 0.50em; color: #888;">${timeStr}</td>`;
+                rowHtml += `<td id="${sourceCellId}" class="${sourceFlashClass}" style="font-size: 0.50em; color: #888;">${sourceStr}</td>`;
+                
                 grandTotalValueChange += symTotalValueChange;
-                rowHtml += `<td style="color: ${color}">${formatNumber(symTotalValueChange)}</td>`;
-                rowHtml += `<td class="row-total">${formatNumber(symTotalValue, 0)}</td></tr>`;
+                
+                // Check for value change and total changes
+                const valueChangeCellId = `valueChange-${sym}`;
+                const totalCellId = `total-${sym}`;
+                let valueChangeFlashClass = '';
+                let totalFlashClass = '';
+                
+                if (oldPriceData && currentPrices[sym]) {
+                    const oldValueChange = previousValues[valueChangeCellId] || 0;
+                    const newValueChange = symTotalValueChange;
+                    if (oldValueChange !== 0 && newValueChange !== oldValueChange) {
+                        valueChangeFlashClass = newValueChange > oldValueChange ? 'flash-positive' : 'flash-negative';
+                    }
+                    previousValues[valueChangeCellId] = newValueChange;
+                    
+                    const oldTotal = previousValues[totalCellId] || 0;
+                    const newTotal = symTotalValue;
+                    if (oldTotal !== 0 && newTotal !== oldTotal) {
+                        totalFlashClass = newTotal > oldTotal ? 'flash-positive' : 'flash-negative';
+                    }
+                    previousValues[totalCellId] = newTotal;
+                }
+                
+                rowHtml += `<td id="${valueChangeCellId}" class="${valueChangeFlashClass}" style="color: ${color}">${formatNumber(symTotalValueChange)}</td>`;
+                rowHtml += `<td id="${totalCellId}" class="${totalFlashClass} row-total">${formatNumber(symTotalValue, 0)}</td></tr>`;
                 
                 rowInfo.html = rowHtml;
                 rowData.push(rowInfo);
@@ -679,17 +1022,20 @@
                     const price = currentPrices[p.symbol]?.price || 0;
                     accTotal += p.quantity * price;
                 });
-                acc.holdings.bonds.forEach(p => accTotal += p.quantity); // Assuming face value for bonds if no price
+                acc.holdings.bonds.forEach(p => {
+                    const price = currentPrices[p.symbol]?.price || 0;
+                    accTotal += p.quantity * (price / 100.0);
+                });
                 grandTotal += accTotal;
-                totalRowHtml += `<td>${formatNumber(accTotal)}</td>`;
+                totalRowHtml += `<td id="total-row-acc-${acc.id}">${formatNumber(accTotal)}</td>`;
             });
             let totalChangeColor = '#e0e0e0';
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
             totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td>';
-            totalRowHtml += `<td style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
-            totalRowHtml += `<td>${formatNumber(grandTotal, 0)}</td></tr>`;
+            totalRowHtml += `<td id="total-row-value-change" style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
+            totalRowHtml += `<td id="total-row-grand-total">${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
 
               // Removed Add Position Buttons row
