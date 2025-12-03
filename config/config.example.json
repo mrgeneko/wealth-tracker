@@ -5,6 +5,7 @@
     "yahoo_batch": { "interval": 60, "enabled": true },
     "tradingview_watchlists": { "interval": 45, "enabled": false },
     "stocks_etfs": { "interval": 90, "enabled": true },
+    "stock_positions": { "interval": 30, "enabled": true },
     "bonds": { "interval": 240, "enabled": true },
     "us_listings": { "interval": 1440, "enabled": true }
   },
