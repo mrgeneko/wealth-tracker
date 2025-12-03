@@ -7,7 +7,7 @@ LOG_DIR=${1:-/usr/src/app/logs}
 RETENTION_DAYS=${2:-7}
 COMP_LEVEL=${3:-1}
 LOOP_SECONDS=${4:-300}
-ARCHIVE_AGE_MIN=${5:-60}
+ARCHIVE_AGE_MIN=${5:-720}
 
 LOCKDIR="$LOG_DIR/.rotate_lock"
 
