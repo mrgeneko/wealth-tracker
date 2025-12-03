@@ -65,6 +65,9 @@ async function scrapeGoogle(browser, security, outputDir) {
 		let regular_change_percent = '';
 		let previous_close_price = '';
 		let after_hours_price = '';
+		let after_hours_change_decimal = '';
+		let after_hours_change_percent = '';
+		let after_hours_price_quote_time = '';
 		let pre_market_price = '';
 		let pre_market_price_change_decimal = '';
 		let pre_market_price_change_percent = '';
@@ -124,6 +127,17 @@ async function scrapeGoogle(browser, security, outputDir) {
 								}
 							}
 							after_hours_change_percent = percent_val.toString();
+						}
+						// Extract after hours quote time
+						const time_div = ext_hours_section.next('[jsname="Vebqub"]');
+						if (time_div.length) {
+							const raw_time = time_div.text();
+							// Format: "Closed: Dec 2, 6:16:40 PM GMT-5 · USD · ..."
+							const parts = raw_time.split('·');
+							if (parts.length > 0) {
+								let t = parts[0].replace('Closed:', '').replace('As of', '').trim();
+								after_hours_price_quote_time = parseToIso(t);
+							}
 						}
 					} else if (ext_hours_section.text().startsWith('Pre-market')) {
 						pre_market_price = ext_price.text().replace('$', '').replace(',', '').trim();
@@ -192,14 +206,17 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"regular_last_price" : regular_last_price,
 			"regular_change_decimal" : regular_change_decimal,
 			"regular_change_percent" : regular_change_percent,
+			regular_quote_time: typeof regular_quote_time !== 'undefined' ? parseToIso(regular_quote_time) : '',
 			"previous_close_price" : previous_close_price,
 			"after_hours_price" : after_hours_price,
+			"after_hours_change_decimal" : after_hours_change_decimal,
+			"after_hours_change_percent" : after_hours_change_percent,
+			"after_hours_price_quote_time" : after_hours_price_quote_time,
 			"pre_market_price" : pre_market_price,
 			"pre_market_price_change_decimal": pre_market_price_change_decimal,
 			"pre_market_price_change_percent": pre_market_price_change_percent,
 			source: 'google_finance',
-			capture_time: new Date().toISOString(),
-			regular_quote_time: typeof regular_quote_time !== 'undefined' ? parseToIso(regular_quote_time) : ''
+			capture_time: new Date().toISOString()
 		};
 
 		logDebug('Google Finance data: ' + JSON.stringify(data));
