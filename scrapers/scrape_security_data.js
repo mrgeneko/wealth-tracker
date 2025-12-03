@@ -421,6 +421,28 @@ async function runCycle(browser, outputDir) {
 //		return;
 //	}
 
+	// ======== US LISTINGS UPDATE ===========
+	const usListingsName = 'us_listings';
+	const usListingsMarker = path.join('/usr/src/app/logs', `last.${usListingsName}.txt`);
+	const attrs = loadScraperAttributes();
+	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
+	const usListingsConfig = groups[usListingsName] || {};
+	const usListingsInterval = typeof usListingsConfig.interval === 'number' ? usListingsConfig.interval : 1440;
+	const usListingsEnabled = usListingsConfig.enabled === true;
+	const usListingsSettings = getScrapeGroupSettings(usListingsName, usListingsInterval);
+	if (usListingsEnabled && shouldRunTask(usListingsSettings, usListingsMarker)) {
+		logDebug('Begin US listings update');
+		try {
+			const { execSync } = require('child_process');
+			execSync('node /usr/src/app/scripts/update_exchange_data.js update', { stdio: 'inherit' });
+			logDebug('US listings update script executed successfully');
+		} catch (e) {
+			logDebug('Error running US listings update script: ' + (e && e.message ? e.message : e));
+		}
+	} else {
+		logDebug('Skipping US listings update (interval not reached or not enabled)');
+	}
+
 	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingWatchlistsName = 'investing_watchlists'
 	// use the name variable for the filename so it's consistent and easy to change
