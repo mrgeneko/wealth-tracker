@@ -243,11 +243,15 @@ The system persists the latest price updates to a MySQL database in the `latest_
 | :--- | :--- | :--- |
 | `ticker` | `VARCHAR(50)` | Primary Key. The stock symbol (e.g., "AAPL", "US500"). |
 | `price` | `DECIMAL(18, 4)` | The current price. |
-| `change_decimal` | `DECIMAL(18, 4)` | The price change value. |
-| `change_percent` | `VARCHAR(20)` | The percentage change (e.g., "+0.56%"). |
-| `source` | `VARCHAR(50)` | The data source (e.g., "investing"). |
-| `capture_time` | `DATETIME` | The timestamp when the price was captured. |
+| `previous_close_price` | `DECIMAL(18, 4)` | The previous day's closing price. |
+| `source` | `VARCHAR(50)` | The data source (e.g., "investing (regular)"). |
+| `quote_time` | `DATETIME` | The timestamp of the quote from the source. |
+| `capture_time` | `DATETIME` | The timestamp when the price was captured by the scraper. |
 | `updated_at` | `TIMESTAMP` | Automatically updated timestamp of the record modification. |
+
+**Note:** The dashboard calculates Change and Change % dynamically:
+- **Change** = Price - Previous Close
+- **Change %** = (Price - Previous Close) / Previous Close × 100
 
 ---
 ## Development notes
@@ -255,6 +259,64 @@ The system persists the latest price updates to a MySQL database in the `latest_
 - The scrapers publish messages via `publish_to_kafka.js` using the `KAFKA_BROKERS` environment variable.
 - To run locally (without Docker) you must have a compatible Chrome and Node.js environment; most development and testing occurs inside the container for environment parity.
 If you run the scrapers outside Docker, set `KAFKA_BROKERS` to a reachable broker list (for example `localhost:9092` when running Kafka locally). Inside Docker Compose use the service DNS name (for example `kafka:9092`).
+
+---
+## Scrape Groups
+
+The scraper daemon supports configurable scrape groups in `config.json`. Each group has an `interval` (minutes) and `enabled` flag:
+
+```json
+{
+  "scrape_groups": {
+    "investing_watchlists": { "interval": 1, "enabled": true },
+    "yahoo_batch": { "interval": 30, "enabled": true },
+    "stock_positions": { "interval": 30, "enabled": true },
+    "bond_positions": { "interval": 30, "enabled": true },
+    "bonds": { "interval": 240, "enabled": true },
+    "us_listings": { "interval": 1440, "enabled": true }
+  }
+}
+```
+
+### Available Scrape Groups
+
+| Group | Description |
+| :--- | :--- |
+| `investing_watchlists` | Scrapes Investing.com watchlist pages |
+| `yahoo_batch` | Batch fetches prices from Yahoo Finance API |
+| `tradingview_watchlists` | Scrapes TradingView watchlist pages |
+| `stocks_etfs` | Scrapes individual stock/ETF pages from configured sources |
+| `stock_positions` | **Queries MySQL** for positions with type 'stock' or 'etf', then scrapes prices using round-robin source selection |
+| `bond_positions` | **Queries MySQL** for positions with type 'bond', then scrapes prices (currently uses Webull bond quotes) |
+| `bonds` | Scrapes bond prices from configured sources |
+| `us_listings` | Updates NYSE/NASDAQ exchange listings for ticker lookup |
+
+The `stock_positions` and `bond_positions` groups dynamically query the database for your actual holdings, ensuring prices are fetched for securities you own without manual configuration.
+
+---
+## Dashboard Features
+
+The dashboard provides real-time portfolio tracking with the following features:
+
+### Investment Accounts Table
+- **Flash Animations**: Price, Change, and Value columns flash green/red when values change
+- **Prev Close Column**: Shows previous day's closing price from source data
+- **Change/Change %**: Calculated dynamically from Price and Prev Close
+- **Sortable Columns**: Click column headers to sort by Symbol, Change %, Value Change, or Total
+- **Draggable Columns**: Drag account column headers to reorder accounts
+- **Click to Edit**: Click any cell to edit position quantity
+
+### Add Position Modal
+When clicking the "+" button in an empty cell:
+- Symbol, Type, and Account are displayed as read-only labels (not editable)
+- Only the Quantity field is editable
+- The Account field shows the account name for the column where "+" was clicked
+
+### Real-Time Updates
+- Price data streams via Socket.IO from Kafka
+- In-place cell updates preserve CSS animations
+- Net Worth and Total row update automatically
+
 ---
 ## Troubleshooting
 - Chrome launch/connect failures:
