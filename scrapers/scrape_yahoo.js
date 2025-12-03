@@ -131,6 +131,7 @@ function mapYahooQuoteToData(quote, securityKey) {
     regular_last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
     regular_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
     regular_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
+    regular_quote_time: qm ? new Date(qm).toISOString() : '',
     previous_close_price: (p.regularMarketPreviousClose != null) ? String(p.regularMarketPreviousClose) : '',
     after_hours_price: (p.postMarketPrice != null) ? String(p.postMarketPrice) : '',
     after_hours_change_decimal: (p.postMarketChange != null) ? String(p.postMarketChange) : '',
@@ -138,9 +139,8 @@ function mapYahooQuoteToData(quote, securityKey) {
     pre_market_price: (p.preMarketPrice != null) ? String(p.preMarketPrice) : '',
     pre_market_price_change_decimal: (p.preMarketChange != null) ? String(p.preMarketChange) : '',
     pre_market_price_change_percent: (p.preMarketChangePercent != null) ? (String(p.preMarketChangePercent) + '%') : '',
-    source: 'yahoo_finance',
-    capture_time: new Date().toISOString(),
-    quote_time: qm ? new Date(qm).toISOString() : ''
+    source: 'yahoo',
+    capture_time: new Date().toISOString()
   };
 }
 

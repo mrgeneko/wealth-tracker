@@ -109,7 +109,7 @@ def process_message(data):
         return time(9, 30) <= t < time(16, 0)
 
     # Parse capture_time
-    capture_time_str = data.get('capture_time') or data.get('regular_last_price_quote_time')
+    capture_time_str = data.get('capture_time') or data.get('regular_quote_time')
     capture_time = datetime.now(ZoneInfo('UTC'))
     if capture_time_str:
         try:
