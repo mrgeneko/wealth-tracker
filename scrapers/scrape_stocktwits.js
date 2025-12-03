@@ -78,6 +78,7 @@ function parseStocktwitsHtml(html, security) {
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
   let regular_time = '';
+  let after_hours_time = '';
 
   try {
     // 1. Try to find the embedded JSON data first (most reliable)
@@ -139,9 +140,12 @@ function parseStocktwitsHtml(html, security) {
             // Extended hours
             const extPrice = extractVal('ExtendedHoursPrice');
             if (extPrice) {
-                after_hours_price = cleanNumberText(extPrice);
-                after_hours_change_decimal = cleanNumberText(extractVal('ExtendedHoursChange'));
-                after_hours_change_percent = cleanNumberText(extractVal('ExtendedHoursPercentChange'));
+              after_hours_price = cleanNumberText(extPrice);
+              after_hours_change_decimal = cleanNumberText(extractVal('ExtendedHoursChange'));
+              after_hours_change_percent = cleanNumberText(extractVal('ExtendedHoursPercentChange'));
+              // Extract after-hours time if available
+              const extTime = extractVal('ExtendedHoursDateTime');
+              if (extTime) after_hours_time = extTime;
             }
             
             // Time
@@ -205,7 +209,8 @@ function parseStocktwitsHtml(html, security) {
     after_hours_change_percent: after_hours_change_percent || '',
     source: 'stocktwits',
     capture_time: new Date().toISOString(),
-    regular_time: parseToIso(regular_time) || ''
+    regular_time: parseToIso(regular_time) || '',
+    after_hours_time: parseToIso(after_hours_time) || ''
   };
 }
 
