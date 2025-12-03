@@ -72,29 +72,29 @@ function parseStockAnalysisHtml(html, security) {
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
   
   let regular_last_price = '';
-  let regular_quote_time = '';
+  let regular_time = '';
   let previous_close_price = '';
   let pre_market_price = '';
   let pre_market_price_change_decimal = '';
   let pre_market_price_change_percent = '';
-  let pre_market_price_quote_time = '';
+  let pre_market_time = '';
   let regular_change_decimal = '';
   let regular_change_percent = '';
   let after_hours_price = '';
   let after_hours_change_decimal = '';
   let after_hours_change_percent = '';
-  let after_hours_price_quote_time = '';
+  let after_hours_time = '';
 
   try {
     const mainPriceEl = $('[class*="text-4xl"]').first();
     if (mainPriceEl && mainPriceEl.length) {
       regular_last_price = cleanNumberText(mainPriceEl.text());
-      // Extract regular_quote_time
+      // Extract regular_time
       // Look for sibling div with "At close:"
       const timeContainer = mainPriceEl.parent().find('div').filter((i, el) => $(el).text().includes('At close:')).first();
       if (timeContainer && timeContainer.length) {
         const text = timeContainer.text().replace('At close:', '').trim();
-        if (text) regular_quote_time = parseToIso(text);
+        if (text) regular_time = parseToIso(text);
       }
     }
 
@@ -165,7 +165,7 @@ function parseStockAnalysisHtml(html, security) {
       if (timeContainer && timeContainer.length) {
         const fullText = timeContainer.text();
         const timeText = fullText.split('Pre-market:')[1];
-        if (timeText) pre_market_price_quote_time = parseToIso(timeText.trim());
+        if (timeText) pre_market_time = parseToIso(timeText.trim());
       }
 
       // Extract price and change
@@ -220,7 +220,7 @@ function parseStockAnalysisHtml(html, security) {
       if (timeContainer && timeContainer.length) {
         const fullText = timeContainer.text();
         const parts = fullText.split('After-hours:');
-        if (parts.length > 1) after_hours_price_quote_time = parseToIso(parts[1].trim());
+        if (parts.length > 1) after_hours_time = parseToIso(parts[1].trim());
       }
 
       let container = afterLabel.parents().filter((i, el) => {
@@ -270,21 +270,20 @@ function parseStockAnalysisHtml(html, security) {
   return {
     key: ticker,
     regular_last_price: regular_last_price || '',
-    regular_quote_time: regular_quote_time || '',
+    regular_time: regular_time || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',
     pre_market_price: pre_market_price || '',
     pre_market_price_change_decimal: pre_market_price_change_decimal || '',
     pre_market_price_change_percent: pre_market_price_change_percent || '',
-    pre_market_price_quote_time: pre_market_price_quote_time || '',
+    pre_market_time: pre_market_time || '',
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
-    after_hours_price_quote_time: after_hours_price_quote_time || '',
+    after_hours_time: after_hours_time || '',
     source: 'stockanalysis',
-    capture_time: new Date().toISOString(),
-    quote_time: ''
+    capture_time: new Date().toISOString()
   };
 }
 

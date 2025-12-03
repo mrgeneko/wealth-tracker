@@ -20,7 +20,7 @@ def main():
         "regular_last_price": "123.45",
         "source": "test",
         "previous_price": "120.00",
-        "regular_quote_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "regular_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "capture_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "note": "this is a test message"
     }

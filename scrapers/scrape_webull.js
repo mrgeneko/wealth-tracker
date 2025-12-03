@@ -47,11 +47,11 @@ async function scrapeWebull(browser, security, outputDir) {
         let after_hours_price = '';
         let after_hours_change_decimal = '';
         let after_hours_change_percent = '';
-        let after_hours_price_quote_time = '';
+        let after_hours_time = '';
         let pre_market_price = '';
         let pre_market_price_change_decimal = '';
         let pre_market_price_change_percent = '';
-        let regular_quote_time = '';
+        let regular_time = '';
 
         // Detect bond or stock by presence of 'YIELD' and 'MATURITY' in HTML
         // Note: This logic is largely redundant as both branches use the same JSON extraction logic
@@ -88,7 +88,7 @@ async function scrapeWebull(browser, security, outputDir) {
                                 }
 
                                 if (rt.tradeTime) {
-                                    regular_quote_time = parseToIso(rt.tradeTime);
+                                    regular_time = parseToIso(rt.tradeTime);
                                 }
                                 foundJson = true;
                             }
@@ -137,7 +137,7 @@ async function scrapeWebull(browser, security, outputDir) {
                             // Set year to current year as it's missing in the string
                             const now = DateTime.now().setZone('America/New_York');
                             const finalDt = dt.set({ year: now.year });
-                            after_hours_price_quote_time = finalDt.toUTC().toISO();
+                            after_hours_time = finalDt.toUTC().toISO();
                         }
                     }
                 }
@@ -152,11 +152,11 @@ async function scrapeWebull(browser, security, outputDir) {
             regular_last_price,
             regular_change_decimal,
             regular_change_percent,
-            regular_quote_time,
+            regular_time,
             after_hours_price,
             after_hours_change_decimal,
             after_hours_change_percent,
-            after_hours_price_quote_time,
+            after_hours_time,
             pre_market_price,
             pre_market_price_change_decimal,
             pre_market_price_change_percent,

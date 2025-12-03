@@ -148,7 +148,7 @@ function parseMarketWatchHtml(html, security) {
     after_hours_price: '',
     after_hours_change_decimal: '',
     after_hours_change_percent: '',
-    regular_quote_time: '',
+    regular_time: '',
     source: 'marketwatch',
     capture_time: new Date().toISOString(),
   };
@@ -165,7 +165,7 @@ function parseMarketWatchHtml(html, security) {
     if (price) data.regular_last_price = cleanNumberText(price);
     if (priceChange) data.regular_change_decimal = cleanNumberText(priceChange);
     if (priceChangePercent) data.regular_change_percent = cleanNumberText(priceChangePercent);
-    if (quoteTime) data.regular_quote_time = parseToIso(quoteTime);
+    if (quoteTime) data.regular_time = parseToIso(quoteTime);
 
     // Previous Close
     // Look for table cell with "Previous Close" header
@@ -199,7 +199,7 @@ function parseMarketWatchHtml(html, security) {
   }
 
   // For backward compatibility, also set quote_time
-  data.quote_time = data.regular_quote_time;
+  data.quote_time = data.regular_time;
   return data;
 }
 
