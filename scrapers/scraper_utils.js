@@ -586,9 +586,26 @@ async function savePageSnapshot(page, basePath) {
     }
 }
 
-function getConstructibleUrls(ticker) {
+/**
+ * Get constructible scraper URLs for a given ticker
+ * @param {string} ticker - The ticker symbol (e.g., 'AAPL' for stocks, '91282CGA3' for bonds)
+ * @param {string} [type='stock'] - The position type: 'stock', 'etf', or 'bond'
+ * @returns {Array<{source: string, url: string}>} Array of source/url pairs
+ */
+function getConstructibleUrls(ticker, type = 'stock') {
     if (!ticker) return [];
     
+    const normalizedType = String(type).toLowerCase();
+    
+    // Handle bonds separately
+    if (normalizedType === 'bond') {
+        const bondTicker = String(ticker).toUpperCase();
+        return [
+            { source: 'webull', url: `https://www.webull.com/quote/bond-${bondTicker}` }
+        ];
+    }
+    
+    // Stock/ETF logic (existing behavior)
     // Normalize ticker: ensure uppercase and use dot separator for these domains
     // e.g. BRK-B -> BRK.B
     const normalizedTicker = String(ticker).toUpperCase().replace(/-/g, '.');
@@ -596,7 +613,7 @@ function getConstructibleUrls(ticker) {
     
     const urls = [
         { source: 'cnbc', url: `https://www.cnbc.com/quotes/${normalizedTicker}` },
-        { source: 'moomoo', url: `https://www.moomoo.com/stock/${normalizedTicker}-US` },
+        //{ source: 'moomoo', url: `https://www.moomoo.com/stock/${normalizedTicker}-US` },
         { source: 'robinhood', url: `https://robinhood.com/us/en/stocks/${normalizedTicker}/` },
         { source: 'stocktwits', url: `https://stocktwits.com/symbol/${normalizedTicker}` },
         { source: 'ycharts', url: `https://ycharts.com/companies/${normalizedTicker}` }
