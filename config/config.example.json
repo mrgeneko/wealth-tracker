@@ -8,7 +8,8 @@
     "stock_positions": { "interval": 30, "enabled": true },
     "bond_positions": { "interval": 30, "enabled": true },
     "bonds": { "interval": 240, "enabled": true },
-    "us_listings": { "interval": 1440, "enabled": true }
+    "us_listings": { "interval": 1440, "enabled": true },
+    "us_treasury_listings": { "interval": 1440, "enabled": true }
   },
   "investing_watchlists": {
     "url": "https://www.investing.com/portfolio/?portfolioID=YOUR_PORTFOLIO_ID_HERE",
