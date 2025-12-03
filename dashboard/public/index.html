@@ -610,6 +610,12 @@
                     priceCell.textContent = formatNumber(price);
                 }
                 
+                // Update prevClose cell
+                const prevCloseCell = document.getElementById(`prevClose-${sym}`);
+                if (prevCloseCell) {
+                    prevCloseCell.textContent = formatNumber(prevClose);
+                }
+                
                 // Update change cell
                 const changeCell = document.getElementById(`change-${sym}`);
                 if (changeCell) {
@@ -808,6 +814,7 @@
                     changePct = currentPrices[sym].change_percent || '0%';
                     changeVal = currentPrices[sym].change || 0;
                     prevClose = price - changeVal;
+                    console.log(`[PrevClose] ${sym}: price=${price}, changeVal=${changeVal}, prevClose=${prevClose}`);
                     
                     if (currentPrices[sym].time) {
                         const d = new Date(currentPrices[sym].time);
@@ -900,7 +907,7 @@
                 rowInfo.valueChange = symTotalValueChange;
                 rowInfo.total = symTotalValue;
                 
-                rowHtml += `<td>${formatNumber(prevClose)}</td>`;
+                rowHtml += `<td id="prevClose-${sym}">${formatNumber(prevClose)}</td>`;
                 rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
                 
                 // Check for change and change% column changes
