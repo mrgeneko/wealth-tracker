@@ -15,3 +15,7 @@ config.json
 20251*.json
 20251*.png
 20251*.html
+nasdaq-listed.csv.*
+nyse-listed.csv.*
+
+
