@@ -1,4 +1,4 @@
-    <!-- Add Symbol Modal -->
+<!-- Add Symbol Modal -->
     <div id="addSymbolModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('addSymbolModal')">&times;</span>
@@ -536,7 +536,13 @@
                 if (newPriceData.time) {
                     const d = new Date(newPriceData.time);
                     if (!isNaN(d.getTime())) {
-                        timeStr = d.toLocaleString().replace(',', '');
+                        // Format as 'M/D HH:mm:ss'
+                        const month = d.getMonth() + 1;
+                        const day = d.getDate();
+                        const hours = d.getHours().toString().padStart(2, '0');
+                        const minutes = d.getMinutes().toString().padStart(2, '0');
+                        const seconds = d.getSeconds().toString().padStart(2, '0');
+                        timeStr = `${month}/${day} ${hours}:${minutes}:${seconds}`;
                     } else {
                         timeStr = newPriceData.time;
                     }
@@ -806,7 +812,13 @@
                     if (currentPrices[sym].time) {
                         const d = new Date(currentPrices[sym].time);
                         if (!isNaN(d.getTime())) {
-                            timeStr = d.toLocaleString().replace(',', '');
+                            // Format as 'M/D HH:mm:ss'
+                            const month = d.getMonth() + 1;
+                            const day = d.getDate();
+                            const hours = d.getHours().toString().padStart(2, '0');
+                            const minutes = d.getMinutes().toString().padStart(2, '0');
+                            const seconds = d.getSeconds().toString().padStart(2, '0');
+                            timeStr = `${month}/${day} ${hours}:${minutes}:${seconds}`;
                         } else {
                             timeStr = currentPrices[sym].time;
                         }
