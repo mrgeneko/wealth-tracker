@@ -1,12 +1,12 @@
 {
-{
   "single_security_mode": "round_robin",
   "scrape_groups": {
     "investing_watchlists": { "interval": 3, "enabled": true },
     "yahoo_batch": { "interval": 60, "enabled": true },
     "tradingview_watchlists": { "interval": 45, "enabled": false },
     "stocks_etfs": { "interval": 90, "enabled": true },
-    "bonds": { "interval": 240, "enabled": true }
+    "bonds": { "interval": 240, "enabled": true },
+    "us_listings": { "interval": 1440, "enabled": true }
   },
   "investing_watchlists": {
     "url": "https://www.investing.com/portfolio/?portfolioID=OTpkM2QwZDE1ZW9iN2FjaA%3D%3D",
