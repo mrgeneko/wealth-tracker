@@ -67,7 +67,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		let after_hours_price = '';
 		let after_hours_change_decimal = '';
 		let after_hours_change_percent = '';
-		let after_hours_price_quote_time = '';
+		let after_hours_time = '';
 		let pre_market_price = '';
 		let pre_market_price_change_decimal = '';
 		let pre_market_price_change_percent = '';
@@ -136,7 +136,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 							const parts = raw_time.split('·');
 							if (parts.length > 0) {
 								let t = parts[0].replace('Closed:', '').replace('As of', '').trim();
-								after_hours_price_quote_time = parseToIso(t);
+								after_hours_time = parseToIso(t);
 							}
 						}
 					} else if (ext_hours_section.text().startsWith('Pre-market')) {
@@ -181,18 +181,18 @@ async function scrapeGoogle(browser, security, outputDir) {
 				}
 			}
 			// Extract quote time (e.g., 'Nov 14, 8:00:00 PM GMT-5')
-			let regular_quote_time = '';
+			let regular_time = '';
 			const time_regex = /([A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2}:\d{2}\s*[AP]M\s*GMT[+-]\d+)/;
 			const body_text = $('body').text();
 			let match = body_text.match(time_regex);
 			if (match) {
-				regular_quote_time = match[1];
+				regular_time = match[1];
 			}
-			if (!regular_quote_time) {
+			if (!regular_time) {
 				$('[class], span, div').each((i, el) => {
 					const t = $(el).text();
 					if (/GMT[+-]\d+/.test(t) && /\d{1,2}:\d{2}:\d{2}/.test(t)) {
-						regular_quote_time = t.trim();
+						regular_time = t.trim();
 						return false;
 					}
 				});
@@ -206,12 +206,12 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"regular_last_price" : regular_last_price,
 			"regular_change_decimal" : regular_change_decimal,
 			"regular_change_percent" : regular_change_percent,
-			regular_quote_time: typeof regular_quote_time !== 'undefined' ? parseToIso(regular_quote_time) : '',
+			regular_time: typeof regular_time !== 'undefined' ? parseToIso(regular_time) : '',
 			"previous_close_price" : previous_close_price,
 			"after_hours_price" : after_hours_price,
 			"after_hours_change_decimal" : after_hours_change_decimal,
 			"after_hours_change_percent" : after_hours_change_percent,
-			"after_hours_price_quote_time" : after_hours_price_quote_time,
+			"after_hours_time" : after_hours_time,
 			"pre_market_price" : pre_market_price,
 			"pre_market_price_change_decimal": pre_market_price_change_decimal,
 			"pre_market_price_change_percent": pre_market_price_change_percent,

@@ -87,7 +87,7 @@ function parseCNBCHtml(html, security) {
     regular_last_price: '',
     regular_change_decimal: '',
     regular_change_percent: '',
-    regular_quote_time: '',
+    regular_time: '',
     previous_close_price: '',
     after_hours_price: '',
     after_hours_change_decimal: '',
@@ -109,14 +109,14 @@ function parseCNBCHtml(html, security) {
           data.regular_change_decimal = cleanNumberText(quoteData.change);
           data.regular_change_percent = cleanNumberText(quoteData.change_pct);
           data.previous_close_price = cleanNumberText(quoteData.previous_day_closing);
-          data.regular_quote_time = parseToIso(quoteData.last_timedate);
+          data.regular_time = parseToIso(quoteData.last_timedate);
 
           const extQuote = quoteData.ExtendedMktQuote;
           if (extQuote) {
             data.after_hours_price = cleanNumberText(extQuote.last);
             data.after_hours_change_decimal = cleanNumberText(extQuote.change);
             data.after_hours_change_percent = cleanNumberText(extQuote.change_pct);
-            if (!data.regular_quote_time) data.regular_quote_time = parseToIso(extQuote.last_timedate);
+            if (!data.regular_time) data.regular_time = parseToIso(extQuote.last_timedate);
           }
           logDebug(`Successfully extracted data from embedded JSON for ${ticker}`);
         }
@@ -183,8 +183,8 @@ function parseCNBCHtml(html, security) {
         }
       }
 
-      if (!data.regular_quote_time) {
-        data.regular_quote_time = parseToIso(getValue([
+      if (!data.regular_time) {
+        data.regular_time = parseToIso(getValue([
           '.QuoteStrip-extendedLastTradeTime',
           '.QuoteStrip-lastTradeTime',
           '.QuoteStrip-lastTimeAndPriceContainer',
