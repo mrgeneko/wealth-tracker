@@ -85,5 +85,6 @@ function reloadExchangeData() {
 
 module.exports = {
     getExchange,
-    reloadExchangeData
+    reloadExchangeData,
+    loadExchangeData
 };
