@@ -6,7 +6,7 @@
             <form id="addSymbolForm">
                 <div class="form-group">
                     <label for="newSymbol">Symbol</label>
-                    <input type="text" id="newSymbol" required maxlength="10" style="text-transform:uppercase;">
+                    <input type="text" id="newSymbol" required maxlength="10" style="text-transform:uppercase;" class="awesomplete" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="newSymbolType">Type</label>
@@ -43,7 +43,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wealth Tracker Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; }
         h1, h2 { color: #ffffff; }
@@ -74,6 +76,24 @@
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #e0e0e0; }
         .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #555; border-radius: 4px; background-color: #333; color: #fff; }
+        
+        /* Awesomplete Autocomplete Styles (Dark Theme) */
+        .awesomplete > ul { background: #2d2d2d; border: 1px solid #555; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); max-height: 350px; overflow-y: auto; }
+        .awesomplete > ul > li { color: #e0e0e0; padding: 10px 12px; border-bottom: 1px solid #444; }
+        .awesomplete > ul > li:last-child { border-bottom: none; }
+        .awesomplete > ul > li:hover { background: #3d3d3d; color: #fff; }
+        .awesomplete > ul > li[aria-selected="true"] { background: #0d6efd; color: #fff; }
+        .awesomplete > ul > li[aria-selected="true"] .ticker-exchange { background: rgba(255,255,255,0.3); }
+        .awesomplete mark { background: #0d6efd; color: #fff; }
+        /* Ticker item styling */
+        .ticker-item { display: flex; flex-direction: column; gap: 2px; }
+        .ticker-main { display: flex; align-items: center; gap: 8px; }
+        .ticker-symbol { font-weight: bold; font-size: 1.1em; }
+        .ticker-exchange { font-size: 0.7em; padding: 2px 6px; border-radius: 3px; font-weight: bold; text-transform: uppercase; }
+        .ticker-exchange.nasdaq { background: #0d6efd; color: #fff; }
+        .ticker-exchange.nyse { background: #198754; color: #fff; }
+        .ticker-exchange.treasury { background: #dc3545; color: #fff; }
+        .ticker-name { font-size: 0.85em; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
         
         /* Clickable Cells */
         .clickable-cell { cursor: pointer; color: #6ea8fe; text-decoration: none; display: block; width: 100%; height: 100%; }
@@ -342,7 +362,29 @@
     </div>
 
     <script>
+                // Ticker autocomplete setup
+                let tickerList = [];
+                let tickerData = []; // Full ticker objects with all fields
+                let tickerLookup = {}; // Map symbol to full data
+                let symbolAutocomplete = null;
 
+                async function loadTickerList() {
+                    if (tickerData.length > 0) return tickerData;
+                    try {
+                        const res = await fetch('/api/tickers');
+                        tickerData = await res.json();
+                        tickerList = tickerData.map(t => t.symbol);
+                        // Build lookup map
+                        tickerLookup = {};
+                        tickerData.forEach(t => {
+                            tickerLookup[t.symbol] = t;
+                        });
+                        return tickerData;
+                    } catch (err) {
+                        console.error('Failed to load tickers:', err);
+                        return [];
+                    }
+                }
 
                 function openAddSymbolModal() {
                     document.getElementById('addSymbolError').style.display = 'none';
@@ -359,6 +401,54 @@
                             accountSelect.appendChild(opt);
                         });
                     }
+                    // Initialize autocomplete on symbol input
+                    loadTickerList().then(tickers => {
+                        const input = document.getElementById('newSymbol');
+                        if (!symbolAutocomplete) {
+                            symbolAutocomplete = new Awesomplete(input, {
+                                minChars: 1,
+                                maxItems: 15,
+                                autoFirst: true,
+                                data: function(item, input) {
+                                    // item is { label, value } - return the object for filtering
+                                    return { label: item.label, value: item.value };
+                                },
+                                filter: function(item, input) {
+                                    const searchTerm = input.toLowerCase();
+                                    return item.label.toLowerCase().includes(searchTerm);
+                                },
+                                item: function(item, input) {
+                                    const li = document.createElement('li');
+                                    // Look up full ticker data from our map
+                                    const ticker = tickerLookup[item.value] || {};
+                                    const exchangeClass = (ticker.exchange || '').toLowerCase();
+                                    li.innerHTML = `
+                                        <div class="ticker-item">
+                                            <div class="ticker-main">
+                                                <span class="ticker-symbol">${ticker.symbol || item.value}</span>
+                                                <span class="ticker-exchange ${exchangeClass}">${ticker.exchange || ''}</span>
+                                            </div>
+                                            <div class="ticker-name">${ticker.name || ''}</div>
+                                        </div>
+                                    `;
+                                    return li;
+                                },
+                                replace: function(item) {
+                                    this.input.value = item.value;
+                                }
+                            });
+                            // Set the list with label (for search) and value (symbol)
+                            symbolAutocomplete.list = tickers.map(t => ({
+                                label: `${t.symbol} ${t.name} ${t.exchange}`,
+                                value: t.symbol
+                            }));
+                        } else {
+                            symbolAutocomplete.list = tickers.map(t => ({
+                                label: `${t.symbol} ${t.name} ${t.exchange}`,
+                                value: t.symbol
+                            }));
+                        }
+                    });
                     document.getElementById('addSymbolModal').style.display = 'block';
                 }
 
