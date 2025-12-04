@@ -6,6 +6,7 @@ const { execSync } = require('child_process');
 const CONFIG_DIR = path.join(__dirname, '../config');
 const NASDAQ_FILE = path.join(CONFIG_DIR, 'nasdaq-listed.csv');
 const NYSE_FILE = path.join(CONFIG_DIR, 'nyse-listed.csv');
+const OTHER_LISTED_FILE = path.join(CONFIG_DIR, 'other-listed.csv');
 
 const REPOS = {
     NASDAQ: {
@@ -16,6 +17,11 @@ const REPOS = {
     NYSE: {
         url: 'https://raw.githubusercontent.com/datasets/nyse-other-listings/main/data/nyse-listed.csv',
         file: NYSE_FILE,
+        repo: 'https://github.com/datasets/nyse-other-listings'
+    },
+    OTHER_LISTED: {
+        url: 'https://raw.githubusercontent.com/datasets/nyse-other-listings/main/data/other-listed.csv',
+        file: OTHER_LISTED_FILE,
         repo: 'https://github.com/datasets/nyse-other-listings'
     }
 };

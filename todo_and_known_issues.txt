@@ -1,19 +1,13 @@
 TODO:
-0. Use https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/treasury-securities-auctions-data
-to determine treasury listing
-
-https://stockanalysis.com/list/nyseamerican-stocks/
-https://stockanalysis.com/list/sp-500-stocks/
 
 0. BKLC price modeling
-2. function to determine if ticker is a us treasury
 3. when adding a new ticker to dashboard, check ust, nyse, and nasdaq.
    if not bond call yahoo to get price and stock/etf flag.
    Test with brk-b and brk.b
    can getConstructibleUrls be improved with stock/etf/bond flag?
 
 1. symbols assume US stock markets. how to handle other exchanges?
-2. ticker autocomplete?
+2. find mutual fund listing not from 2020
 2. Store security data
 when making a yahoo call, store entire response to file?
     ticker, exchange:{yahoo, google, etc}, type
@@ -23,7 +17,7 @@ when making a yahoo call, store entire response to file?
     dividend_urls: [{ domain, url }]
     news_urls: [{ domain, url }]
     trading_sessions: {regular:{}, pre_market:{}, after_hours{}, overnight:{} }
-
+2. create 'Settings' tab in dashboard with import/export options
 2. Store stream of price updates to database keyed by ticker + source + capture_time
 2. change scrapers to work with ticker without url where possible (partially done)
 3. create demo assets_liabilities (without need for investing.com watchlist).
