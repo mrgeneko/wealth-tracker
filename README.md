@@ -1,6 +1,18 @@
 # wealth-tracker
 Lightweight scrapers and processors for personal portfolio tracking.
 
+## Recent Feature Updates
+
+- **Expanded Exchange Listings:**
+  - The system now downloads and processes `other-listed.csv` from the nyse-other-listings GitHub repository, adding 6,800+ tickers from additional exchanges (NYSE MKT, NYSE ARCA, BATS, IEX, and others).
+  - Exchange codes are mapped as follows: A → NYSE MKT, N → NYSE, P → NYSE ARCA, Z → BATS, V → IEX.
+  - The dashboard autocomplete and ticker registry now include these new exchanges, with color-coded badges for each type.
+- **Dashboard Autocomplete & Badges:**
+  - The autocomplete dropdown and investment tables now support all ~14,200 tickers from NASDAQ, NYSE, OTHER_LISTED, and TREASURY, with distinct badges for each exchange type.
+- **Ticker Registry & Listings Update:**
+  - `scripts/update_exchange_listings.js` now updates NASDAQ, NYSE, and OTHER_LISTED files for ticker lookup.
+  - New file: `config/other-listed.csv` contains additional US-listed tickers.
+
 This repository contains Node.js scraper code that runs a persistent daemon to collect price and watchlist data using Puppeteer/Chrome, publishes messages to Kafka, and writes logs to a mounted host directory.
 This README focuses on running the project in Docker, the long-running scraper daemon, and operational instructions (start/stop/logs/heartbeat). For additional operational notes see `DAEMON.md`.
 ---
@@ -372,6 +384,8 @@ If you need to revert to scheduled runs instead of the daemon, let me know and I
 - `Dockerfile.scrapers` — build for the scrapers image.
 - `docker-compose.yml` — compose configuration for local development.
 - `DAEMON.md` — additional daemon operational notes (included in repo).
+- `scripts/update_exchange_listings.js` — downloads and updates NASDAQ, NYSE, and OTHER exchange listings for ticker lookup.
+- `config/other-listed.csv` — new file containing additional US-listed tickers.
 ---
 ## Contributing
 PRs are welcome. When working on scrapers locally prefer building the scrapers image and running via Docker Compose for a consistent environment.
