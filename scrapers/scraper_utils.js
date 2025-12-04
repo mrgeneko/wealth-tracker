@@ -351,6 +351,8 @@ function parseToIso(timeStr) {
       'M/d/yy h:mm a',
       'M/d/yy',
       'h:mm a',
+      'HH:mm',
+      'H:mm',
       'MMM d HH:mm',
       'MMM d H:mm',
       'MMM d, HH:mm',
