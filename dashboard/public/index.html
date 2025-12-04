@@ -281,6 +281,8 @@
             <form id="positionForm">
                 <input type="hidden" id="posId">
                 <input type="hidden" id="posAccountId">
+                <input type="hidden" id="posSymbol">
+                <input type="hidden" id="posType">
                 <div class="form-group" id="posSymbolGroup">
                     <label for="posSymbol">Symbol</label>
                     <div id="posSymbolDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
@@ -1309,6 +1311,8 @@
 
             document.getElementById('posAccountId').value = pos.account_id;
             document.getElementById('posQuantity').value = pos.quantity;
+            document.getElementById('posSymbol').value = pos.symbol;
+            document.getElementById('posType').value = pos.type;
 
             // Output-only fields
             document.getElementById('posSymbolDisplay').textContent = pos.symbol;
