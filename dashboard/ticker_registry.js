@@ -9,7 +9,18 @@ const { parse } = require('csv-parse/sync');
 const CONFIG_DIR = process.env.CONFIG_DIR || '/app/config';
 const NASDAQ_FILE = path.join(CONFIG_DIR, 'nasdaq-listed.csv');
 const NYSE_FILE = path.join(CONFIG_DIR, 'nyse-listed.csv');
+const OTHER_LISTED_FILE = path.join(CONFIG_DIR, 'other-listed.csv');
 const TREASURY_FILE = path.join(CONFIG_DIR, 'us-treasury-auctions.csv');
+
+// Exchange code mapping from NASDAQ symboldirdefs
+// A = NYSE MKT, N = NYSE, P = NYSE ARCA, Z = BATS, V = IEX
+const EXCHANGE_CODES = {
+    'A': 'NYSE MKT',
+    'N': 'NYSE',
+    'P': 'NYSE ARCA',
+    'Z': 'BATS',
+    'V': 'IEX'
+};
 
 let tickerCache = null;
 
@@ -58,6 +69,32 @@ function loadAllTickers() {
                         symbol: record['ACT Symbol'].trim().toUpperCase(),
                         name: record['Company Name'] || '',
                         exchange: 'NYSE'
+                    });
+                }
+            });
+        }
+
+        // Load Other Listed symbols (NYSE MKT, NYSE ARCA, BATS, IEX, etc.)
+        // Track symbols we've already seen to avoid duplicates with NYSE
+        const seenSymbols = new Set(tickers.map(t => t.symbol));
+        if (fs.existsSync(OTHER_LISTED_FILE)) {
+            const content = stripBOM(fs.readFileSync(OTHER_LISTED_FILE, 'utf-8'));
+            const records = parse(content, {
+                columns: true,
+                skip_empty_lines: true
+            });
+            records.forEach(record => {
+                if (record['ACT Symbol']) {
+                    const symbol = record['ACT Symbol'].trim().toUpperCase();
+                    // Skip if we already have this symbol from NYSE or NASDAQ
+                    if (seenSymbols.has(symbol)) return;
+                    seenSymbols.add(symbol);
+                    const exchangeCode = record['Exchange'] || '';
+                    const exchange = EXCHANGE_CODES[exchangeCode] || exchangeCode || 'OTHER';
+                    tickers.push({
+                        symbol: symbol,
+                        name: record['Company Name'] || '',
+                        exchange: exchange
                     });
                 }
             });
