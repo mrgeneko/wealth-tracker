@@ -50,10 +50,11 @@ const scraperMap = {
 // Determine canonical data directory (host mount or repo folder). This
 // avoids relying on a `config/` folder and prefers the host-mounted
 // `/usr/src/app/data` or repo `wealth_tracker_data`.
-// Use the container-hosted data directory for all runtime data/config.
-// This is the single canonical path for scraper attributes and CSVs.
+// Use the container-hosted data directory for runtime data (logs, cache, etc.)
+// Configuration files live in /usr/src/app/config (mounted from ./config)
 const DATA_DIR = path.join('/usr/src/app', 'data');
-const ATTR_PATH = path.join(DATA_DIR, 'config.json');
+const CONFIG_DIR = path.join('/usr/src/app', 'config');
+const ATTR_PATH = path.join(CONFIG_DIR, 'config.json');
 let _cachedAttrs = null;
 let _cachedMtime = 0;
 
@@ -71,18 +72,6 @@ function loadScraperAttributes() {
 		try { logDebug('Loaded/updated scraper attributes (mtime=' + _cachedMtime + ')'); } catch (e) {}
 		return _cachedAttrs;
 	} catch (e) {
-		// Fallback: try loading from config/config.json if data/config.json fails
-		try {
-			const fallbackPath = path.join('/usr/src/app', 'config', 'config.json');
-			if (fs.existsSync(fallbackPath)) {
-				const txt = fs.readFileSync(fallbackPath, 'utf8');
-				const parsed = JSON.parse(txt);
-				_cachedAttrs = parsed || {};
-				try { logDebug('Loaded scraper attributes from fallback path'); } catch (e) {}
-				return _cachedAttrs;
-			}
-		} catch (e2) {}
-		
 		try { logDebug('Failed to read/parse scraper attributes: ' + (e && e.message ? e.message : e)); } catch (e2) { console.error('Failed to read/parse scraper attributes', e); }
 		return _cachedAttrs || {};
 	}
@@ -523,6 +512,7 @@ async function runCycle(browser, outputDir) {
 		// Get update_rules from the 'investing' config section
 		const investingConfig = getConfig('investing');
 		const updateRules = investingConfig && investingConfig.update_rules ? investingConfig.update_rules : null;
+		logDebug(`investing updateRules: ${updateRules ? JSON.stringify(updateRules.map(r => r.key)) : 'null'}`);
 		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
 			for (const item of attrs.watchlists) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
