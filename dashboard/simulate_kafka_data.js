@@ -1,6 +1,6 @@
 const { Kafka } = require('kafkajs');
 
-const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
 const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'price_data';
 
 const kafka = new Kafka({

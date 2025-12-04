@@ -268,7 +268,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 		logDebug(`Parsed data written to ${outPath}`);
 
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
-		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
 		
 		// Filter tickers based on update_rules before publishing to Kafka
 		let publishCount = 0;

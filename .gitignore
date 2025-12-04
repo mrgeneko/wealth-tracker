@@ -17,5 +17,8 @@ config.json
 20251*.html
 nasdaq-listed.csv.*
 nyse-listed.csv.*
+us-treasury-auctions.csv.backup.*
+*.pyc
+
 
 

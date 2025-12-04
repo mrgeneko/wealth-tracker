@@ -55,9 +55,11 @@ app.use(cors());
 app.use(express.json());
 
 // Kafka Configuration
-const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
-const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'price_data';
-const KAFKA_GROUP_ID = process.env.KAFKA_GROUP_ID || 'dashboard-group';
+// Kafka Configuration
+const config = require('./config');
+const KAFKA_BROKERS = config.KAFKA_BROKERS;
+const KAFKA_TOPIC = config.KAFKA_TOPIC;
+const KAFKA_GROUP_ID = config.KAFKA_GROUP_ID;
 
 // MySQL Configuration
 const MYSQL_HOST = process.env.MYSQL_HOST || 'mysql';
@@ -104,7 +106,7 @@ async function fetchInitialPrices() {
                     console.warn(`Invalid price for ${row.ticker}: ${row.price}`);
                 }
             });
-            
+
             await connection.end();
             return; // Success
         } catch (err) {
@@ -172,7 +174,7 @@ async function fetchAssetsFromDB() {
             };
 
             const accPositions = positions.filter(p => p.account_id === acc.id);
-            
+
             for (const pos of accPositions) {
                 if (pos.type === 'cash') {
                     accountObj.holdings.cash = {
@@ -195,7 +197,7 @@ async function fetchAssetsFromDB() {
                     });
                 }
             }
-            
+
             result.accounts.push(accountObj);
         }
 
@@ -227,16 +229,16 @@ loadAssets();
 // Supports extended hours pricing (pre-market, after-hours)
 function updatePriceCache(item) {
     if (!item.key) return false;
-    
+
     // Determine the best price to use
     // Prefer extended hours prices during pre/post market
     let price = 0;
     let priceSource = 'regular';
-    
+
     // Helper to check if a time is within regular market hours (Mon-Fri 9:30-16:00 ET)
     const isRegularHours = (dateObj) => {
         try {
-            const nyString = dateObj.toLocaleString("en-US", {timeZone: "America/New_York"});
+            const nyString = dateObj.toLocaleString("en-US", { timeZone: "America/New_York" });
             const nyDate = new Date(nyString);
             const day = nyDate.getDay();
             const hour = nyDate.getHours();
@@ -283,16 +285,16 @@ function updatePriceCache(item) {
             priceSource = 'regular';
         }
     }
-    
+
     if (isNaN(price) || price === 0) return false;
-    
+
     // Get previous close price
     let previousClosePrice = null;
     if (item.previous_close_price) {
         previousClosePrice = parseFloat(String(item.previous_close_price).replace(/[$,]/g, ''));
         if (isNaN(previousClosePrice)) previousClosePrice = null;
     }
-    
+
     priceCache[item.key] = {
         price: price,
         previous_close_price: previousClosePrice,
@@ -300,7 +302,7 @@ function updatePriceCache(item) {
         time: item.capture_time || new Date().toISOString(),
         source: item.source ? `${item.source} (${priceSource})` : priceSource
     };
-    
+
     return true;
 }
 
@@ -317,7 +319,7 @@ async function startKafkaConsumer() {
         console.log(`Connecting to Kafka brokers: ${KAFKA_BROKERS.join(',')}`);
         await consumer.connect();
         console.log('Connected to Kafka');
-        
+
         await consumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: false });
         console.log(`Subscribed to topic: ${KAFKA_TOPIC}`);
 
@@ -327,7 +329,7 @@ async function startKafkaConsumer() {
                     const value = message.value.toString();
                     const data = JSON.parse(value);
                     console.log(`Received update for ${data.key}`);
-                    
+
                     if (updatePriceCache(data)) {
                         // Broadcast updated prices to all connected clients
                         io.emit('price_update', priceCache);
@@ -364,7 +366,7 @@ const LOGS_DIR = '/usr/src/app/logs';
 app.get('/api/logs', async (req, res) => {
     try {
         if (!fs.existsSync(LOGS_DIR)) {
-             return res.json([]);
+            return res.json([]);
         }
         const files = await fs.promises.readdir(LOGS_DIR);
         const fileStats = await Promise.all(files.map(async (file) => {
@@ -376,10 +378,10 @@ app.get('/api/logs', async (req, res) => {
                 size: stats.size
             };
         }));
-        
+
         // Sort by timestamp descending (most recent first)
         fileStats.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        
+
         res.json(fileStats);
     } catch (error) {
         console.error('Error reading logs directory:', error);
@@ -394,12 +396,12 @@ app.get('/api/logs/:filename', async (req, res) => {
         if (filename.includes('..') || filename.includes('/')) {
             return res.status(400).json({ error: 'Invalid filename' });
         }
-        
+
         const filePath = path.join(LOGS_DIR, filename);
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ error: 'File not found' });
         }
-        
+
         if (filename.endsWith('.gz')) {
             res.download(filePath);
         } else {
@@ -440,11 +442,11 @@ app.put('/api/accounts/:id', async (req, res) => {
         if (category !== undefined) { updates.push('category=?'); params.push(category); }
         if (currency !== undefined) { updates.push('currency=?'); params.push(currency); }
         if (display_order !== undefined) { updates.push('display_order=?'); params.push(display_order); }
-        
+
         if (updates.length === 0) {
             return res.status(400).json({ error: 'No fields to update' });
         }
-        
+
         params.push(req.params.id);
         await pool.execute(
             `UPDATE accounts SET ${updates.join(', ')} WHERE id=?`,
@@ -559,7 +561,7 @@ io.on('connection', (socket) => {
     console.log('Client connected');
     // Send current prices immediately
     socket.emit('price_update', priceCache);
-    
+
     socket.on('disconnect', () => {
         console.log('Client disconnected');
     });

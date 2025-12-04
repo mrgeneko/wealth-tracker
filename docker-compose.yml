@@ -99,7 +99,7 @@ services:
       # Ensure producers auto-create topics when first message is sent
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
-      - "9092:9092"
+      - "9094:9092"
       - "9093:9093"
     healthcheck:
       test: ["CMD", "bash", "-c", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]

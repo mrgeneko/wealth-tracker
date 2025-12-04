@@ -2,7 +2,7 @@
 const { Kafka } = require('kafkajs');
 const { logDebug } = require('./scraper_utils');
 
-// Usage: publishToKafka({ key: 'AAPL', last_price: 123 }, 'my-topic', ['localhost:9092'])
+// Usage: publishToKafka({ key: 'AAPL', last_price: 123 }, 'my-topic', ['localhost:9094'])
 async function publishToKafka(data, topic, brokers) {
   const kafka = new Kafka({ brokers });
   const producer = kafka.producer();

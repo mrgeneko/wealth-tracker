@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Health check for wealth_tracker: verifies python interpreter, required imports, and Kafka connectivity.
 PYTHON_EXEC="${PYTHON_EXEC:-/Users/gene/.pyenv/versions/3.13.3/bin/python}"
+source "$(dirname "$0")/common.sh"
 
 echo "Using python: $PYTHON_EXEC"
 
@@ -17,18 +18,18 @@ for r in reqs:
         __import__(r)
         print(f'OK import {r}')
     except Exception as e:
-        print(f'MISSING import {r}: {e}', file=sys.stderr)
+        print(f"MISSING import {r}: {e}", file=sys.stderr)
         ok = False
 
 # Check Kafka bootstrap server connectivity
-bs = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+bs = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 first = bs.split(',')[0].strip()
 if ':' in first:
     host, port = first.split(':', 1)
     port = int(port)
 else:
     host = first
-    port = 9092
+    port = 9094
 print(f'Checking Kafka at {host}:{port}...')
 try:
     s = socket.create_connection((host, port), timeout=3)

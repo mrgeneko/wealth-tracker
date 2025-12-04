@@ -115,7 +115,7 @@ async function scrapeMarketWatch(browser, security, outputDir) {
     data = result;
     
     const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeMarketWatch';
-    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
     await publishToKafka(data, kafkaTopic, kafkaBrokers);
 
     const jsonFileName = `${dateTimeString}.${ticker}.marketwatch.json`;
