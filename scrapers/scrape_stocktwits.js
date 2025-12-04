@@ -79,6 +79,11 @@ function parseStocktwitsHtml(html, security) {
   let after_hours_change_percent = '';
   let regular_time = '';
   let after_hours_time = '';
+  let pre_market_price = '';
+  let pre_market_change_decimal = '';
+  let pre_market_change_percent = '';
+  let pre_market_time = '';
+  let extendedHoursType = ''; // 'pre-market' or 'after-hours'
 
   try {
     // 1. Try to find the embedded JSON data first (most reliable)
@@ -102,8 +107,19 @@ function parseStocktwitsHtml(html, security) {
     // However, the example showed: {"id":..., "symbol":"NVDA", ..., "priceData":{...}}
     // So "symbol" comes before "priceData".
     
-    const symbolPattern = new RegExp(`"symbol"\\s*:\\s*"${ticker}"`, 'i');
-    const symbolMatch = html.match(symbolPattern);
+    // Handle ticker variations: BRK-B vs BRK.B - try both formats
+    const tickerVariations = [
+      ticker,
+      ticker.replace(/-/g, '.'),  // BRK-B -> BRK.B
+      ticker.replace(/\./g, '-'), // BRK.B -> BRK-B
+    ];
+    
+    let symbolMatch = null;
+    for (const tickerVar of tickerVariations) {
+      const symbolPattern = new RegExp(`"symbol"\\s*:\\s*"${tickerVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'i');
+      symbolMatch = html.match(symbolPattern);
+      if (symbolMatch) break;
+    }
     
     if (symbolMatch) {
       // Found the symbol. Now look for "priceData" after it.
@@ -140,12 +156,27 @@ function parseStocktwitsHtml(html, security) {
             // Extended hours
             const extPrice = extractVal('ExtendedHoursPrice');
             if (extPrice) {
-              after_hours_price = cleanNumberText(extPrice);
-              after_hours_change_decimal = cleanNumberText(extractVal('ExtendedHoursChange'));
-              after_hours_change_percent = cleanNumberText(extractVal('ExtendedHoursPercentChange'));
-              // Extract after-hours time if available
+              const extChangeDec = cleanNumberText(extractVal('ExtendedHoursChange'));
+              const extChangePct = cleanNumberText(extractVal('ExtendedHoursPercentChange'));
               const extTime = extractVal('ExtendedHoursDateTime');
-              if (extTime) after_hours_time = extTime;
+              const extType = extractVal('ExtendedHoursType'); // May contain 'pre-market' or 'after-hours'
+              
+              // Check HTML for "Pre-Market" indicator if not in JSON
+              const isPreMarket = /pre[-\s]?market/i.test(extType) || /Pre[-\s]?Market/i.test(html);
+              
+              if (isPreMarket) {
+                pre_market_price = cleanNumberText(extPrice);
+                pre_market_change_decimal = extChangeDec;
+                pre_market_change_percent = extChangePct;
+                if (extTime) pre_market_time = extTime;
+                extendedHoursType = 'pre-market';
+              } else {
+                after_hours_price = cleanNumberText(extPrice);
+                after_hours_change_decimal = extChangeDec;
+                after_hours_change_percent = extChangePct;
+                if (extTime) after_hours_time = extTime;
+                extendedHoursType = 'after-hours';
+              }
             }
             
             // Time
@@ -159,8 +190,11 @@ function parseStocktwitsHtml(html, security) {
     }
 
     // 2. Fallback to DOM parsing if JSON failed or was incomplete
-    if (!last_price) {
+    if (!regular_last_price) {
         const $ = cheerio.load(html);
+        
+        // Check if page shows Pre-Market indicator
+        const isPreMarketPage = /Pre[-\s]?Market/i.test(html);
         
         // Price is often in a header with class containing 'SymbolHeader_price'
         // Example: <span class="SymbolHeader_price__3_2_O">135.58</span>
@@ -177,8 +211,12 @@ function parseStocktwitsHtml(html, security) {
              }
         }
 
+        let extractedPrice = '';
+        let extractedChangeDec = '';
+        let extractedChangePct = '';
+        
         if (priceEl.length) {
-          regular_last_price = cleanNumberText(priceEl.first().text());
+          extractedPrice = cleanNumberText(priceEl.first().text());
         }
         
         // Change
@@ -188,9 +226,23 @@ function parseStocktwitsHtml(html, security) {
           const txt = changeEl.first().text();
           const m = txt.match(/([+-]?[0-9.,]+)\s*(?:\(?\s*([+-]?[0-9.,]+%?)\s*\)?)?/);
           if (m) {
-            regular_change_decimal = cleanNumberText(m[1]).replace(/^\+/, '');
-            regular_change_percent = m[2] ? String(m[2]).replace(/\s/g, '') : '';
+            extractedChangeDec = cleanNumberText(m[1]).replace(/^\+/, '');
+            extractedChangePct = m[2] ? String(m[2]).replace(/\s/g, '') : '';
           }
+        }
+        
+        // If Pre-Market is shown, the displayed price IS the pre-market price
+        // We need to find the regular/close price separately
+        if (isPreMarketPage && extractedPrice) {
+          pre_market_price = extractedPrice;
+          pre_market_change_decimal = extractedChangeDec;
+          pre_market_change_percent = extractedChangePct;
+          pre_market_time = new Date().toISOString();
+          extendedHoursType = 'pre-market';
+        } else {
+          regular_last_price = extractedPrice;
+          regular_change_decimal = extractedChangeDec;
+          regular_change_percent = extractedChangePct;
         }
     }
 
@@ -207,10 +259,14 @@ function parseStocktwitsHtml(html, security) {
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
+    after_hours_time: parseToIso(after_hours_time) || '',
+    pre_market_price: pre_market_price || '',
+    pre_market_change_decimal: pre_market_change_decimal || '',
+    pre_market_change_percent: pre_market_change_percent || '',
+    pre_market_time: parseToIso(pre_market_time) || '',
     source: 'stocktwits',
     capture_time: new Date().toISOString(),
-    regular_time: parseToIso(regular_time) || '',
-    after_hours_time: parseToIso(after_hours_time) || ''
+    regular_time: parseToIso(regular_time) || ''
   };
 }
 
