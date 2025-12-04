@@ -2,6 +2,54 @@ const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, sa
 const { publishToKafka } = require('./publish_to_kafka');
 const { DateTime } = require('luxon');
 
+/**
+ * Check if a ticker is within its update window based on update_rules config.
+ * @param {string} ticker - The ticker symbol to check
+ * @param {Array} updateRules - Array of update_rules from config
+ * @returns {boolean} - true if ticker should be updated, false otherwise
+ */
+function isWithinUpdateWindow(ticker, updateRules) {
+	if (!updateRules || !Array.isArray(updateRules) || updateRules.length === 0) {
+		// No rules defined, allow all updates
+		return true;
+	}
+
+	// Find rule for this ticker, or fall back to 'default'
+	let rule = updateRules.find(r => r.key === ticker);
+	if (!rule) {
+		rule = updateRules.find(r => r.key === 'default');
+	}
+	if (!rule || !rule.update_windows || !Array.isArray(rule.update_windows)) {
+		// No matching rule or no windows, allow update
+		return true;
+	}
+
+	const now = DateTime.now().setZone('America/New_York');
+	const dayNames = ['', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // 1=Monday in Luxon
+	const currentDay = dayNames[now.weekday];
+	const currentTimeMinutes = now.hour * 60 + now.minute;
+
+	for (const window of rule.update_windows) {
+		// Check if current day is in the window's days
+		if (!window.days || !Array.isArray(window.days) || !window.days.includes(currentDay)) {
+			continue;
+		}
+
+		// Parse start and end times
+		const [startH, startM] = (window.start || '00:00').split(':').map(Number);
+		const [endH, endM] = (window.end || '23:59').split(':').map(Number);
+		const startMinutes = startH * 60 + startM;
+		const endMinutes = endH * 60 + endM;
+
+		// Check if current time is within window
+		if (currentTimeMinutes >= startMinutes && currentTimeMinutes <= endMinutes) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 // Helper to check if error is from a known ad/tracker domain
 function isSuppressedPageError(err) {
 	if (!err || !err.stack) return false;
@@ -56,7 +104,7 @@ function parseToIso(timeStr) {
   }
 }
 
-async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
+async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updateRules = null) {
 	const investingUrl = watchlist.url;
 	if (!investingUrl) {
 		logDebug('WARNING: INVESTING_URL is missing or invalid');
@@ -221,9 +269,20 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
 		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+		
+		// Filter tickers based on update_rules before publishing to Kafka
+		let publishCount = 0;
+		let skippedCount = 0;
 		for (const sec of dataObjects) {
-			publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
+			if (isWithinUpdateWindow(sec.key, updateRules)) {
+				publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
+				publishCount++;
+			} else {
+				skippedCount++;
+				logDebug(`Skipping ${sec.key} - outside update window`);
+			}
 		}
+		logDebug(`Published ${publishCount} tickers, skipped ${skippedCount} (outside update window)`);
 	} catch (err) {
 		logDebug('Error in scrapeInvestingComWatchlist: ' + err);
 		if (err.stack) console.error('Occurred at:', err.stack.split('\n')[1].trim());

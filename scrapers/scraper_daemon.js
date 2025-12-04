@@ -520,12 +520,15 @@ async function runCycle(browser, outputDir) {
 		logDebug('Begin investing.com scrape');
 		// Prefer configuration from config.json
 		const attrs = getConfig(investingWatchlistsName);
+		// Get update_rules from the 'investing' config section
+		const investingConfig = getConfig('investing');
+		const updateRules = investingConfig && investingConfig.update_rules ? investingConfig.update_rules : null;
 		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
 			for (const item of attrs.watchlists) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`investingcom watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
-					await scrapeInvestingComWatchlists(browser, record, outputDir);
+					await scrapeInvestingComWatchlists(browser, record, outputDir, updateRules);
 				} else {
 					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
 				}
