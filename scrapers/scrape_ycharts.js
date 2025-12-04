@@ -48,45 +48,99 @@ async function scrapeYCharts(browser, security, outputDir) {
 
         // Extract data
         const extractedData = await page.evaluate((ticker) => {
-            const priceEl = document.querySelector('.index-rank-value');
-            const changeContainer = document.querySelector('.index-change');
-            const infoEl = document.querySelector('.index-info');
-
+            // Get all index-rank containers - first is regular hours, second (if present) is after-hours
+            const indexRanks = document.querySelectorAll('.index-rank');
+            
             let regular_last_price = '';
             let regular_change_decimal = '';
             let regular_change_percent = '';
             let regular_time = '';
+            let after_hours_price = '';
+            let after_hours_change_decimal = '';
+            let after_hours_change_percent = '';
+            let after_hours_time = '';
 
-            if (priceEl) {
-                regular_last_price = priceEl.innerText.trim().replace(/[,\s]/g, '');
-            }
-
-            if (infoEl) {
-                // Format: "USD | NASDAQ | Nov 24, 12:09"
-                const parts = infoEl.innerText.split('|');
-                if (parts.length > 0) {
-                    regular_time = parts[parts.length - 1].trim();
+            // Helper function to parse change text like "0.00 (0.00%)" or "+13.27 (+2.25%)"
+            function parseChangeText(text) {
+                const match = text.match(/([+-]?[\d,]+\.?\d*)\s*\(\s*([+-]?[\d,]+\.?\d*%)\s*\)/);
+                if (match) {
+                    return {
+                        decimal: match[1].replace(/[,\s]/g, '').replace(/^\+/, ''),
+                        percent: match[2].replace(/\s/g, '')
+                    };
                 }
+                return { decimal: '', percent: '' };
             }
 
-            if (changeContainer) {
-                // Try to find specific value elements first (handling positive and negative classes)
-                const valEls = changeContainer.querySelectorAll('.valPos, .valNeg');
-                if (valEls.length >= 2) {
-                    regular_change_decimal = valEls[0].innerText.trim().replace(/[,\s]/g, '').replace(/^\+/, '');
-                    regular_change_percent = valEls[1].innerText.trim().replace(/\s/g, '');
-                } else {
-                    // Fallback: Parse the full text content
-                    // Expected format: "+13.27 (+2.25%)" or "-1.23 (-0.50%)"
-                    const text = changeContainer.innerText.trim();
-                    // Matches: start, optional sign, digits, dot, digits, space, (, optional sign, digits, dot, digits, %, )
-                    const match = text.match(/([+-]?[\d,]+\.?\d*)\s*\(\s*([+-]?[\d,]+\.?\d*%)\s*\)/);
-                    if (match) {
-                        regular_change_decimal = match[1].replace(/[,\s]/g, '').replace(/^\+/, '');
-                        regular_change_percent = match[2].replace(/\s/g, '');
+            // Helper function to extract data from an index-rank container
+            function extractFromContainer(container) {
+                const priceEl = container.querySelector('.index-rank-value');
+                const changeEl = container.querySelector('.index-change');
+                const infoEl = container.querySelector('.index-info');
+                
+                let price = '';
+                let change_decimal = '';
+                let change_percent = '';
+                let time = '';
+                let isAfterHours = false;
+
+                if (priceEl) {
+                    price = priceEl.innerText.trim().replace(/[,\s]/g, '');
+                }
+
+                if (infoEl) {
+                    const infoText = infoEl.innerText.trim();
+                    // Check if this is after-hours data
+                    if (infoText.toLowerCase().includes('after-hours')) {
+                        isAfterHours = true;
+                        // Extract time from "After-Hours: 16:44"
+                        const timeMatch = infoText.match(/after-hours:\s*(\d{1,2}:\d{2})/i);
+                        if (timeMatch) {
+                            time = timeMatch[1];
+                        }
+                    } else {
+                        // Regular hours format: "USD | NASDAQ | Nov 24, 12:09"
+                        const parts = infoText.split('|');
+                        if (parts.length > 0) {
+                            time = parts[parts.length - 1].trim();
+                        }
                     }
                 }
+
+                if (changeEl) {
+                    // Try to find specific value elements first (handling positive and negative classes)
+                    const valEls = changeEl.querySelectorAll('.valPos, .valNeg');
+                    if (valEls.length >= 2) {
+                        change_decimal = valEls[0].innerText.trim().replace(/[,\s]/g, '').replace(/^\+/, '');
+                        change_percent = valEls[1].innerText.trim().replace(/\s/g, '');
+                    } else {
+                        // Fallback: Parse the full text content
+                        const text = changeEl.innerText.trim();
+                        const parsed = parseChangeText(text);
+                        change_decimal = parsed.decimal;
+                        change_percent = parsed.percent;
+                    }
+                }
+
+                return { price, change_decimal, change_percent, time, isAfterHours };
             }
+
+            // Process each index-rank container
+            indexRanks.forEach((container) => {
+                const data = extractFromContainer(container);
+                if (data.isAfterHours) {
+                    after_hours_price = data.price;
+                    after_hours_change_decimal = data.change_decimal;
+                    after_hours_change_percent = data.change_percent;
+                    after_hours_time = data.time;
+                } else if (!regular_last_price) {
+                    // Only set regular data if not already set (take the first non-after-hours container)
+                    regular_last_price = data.price;
+                    regular_change_decimal = data.change_decimal;
+                    regular_change_percent = data.change_percent;
+                    regular_time = data.time;
+                }
+            });
 
             return {
                 key: ticker,
@@ -99,14 +153,17 @@ async function scrapeYCharts(browser, security, outputDir) {
                 pre_market_price_change_decimal: '',
                 pre_market_price_change_percent: '',
                 pre_market_time: '',
-                after_hours_price: '',
-                after_hours_change_percent: '',
+                after_hours_price: after_hours_price || '',
+                after_hours_change_decimal: after_hours_change_decimal || '',
+                after_hours_change_percent: after_hours_change_percent || '',
+                after_hours_time: after_hours_time || '',
             };
         }, ticker);
 
         const data = {
             ...extractedData,
             regular_time: parseToIso(extractedData.regular_time),
+            after_hours_time: parseToIso(extractedData.after_hours_time),
             capture_time: new Date().toISOString()
         };
 
