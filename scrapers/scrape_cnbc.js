@@ -14,7 +14,7 @@ function parseToIso(timeStr) {
   clean = clean.replace(/^\|\s*/, '').replace(/Last\s*\|\s*/i, '');
   if (/^\d{4}-\d{2}-\d{2}T/.test(clean)) return clean;
   clean = clean.replace(/\s+(?:EST|EDT|ET)\s*$/i, '');
-  
+
   const zone = 'America/New_York';
   const formats = ['M/d/yy h:mm a', 'M/d/yy', 'h:mm a'];
 
@@ -22,7 +22,7 @@ function parseToIso(timeStr) {
     const dt = DateTime.fromFormat(clean, fmt, { zone });
     if (dt.isValid) return dt.toUTC().toISO();
   }
-  
+
   const dtIso = DateTime.fromISO(clean, { zone });
   if (dtIso.isValid) return dtIso.toUTC().toISO();
 
@@ -55,9 +55,10 @@ async function scrapeCNBC(browser, security, outputDir) {
 
     const result = parseCNBCHtml(html || '', { key: ticker });
     data = result;
-    
-    const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeCNBC';
-    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+
+    const config = require('./config');
+    const kafkaTopic = config.KAFKA_TOPIC;
+    const kafkaBrokers = config.KAFKA_BROKERS;
     await publishToKafka(data, kafkaTopic, kafkaBrokers);
 
     const jsonFileName = `${dateTimeString}.${ticker}.cnbc.json`;
@@ -65,15 +66,15 @@ async function scrapeCNBC(browser, security, outputDir) {
     fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
     logDebug(`Saved CNBC JSON to ${jsonFilePath}`);
 
-  } catch (err) { 
-    logDebug('Error in scrapeCNBC: ' + err); 
+  } catch (err) {
+    logDebug('Error in scrapeCNBC: ' + err);
     // Re-throw or handle more explicitly if downstream consumers need to know about the failure
     throw err;
   }
-  finally { 
-    if (page) { 
-      try { await page.close(); } catch (e) { logDebug('Error closing CNBC tab: ' + e); } 
-    } 
+  finally {
+    if (page) {
+      try { await page.close(); } catch (e) { logDebug('Error closing CNBC tab: ' + e); }
+    }
   }
   return data;
 }
@@ -155,7 +156,7 @@ function parseCNBCHtml(html, security) {
         }
         return '';
       };
-      
+
       function parseChangeText(s) {
         if (!s) return {};
         const m = String(s).match(/([+-]?[0-9.,]+)\s*(?:\(?\s*([+-]?[0-9.,]+%?)\s*\)?)?/);
@@ -172,7 +173,7 @@ function parseCNBCHtml(html, security) {
           '.Summary-value',
         ]));
       }
-      
+
       if (!data.regular_change_decimal) {
         const changeText = getValue([
           '.QuoteStrip-changeUp', '.QuoteStrip-changeDown', '.QuoteStrip-unchanged',
@@ -182,7 +183,7 @@ function parseCNBCHtml(html, security) {
         data.regular_change_decimal = parsedChange.dec || '';
         data.regular_change_percent = parsedChange.pct || '';
       }
-      
+
       if (!data.previous_close_price) {
         data.previous_close_price = cleanNumberText(getValue([
           '.SplitStats-item:contains("Prev Close") .SplitStats-price',

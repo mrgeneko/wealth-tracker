@@ -29,7 +29,7 @@ async function scrapeMoomoo(browser, security, outputDir) {
         // publish & save
         try {
             const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeMoomoo';
-            const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+            const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
             await publishToKafka(data, kafkaTopic, kafkaBrokers);
         } catch (kafkaErr) { logDebug('Kafka publish error (Moomoo): ' + kafkaErr); }
 

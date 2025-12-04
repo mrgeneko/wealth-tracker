@@ -11,6 +11,7 @@ import logging
 import argparse
 import uuid
 from kafka import KafkaConsumer
+from wealth_tracker import config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
@@ -19,8 +20,8 @@ def main():
     parser = argparse.ArgumentParser(description='Consume N messages from Kafka then exit')
     parser.add_argument('--num', '-n', type=int, default=1, help='Number of messages to consume before exiting')
     parser.add_argument('--timeout', '-t', type=float, default=10.0, help='Poll timeout in seconds')
-    parser.add_argument('--bootstrap', '-b', type=str, default=os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092'))
-    parser.add_argument('--topic', '-p', type=str, default=os.getenv('KAFKA_TOPIC', 'price_data'))
+    parser.add_argument('--bootstrap', '-b', type=str, default=config.KAFKA_BOOTSTRAP_SERVERS)
+    parser.add_argument('--topic', '-p', type=str, default=config.KAFKA_TOPIC)
     parser.add_argument('--from-beginning', action='store_true', help='Start from earliest offset')
 
     args = parser.parse_args()

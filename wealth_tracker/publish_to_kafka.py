@@ -13,6 +13,8 @@ except Exception as e:
     ) from e
 
 
+from wealth_tracker import config
+
 def publish_to_kafka(data, bootstrap_servers=None, topic=None, retries=3, retry_delay=2):
     logging.info(f"publish_to_kafka called")
     """
@@ -20,21 +22,18 @@ def publish_to_kafka(data, bootstrap_servers=None, topic=None, retries=3, retry_
 
     Parameters:
     - data: dict - the message payload
-    - bootstrap_servers: list or comma-separated string, default 'localhost:9092'
-    - topic: str - Kafka topic, default 'price_data'
+    - bootstrap_servers: list or comma-separated string, default from config
+    - topic: str - Kafka topic, default from config
     - retries: int - number of retries on failure
     - retry_delay: int - seconds between retries
 
     The function logs errors and raises if publishing ultimately fails.
     """
-    # Allow configuration via environment variables
-    env_bootstrap = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
-    env_topic = os.getenv('KAFKA_TOPIC')
-
+    
     if bootstrap_servers is None:
-        bootstrap_servers = env_bootstrap if env_bootstrap is not None else 'localhost:9092'
+        bootstrap_servers = config.KAFKA_BOOTSTRAP_SERVERS
     if topic is None:
-        topic = env_topic if env_topic is not None else 'price_data'
+        topic = config.KAFKA_TOPIC
 
     # Create producer
     producer = KafkaProducer(

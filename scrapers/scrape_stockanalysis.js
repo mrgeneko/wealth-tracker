@@ -51,7 +51,7 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
 
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeStockAnalysis';
-      const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+      const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
       await publishToKafka(data, kafkaTopic, kafkaBrokers);
     } catch (kafkaErr) { logDebug('Kafka publish error (StockAnalysis): ' + kafkaErr); }
 

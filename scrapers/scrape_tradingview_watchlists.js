@@ -209,7 +209,7 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
 		logDebug(`Parsed data written to ${outPath}`);
 
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'tradingview_watchlist';
-		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
 		for (const sec of dataObjects) {
 			publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
 		}
