@@ -11,6 +11,7 @@ const { DateTime } = require('luxon');
 function isWithinUpdateWindow(ticker, updateRules) {
 	if (!updateRules || !Array.isArray(updateRules) || updateRules.length === 0) {
 		// No rules defined, allow all updates
+		logDebug(`isWithinUpdateWindow(${ticker}): No updateRules defined, allowing update`);
 		return true;
 	}
 
@@ -21,6 +22,7 @@ function isWithinUpdateWindow(ticker, updateRules) {
 	}
 	if (!rule || !rule.update_windows || !Array.isArray(rule.update_windows)) {
 		// No matching rule or no windows, allow update
+		logDebug(`isWithinUpdateWindow(${ticker}): No matching rule or windows, allowing update`);
 		return true;
 	}
 
@@ -43,10 +45,12 @@ function isWithinUpdateWindow(ticker, updateRules) {
 
 		// Check if current time is within window
 		if (currentTimeMinutes >= startMinutes && currentTimeMinutes <= endMinutes) {
+			logDebug(`isWithinUpdateWindow(${ticker}): WITHIN window ${window.start}-${window.end} (current: ${now.hour}:${now.minute}, ${currentTimeMinutes} mins)`);
 			return true;
 		}
 	}
 
+	logDebug(`isWithinUpdateWindow(${ticker}): OUTSIDE all windows (current: ${currentDay} ${now.hour}:${now.minute}, ${currentTimeMinutes} mins)`);
 	return false;
 }
 
