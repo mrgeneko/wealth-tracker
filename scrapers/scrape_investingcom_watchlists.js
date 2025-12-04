@@ -202,7 +202,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir) {
 						regular_time: qTime,
 						extended_hours_price: rowData["extended_hours"] || null,
 						extended_hours_change: extendedHoursChange,
-						extended_hours_change_percent: (rowData["chg"] + extendedHoursChange) / rowData["prev"] || null,
+						extended_hours_change_percent: rowData["extended_hours_percent"] || null,
 						extended_hours_time: extendedHoursQuoteTime,
 						source: "investing",
 						previous_close_price: rowData["prev"],

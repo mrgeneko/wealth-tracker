@@ -13,21 +13,21 @@
   },
   "investing_watchlists": {
     "url": "https://www.investing.com/portfolio/?portfolioID=OTpkM2QwZDE1ZW9iN2FjaA%3D%3D",
-    "items": [
+    "watchlists": [
       { "key": "primary", "interval": 2 },
       { "key": "secondary", "interval": 5 }
     ]
   },
   "webull_watchlists": {
     "url": "https://www.webull.com/watch",
-    "items": [
+    "watchlists": [
       { "key": "My Watchlist", "interval": 5 },
       { "key": "testlist 2", "interval": 5 }
     ]
   },
   "tradingview_watchlists": {
     "url": "https://www.tradingview.com/watchlists/189516536/",
-    "items": [
+    "watchlists": [
       { "key": "Watchlist", "interval": 5 }
     ]
   },
