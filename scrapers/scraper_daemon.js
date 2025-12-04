@@ -608,11 +608,17 @@ async function runCycle(browser, outputDir) {
 	logDebug('yahooBatchInterval:' + yahooBatchSettings.interval)
 	if (shouldRunTask(yahooBatchSettings, yahooBatchMarker)) {
 		logDebug('Begin yahoo_batch api');
-		const attrs = loadScraperAttributes();
-		const records = attrs.single_securities || [];
-
-		// Run Yahoo batch for any record that has a `ticker_yahoo` column populated
-		const yahooSecurities = records.filter(s => s.ticker_yahoo && s.ticker_yahoo.toString().trim());
+		
+		// Fetch stock/etf positions from MySQL and map to security objects with ticker_yahoo
+		const positions = await fetchStockPositions();
+		logDebug(`Found ${positions.length} stock/etf positions for Yahoo batch: ${positions.map(p => p.symbol).join(', ')}`);
+		
+		const yahooSecurities = positions.map(p => ({
+			...p,
+			key: p.symbol,
+			ticker_yahoo: p.symbol
+		}));
+		
 		if (yahooSecurities.length) {
 			try {
 				const batchResults = await scrapeYahooBatch(browser, yahooSecurities, outputDir, { chunkSize: 50, delayMs: 500 });
