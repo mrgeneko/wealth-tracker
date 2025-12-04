@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { needsUpdate } = require('./update_exchange_data');
+const { needsUpdate } = require('./update_exchange_listings');
 
 const CONFIG_DIR = path.join(__dirname, '../config');
 const NASDAQ_FILE = path.join(CONFIG_DIR, 'nasdaq-listed.csv');

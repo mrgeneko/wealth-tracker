@@ -480,7 +480,7 @@ async function runCycle(browser, outputDir) {
 		logDebug('Begin US listings update');
 		try {
 			const { execSync } = require('child_process');
-			execSync('node /usr/src/app/scripts/update_exchange_data.js update', { stdio: 'inherit' });
+					   execSync('node /usr/src/app/scripts/update_exchange_listings.js update', { stdio: 'inherit' });
 			logDebug('US listings update script executed successfully');
 		} catch (e) {
 			logDebug('Error running US listings update script: ' + (e && e.message ? e.message : e));
