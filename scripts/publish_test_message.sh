@@ -4,14 +4,16 @@ PYTHON_EXEC="${PYTHON_EXEC:-/Users/gene/.pyenv/versions/3.13.3/bin/python}"
 # Ensure the repository root is on PYTHONPATH so local modules can be imported
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Quick health check for Kafka before running the publish script. Exits with code 2 if unreachable.
+source "$(dirname "$0")/common.sh"
+
 "$PYTHON_EXEC" - <<'PY'
 import os, socket, sys
-bs = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+bs = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
 hostport = bs.split(',')[0]
 if ':' in hostport:
 		host, port = hostport.split(':', 1)
 else:
-		host, port = hostport, '9092'
+		host, port = hostport, '9094'
 try:
 		s = socket.socket()
 		s.settimeout(2)

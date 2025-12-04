@@ -258,7 +258,7 @@ The system persists the latest price updates to a MySQL database in the `latest_
 - The scraper code uses `puppeteer-extra` with stealth plugin to drive Chrome. The container image provides a Chrome installation and Xvfb/VNC for a display.
 - The scrapers publish messages via `publish_to_kafka.js` using the `KAFKA_BROKERS` environment variable.
 - To run locally (without Docker) you must have a compatible Chrome and Node.js environment; most development and testing occurs inside the container for environment parity.
-If you run the scrapers outside Docker, set `KAFKA_BROKERS` to a reachable broker list (for example `localhost:9092` when running Kafka locally). Inside Docker Compose use the service DNS name (for example `kafka:9092`).
+If you run the scrapers outside Docker, set `KAFKA_BROKERS` to a reachable broker list (for example `localhost:9094` when running Kafka locally). Inside Docker Compose use the service DNS name (for example `kafka:9092`).
 
 ---
 ## Scrape Groups

@@ -17,7 +17,7 @@ def test_publish_to_kafka_success():
     mock_producer.send.return_value = mock_future
 
     with patch("wealth_tracker.publish_to_kafka.KafkaProducer", return_value=mock_producer):
-        res = publish_to_kafka(data, bootstrap_servers="localhost:9092", topic="test_topic", retries=1)
+        res = publish_to_kafka(data, bootstrap_servers="localhost:9094", topic="test_topic", retries=1)
 
     assert res is True
     mock_producer.send.assert_called_once_with("test_topic", data)
