@@ -138,7 +138,7 @@ async function scrapeWSJ(browser, security, outputDir) {
 
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeWSJ';
-      const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+      const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
       await publishToKafka(data, kafkaTopic, kafkaBrokers);
       logDebug(`Published WSJ data to Kafka topic ${kafkaTopic}`);
     } catch (kafkaErr) {

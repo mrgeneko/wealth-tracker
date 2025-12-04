@@ -199,7 +199,7 @@ async function scrapeYahoo(browser, security, outputDir) {
     // Publish to Kafka
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeYahoo';
-      const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+      const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
       await publishToKafka(data, kafkaTopic, kafkaBrokers);
       logDebug(`Published Yahoo Finance data to Kafka topic ${kafkaTopic}`);
     } catch (kafkaErr) {
@@ -415,7 +415,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         // publish per-security
         try {
           const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeYahoo';
-          const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+          const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
           await publishToKafka(data, kafkaTopic, kafkaBrokers);
         } catch (kafkaErr) { logDebug('Kafka publish error (Yahoo batch): ' + kafkaErr); }
         // write JSON file

@@ -170,7 +170,7 @@ async function scrapeWebull(browser, security, outputDir) {
         // Publish the data object to Kafka
         try {
             const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeWebull';
-            const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+            const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
             await publishToKafka(data, kafkaTopic, kafkaBrokers);
             logDebug(`Published Webull data to Kafka topic ${kafkaTopic}`);
         } catch (kafkaErr) {
