@@ -65,7 +65,22 @@
     "has_after_hours": true,
     "has_bond_prices": false,
     "has_stock_prices": true,
-    "has_previous_close": false
+    "has_previous_close": false,
+    "update_rules": [
+      {
+        "key": "BKLC",
+        "update_windows": [
+          { "start": "09:31", "end": "16:00", "days": ["mon", "tue", "wed", "thu", "fri"] } 
+        ]
+      },
+      {
+        "key": "default",
+        "update_windows": [
+          { "start": "09:31", "end": "23:59", "days": ["mon", "tue", "wed", "thu", "fri"] },
+          { "start": "00:00", "end": "09:29", "days": ["mon", "tue", "wed", "thu", "fri"] }
+        ]
+      }
+    ]
   },
   "marketbeat": {
     "name": "marketbeat",
