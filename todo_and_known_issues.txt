@@ -5,6 +5,13 @@ to determine treasury listing
 https://stockanalysis.com/list/nyseamerican-stocks/
 https://stockanalysis.com/list/sp-500-stocks/
 
+0. BKLC price modeling
+2. function to determine if ticker is a us treasury
+3. when adding a new ticker to dashboard, check ust, nyse, and nasdaq.
+   if not bond call yahoo to get price and stock/etf flag.
+   Test with brk-b and brk.b
+   can getConstructibleUrls be improved with stock/etf/bond flag?
+
 1. symbols assume US stock markets. how to handle other exchanges?
 2. ticker autocomplete?
 2. Store security data

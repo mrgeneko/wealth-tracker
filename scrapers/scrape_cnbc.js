@@ -92,6 +92,11 @@ function parseCNBCHtml(html, security) {
     after_hours_price: '',
     after_hours_change_decimal: '',
     after_hours_change_percent: '',
+    after_hours_time: '',
+    pre_market_price: '',
+    pre_market_change_decimal: '',
+    pre_market_change_percent: '',
+    pre_market_time: '',
     source: 'cnbc',
     capture_time: new Date().toISOString(),
   };
@@ -113,10 +118,24 @@ function parseCNBCHtml(html, security) {
 
           const extQuote = quoteData.ExtendedMktQuote;
           if (extQuote) {
-            data.after_hours_price = cleanNumberText(extQuote.last);
-            data.after_hours_change_decimal = cleanNumberText(extQuote.change);
-            data.after_hours_change_percent = cleanNumberText(extQuote.change_pct);
-            if (!data.regular_time) data.regular_time = parseToIso(extQuote.last_timedate);
+            const extPrice = cleanNumberText(extQuote.last);
+            const extChangeDec = cleanNumberText(extQuote.change);
+            const extChangePct = cleanNumberText(extQuote.change_pct);
+            const extTimeRaw = extQuote.last_timedate || '';
+            const extTimeIso = parseToIso(extTimeRaw);
+            // Check if time is AM (pre-market) or PM (after-hours)
+            if (/AM/i.test(extTimeRaw)) {
+              data.pre_market_price = extPrice;
+              data.pre_market_change_decimal = extChangeDec;
+              data.pre_market_change_percent = extChangePct;
+              data.pre_market_time = extTimeIso;
+            } else {
+              data.after_hours_price = extPrice;
+              data.after_hours_change_decimal = extChangeDec;
+              data.after_hours_change_percent = extChangePct;
+              data.after_hours_time = extTimeIso;
+            }
+            if (!data.regular_time) data.regular_time = extTimeIso;
           }
           logDebug(`Successfully extracted data from embedded JSON for ${ticker}`);
         }
@@ -172,14 +191,42 @@ function parseCNBCHtml(html, security) {
         ]));
       }
 
-      if (!data.after_hours_price) {
+      if (!data.after_hours_price && !data.pre_market_price) {
         const extContainer = $('.QuoteStrip-extendedDataContainer');
         if (extContainer.length) {
-          data.after_hours_price = cleanNumberText(extContainer.find('.QuoteStrip-lastPrice').first().text());
+          const extPrice = cleanNumberText(extContainer.find('.QuoteStrip-lastPrice').first().text());
           const extChangeText = extContainer.find('.QuoteStrip-changeUp, .QuoteStrip-changeDown').first().text();
           const parsedExtChange = parseChangeText(extChangeText);
-          data.after_hours_change_decimal = parsedExtChange.dec || '';
-          data.after_hours_change_percent = parsedExtChange.pct || '';
+          // Find the time string
+          let extTimeText = extContainer.find('.QuoteStrip-extendedLastTradeTime').first().text();
+          if (!extTimeText) {
+            // fallback: look for text like 'After Hours: Last | 6:15 AM EST'
+            const extRawText = extContainer.text();
+            const timeMatch = extRawText.match(/After Hours:\s*Last\s*[|]?\s*([\d:]+\s*[AP]M\s*EST)/i);
+            if (timeMatch) extTimeText = timeMatch[1];
+          }
+          // Always treat AM as pre-market, PM as after-hours
+          if (extTimeText && /AM/i.test(extTimeText)) {
+            data.pre_market_price = extPrice;
+            data.pre_market_change_decimal = parsedExtChange.dec || '';
+            data.pre_market_change_percent = parsedExtChange.pct || '';
+            data.pre_market_time = parseToIso(extTimeText);
+            // Clear any after-hours fields
+            data.after_hours_price = '';
+            data.after_hours_change_decimal = '';
+            data.after_hours_change_percent = '';
+            data.after_hours_time = '';
+          } else if (extTimeText && /PM/i.test(extTimeText)) {
+            data.after_hours_price = extPrice;
+            data.after_hours_change_decimal = parsedExtChange.dec || '';
+            data.after_hours_change_percent = parsedExtChange.pct || '';
+            data.after_hours_time = parseToIso(extTimeText);
+          } else {
+            // If time not found, default to after-hours
+            data.after_hours_price = extPrice;
+            data.after_hours_change_decimal = parsedExtChange.dec || '';
+            data.after_hours_change_percent = parsedExtChange.pct || '';
+          }
         }
       }
 
