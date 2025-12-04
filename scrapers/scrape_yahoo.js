@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const mysql = require('mysql2/promise');
 // Load yahoo-finance2 in a way that works for both CJS and ESM package exports.
 let _yahooModule = null;
 async function ensureYahoo() {
@@ -167,10 +168,23 @@ async function scrapeYahoo(browser, security, outputDir) {
     let quote = null;
     try {
       quote = await yahoo.quote(tickerRaw);
+      // Write full Yahoo API response to a .json file
+      try {
+        const rawFileName = `${getDateTimeString()}.${sanitizeForFilename(security.key)}.yahoo_raw.json`;
+        const rawFilePath = path.join(outputDir, rawFileName);
+        fs.writeFileSync(rawFilePath, JSON.stringify(quote, null, 2), 'utf-8');
+      } catch (e) { logDebug('Error saving Yahoo raw JSON: ' + e); }
     } catch (e) {
       logDebug('Yahoo quote fetch error for ' + tickerRaw + ': ' + e);
       // try a raw symbol only attempt
-      try { quote = await yahoo.quote(ticker); } catch (e2) { logDebug('Yahoo fallback quote fetch error: ' + e2); }
+      try {
+        quote = await yahoo.quote(ticker);
+        try {
+          const rawFileName = `${getDateTimeString()}.${sanitizeForFilename(security.key)}.yahoo_raw.json`;
+          const rawFilePath = path.join(outputDir, rawFileName);
+          fs.writeFileSync(rawFilePath, JSON.stringify(quote, null, 2), 'utf-8');
+        } catch (e) { logDebug('Error saving Yahoo raw JSON (fallback): ' + e); }
+      } catch (e2) { logDebug('Yahoo fallback quote fetch error: ' + e2); }
     }
 
     if (!quote) {
@@ -316,6 +330,12 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         while (sAttempt <= maxRetries) {
           try {
             single = await yahoo.quote(sym);
+            // Write full Yahoo API response to a .json file
+            try {
+              const rawFileName = `${getDateTimeString()}.${sanitizeForFilename(sym)}.yahoo_raw.json`;
+              const rawFilePath = path.join(outputDir, rawFileName);
+              fs.writeFileSync(rawFilePath, JSON.stringify(single, null, 2), 'utf-8');
+            } catch (e) { logDebug('Error saving Yahoo raw JSON (batch single): ' + e); }
             break;
           } catch (e) {
             const status = (e && (e.status || (e.response && e.response.status))) || (String(e && e.message).includes('429') ? 429 : undefined);
@@ -340,6 +360,13 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
         // pacing between single requests
         await sleep(jitter(Math.max(1000, Math.floor(baseDelayMs / Math.max(1, chunkSize)))));
       }
+    } else {
+      // Write full Yahoo API batch response to a .json file
+      try {
+        const rawFileName = `${getDateTimeString()}.yahoo_batch_raw.json`;
+        const rawFilePath = path.join(outputDir, rawFileName);
+        fs.writeFileSync(rawFilePath, JSON.stringify(chunkRes, null, 2), 'utf-8');
+      } catch (e) { logDebug('Error saving Yahoo raw JSON (batch): ' + e); }
     }
 
     if (!Array.isArray(chunkRes)) {
