@@ -8,6 +8,7 @@ const path = require('path');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
+const { loadAllTickers } = require('./ticker_registry');
 
 const app = express();
 
@@ -362,6 +363,17 @@ app.get('/api/assets', async (req, res) => {
 });
 
 const LOGS_DIR = '/usr/src/app/logs';
+
+// API to get all tickers for autocomplete
+app.get('/api/tickers', (req, res) => {
+    try {
+        const tickers = loadAllTickers();
+        res.json(tickers);
+    } catch (err) {
+        console.error('Error loading tickers:', err);
+        res.status(500).json({ error: 'Failed to load tickers' });
+    }
+});
 
 app.get('/api/logs', async (req, res) => {
     try {

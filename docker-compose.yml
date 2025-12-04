@@ -52,6 +52,7 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
       - ./config/assets_liabilities.json:/assets_liabilities.json:ro
+      - ./config:/app/config:ro
     ports:
       - "3001:3001"
 
