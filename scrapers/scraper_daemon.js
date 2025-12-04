@@ -520,8 +520,8 @@ async function runCycle(browser, outputDir) {
 		logDebug('Begin investing.com scrape');
 		// Prefer configuration from config.json
 		const attrs = getConfig(investingWatchlistsName);
-		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
-			for (const item of attrs.items) {
+		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
+			for (const item of attrs.watchlists) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`investingcom watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
@@ -560,8 +560,8 @@ async function runCycle(browser, outputDir) {
 		} catch (e) {
 			logDebug('webull attrs: <unstringifiable> ' + String(e));
 		}
-		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
-			for (const item of attrs.items) {
+		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
+			for (const item of attrs.watchlists) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`webull watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
@@ -584,8 +584,8 @@ async function runCycle(browser, outputDir) {
 	if (shouldRunTask(tvSettings, tvMarker)) {
 		logDebug('Begin tradingview watchlists scrape');
 		const attrs = getConfig(tvWatchlistsName);
-		if (attrs && attrs.items && Array.isArray(attrs.items) && attrs.url) {
-			for (const item of attrs.items) {
+		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
+			for (const item of attrs.watchlists) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`tradingview watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
