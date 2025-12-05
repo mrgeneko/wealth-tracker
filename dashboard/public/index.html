@@ -74,6 +74,15 @@
         .close:hover { color: white; }
         
         .form-group { margin-bottom: 15px; }
+            }
+
+            /* Prev-close small info icon (tooltip) */
+            .prev-close-info {
+                font-size: 0.75em;
+                margin-left: 6px;
+                color: #bbb;
+                cursor: help;
+                vertical-align: middle;
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #e0e0e0; }
         .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #555; border-radius: 4px; background-color: #333; color: #fff; }
         
@@ -913,14 +922,20 @@
                 const prevCloseCell = document.getElementById(`prevClose-${sym}`);
                 if (prevCloseCell) {
                     // Only update the cell if the incoming data contains a valid prev close.
-                    // If we receive an empty or invalid prev-close we intentionally do
-                    // nothing so the existing on-screen Prev Close is preserved.
-                    // That way, scrapers that don't populate previous_close_price can't
-                    // inadvertently zero-out the UI.
                     if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
                         const parsedPrev = parseFloat(newPriceData.previous_close_price);
                         if (!isNaN(parsedPrev) && parsedPrev > 0) {
-                            prevCloseCell.textContent = formatNumber(parsedPrev);
+                            // Build tooltip from metadata if available
+                            const sourceMeta = newPriceData.prev_close_source || newPriceData.previous_close_source || newPriceData.source || (oldPriceData && oldPriceData.prev_close_source) || '';
+                            const timeMeta = newPriceData.prev_close_time || newPriceData.previous_close_time || newPriceData.capture_time || (oldPriceData && oldPriceData.prev_close_time) || '';
+                            let tooltip = '';
+                            if (sourceMeta) tooltip += `Source: ${sourceMeta}`;
+                            if (timeMeta) tooltip += (tooltip ? '\n' : '') + `Time: ${timeMeta}`;
+                            if (tooltip) {
+                                prevCloseCell.innerHTML = `${formatNumber(parsedPrev)} <span class="prev-close-info" title="${escapeHtml(tooltip)}">ℹ</span>`;
+                            } else {
+                                prevCloseCell.textContent = formatNumber(parsedPrev);
+                            }
                         } else {
                             // incoming invalid value: do not overwrite existing cell
                         }
@@ -1282,7 +1297,15 @@
                 rowInfo.valueChange = symTotalValueChange;
                 rowInfo.total = symTotalValue;
                 
-                rowHtml += `<td id="prevClose-${sym}">${formatNumber(prevClose)}</td>`;
+                // Build a tooltip showing prev-close source & time (if available)
+                let prevCloseTooltip = '';
+                if (prevClose && prevClose !== 0) {
+                    const prevCloseSource = (currentPrices[sym] && (currentPrices[sym].prev_close_source || currentPrices[sym].previous_close_source)) || (oldPrices[sym] && (oldPrices[sym].prev_close_source || oldPrices[sym].previous_close_source)) || '';
+                    const prevCloseTime = (currentPrices[sym] && (currentPrices[sym].prev_close_time || currentPrices[sym].previous_close_time || currentPrices[sym].capture_time)) || (oldPrices[sym] && (oldPrices[sym].prev_close_time || oldPrices[sym].previous_close_time || oldPrices[sym].capture_time)) || '';
+                    if (prevCloseSource) prevCloseTooltip += `Source: ${prevCloseSource}`;
+                    if (prevCloseTime) prevCloseTooltip += (prevCloseTooltip ? '\n' : '') + `Time: ${prevCloseTime}`;
+                }
+                rowHtml += `<td id="prevClose-${sym}" ${prevCloseTooltip ? `title="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}${prevCloseTooltip ? ` <span class="prev-close-info" title="${escapeHtml(prevCloseTooltip)}">ℹ</span>` : ''}</td>`;
                 rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
                 
                 // Check for change and change% column changes
