@@ -114,78 +114,79 @@ function parseStocktwitsHtml(html, security) {
       ticker.replace(/\./g, '-'), // BRK.B -> BRK-B
     ];
     
-    let symbolMatch = null;
-    for (const tickerVar of tickerVariations) {
-      const symbolPattern = new RegExp(`"symbol"\\s*:\\s*"${tickerVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'i');
-      symbolMatch = html.match(symbolPattern);
-      if (symbolMatch) break;
+    // Strategy: Find priceData blocks and match by Symbol/Identifier field
+    // The priceData contains a "Symbol" or "Identifier" field that identifies which ticker it belongs to
+    const priceDataPattern = /"priceData"\s*:\s*\{[^}]+\}/g;
+    let priceDataMatch;
+    let foundPriceData = null;
+    
+    while ((priceDataMatch = priceDataPattern.exec(html)) !== null) {
+      const pdBlock = priceDataMatch[0];
+      // Check if this priceData is for our ticker
+      for (const tickerVar of tickerVariations) {
+        const escapedTicker = tickerVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match Symbol or Identifier field
+        const symbolMatch = pdBlock.match(new RegExp(`"(?:Symbol|Identifier)"\\s*:\\s*"${escapedTicker}"`, 'i'));
+        if (symbolMatch) {
+          foundPriceData = pdBlock;
+          break;
+        }
+      }
+      if (foundPriceData) break;
     }
     
-    if (symbolMatch) {
-      // Found the symbol. Now look for "priceData" after it.
-      const afterSymbol = html.substring(symbolMatch.index);
-      const priceDataMatch = afterSymbol.match(/"priceData"\s*:\s*(\{.*?\})/);
-      
-      if (priceDataMatch) {
-        // We have a candidate JSON string. It might be cut off if we just match non-greedy until },
-        // because the object might contain nested braces.
-        // But priceData usually contains simple key-values.
-        // Let's try to parse it.
-        try {
-            // Heuristic: match until the matching closing brace.
-            // Since regex can't do recursive balancing, we'll take a chunk and try to parse.
-            // Or we can just regex extract the fields we need from the string.
-            const pdStr = priceDataMatch[1];
-            
-            // Extract fields using regex from the JSON string to avoid parsing issues
-            const extractVal = (key) => {
-                const m = pdStr.match(new RegExp(`"${key}"\\s*:\\s*(".*?"|[0-9.-]+|null|true|false)`, 'i'));
-                if (m) {
-                    let val = m[1];
-                    if (val.startsWith('"')) val = val.slice(1, -1);
-                    return val === 'null' ? '' : val;
-                }
-                return '';
-            };
+    if (foundPriceData) {
+      try {
+        // Extract the JSON object from the priceData match
+        const pdStr = foundPriceData.replace(/^"priceData"\s*:\s*/, '');
+        
+        // Extract fields using regex from the JSON string
+        const extractVal = (key) => {
+          const m = pdStr.match(new RegExp(`"${key}"\\s*:\\s*(".*?"|[0-9.-]+|null|true|false)`, 'i'));
+          if (m) {
+            let val = m[1];
+            if (val.startsWith('"')) val = val.slice(1, -1);
+            return val === 'null' ? '' : val;
+          }
+          return '';
+        };
 
-            regular_last_price = cleanNumberText(extractVal('Last'));
-            regular_change_decimal = cleanNumberText(extractVal('Change'));
-            regular_change_percent = cleanNumberText(extractVal('PercentChange'));
-            previous_close_price = cleanNumberText(extractVal('PreviousClose'));
-            
-            // Extended hours
-            const extPrice = extractVal('ExtendedHoursPrice');
-            if (extPrice) {
-              const extChangeDec = cleanNumberText(extractVal('ExtendedHoursChange'));
-              const extChangePct = cleanNumberText(extractVal('ExtendedHoursPercentChange'));
-              const extTime = extractVal('ExtendedHoursDateTime');
-              const extType = extractVal('ExtendedHoursType'); // May contain 'pre-market' or 'after-hours'
-              
-              // Check HTML for "Pre-Market" indicator if not in JSON
-              const isPreMarket = /pre[-\s]?market/i.test(extType) || /Pre[-\s]?Market/i.test(html);
-              
-              if (isPreMarket) {
-                pre_market_price = cleanNumberText(extPrice);
-                pre_market_change_decimal = extChangeDec;
-                pre_market_change_percent = extChangePct;
-                if (extTime) pre_market_time = extTime;
-                extendedHoursType = 'pre-market';
-              } else {
-                after_hours_price = cleanNumberText(extPrice);
-                after_hours_change_decimal = extChangeDec;
-                after_hours_change_percent = extChangePct;
-                if (extTime) after_hours_time = extTime;
-                extendedHoursType = 'after-hours';
-              }
-            }
-            
-            // Time
-            const dt = extractVal('DateTime'); // "2025-11-26 09:42:08"
-            if (dt) regular_time = dt;
-            
-        } catch (e) {
-            logDebug('Error parsing Stocktwits JSON snippet: ' + e);
+        regular_last_price = cleanNumberText(extractVal('Last'));
+        regular_change_decimal = cleanNumberText(extractVal('Change'));
+        regular_change_percent = cleanNumberText(extractVal('PercentChange'));
+        previous_close_price = cleanNumberText(extractVal('PreviousClose'));
+        
+        // Extended hours
+        const extPrice = extractVal('ExtendedHoursPrice');
+        if (extPrice) {
+          const extChangeDec = cleanNumberText(extractVal('ExtendedHoursChange'));
+          const extChangePct = cleanNumberText(extractVal('ExtendedHoursPercentChange'));
+          const extTime = extractVal('ExtendedHoursDateTime');
+          const extType = extractVal('ExtendedHoursType'); // 'PostMarket' or 'PreMarket'
+          
+          const isPreMarket = /pre[-\s]?market/i.test(extType);
+          
+          if (isPreMarket) {
+            pre_market_price = cleanNumberText(extPrice);
+            pre_market_change_decimal = extChangeDec;
+            pre_market_change_percent = extChangePct;
+            if (extTime) pre_market_time = extTime;
+            extendedHoursType = 'pre-market';
+          } else {
+            after_hours_price = cleanNumberText(extPrice);
+            after_hours_change_decimal = extChangeDec;
+            after_hours_change_percent = extChangePct;
+            if (extTime) after_hours_time = extTime;
+            extendedHoursType = 'after-hours';
+          }
         }
+        
+        // Time
+        const dt = extractVal('DateTime'); // "2025-11-26 09:42:08"
+        if (dt) regular_time = dt;
+        
+      } catch (e) {
+        logDebug('Error parsing Stocktwits JSON snippet: ' + e);
       }
     }
 

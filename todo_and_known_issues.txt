@@ -42,3 +42,4 @@ should there be multiple 'logins'?
 #   marketbeat       |     ?      |    some?    |     X     |         |
 #   nasdaq           |            |      X      |     X     | 
 #   cnbc (times out) |     ?      |      X      |     X     |         |             |
+#.  stockmarketwatch - some tickers (IAUM) have to price data except in tradingview chart widget
