@@ -1,0 +1,36 @@
+{
+  "description": "Source priority configuration for previous_close_price merging. Lower index = higher priority.",
+  "priority": [
+    "yahoo",
+    "google",
+    "nasdaq",
+    "cnbc",
+    "wsj",
+    "ycharts",
+    "marketbeat",
+    "stockanalysis",
+    "moomoo",
+    "robinhood",
+    "investingcom",
+    "stockmarketwatch",
+    "stocktwits"
+  ],
+  "weights": {
+    "yahoo": 1.0,
+    "google": 0.98,
+    "nasdaq": 0.95,
+    "cnbc": 0.9,
+    "wsj": 0.9,
+    "ycharts": 0.8,
+    "marketbeat": 0.75,
+    "stockanalysis": 0.75,
+    "moomoo": 0.7,
+    "robinhood": 0.7,
+    "investingcom": 0.65,
+    "stockmarketwatch": 0.6,
+    "stocktwits": 0.5
+  },
+  "default_weight": 0.5,
+  "recency_threshold_minutes": 60,
+  "notes": "Google and official exchanges are preferred. Stocktwits is lowest priority as it often lacks prev-close data."
+}

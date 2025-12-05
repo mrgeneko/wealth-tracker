@@ -74,6 +74,15 @@
         .close:hover { color: white; }
         
         .form-group { margin-bottom: 15px; }
+            }
+
+            /* Prev-close small info icon (tooltip) */
+            .prev-close-info {
+                font-size: 0.75em;
+                margin-left: 6px;
+                color: #bbb;
+                cursor: help;
+                vertical-align: middle;
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #e0e0e0; }
         .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #555; border-radius: 4px; background-color: #333; color: #fff; }
         
@@ -802,7 +811,31 @@
                 if (!newPriceData) return;
                 
                 let price = newPriceData.price;
-                let prevClose = newPriceData.previous_close_price || 0;
+                // Prefer a valid previous_close_price from the incoming data.
+                // RATIONALE: Some scrapers (or intermittent updates) may not provide
+                // `previous_close_price` on every update, or might send an empty
+                // string / zero. If we blindly set prev-close to that, the dashboard
+                // will display 0 and compute changes from an incorrect base.
+                // To protect the UI value we:
+                // 1) Accept an incoming previous_close_price only if it's a valid
+                //    positive number (parseFloat > 0).
+                // 2) If the incoming value is missing/invalid, fall back to the
+                //    previously-known value (from oldPriceData) if available.
+                // This mirrors the server-side cache behavior and prevents noisy
+                // scrapers from erasing a valid Prev Close.
+                let prevClose = 0;
+                if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
+                    const parsedPrev = parseFloat(newPriceData.previous_close_price);
+                    if (!isNaN(parsedPrev) && parsedPrev > 0) {
+                        prevClose = parsedPrev;
+                    } else if (oldPriceData && oldPriceData.previous_close_price) {
+                        // incoming prev close is present but invalid (e.g. 0 or NaN) — fall back to old
+                        prevClose = parseFloat(oldPriceData.previous_close_price) || 0;
+                    }
+                } else if (oldPriceData && oldPriceData.previous_close_price) {
+                    // incoming prev close missing — reuse the old value
+                    prevClose = parseFloat(oldPriceData.previous_close_price) || 0;
+                }
                 let changeVal = price - prevClose;
                 let changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                 let timeStr = '-';
@@ -888,7 +921,30 @@
                 // Update prevClose cell
                 const prevCloseCell = document.getElementById(`prevClose-${sym}`);
                 if (prevCloseCell) {
-                    prevCloseCell.textContent = formatNumber(prevClose);
+                    // Only update the cell if the incoming data contains a valid prev close.
+                    if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
+                        const parsedPrev = parseFloat(newPriceData.previous_close_price);
+                        if (!isNaN(parsedPrev) && parsedPrev > 0) {
+                            // Build tooltip from metadata if available
+                            const sourceMeta = newPriceData.prev_close_source || newPriceData.previous_close_source || newPriceData.source || (oldPriceData && oldPriceData.prev_close_source) || '';
+                            const timeMeta = newPriceData.prev_close_time || newPriceData.previous_close_time || newPriceData.capture_time || (oldPriceData && oldPriceData.prev_close_time) || '';
+                            let tooltip = '';
+                            if (sourceMeta) tooltip += `Source: ${sourceMeta}`;
+                            if (timeMeta) tooltip += (tooltip ? '\n' : '') + `Time: ${timeMeta}`;
+                            if (tooltip) {
+                                prevCloseCell.innerHTML = `${formatNumber(parsedPrev)} <span class="prev-close-info" title="${escapeHtml(tooltip)}">ℹ</span>`;
+                            } else {
+                                prevCloseCell.textContent = formatNumber(parsedPrev);
+                            }
+                        } else {
+                            // incoming invalid value: do not overwrite existing cell
+                        }
+                    } else {
+                        // incoming value is missing: do not overwrite existing cell
+                        if (oldPriceData && oldPriceData.previous_close_price) {
+                            console.warn(`[PrevClose] Skipping update for ${sym}, incoming prev close missing — preserving previous value ${oldPriceData.previous_close_price}`);
+                        }
+                    }
                 }
                 
                 // Update change cell
@@ -1111,7 +1167,30 @@
                 
                 if (currentPrices[sym]) {
                     price = currentPrices[sym].price;
-                    prevClose = currentPrices[sym].previous_close_price || 0;
+                    // Prefer a valid previous_close_price from the currentPrices object.
+                    // NOTE: When the dashboard performs a full render (e.g. page refresh)
+                    // or is fed a fresh snapshot of `currentPrices`, some scrapers may
+                    // still provide no previous_close_price for certain tickers. To
+                    // maintain a consistent UX and avoid computing changes from a
+                    // bogus zero base, we only accept incoming prev-close values
+                    // that are valid positive numbers. When a current snapshot lacks
+                    // a valid previous_close_price, we fall back to the previously
+                    // known value (from oldPrices) — this mirrors server-side cache
+                    // behavior and prevents accidental erasure of a valid Prev Close.
+                    prevClose = 0;
+                    if (currentPrices[sym].previous_close_price !== undefined && currentPrices[sym].previous_close_price !== null && currentPrices[sym].previous_close_price !== '') {
+                        const parsedPrev = parseFloat(currentPrices[sym].previous_close_price);
+                        if (!isNaN(parsedPrev) && parsedPrev > 0) {
+                                prevClose = parsedPrev;
+                            } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                                // fallback to prev value if current data doesn't provide valid prev close
+                                prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
+                                console.warn(`[PrevClose] Current data for ${sym} missing valid prev close — falling back to previous value ${prevClose}`);
+                            }
+                    } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                        // Fall back to previously known value when current has none
+                        prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
+                    }
                     changeVal = price - prevClose;
                     changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                     console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
@@ -1218,7 +1297,15 @@
                 rowInfo.valueChange = symTotalValueChange;
                 rowInfo.total = symTotalValue;
                 
-                rowHtml += `<td id="prevClose-${sym}">${formatNumber(prevClose)}</td>`;
+                // Build a tooltip showing prev-close source & time (if available)
+                let prevCloseTooltip = '';
+                if (prevClose && prevClose !== 0) {
+                    const prevCloseSource = (currentPrices[sym] && (currentPrices[sym].prev_close_source || currentPrices[sym].previous_close_source)) || (oldPrices[sym] && (oldPrices[sym].prev_close_source || oldPrices[sym].previous_close_source)) || '';
+                    const prevCloseTime = (currentPrices[sym] && (currentPrices[sym].prev_close_time || currentPrices[sym].previous_close_time || currentPrices[sym].capture_time)) || (oldPrices[sym] && (oldPrices[sym].prev_close_time || oldPrices[sym].previous_close_time || oldPrices[sym].capture_time)) || '';
+                    if (prevCloseSource) prevCloseTooltip += `Source: ${prevCloseSource}`;
+                    if (prevCloseTime) prevCloseTooltip += (prevCloseTooltip ? '\n' : '') + `Time: ${prevCloseTime}`;
+                }
+                rowHtml += `<td id="prevClose-${sym}" ${prevCloseTooltip ? `title="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}${prevCloseTooltip ? ` <span class="prev-close-info" title="${escapeHtml(prevCloseTooltip)}">ℹ</span>` : ''}</td>`;
                 rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
                 
                 // Check for change and change% column changes
