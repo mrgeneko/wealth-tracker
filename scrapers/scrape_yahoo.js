@@ -131,7 +131,7 @@ function mapYahooQuoteToData(quote, securityKey) {
 
   return {
     key: sanitizeForFilename(securityKey),
-    regular_last_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
+    regular_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
     regular_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
     regular_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
     regular_time: qm ? new Date(qm).toISOString() : '',

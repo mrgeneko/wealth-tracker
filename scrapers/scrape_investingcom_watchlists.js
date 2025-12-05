@@ -248,7 +248,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 
 					dataObjects.push({
 						key: rowData["symbol"],
-						regular_last_price: rowData["last"],
+						regular_price: rowData["last"],
 						regular_change_decimal: rowData["chg"],
 						regular_change_percent: rowData["chgpercent"],
 						regular_time: qTime,

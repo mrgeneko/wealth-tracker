@@ -40,7 +40,7 @@ async function scrapeWebull(browser, security, outputDir) {
         const $ = cheerio.load(html);
         //logDebug('webull html:' + html);
 
-        let regular_last_price = '';
+        let regular_price = '';
         let regular_change_decimal = '';
         let regular_change_percent = '';
         let previous_close_price = '';
@@ -74,7 +74,7 @@ async function scrapeWebull(browser, security, outputDir) {
                             const tickerObj = state.tickerMap[tickerKeys[0]];
                             if (tickerObj.tickerRT) {
                                 const rt = tickerObj.tickerRT;
-                                regular_last_price = rt.close || '';
+                                regular_price = rt.close || '';
                                 regular_change_decimal = rt.change || '';
                                 regular_change_percent = rt.changeRatio || '';
                                 previous_close_price = rt.preClose || '';
@@ -149,7 +149,7 @@ async function scrapeWebull(browser, security, outputDir) {
 
         data = {
             key: ticker,
-            regular_last_price,
+            regular_price,
             regular_change_decimal,
             regular_change_percent,
             regular_time,
