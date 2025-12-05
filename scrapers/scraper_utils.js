@@ -24,7 +24,7 @@ function getDateTimeString() {
 // Cache for the datetime string used in log file naming
 let cachedDateTimeString = null;
 
-function getTimestampedLogPath(prefix = 'scraper_daemon') {
+function getTimestampedLogPath(prefix = 'scrape_daemon') {
     if (!cachedDateTimeString) {
         cachedDateTimeString = getDateTimeString();
     }
@@ -50,7 +50,7 @@ function logDebug(msg, logPath) {
         try {
             const fallbackDir = './logs';
             if (!fs.existsSync(fallbackDir)) fs.mkdirSync(fallbackDir, { recursive: true });
-            const fname = (logPath && path.basename(logPath)) || path.basename(getTimestampedLogPath('scraper_daemon'));
+            const fname = (logPath && path.basename(logPath)) || path.basename(getTimestampedLogPath('scrape_daemon'));
             const fallbackPath = path.join(fallbackDir, fname);
             fs.appendFileSync(fallbackPath, line);
         } catch (e2) {
