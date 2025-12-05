@@ -102,7 +102,11 @@ function parseStockMarketWatchHtml(html, security) {
     // Use specific selectors based on the actual StockMarketWatch HTML structure
     
     // Main price: ".stock-current-price" contains "491.86 USD"
-    const mainPriceText = $('.stock-current-price').first().text().trim();
+    const mainPriceEl = $('.stock-current-price').first();
+    if (!mainPriceEl.length) {
+      logDebug(`StockMarketWatch: Expected element .stock-current-price not found for ${ticker}. Page may use chart-only template.`);
+    }
+    const mainPriceText = mainPriceEl.text().trim();
     if (mainPriceText) {
       const priceMatch = mainPriceText.match(/([\d,]+\.?\d*)/);
       if (priceMatch) {
