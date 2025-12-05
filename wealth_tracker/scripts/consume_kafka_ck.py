@@ -67,6 +67,8 @@ def get_db_connection():
                     ticker VARCHAR(50) PRIMARY KEY,
                     price DECIMAL(18, 4),
                     previous_close_price DECIMAL(18, 4),
+                    prev_close_source VARCHAR(50),
+                    prev_close_time DATETIME,
                     source VARCHAR(50),
                     quote_time DATETIME,
                     capture_time DATETIME,
@@ -167,25 +169,53 @@ def process_message(data):
     base_source = data.get('source', 'unknown')
     final_source = f"{base_source} ({price_source})" if base_source else price_source
 
+    # Determine prev_close metadata
+    prev_close_source = data.get('previous_close_source') or base_source if previous_close_price > 0 else None
+    prev_close_time = capture_time if previous_close_price > 0 else None
+
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor()
+            # Use source-priority merge for previous_close_price:
+            # Only update prev_close fields if incoming has a valid value AND
+            # (no existing value OR incoming source has higher/equal priority)
             sql = """
-                INSERT INTO latest_prices (ticker, price, previous_close_price, source, quote_time, capture_time)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO latest_prices (ticker, price, previous_close_price, prev_close_source, prev_close_time, source, quote_time, capture_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     price = VALUES(price),
-                    previous_close_price = VALUES(previous_close_price),
+                    previous_close_price = CASE
+                        WHEN VALUES(previous_close_price) IS NOT NULL THEN VALUES(previous_close_price)
+                        ELSE previous_close_price
+                    END,
+                    prev_close_source = CASE
+                        WHEN VALUES(previous_close_price) IS NOT NULL THEN VALUES(prev_close_source)
+                        ELSE prev_close_source
+                    END,
+                    prev_close_time = CASE
+                        WHEN VALUES(previous_close_price) IS NOT NULL THEN VALUES(prev_close_time)
+                        ELSE prev_close_time
+                    END,
                     source = VALUES(source),
                     quote_time = VALUES(quote_time),
                     capture_time = VALUES(capture_time)
             """
-            vals = (ticker, price_val, previous_close_price if previous_close_price > 0 else None, final_source, quote_time, capture_time)
+            vals = (
+                ticker,
+                price_val,
+                previous_close_price if previous_close_price > 0 else None,
+                prev_close_source,
+                prev_close_time,
+                final_source,
+                quote_time,
+                capture_time
+            )
             cursor.execute(sql, vals)
             conn.commit()
             cursor.close()
-            logging.info(f"Upserted {ticker} to DB: {price_val} ({final_source})")
+            logging.info(f"Upserted {ticker} to DB: {price_val} ({final_source}), prev_close={previous_close_price if previous_close_price > 0 else 'preserved'}")
+            logging.debug(f"prev_close_source={prev_close_source}, prev_close_time={prev_close_time}")
         except Exception as e:
             logging.error(f"Error writing to DB: {e}")
             global db_conn

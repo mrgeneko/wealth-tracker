@@ -802,7 +802,31 @@
                 if (!newPriceData) return;
                 
                 let price = newPriceData.price;
-                let prevClose = newPriceData.previous_close_price || 0;
+                // Prefer a valid previous_close_price from the incoming data.
+                // RATIONALE: Some scrapers (or intermittent updates) may not provide
+                // `previous_close_price` on every update, or might send an empty
+                // string / zero. If we blindly set prev-close to that, the dashboard
+                // will display 0 and compute changes from an incorrect base.
+                // To protect the UI value we:
+                // 1) Accept an incoming previous_close_price only if it's a valid
+                //    positive number (parseFloat > 0).
+                // 2) If the incoming value is missing/invalid, fall back to the
+                //    previously-known value (from oldPriceData) if available.
+                // This mirrors the server-side cache behavior and prevents noisy
+                // scrapers from erasing a valid Prev Close.
+                let prevClose = 0;
+                if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
+                    const parsedPrev = parseFloat(newPriceData.previous_close_price);
+                    if (!isNaN(parsedPrev) && parsedPrev > 0) {
+                        prevClose = parsedPrev;
+                    } else if (oldPriceData && oldPriceData.previous_close_price) {
+                        // incoming prev close is present but invalid (e.g. 0 or NaN) — fall back to old
+                        prevClose = parseFloat(oldPriceData.previous_close_price) || 0;
+                    }
+                } else if (oldPriceData && oldPriceData.previous_close_price) {
+                    // incoming prev close missing — reuse the old value
+                    prevClose = parseFloat(oldPriceData.previous_close_price) || 0;
+                }
                 let changeVal = price - prevClose;
                 let changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                 let timeStr = '-';
@@ -888,7 +912,24 @@
                 // Update prevClose cell
                 const prevCloseCell = document.getElementById(`prevClose-${sym}`);
                 if (prevCloseCell) {
-                    prevCloseCell.textContent = formatNumber(prevClose);
+                    // Only update the cell if the incoming data contains a valid prev close.
+                    // If we receive an empty or invalid prev-close we intentionally do
+                    // nothing so the existing on-screen Prev Close is preserved.
+                    // That way, scrapers that don't populate previous_close_price can't
+                    // inadvertently zero-out the UI.
+                    if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
+                        const parsedPrev = parseFloat(newPriceData.previous_close_price);
+                        if (!isNaN(parsedPrev) && parsedPrev > 0) {
+                            prevCloseCell.textContent = formatNumber(parsedPrev);
+                        } else {
+                            // incoming invalid value: do not overwrite existing cell
+                        }
+                    } else {
+                        // incoming value is missing: do not overwrite existing cell
+                        if (oldPriceData && oldPriceData.previous_close_price) {
+                            console.warn(`[PrevClose] Skipping update for ${sym}, incoming prev close missing — preserving previous value ${oldPriceData.previous_close_price}`);
+                        }
+                    }
                 }
                 
                 // Update change cell
@@ -1111,7 +1152,30 @@
                 
                 if (currentPrices[sym]) {
                     price = currentPrices[sym].price;
-                    prevClose = currentPrices[sym].previous_close_price || 0;
+                    // Prefer a valid previous_close_price from the currentPrices object.
+                    // NOTE: When the dashboard performs a full render (e.g. page refresh)
+                    // or is fed a fresh snapshot of `currentPrices`, some scrapers may
+                    // still provide no previous_close_price for certain tickers. To
+                    // maintain a consistent UX and avoid computing changes from a
+                    // bogus zero base, we only accept incoming prev-close values
+                    // that are valid positive numbers. When a current snapshot lacks
+                    // a valid previous_close_price, we fall back to the previously
+                    // known value (from oldPrices) — this mirrors server-side cache
+                    // behavior and prevents accidental erasure of a valid Prev Close.
+                    prevClose = 0;
+                    if (currentPrices[sym].previous_close_price !== undefined && currentPrices[sym].previous_close_price !== null && currentPrices[sym].previous_close_price !== '') {
+                        const parsedPrev = parseFloat(currentPrices[sym].previous_close_price);
+                        if (!isNaN(parsedPrev) && parsedPrev > 0) {
+                                prevClose = parsedPrev;
+                            } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                                // fallback to prev value if current data doesn't provide valid prev close
+                                prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
+                                console.warn(`[PrevClose] Current data for ${sym} missing valid prev close — falling back to previous value ${prevClose}`);
+                            }
+                    } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                        // Fall back to previously known value when current has none
+                        prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
+                    }
                     changeVal = price - prevClose;
                     changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                     console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
