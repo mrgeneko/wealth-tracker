@@ -332,3 +332,11 @@ th:first-child { background-color: #252525; z-index: 2; }
     background-color: transparent;
     z-index: auto;
 }
+
+/* Logs Modal - Large size (98% window) */
+.logs-modal-content {
+    width: 98% !important;
+    height: 98% !important;
+    max-width: none !important;
+    margin: 1% auto !important;
+}
