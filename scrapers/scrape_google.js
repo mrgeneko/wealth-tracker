@@ -63,6 +63,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		let regular_price = '';
 		let regular_change_decimal = '';
 		let regular_change_percent = '';
+		let regular_time = '';
 		let previous_close_price = '';
 		let after_hours_price = '';
 		let after_hours_change_decimal = '';
@@ -72,131 +73,105 @@ async function scrapeGoogle(browser, security, outputDir) {
 		let pre_market_price_change_decimal = '';
 		let pre_market_price_change_percent = '';
 		try {
-			const main_element = $('[class="Gfxi4"]').first();
-			const price_element = main_element.find('[class="YMlKec fxKbKc"]').first();
-			if (price_element.length) {
-				regular_price = price_element.text().replace('$', '').replace(',', '');
-			}
-			// Previous close
-			const prev_close_label = $('div').filter((i, el) => $(el).text().trim().toLowerCase() === 'previous close').first();
-			if (prev_close_label.length) {
-				const parent = prev_close_label.closest('div.gyFHrc');
-				if (parent.length) {
-					const price_div = parent.find('div.P6K39c').first();
-					if (price_div.length) {
-						previous_close_price = price_div.text().replace('$', '').replace(',', '').trim();
-					}
-				}
-			}
-			// Price change
-			let change_element = main_element.find('[class="P2Luy Ez2Ioe ZYVHBb"], [class="P2Luy Ebnabc ZYVHBb"]').first();
-			if (change_element.length) {
-				const change_text = change_element.text();
-				if (change_text.startsWith('+') || change_text.startsWith('-')) {
-					const parts = change_text.split(' ');
-					regular_change_decimal = parts[0];
-					// Percent is in a sibling span with class JwB6zf
-					const percent_element = main_element.find('[class="JwB6zf"]').first();
-					if (percent_element.length) {
-						regular_change_percent = (change_text[0] || '') + percent_element.text();
-					}
-				}
-			}
-			// After/pre-market
-			const ext_hours_section = $('[jsname="QRHKC"]').first();
-			if (ext_hours_section.length) {
-				const ext_price = ext_hours_section.find('[class="YMlKec fxKbKc"]').first();
-				if (ext_price.length) {
-					if (ext_hours_section.text().startsWith('After Hours')) {
-						after_hours_price = ext_price.text().replace('$', '').replace(',', '').trim();
-						const ah_text = ext_hours_section.text();
-						// Format: After Hours: $110.51 (0.00072%) +0.00080
-						const match = ah_text.match(/\(([+\-]?[\d.]+)%\)\s*([+\-]?[\d.]+)/);
+			// Parse data from JavaScript AF_initDataCallback script blocks
+			// ds:10 contains the most complete data for the quoted ticker
+			const scripts = $('script[class^="ds:"]');
+			let intradayData = null;
+			
+			scripts.each((i, script) => {
+				const scriptText = $(script).html();
+				if (scriptText && scriptText.includes('AF_initDataCallback')) {
+					const className = $(script).attr('class');
+					// ds:10 contains intraday data with regular hours and after-hours
+					if (className === 'ds:10') {
+						const match = scriptText.match(/data:\s*(\[[\s\S]*?\]),\s*sideChannel/);
 						if (match) {
-							let percent_str = match[1];
-							let change_str = match[2];
-							after_hours_change_decimal = change_str;
-							
-							let percent_val = parseFloat(percent_str);
-							// If percent string didn't have a sign, apply sign from change
-							if (!percent_str.startsWith('+') && !percent_str.startsWith('-')) {
-								if (change_str.startsWith('-')) {
-									percent_val = -Math.abs(percent_val);
-								} else {
-									percent_val = Math.abs(percent_val);
-								}
-							}
-							after_hours_change_percent = percent_val.toString();
-						}
-						// Extract after hours quote time
-						const time_div = ext_hours_section.next('[jsname="Vebqub"]');
-						if (time_div.length) {
-							const raw_time = time_div.text();
-							// Format: "Closed: Dec 2, 6:16:40 PM GMT-5 · USD · ..."
-							const parts = raw_time.split('·');
-							if (parts.length > 0) {
-								let t = parts[0].replace('Closed:', '').replace('As of', '').trim();
-								after_hours_time = parseToIso(t);
+							try {
+								intradayData = JSON.parse(match[1]);
+							} catch (e) {
+								logDebug('Error parsing ds:10 data: ' + e);
 							}
 						}
-					} else if (ext_hours_section.text().startsWith('Pre-market')) {
-						pre_market_price = ext_price.text().replace('$', '').replace(',', '').trim();
-						let preMarketChangeElem = $('span.P2Luy.Ebnabc.DnMTof');
-						if (preMarketChangeElem.length) {
-							logDebug('premarketchange text:' + preMarketChangeElem.text());
-							const changeText = preMarketChangeElem.text().trim();
-							// Expect format like "1.77%-3.36" or just "-3.36"
-							const match = changeText.match(/^([+-]?[0-9,.]+%)?\s*([+-]?[0-9,.]+)$/);
-							if (match) {
-								let percent = match[1] ? match[1].replace(',', '') : '';
-								let decimal = match[2].replace(',', '');
-								// Try to find the arrow in the same parent node
-								let arrowElem = preMarketChangeElem.parent().find('span.notranslate.V53LMb').first();
-								logDebug('arrowElem.html:' + (arrowElem.length ? arrowElem.html() : 'null'));
-								logDebug('length:' + arrowElem.length);
-								let sign = '';
-								let svgHtml = '';
-								if (arrowElem.length) {
-									svgHtml = arrowElem.html() || '';
-									logDebug('premarket arrow SVG HTML: ' + svgHtml);
-									if (svgHtml.includes('M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z')) {
-										sign = '-'; // Down arrow
-									} else if (svgHtml.includes('M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.58L20 12l-8-8-8 8z')) {
-										sign = '+'; // Up arrow
-									}
+					}
+				}
+			});
+
+			// Extract from ds:10 intraday data
+			// Structure: [[[["BRK.B","NYSE"],"/g/..","USD",[[[1,...],[data points]],[[3,...],[ah points]]],null,-18000,503.23,"Company",60,0]]]
+			if (intradayData && intradayData[0] && intradayData[0][0]) {
+				const tickerWrapper = intradayData[0][0];
+				const tickerInfo = tickerWrapper[0]; // ["BRK.B","NYSE"]
+				
+				// Verify this is our ticker
+				if (tickerInfo && tickerInfo[0] === security.key) {
+					// Previous close is at index [6]
+					const prevClose = tickerWrapper[6];
+					if (prevClose) {
+						previous_close_price = prevClose.toString();
+					}
+					
+					// Data sections at index [3]
+					const dataSections = tickerWrapper[3];
+					if (dataSections) {
+						// Regular hours data: dataSections[0]
+						// After-hours data: dataSections[1] (if exists)
+						
+						// Process regular hours
+						if (dataSections[0] && dataSections[0][1]) {
+							const regularPoints = dataSections[0][1];
+							if (regularPoints && regularPoints.length > 0) {
+								const lastRegularPoint = regularPoints[regularPoints.length - 1];
+								const pointTime = lastRegularPoint[0]; // [2025,12,5,16,null,null,null,[-18000]]
+								const pointData = lastRegularPoint[1]; // [504.32,1.09,0.00216,2,2,4]
+								
+								if (pointData && pointData.length >= 3) {
+									regular_price = pointData[0].toString();
+									regular_change_decimal = pointData[1].toString();
+									regular_change_percent = (pointData[2] * 100).toFixed(2) + '%';
+									
+									// Build timestamp
+									const dt = DateTime.fromObject({
+										year: pointTime[0],
+										month: pointTime[1],
+										day: pointTime[2],
+										hour: pointTime[3] || 0,
+										minute: pointTime[4] || 0,
+										second: pointTime[5] || 0
+									}, { zone: 'America/New_York' });
+									regular_time = dt.isValid ? dt.toISO() : '';
 								}
-								logDebug('premarket percent before sign logic: ' + percent);
-								logDebug('premarket detected sign: ' + sign);
-								// Only set the sign for percent
-								if (percent) {
-									percent = percent.replace(/^[-+]/, ''); // Remove any sign
-									if (sign) percent = sign + percent;
-									logDebug('premarket percent after sign logic: ' + percent);
-									pre_market_price_change_percent = percent;
+							}
+						}
+						
+						// Process after-hours if available
+						if (dataSections[1] && dataSections[1][1]) {
+							const afterHoursPoints = dataSections[1][1];
+							if (afterHoursPoints && afterHoursPoints.length > 0) {
+								const lastAHPoint = afterHoursPoints[afterHoursPoints.length - 1];
+								const ahTime = lastAHPoint[0];
+								const ahData = lastAHPoint[1];
+								
+								if (ahData && ahData.length >= 3) {
+									after_hours_price = ahData[0].toString();
+									after_hours_change_decimal = ahData[1].toString();
+									after_hours_change_percent = (ahData[2] * 100).toFixed(2) + '%';
+									
+									const dt = DateTime.fromObject({
+										year: ahTime[0],
+										month: ahTime[1],
+										day: ahTime[2],
+										hour: ahTime[3] || 0,
+										minute: ahTime[4] || 0,
+										second: ahTime[5] || 0
+									}, { zone: 'America/New_York' });
+									after_hours_time = dt.isValid ? dt.toISO() : '';
 								}
-								pre_market_price_change_decimal = decimal;
 							}
 						}
 					}
 				}
 			}
-			// Extract quote time (e.g., 'Nov 14, 8:00:00 PM GMT-5')
-			let regular_time = '';
-			const time_regex = /([A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2}:\d{2}\s*[AP]M\s*GMT[+-]\d+)/;
-			const body_text = $('body').text();
-			let match = body_text.match(time_regex);
-			if (match) {
-				regular_time = match[1];
-			}
-			if (!regular_time) {
-				$('[class], span, div').each((i, el) => {
-					const t = $(el).text();
-					if (/GMT[+-]\d+/.test(t) && /\d{1,2}:\d{2}:\d{2}/.test(t)) {
-						regular_time = t.trim();
-						return false;
-					}
-				});
-			}
+
 		} catch (extractErr) {
 			logDebug('Error extracting Google Finance data: ' + extractErr);
 		}
@@ -206,7 +181,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 			"regular_price" : regular_price,
 			"regular_change_decimal" : regular_change_decimal,
 			"regular_change_percent" : regular_change_percent,
-			regular_time: typeof regular_time !== 'undefined' ? parseToIso(regular_time) : '',
+			regular_time: regular_time,
 			"previous_close_price" : previous_close_price,
 			"after_hours_price" : after_hours_price,
 			"after_hours_change_decimal" : after_hours_change_decimal,
