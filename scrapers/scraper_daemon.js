@@ -32,19 +32,21 @@ const { scrapeWSJ } = require('./scrape_wsj');
 const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeYCharts } = require('./scrape_ycharts');
 
+const { scrapeStockMarketWatch } = require('./scrape_stockmarketwatch');
 const scraperMap = {
-    'cnbc': scrapeCNBC,
-    'google': scrapeGoogle,
-    'marketbeat': scrapeMarketBeat,
-    //'marketwatch': scrapeMarketWatch,
-    //'moomoo': scrapeMoomoo,
+	'cnbc': scrapeCNBC,
+	'google': scrapeGoogle,
+	'marketbeat': scrapeMarketBeat,
+	//'marketwatch': scrapeMarketWatch,
+	//'moomoo': scrapeMoomoo,
 	'nasdaq': scrapeNasdaq,
-    'robinhood': scrapeRobinhood,
+	'robinhood': scrapeRobinhood,
 	'stockanalysis': scrapeStockAnalysis,
-    'stocktwits': scrapeStocktwits,
-    'ycharts': scrapeYCharts,
+	'stocktwits': scrapeStocktwits,
+	'ycharts': scrapeYCharts,
 	'webull': scrapeWebull,
-    'wsj': scrapeWSJ
+	'wsj': scrapeWSJ,
+	'stockmarketwatch': scrapeStockMarketWatch
 };
 
 // Determine canonical data directory (host mount or repo folder). This

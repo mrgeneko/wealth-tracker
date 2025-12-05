@@ -618,7 +618,8 @@ function getConstructibleUrls(ticker, type = 'stock') {
         //{ source: 'moomoo', url: `https://www.moomoo.com/stock/${normalizedTicker}-US` },
         { source: 'robinhood', url: `https://robinhood.com/us/en/stocks/${normalizedTicker}/` },
         { source: 'stocktwits', url: `https://stocktwits.com/symbol/${normalizedTicker}` },
-        { source: 'ycharts', url: `https://ycharts.com/companies/${normalizedTicker}` }
+        { source: 'ycharts', url: `https://ycharts.com/companies/${normalizedTicker}` },
+        { source: 'stockmarketwatch', url: `https://stockmarketwatch.com/stock/${normalizedTicker}` }
     ];
 
     if (exchange) {
