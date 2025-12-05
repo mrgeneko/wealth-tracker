@@ -62,6 +62,83 @@ const KAFKA_BROKERS = config.KAFKA_BROKERS;
 const KAFKA_TOPIC = config.KAFKA_TOPIC;
 const KAFKA_GROUP_ID = config.KAFKA_GROUP_ID;
 
+// Source priority configuration for previous_close_price merging
+// Lower index in priority array = higher priority source
+let sourcePriorityConfig = {
+    priority: ['google', 'nasdaq', 'cnbc', 'wsj', 'ycharts', 'marketbeat', 'stockanalysis', 'moomoo', 'robinhood', 'investingcom', 'stockmarketwatch', 'stocktwits'],
+    weights: { google: 1.0, nasdaq: 0.95, cnbc: 0.9, wsj: 0.9, ycharts: 0.8, marketbeat: 0.75, stockanalysis: 0.75, moomoo: 0.7, robinhood: 0.7, investingcom: 0.65, stockmarketwatch: 0.6, stocktwits: 0.5 },
+    default_weight: 0.5,
+    recency_threshold_minutes: 60
+};
+
+// Try to load source priority config from file
+const sourcePriorityPath = path.join(__dirname, '../config/source_priority.json');
+try {
+    if (fs.existsSync(sourcePriorityPath)) {
+        const loaded = JSON.parse(fs.readFileSync(sourcePriorityPath, 'utf8'));
+        sourcePriorityConfig = { ...sourcePriorityConfig, ...loaded };
+        console.log('Loaded source priority config from file');
+    }
+} catch (e) {
+    console.warn('Could not load source_priority.json, using defaults:', e.message);
+}
+
+/**
+ * Get the priority rank of a source (lower = higher priority).
+ * Returns a high number (999) for unknown sources.
+ */
+function getSourcePriorityRank(source) {
+    if (!source) return 999;
+    // Extract base source name (e.g., "google" from "google (after-hours)")
+    const baseSource = source.toLowerCase().split(' ')[0].split('(')[0].trim();
+    const idx = sourcePriorityConfig.priority.indexOf(baseSource);
+    return idx >= 0 ? idx : 999;
+}
+
+/**
+ * Determine whether to accept an incoming prev-close over the cached one.
+ * Uses source priority and recency to decide.
+ */
+function shouldAcceptIncomingPrevClose(incoming, cached) {
+    // If no cached prev-close, accept any valid incoming
+    if (!cached || !cached.previous_close_price) return true;
+    // If no valid incoming prev-close, reject
+    if (!incoming.previousClosePrice) return false;
+
+    const incomingRank = getSourcePriorityRank(incoming.source);
+    const cachedRank = getSourcePriorityRank(cached.prev_close_source);
+
+    // If incoming has strictly higher priority (lower rank), accept
+    if (incomingRank < cachedRank) {
+        console.log(`[PrevClose] Accepting ${incoming.source} (rank ${incomingRank}) over ${cached.prev_close_source} (rank ${cachedRank})`);
+        return true;
+    }
+
+    // If incoming has lower priority (higher rank), reject unless significantly fresher
+    if (incomingRank > cachedRank) {
+        // Check recency: if incoming is much fresher, consider accepting anyway
+        const cachedTime = cached.prev_close_time ? new Date(cached.prev_close_time) : null;
+        const incomingTime = incoming.time ? new Date(incoming.time) : new Date();
+        if (cachedTime && incomingTime) {
+            const diffMinutes = (incomingTime - cachedTime) / (1000 * 60);
+            if (diffMinutes > sourcePriorityConfig.recency_threshold_minutes) {
+                console.log(`[PrevClose] Accepting fresher ${incoming.source} despite lower priority (${diffMinutes.toFixed(0)} min newer)`);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Same priority: use recency (newer wins)
+    const cachedTime = cached.prev_close_time ? new Date(cached.prev_close_time) : null;
+    const incomingTime = incoming.time ? new Date(incoming.time) : new Date();
+    if (cachedTime && incomingTime && incomingTime > cachedTime) {
+        return true;
+    }
+
+    return false;
+}
+
 // MySQL Configuration
 const MYSQL_HOST = process.env.MYSQL_HOST || 'mysql';
 const MYSQL_PORT = process.env.MYSQL_PORT || 3306;
@@ -99,6 +176,10 @@ async function fetchInitialPrices() {
                     priceCache[row.ticker] = {
                         price: priceVal,
                         previous_close_price: row.previous_close_price ? parseFloat(row.previous_close_price) : null,
+                        // If the DB has prev-close metadata columns, use them; otherwise
+                        // record null so updatePriceCache may add metadata later.
+                        prev_close_source: row.prev_close_source || row.source || null,
+                        prev_close_time: row.prev_close_time || row.capture_time || null,
                         currency: 'USD',
                         time: row.capture_time,
                         source: row.source
@@ -289,16 +370,86 @@ function updatePriceCache(item) {
 
     if (isNaN(price) || price === 0) return false;
 
-    // Get previous close price
-    let previousClosePrice = null;
+    // Get previous close price.
+    // IMPORTANT: Some data sources/scrapers do not include a previous_close_price
+    // (or return an empty string / zero) on every update. If we blindly accept a
+    // missing/empty/zero previous_close_price we'd overwrite a previously-known
+    // valid value in our in-memory cache with null/0 and cause the dashboard to
+    // display an incorrect "Prev Close" (e.g. 0). To avoid this, the code below
+    // attempts to parse a valid prev-close from the incoming item. If the parsed
+    // value is invalid, we preserve any previously-cached previous_close_price.
+    // This keeps the canonical prev-close value available until a new valid one
+    // is supplied by a later update.
+    //
+    // SOURCE-PRIORITY MERGING: When an incoming update has a valid prev-close,
+    // we use source priority ranking to decide whether to accept it over the
+    // cached value. Higher-priority sources (e.g., Google, NASDAQ) are preferred
+    // over lower-priority sources (e.g., Stocktwits). This prevents low-quality
+    // sources from overwriting good prev-close data.
+
+    // Parse any incoming prev-close and capture its source/time metadata if present
+    let incomingPrevClosePrice = null;
+    let incomingPrevSource = null;
+    let incomingPrevTime = null;
+
     if (item.previous_close_price) {
-        previousClosePrice = parseFloat(String(item.previous_close_price).replace(/[$,]/g, ''));
-        if (isNaN(previousClosePrice)) previousClosePrice = null;
+        const parsed = parseFloat(String(item.previous_close_price).replace(/[$,]/g, ''));
+        if (!isNaN(parsed) && parsed > 0) {
+            incomingPrevClosePrice = parsed;
+            // Prefer prev-specific metadata fields if scrapers include them, otherwise
+            // fall back to the generic item-level metadata.
+            incomingPrevSource = item.previous_close_source || item.source || null;
+            incomingPrevTime = item.previous_close_time || item.capture_time || new Date().toISOString();
+        }
+    }
+
+    // Prepare final prev-close values (will be set based on merge logic)
+    let previousClosePrice = null;
+    let prevCloseSource = null;
+    let prevCloseTime = null;
+
+    // Get cached prev-close data (if any)
+    const cached = priceCache[item.key] || null;
+
+    // Use source-priority merge logic to decide whether to accept incoming prev-close
+    const incomingData = {
+        previousClosePrice: incomingPrevClosePrice,
+        source: incomingPrevSource,
+        time: incomingPrevTime
+    };
+
+    if (shouldAcceptIncomingPrevClose(incomingData, cached)) {
+        // Accept incoming prev-close
+        if (incomingPrevClosePrice !== null) {
+            previousClosePrice = incomingPrevClosePrice;
+            prevCloseSource = incomingPrevSource;
+            prevCloseTime = incomingPrevTime;
+            if (cached && cached.previous_close_price && cached.previous_close_price !== incomingPrevClosePrice) {
+                console.log(`[PrevClose] ${item.key}: Updated from ${cached.previous_close_price} (${cached.prev_close_source}) to ${previousClosePrice} (${prevCloseSource})`);
+            }
+        }
+    } else {
+        // Preserve cached prev-close
+        if (cached && cached.previous_close_price) {
+            previousClosePrice = cached.previous_close_price;
+            prevCloseSource = cached.prev_close_source || null;
+            prevCloseTime = cached.prev_close_time || null;
+            if (incomingPrevClosePrice !== null) {
+                console.log(`[PrevClose] ${item.key}: Rejected ${incomingPrevClosePrice} from ${incomingPrevSource}, keeping ${previousClosePrice} from ${prevCloseSource}`);
+            } else {
+                console.warn(`Preserving existing previous_close_price for ${item.key} (incoming update had none)`);
+            }
+        }
     }
 
     priceCache[item.key] = {
         price: price,
         previous_close_price: previousClosePrice,
+        // prev_close_source and prev_close_time record where and when the
+        // prev-close value was obtained. These fields help with future
+        // source-priority merging and debugging.
+        prev_close_source: prevCloseSource,
+        prev_close_time: prevCloseTime,
         currency: 'USD',
         time: item.capture_time || new Date().toISOString(),
         source: item.source ? `${item.source} (${priceSource})` : priceSource
