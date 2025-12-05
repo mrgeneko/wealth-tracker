@@ -314,7 +314,13 @@ async function gotoWithRetries(page, url, options = {}, maxAttempts = 3) {
             metrics.failedNavigations += 1;
             logDebug(`[NAV FAIL] attempt=${attempt} url=${url} err=${e && e.message ? e.message : e}`);
             // on final attempt rethrow
-            if (attempt === maxAttempts) throw e;
+            if (attempt === maxAttempts) {
+                // If the error is a timeout, flag for browser restart
+                if (e && e.message && (e.message.includes('Navigation timeout') || e.message.includes('TimeoutError') || e.message.includes('timeout'))) {
+                    e.isProtocolTimeout = true;
+                }
+                throw e;
+            }
         }
     }
     if (lastErr) throw lastErr;
