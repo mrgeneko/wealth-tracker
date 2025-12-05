@@ -159,6 +159,7 @@ function parseRobinhoodHtml(html, security) {
     after_hours_price: after_hours_price || '',
     after_hours_change_decimal: after_hours_change_decimal || '',
     after_hours_change_percent: after_hours_change_percent || '',
+    after_hours_time: '',
     source: 'robinhood',
     capture_time: new Date().toISOString(),
     regular_time: regular_time || ''
