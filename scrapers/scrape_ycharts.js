@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, parseToIso } = require('./scraper_utils');
+const { publishToKafka } = require('./publish_to_kafka');
 
 async function scrapeYCharts(browser, security, outputDir) {
     const url = security.ycharts;
@@ -169,6 +170,16 @@ async function scrapeYCharts(browser, security, outputDir) {
 
         logDebug(`${logPrefix} Extracted data: ${JSON.stringify(data)}`);
 
+        // Publish the data object to Kafka
+        try {
+            const kafkaTopic = process.env.KAFKA_TOPIC || 'price_data';
+            const kafkaBrokers = (process.env.KAFKA_BROKERS || 'kafka:9092').split(',');
+            await publishToKafka(data, kafkaTopic, kafkaBrokers);
+            logDebug(`${logPrefix} Published YCharts data to Kafka topic ${kafkaTopic}`);
+        } catch (kafkaErr) {
+            logDebug(`${logPrefix} Kafka publish error: ${kafkaErr}`);
+        }
+
         // Save HTML
         const htmlContent = await page.content();
         const timestamp = getDateTimeString();
@@ -177,6 +188,16 @@ async function scrapeYCharts(browser, security, outputDir) {
         const htmlPath = path.join(outputDir, htmlFilename);
         fs.writeFileSync(htmlPath, htmlContent);
         logDebug(`${logPrefix} Saved HTML to ${htmlPath}`);
+
+        // Save PNG screenshot
+        const pngFilename = `${timestamp}.${safeTicker}.ycharts.png`;
+        const pngPath = path.join(outputDir, pngFilename);
+        try {
+            await page.screenshot({ path: pngPath, fullPage: true });
+            logDebug(`${logPrefix} Saved PNG screenshot to ${pngPath}`);
+        } catch (e) {
+            logDebug(`${logPrefix} Failed to save PNG screenshot: ${e.message}`);
+        }
 
         // Save JSON
         const jsonFilename = `${timestamp}.${safeTicker}.ycharts.json`;
