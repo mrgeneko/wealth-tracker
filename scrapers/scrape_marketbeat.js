@@ -49,7 +49,7 @@ function parseMarketBeatHtml(html, security) {
     const $ = cheerio.load(html || '');
     const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
 
-    let regular_last_price = '';
+    let regular_price = '';
     let regular_change_decimal = '';
     let regular_change_percent = '';
     let previous_close_price = '';
@@ -74,7 +74,7 @@ function parseMarketBeatHtml(html, security) {
             
             if (priceStrong.length) {
                 const priceText = priceStrong.text().trim();
-                regular_last_price = cleanNumberText(priceText);
+                regular_price = cleanNumberText(priceText);
 
                 // Change and Percent Change are in the next strong tag
                 const changeStrong = priceStrong.next('strong');
@@ -90,9 +90,9 @@ function parseMarketBeatHtml(html, security) {
                 }
 
                 // Calculate previous close if we have price and change
-                if (regular_last_price && regular_change_decimal !== '') {
+                if (regular_price && regular_change_decimal !== '') {
                     // Current = Prev + Change  =>  Prev = Current - Change
-                    const prev = parseFloat(regular_last_price) - parseFloat(regular_change_decimal);
+                    const prev = parseFloat(regular_price) - parseFloat(regular_change_decimal);
                     previous_close_price = prev.toFixed(2);
                 }
             }
@@ -115,7 +115,7 @@ function parseMarketBeatHtml(html, security) {
 
     return {
         key: ticker,
-        regular_last_price: regular_last_price || '',
+        regular_price: regular_price || '',
         regular_change_decimal: regular_change_decimal || '',
         regular_change_percent: regular_change_percent || '',
         previous_close_price: previous_close_price || '',

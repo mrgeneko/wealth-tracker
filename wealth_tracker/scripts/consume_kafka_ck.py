@@ -120,7 +120,7 @@ def process_message(data):
     now = datetime.now(ZoneInfo('UTC'))
     prefer_regular = is_regular_hours(now) and is_regular_hours(capture_time)
 
-    regular_last_price = clean_val(data.get('regular_last_price'))
+    regular_price = clean_val(data.get('regular_price'))
     pre_market = clean_val(data.get('pre_market_price'))
     after_hours = clean_val(data.get('after_hours_price'))
     extended = clean_val(data.get('extended_hours_price'))
@@ -129,8 +129,8 @@ def process_message(data):
     price_source = 'regular'
     found = False
 
-    if prefer_regular and regular_last_price > 0:
-        price_val = regular_last_price
+    if prefer_regular and regular_price > 0:
+        price_val = regular_price
         price_source = 'regular'
         found = True
     
@@ -144,8 +144,8 @@ def process_message(data):
         elif extended > 0:
             price_val = extended
             price_source = 'extended'
-        elif regular_last_price > 0:
-            price_val = regular_last_price
+        elif regular_price > 0:
+            price_val = regular_price
             price_source = 'regular'
 
     if price_val == 0:

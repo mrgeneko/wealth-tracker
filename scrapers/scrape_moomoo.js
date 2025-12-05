@@ -49,7 +49,7 @@ function parseMoomooHtml(html, security) {
     const $ = cheerio.load(html || '');
     const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
 
-    let regular_last_price = '';
+    let regular_price = '';
     let regular_change_decimal = '';
     let regular_change_percent = '';
     let previous_close_price = '';
@@ -60,7 +60,7 @@ function parseMoomooHtml(html, security) {
         const priceEl = $('.stock-data .price');
         if (priceEl.length) {
             const priceText = priceEl.text().trim();
-            regular_last_price = cleanNumberText(priceText);
+            regular_price = cleanNumberText(priceText);
         }
 
         // Change: .stock-data .change-price
@@ -78,8 +78,8 @@ function parseMoomooHtml(html, security) {
         }
 
         // Calculate previous close
-        if (regular_last_price && !isNaN(regular_change_decimal)) {
-            const prev = parseFloat(regular_last_price) - regular_change_decimal;
+        if (regular_price && !isNaN(regular_change_decimal)) {
+            const prev = parseFloat(regular_price) - regular_change_decimal;
             previous_close_price = prev.toFixed(3); // Moomoo seems to use 3 decimals
         }
 
@@ -100,7 +100,7 @@ function parseMoomooHtml(html, security) {
 
     return {
         key: ticker,
-        regular_last_price: regular_last_price || '',
+        regular_price: regular_price || '',
         regular_change_decimal: regular_change_decimal || '',
         regular_change_percent: regular_change_percent || '',
         previous_close_price: previous_close_price || '',

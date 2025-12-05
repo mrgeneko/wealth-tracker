@@ -192,7 +192,7 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
                 let prevClose = (chg !== null) ? Math.round((lastPrice - chg) * 100) / 100 : null;
                 dataObjects.push({
                     key: symbol,
-                    regular_last_price: lastPrice,
+                    regular_price: lastPrice,
                     regular_change_decimal: chgStr,
                     regular_change_percent: chgPctStr,
                     source: "tradingview",
