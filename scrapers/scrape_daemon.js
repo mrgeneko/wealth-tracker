@@ -33,6 +33,7 @@ const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeYCharts } = require('./scrape_ycharts');
 
 const { scrapeStockMarketWatch } = require('./scrape_stockmarketwatch');
+const { scrapeStockEvents } = require('./scrape_stockevents');
 const scraperMap = {
 	'cnbc': scrapeCNBC,
 	'google': scrapeGoogle,
@@ -46,7 +47,8 @@ const scraperMap = {
 	'ycharts': scrapeYCharts,
 	'webull': scrapeWebull,
 	'wsj': scrapeWSJ,
-	'stockmarketwatch': scrapeStockMarketWatch
+	'stockmarketwatch': scrapeStockMarketWatch,
+	'stockevents': scrapeStockEvents
 };
 
 // Determine canonical data directory (host mount or repo folder). This
