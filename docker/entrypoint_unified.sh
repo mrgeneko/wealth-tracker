@@ -114,7 +114,7 @@ mkdir -p /usr/src/app/data || true
 # No longer copying to data directory to avoid config duplication/sync issues.
 echo "[DEBUG] Config will be loaded from /usr/src/app/config/config.json"
 
-echo "[DEBUG] Executing scraper_daemon as PID 1 (exec)..."
+echo "[DEBUG] Executing scrape_daemon as PID 1 (exec)..."
 # Exec will replace this shell with the Node process, ensuring Docker SIGTERM/SIGINT
 # are delivered directly to Node and its handlers (graceful shutdown will run).
-exec node /usr/src/app/scrapers/scraper_daemon.js
+exec node /usr/src/app/scrapers/scrape_daemon.js
