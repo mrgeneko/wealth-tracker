@@ -70,7 +70,7 @@ async function scrapeStocktwits(browser, security, outputDir) {
 
 function parseStocktwitsHtml(html, security) {
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
-  let regular_last_price = '';
+  let regular_price = '';
   let regular_change_decimal = '';
   let regular_change_percent = '';
   let previous_close_price = '';
@@ -151,7 +151,7 @@ function parseStocktwitsHtml(html, security) {
           return '';
         };
 
-        regular_last_price = cleanNumberText(extractVal('Last'));
+        regular_price = cleanNumberText(extractVal('Last'));
         regular_change_decimal = cleanNumberText(extractVal('Change'));
         regular_change_percent = cleanNumberText(extractVal('PercentChange'));
         previous_close_price = cleanNumberText(extractVal('PreviousClose'));
@@ -191,7 +191,7 @@ function parseStocktwitsHtml(html, security) {
     }
 
     // 2. Fallback to DOM parsing if JSON failed or was incomplete
-    if (!regular_last_price) {
+    if (!regular_price) {
         const $ = cheerio.load(html);
         
         // Check if page shows Pre-Market indicator
@@ -241,7 +241,7 @@ function parseStocktwitsHtml(html, security) {
           pre_market_time = new Date().toISOString();
           extendedHoursType = 'pre-market';
         } else {
-          regular_last_price = extractedPrice;
+          regular_price = extractedPrice;
           regular_change_decimal = extractedChangeDec;
           regular_change_percent = extractedChangePct;
         }
@@ -253,7 +253,7 @@ function parseStocktwitsHtml(html, security) {
 
   return {
     key: ticker,
-    regular_last_price: regular_last_price || '',
+    regular_price: regular_price || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',
     previous_close_price: previous_close_price || '',

@@ -71,7 +71,7 @@ function parseStockAnalysisHtml(html, security) {
   const $ = cheerio.load(html || '');
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
   
-  let regular_last_price = '';
+  let regular_price = '';
   let regular_time = '';
   let previous_close_price = '';
   let pre_market_price = '';
@@ -88,7 +88,7 @@ function parseStockAnalysisHtml(html, security) {
   try {
     const mainPriceEl = $('[class*="text-4xl"]').first();
     if (mainPriceEl && mainPriceEl.length) {
-      regular_last_price = cleanNumberText(mainPriceEl.text());
+      regular_price = cleanNumberText(mainPriceEl.text());
       // Extract regular_time
       // Look for sibling div with "At close:"
       const timeContainer = mainPriceEl.parent().find('div').filter((i, el) => $(el).text().includes('At close:')).first();
@@ -269,7 +269,7 @@ function parseStockAnalysisHtml(html, security) {
 
   return {
     key: ticker,
-    regular_last_price: regular_last_price || '',
+    regular_price: regular_price || '',
     regular_time: regular_time || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',

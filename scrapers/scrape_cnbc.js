@@ -85,7 +85,7 @@ function parseCNBCHtml(html, security) {
 
   const data = {
     key: ticker,
-    regular_last_price: '',
+    regular_price: '',
     regular_change_decimal: '',
     regular_change_percent: '',
     regular_time: '',
@@ -111,7 +111,7 @@ function parseCNBCHtml(html, security) {
         const sObj = JSON.parse(sMatch[1]);
         const quoteData = sObj?.quote?.data?.[0];
         if (quoteData) {
-          data.regular_last_price = cleanNumberText(quoteData.last);
+          data.regular_price = cleanNumberText(quoteData.last);
           data.regular_change_decimal = cleanNumberText(quoteData.change);
           data.regular_change_percent = cleanNumberText(quoteData.change_pct);
           data.previous_close_price = cleanNumberText(quoteData.previous_day_closing);
@@ -146,7 +146,7 @@ function parseCNBCHtml(html, security) {
     }
 
     // --- Step 2: Fallback to HTML scraping for any missing data ---
-    if (!data.regular_last_price || !data.regular_change_decimal) {
+    if (!data.regular_price || !data.regular_change_decimal) {
       logDebug(`Falling back to HTML scrape for ${ticker}`);
 
       const getValue = (selectors) => {
@@ -164,8 +164,8 @@ function parseCNBCHtml(html, security) {
         return { dec: cleanNumberText(m[1]).replace(/^\+/, ''), pct: m[2] ? String(m[2]).replace(/\s/g, '') : '' };
       }
 
-      if (!data.regular_last_price) {
-        data.regular_last_price = cleanNumberText(getValue([
+      if (!data.regular_price) {
+        data.regular_price = cleanNumberText(getValue([
           '.QuoteStrip-lastPrice',
           '[data-field="last"]',
           '[data-field="price"]',

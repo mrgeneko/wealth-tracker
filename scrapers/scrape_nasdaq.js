@@ -79,7 +79,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
         logDebug('Calling Nasdaq API to supplement parsed HTML for ' + ticker);
         const apiData = await fetchNasdaqApi(ticker);
         // merge only missing fields
-        data.regular_last_price = data.regular_last_price || apiData.regular_last_price || '';
+        data.regular_price = data.regular_price || apiData.regular_price || '';
         data.regular_change_decimal = data.regular_change_decimal || apiData.regular_change_decimal || '';
         data.regular_change_percent = data.regular_change_percent || apiData.regular_change_percent || '';
         data.previous_close_price = data.previous_close_price || apiData.previous_close_price || '';
@@ -128,7 +128,7 @@ async function scrapeNasdaq(browser, security, outputDir) {
           
           const result = parseNasdaqHtml(html || await page.content(), { key: ticker });
           // merge parsed page values (prefer page values when present)
-          data.regular_last_price = result.regular_last_price || data.regular_last_price || '';
+          data.regular_price = result.regular_price || data.regular_price || '';
           data.regular_change_decimal = result.regular_change_decimal || data.regular_change_decimal || '';
           data.regular_change_percent = result.regular_change_percent || data.regular_change_percent || '';
           data.previous_close_price = result.previous_close_price || data.previous_close_price || '';
@@ -170,7 +170,7 @@ function parseNasdaqHtml(html, security) {
   const $ = cheerio.load(html || '');
   const ticker = (security && security.key) ? sanitizeForFilename(security.key) : 'unknown';
 
-  let regular_last_price = '';
+  let regular_price = '';
   let regular_change_decimal = '';
   let regular_change_percent = '';
   let previous_close_price = '';
@@ -192,7 +192,7 @@ function parseNasdaqHtml(html, security) {
           const o = JSON.parse(initMatch[1]);
           if (o && o.page && o.page.props && o.page.props.initialState && o.page.props.initialState.quote) {
             const qd = o.page.props.initialState.quote;
-            if (qd.last) regular_last_price = cleanNumberText(qd.last);
+            if (qd.last) regular_price = cleanNumberText(qd.last);
             if (qd.change) regular_change_decimal = cleanNumberText(qd.change);
             if (qd.changePercent) regular_change_percent = String(qd.changePercent);
             if (qd.previousClose) previous_close_price = cleanNumberText(qd.previousClose);
@@ -205,7 +205,7 @@ function parseNasdaqHtml(html, security) {
             if (qd.lastTradeTime) regular_time = parseToIso(qd.lastTradeTime);
           } else if (o && o.quote && o.quote.last) {
             const qd = o.quote;
-            if (qd.last) regular_last_price = cleanNumberText(qd.last);
+            if (qd.last) regular_price = cleanNumberText(qd.last);
             if (qd.change) regular_change_decimal = cleanNumberText(qd.change);
           }
         } catch (e) {
@@ -217,9 +217,9 @@ function parseNasdaqHtml(html, security) {
     }
 
     // 2) Prefer specific Nasdaq selectors if present
-    if (!regular_last_price) {
+    if (!regular_price) {
       const headerPrice = $('[class*="symbol-page-header__pricing-price"], [class*="qwidget-dollar"] , [class*="quote-header__price"]').first();
-      if (headerPrice && headerPrice.length) regular_last_price = cleanNumberText(headerPrice.text());
+      if (headerPrice && headerPrice.length) regular_price = cleanNumberText(headerPrice.text());
     }
     if (!regular_change_decimal || !regular_change_percent) {
       const headerChange = $('[class*="symbol-page-header__pricing-change"], [class*="qwidget-change"], [class*="quote-header__change"]').first();
@@ -300,7 +300,7 @@ function parseNasdaqHtml(html, security) {
 
   return {
     key: ticker,
-    regular_last_price: regular_last_price || '',
+    regular_price: regular_price || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',
     regular_time: regular_time || '',
@@ -317,7 +317,7 @@ async function fetchNasdaqApi(symbol) {
   // Use Nasdaq public API endpoints to fetch info and summary. Try fetch first, then curl fallback.
   const headers = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json, text/plain, */*' };
   const out = {
-    regular_last_price: '', regular_change_decimal: '', regular_change_percent: '', previous_close_price: '',
+    regular_price: '', regular_change_decimal: '', regular_change_percent: '', previous_close_price: '',
     after_hours_price: '', after_hours_change_decimal: '', after_hours_change_percent: '',
     pre_market_price: '', pre_market_price_change_decimal: '', pre_market_price_change_percent: '',
     regular_time: '', market_status: ''
@@ -337,7 +337,7 @@ async function fetchNasdaqApi(symbol) {
     const prevClean = cleanNumberText(prev);
     
     if (lp || prevClean) {
-      out.regular_last_price = lp;
+      out.regular_price = lp;
       out.regular_change_decimal = cleanNumberText(primary.netChange);
       out.regular_change_percent = primary.percentageChange || '';
       out.previous_close_price = prevClean;
@@ -374,14 +374,14 @@ async function fetchNasdaqApi(symbol) {
         
         if ((!out.after_hours_price || out.after_hours_price === '') && isAfterHours) {
           logDebug(`nasdaq api: marketStatus indicates after-hours (${marketStatusTop || primary.marketStatus}), setting after_hours from primary`);
-          out.after_hours_price = out.after_hours_price || out.regular_last_price;
+          out.after_hours_price = out.after_hours_price || out.regular_price;
           out.after_hours_change_decimal = out.after_hours_change_decimal || out.regular_change_decimal;
           out.after_hours_change_percent = out.after_hours_change_percent || out.regular_change_percent;
         }
         if ((!out.pre_market_price || out.pre_market_price === '') && isPreMarket) {
           logDebug(`nasdaq api: marketStatus indicates pre-market (${marketStatusTop || primary.marketStatus}), populating pre_market fields`);
           const pm = primary.preMarket || primary.pre_market || {};
-          out.pre_market_price = out.pre_market_price || cleanNumberText(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.regular_last_price || cleanNumberText(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
+          out.pre_market_price = out.pre_market_price || cleanNumberText(pm.last || pm.lastSale || pm.lastSalePrice || pm.price) || out.regular_price || cleanNumberText(primary.lastSalePrice || primary.lastSale || primary.last || primary.price);
           out.pre_market_price_change_decimal = out.pre_market_price_change_decimal || cleanNumberText(pm.change || pm.netChange || pm.changeAmount) || out.regular_change_decimal || cleanNumberText(primary.netChange || primary.change);
           out.pre_market_price_change_percent = out.pre_market_price_change_percent || (pm.changePercent || pm.percentageChange || out.regular_change_percent || primary.percentageChange || primary.changePercent || '');
         }

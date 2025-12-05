@@ -17,7 +17,7 @@ from wealth_tracker.publish_to_kafka import publish_to_kafka
 def main():
     data = {
         "key": "TEST-1",
-        "regular_last_price": "123.45",
+        "regular_price": "123.45",
         "source": "test",
         "previous_price": "120.00",
         "regular_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

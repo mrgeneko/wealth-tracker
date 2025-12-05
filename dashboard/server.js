@@ -258,8 +258,8 @@ function updatePriceCache(item) {
     let foundPrice = false;
 
     // If in regular session, try regular price first
-    if (preferRegular && item.regular_last_price && parseFloat(String(item.regular_last_price).replace(/[$,]/g, '')) > 0) {
-        price = parseFloat(String(item.regular_last_price).replace(/[$,]/g, ''));
+    if (preferRegular && item.regular_price && parseFloat(String(item.regular_price).replace(/[$,]/g, '')) > 0) {
+        price = parseFloat(String(item.regular_price).replace(/[$,]/g, ''));
         priceSource = 'regular';
         foundPrice = true;
     }
@@ -281,8 +281,8 @@ function updatePriceCache(item) {
             priceSource = 'extended';
         }
         // Fall back to regular last price
-        else if (item.regular_last_price) {
-            price = parseFloat(String(item.regular_last_price).replace(/[$,]/g, ''));
+        else if (item.regular_price) {
+            price = parseFloat(String(item.regular_price).replace(/[$,]/g, ''));
             priceSource = 'regular';
         }
     }

@@ -55,7 +55,7 @@ async function run() {
 
             const message = {
                 key: ticker,
-                regular_last_price: newPrice,
+                regular_price: newPrice,
                 regular_change_decimal: change,
                 regular_change_percent: changePct,
                 source: 'simulator',
