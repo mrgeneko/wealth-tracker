@@ -372,6 +372,27 @@ node scripts/update_treasury_listings.js
 - The script requires Puppeteer and Chrome; ensure dependencies are installed if running outside Docker.
 
 ---
+## Data Source Capabilities
+
+The system supports multiple data sources with varying capabilities for price data extraction:
+
+| Source | Real-time | Pre-market | After-hours | Previous Close | Stock Prices | Bond Prices |
+|--------|-----------|------------|-------------|----------------|---------------|-------------|
+| **Yahoo Finance** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **YCharts** | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| **Google Finance** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **Robinhood** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **StockEvents** | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **Investing.com** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **Webull** | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
+
+**Notes:**
+- **Previous Close**: Some sources (like YCharts) do not expose previous close price data in their HTML/API, so the `previous_close_price` field remains null for these sources. The dashboard calculates change and change % using available data.
+- **Real-time**: Indicates if the source provides live price updates during market hours
+- **Pre-market/After-hours**: Extended trading hours support
+- **Stock/Bond Prices**: Asset type support
+
+---
 ## Dashboard Features
 
 The dashboard provides real-time portfolio tracking with the following features:
