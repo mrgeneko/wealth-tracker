@@ -425,6 +425,101 @@ app.get('/api/logs/:filename', async (req, res) => {
     }
 });
 
+// API to export all data
+app.get('/api/export', async (req, res) => {
+    try {
+        const data = await fetchAssetsFromDB();
+        const exportData = {
+            exportDate: new Date().toISOString(),
+            version: '1.0',
+            data: data
+        };
+        res.json(exportData);
+    } catch (error) {
+        console.error('Error exporting data:', error);
+        res.status(500).json({ error: 'Failed to export data' });
+    }
+});
+
+// API to import data
+app.post('/api/import', async (req, res) => {
+    try {
+        const importData = req.body;
+        
+        // Validate the data structure
+        if (!importData.data || !importData.data.accounts || !importData.data.positions) {
+            return res.status(400).json({ error: 'Invalid data format' });
+        }
+
+        const { accounts, positions, fixed_assets } = importData.data;
+
+        // Start transaction
+        await pool.execute('START TRANSACTION');
+
+        try {
+            // Clear existing data
+            await pool.execute('DELETE FROM positions');
+            await pool.execute('DELETE FROM accounts');
+            if (fixed_assets && fixed_assets.length > 0) {
+                await pool.execute('DELETE FROM fixed_assets');
+            }
+
+            // Insert accounts
+            for (const account of accounts) {
+                await pool.execute(
+                    'INSERT INTO accounts (id, name, type, category, currency, display_order) VALUES (?, ?, ?, ?, ?, ?)',
+                    [account.id, account.name, account.type, account.category || 'investment', account.currency || 'USD', account.display_order || 0]
+                );
+            }
+
+            // Insert positions
+            for (const position of positions) {
+                await pool.execute(
+                    'INSERT INTO positions (account_id, symbol, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [
+                        position.account_id,
+                        position.symbol,
+                        position.quantity,
+                        position.type,
+                        position.exchange || null,
+                        position.currency || 'USD',
+                        position.maturity_date || null,
+                        position.coupon || null,
+                        position.display_order || 0
+                    ]
+                );
+            }
+
+            // Insert fixed assets if present
+            if (fixed_assets && fixed_assets.length > 0) {
+                for (const asset of fixed_assets) {
+                    await pool.execute(
+                        'INSERT INTO fixed_assets (name, type, value, currency, display_order) VALUES (?, ?, ?, ?, ?)',
+                        [asset.name, asset.type, asset.value, asset.currency || 'USD', asset.display_order || 0]
+                    );
+                }
+            }
+
+            // Commit transaction
+            await pool.execute('COMMIT');
+
+            // Clear cache so dashboard refreshes with new data
+            assetsCache = null;
+
+            res.json({ success: true, message: 'Data imported successfully' });
+
+        } catch (error) {
+            // Rollback on error
+            await pool.execute('ROLLBACK');
+            throw error;
+        }
+
+    } catch (error) {
+        console.error('Error importing data:', error);
+        res.status(500).json({ error: 'Failed to import data: ' + error.message });
+    }
+});
+
 // CRUD Endpoints
 
 // Accounts

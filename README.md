@@ -3,17 +3,45 @@ Lightweight scrapers and processors for personal portfolio tracking.
 
 ## Recent Feature Updates
 
+- **New StockEvents Scraper:**
+  - Added support for stockevents.app as a new data source for stocks, ETFs, bonds, and mutual funds
+  - Implements text-based parsing for price and change data extraction
+  - Handles "Today" timestamps for current trading data
+  - Integrated into the scraper daemon with configurable settings
+  - THIS WAS DISABLED FOR NOW BECAUSE BOND PRICES LOOK BAD and stock prices may be delayed
+
+- **Codebase Consistency Improvements:**
+  - Renamed `regular_last_price` field to `regular_price` across all scraper files, Python scripts, and dashboard code
+  - Updated 20+ files including all major scrapers (Google, Robinhood, Yahoo, etc.)
+  - Improved field naming consistency throughout the application
+
+- **Enhanced Dashboard Settings:**
+  - Added gear icon (⚙️) in top right corner with dropdown menu
+  - Moved Logs access from main tab navigation to gear dropdown
+  - Comprehensive settings modal with auto-refresh controls, theme selection, and data management
+  - Added Import/Export functionality for complete data portability
+  - Settings persist in browser localStorage
+  - **Logs Modal Improvements**: Large 98% window size modal with resizable panes, Escape key support, and close button
+
+- **Data Management Features:**
+  - **Export Data**: Download complete portfolio data as JSON
+  - **Import Data**: Restore portfolio data from exported JSON files
+  - Full database replacement with transaction safety
+  - Backup and migration capabilities between environments
+
 - **Expanded Exchange Listings:**
   - The system now downloads and processes `other-listed.csv` from the nyse-other-listings GitHub repository, adding 6,800+ tickers from additional exchanges (NYSE MKT, NYSE ARCA, BATS, IEX, and others).
   - Exchange codes are mapped as follows: A → NYSE MKT, N → NYSE, P → NYSE ARCA, Z → BATS, V → IEX.
   - The dashboard autocomplete and ticker registry now include these new exchanges, with color-coded badges for each type.
+
 - **Dashboard Autocomplete & Badges:**
   - The autocomplete dropdown and investment tables now support all ~14,200 tickers from NASDAQ, NYSE, OTHER_LISTED, and TREASURY, with distinct badges for each exchange type.
+
 - **Ticker Registry & Listings Update:**
   - `scripts/update_exchange_listings.js` now updates NASDAQ, NYSE, and OTHER_LISTED files for ticker lookup.
   - New file: `config/other-listed.csv` contains additional US-listed tickers.
 
-This repository contains Node.js scraper code that runs a persistent daemon to collect price and watchlist data using Puppeteer/Chrome, publishes messages to Kafka, and writes logs to a mounted host directory.
+This repository contains Node.js scraper code that runs a persistent daemon to collect price and watchlist data from multiple sources (Yahoo Finance, Google Finance, Robinhood, StockEvents, and more) using Puppeteer/Chrome, publishes messages to Kafka, and provides a real-time web dashboard for portfolio tracking. The system supports comprehensive data management with import/export capabilities and persistent settings.
 This README focuses on running the project in Docker, the long-running scraper daemon, and operational instructions (start/stop/logs/heartbeat). For additional operational notes see `DAEMON.md`.
 ---
 ## Quick Start (Docker Compose)
@@ -297,6 +325,7 @@ The scraper daemon supports configurable scrape groups in `config.json`. Each gr
 | `investing_watchlists` | Scrapes Investing.com watchlist pages |
 | `yahoo_batch` | Batch fetches prices from Yahoo Finance API |
 | `tradingview_watchlists` | Scrapes TradingView watchlist pages |
+| `stockevents` | Scrapes stockevents.app for stocks, ETFs, bonds, and mutual funds |
 | `stocks_etfs` | Scrapes individual stock/ETF pages from configured sources |
 | `stock_positions` | **Queries MySQL** for positions with type 'stock' or 'etf', then scrapes prices using round-robin source selection |
 | `bond_positions` | **Queries MySQL** for positions with type 'bond', then scrapes prices (currently uses Webull bond quotes) |
@@ -366,6 +395,67 @@ When clicking the "+" button in an empty cell:
 - In-place cell updates preserve CSS animations
 - Net Worth and Total row update automatically
 
+### Dashboard Settings
+
+The dashboard includes a comprehensive settings system accessible via the gear icon (⚙️) in the top right corner. The gear icon displays a dropdown menu with "Logs" and "Settings" options.
+
+#### Settings Modal
+
+The Settings modal provides the following configuration options:
+
+**Dashboard Preferences:**
+- **Auto refresh account and positions**: Toggle automatic data refreshing (default: enabled)
+- **Refresh interval**: Set how often data refreshes (30 seconds, 1 minute, 5 minutes, 10 minutes)
+- **Theme**: Choose between Dark and Light themes (default: Dark)
+
+**System:**
+- **Export Data**: Download all account and position data as a JSON file
+- **Import Data**: Upload and restore data from an exported JSON file (replaces all existing data)
+- **Clear Cache**: Clear browser cache and reload the dashboard
+
+**Keyboard Shortcuts:**
+- **Escape Key**: Close any open modal (Settings, Logs, Add Symbol, etc.)
+
+#### Settings Storage
+
+All settings are stored locally in your browser's localStorage and persist between sessions. Settings are specific to each browser/device and are not synced across different browsers or devices.
+
+#### Logs Access
+
+The "Logs" option in the gear dropdown opens a large 98% window size modal providing access to system logs with enhanced functionality:
+- File browser showing all log files with timestamps and sizes
+- Click any log file to view its contents
+- Resizable panes for file list and log viewer
+- Real-time log updates
+- **Modal Features**: Large screen coverage, Escape key to close, close button, and click-outside-to-close
+
+#### Settings Persistence
+
+Settings are automatically saved when you click "Save Settings" and applied immediately. The dashboard remembers your preferences including:
+- Auto-refresh preferences and intervals
+- Theme selection (Dark/Light)
+- Any custom configurations you set
+
+#### Data Import/Export
+
+The dashboard provides full data portability through import and export functionality:
+
+**Export Data:**
+- Downloads all accounts, positions, and fixed assets as a JSON file
+- Includes metadata like export date and version
+- File format: `wealth-tracker-export-YYYY-MM-DD.json`
+
+**Import Data:**
+- Reads exported JSON files and replaces all existing data
+- Validates file format before importing
+- Uses database transactions for data integrity
+- Automatically refreshes the dashboard after successful import
+- **Warning**: Import completely replaces existing data - use with caution
+
+This allows you to backup your portfolio data, migrate between environments, or restore from backups.
+
+The "Clear Cache" option resets all settings to defaults and clears any cached data, which can be useful for troubleshooting.
+
 ---
 ## Troubleshooting
 - Chrome launch/connect failures:
@@ -380,6 +470,7 @@ If you need to revert to scheduled runs instead of the daemon, let me know and I
 ---
 ## Files of interest
 - `scrape_daemon.js` — main daemon that orchestrates scrapes and publishes to Kafka.
+- `scrapers/scrape_stockevents.js` — scraper for stockevents.app data source.
 - `entrypoint_unified.sh` — container entrypoint that launches Node as PID 1.
 - `Dockerfile.scrapers` — build for the scrapers image.
 - `docker-compose.yml` — compose configuration for local development.
