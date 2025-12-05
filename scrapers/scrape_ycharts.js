@@ -51,7 +51,7 @@ async function scrapeYCharts(browser, security, outputDir) {
             // Get all index-rank containers - first is regular hours, second (if present) is after-hours
             const indexRanks = document.querySelectorAll('.index-rank');
             
-            let regular_last_price = '';
+            let regular_price = '';
             let regular_change_decimal = '';
             let regular_change_percent = '';
             let regular_time = '';
@@ -133,9 +133,9 @@ async function scrapeYCharts(browser, security, outputDir) {
                     after_hours_change_decimal = data.change_decimal;
                     after_hours_change_percent = data.change_percent;
                     after_hours_time = data.time;
-                } else if (!regular_last_price) {
+                } else if (!regular_price) {
                     // Only set regular data if not already set (take the first non-after-hours container)
-                    regular_last_price = data.price;
+                    regular_price = data.price;
                     regular_change_decimal = data.change_decimal;
                     regular_change_percent = data.change_percent;
                     regular_time = data.time;
@@ -144,7 +144,7 @@ async function scrapeYCharts(browser, security, outputDir) {
 
             return {
                 key: ticker,
-                regular_last_price: regular_last_price || '',
+                regular_price: regular_price || '',
                 regular_time: regular_time || '',
                 regular_change_decimal: regular_change_decimal || '',
                 regular_change_percent: regular_change_percent || '',

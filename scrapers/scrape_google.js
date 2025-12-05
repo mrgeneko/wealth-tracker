@@ -60,7 +60,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 		
 		const $ = cheerio.load(html);
 		// Extract main price
-		let regular_last_price = '';
+		let regular_price = '';
 		let regular_change_decimal = '';
 		let regular_change_percent = '';
 		let previous_close_price = '';
@@ -75,7 +75,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 			const main_element = $('[class="Gfxi4"]').first();
 			const price_element = main_element.find('[class="YMlKec fxKbKc"]').first();
 			if (price_element.length) {
-				regular_last_price = price_element.text().replace('$', '').replace(',', '');
+				regular_price = price_element.text().replace('$', '').replace(',', '');
 			}
 			// Previous close
 			const prev_close_label = $('div').filter((i, el) => $(el).text().trim().toLowerCase() === 'previous close').first();
@@ -203,7 +203,7 @@ async function scrapeGoogle(browser, security, outputDir) {
 
 		data = {
 			"key" : ticker,
-			"regular_last_price" : regular_last_price,
+			"regular_price" : regular_price,
 			"regular_change_decimal" : regular_change_decimal,
 			"regular_change_percent" : regular_change_percent,
 			regular_time: typeof regular_time !== 'undefined' ? parseToIso(regular_time) : '',

@@ -37,7 +37,7 @@ async function scrapeStockEvents(browser, security, outputDir) {
 		
 		const $ = cheerio.load(html);
 		
-		let regular_last_price = '';
+		let regular_price = '';
 		let regular_change_decimal = '';
 		let regular_change_percent = '';
 		let previous_close_price = '';
@@ -51,7 +51,7 @@ async function scrapeStockEvents(browser, security, outputDir) {
 			// Find price pattern: $ followed by number
 			const priceMatch = bodyText.match(/\$([\d,]+\.?\d*)/);
 			if (priceMatch) {
-				regular_last_price = priceMatch[1].replace(',', '');
+				regular_price = priceMatch[1].replace(',', '');
 			}
 			
 			// Find change pattern: +$1+0.3% or -$0.01-0.01%
@@ -85,7 +85,7 @@ async function scrapeStockEvents(browser, security, outputDir) {
 		data = {
 			source: 'stockevents',
 			symbol: security.key,
-			regular_last_price,
+			regular_price,
 			regular_change_decimal,
 			regular_change_percent,
 			previous_close_price,
@@ -93,7 +93,7 @@ async function scrapeStockEvents(browser, security, outputDir) {
 			scraped_at: new Date().toISOString()
 		};
 		
-		logDebug(`StockEvents data for ${security.key}: price=${regular_last_price}, change=${regular_change_decimal} (${regular_change_percent})`);
+		logDebug(`StockEvents data for ${security.key}: price=${regular_price}, change=${regular_change_decimal} (${regular_change_percent})`);
 		
 	} catch (e) {
 		logDebug('Error scraping StockEvents: ' + e.message);
