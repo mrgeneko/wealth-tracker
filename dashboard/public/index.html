@@ -191,6 +191,9 @@
                     <button class="icon-btn" title="Add Symbol" onclick="openAddSymbolModal()" style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
                         <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Symbol</span>
                     </button>
+                    <button class="icon-btn" title="Expand Accounts" onclick="toggleAccountsCollapse()" style="font-size: inherit; white-space: nowrap; margin-left: 48px;">
+                        <span id="collapse-toggle" class="plus-icon" style="font-size: inherit; white-space: nowrap;">Expand Accounts</span>
+                    </button>
                 </h2>
             </div>
             <table id="investment-grid">
@@ -513,6 +516,9 @@
         // --- Sorting State ---
         let investmentGridSort = { column: 'symbol', direction: 'asc' };
         let accountOrder = [];
+        
+        // --- Accounts Collapse State ---
+        let accountsCollapsed = true; // Start with accounts collapsed by default
 
         // --- Socket.IO Listeners ---
         socket.on('price_update', (data) => {
@@ -851,6 +857,23 @@
             element.classList.add('flash-text');
         }
 
+        function toggleAccountsCollapse() {
+            accountsCollapsed = !accountsCollapsed;
+            const toggleButton = document.getElementById('collapse-toggle');
+            if (accountsCollapsed) {
+                toggleButton.innerHTML = 'Expand Accounts';
+                toggleButton.title = 'Expand Accounts';
+            } else {
+                toggleButton.innerHTML = 'Collapse Accounts';
+                toggleButton.title = 'Collapse Accounts';
+            }
+            // Re-render the investment grid with the new collapsed state
+            if (lastAssetsData) {
+                const investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
+                renderInvestmentGridWithFlashes('investment-grid', investmentAccounts, {});
+            }
+        }
+
         function renderInvestmentGrid(tableId, accounts) {
             renderInvestmentGridWithFlashes(tableId, accounts, {});
         }
@@ -882,11 +905,19 @@
                 return '<span class="sort-indicator">⇅</span>';
             };
             let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Symbol${sortIndicator('symbol')}</th>`;
-            accounts.forEach(acc => {
-                const accJson = escapeHtml(JSON.stringify(acc));
-                const accType = acc.type ? acc.type.toUpperCase() : '';
-                headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><span class='account-type'>${accType}</span> <span class="edit-icon">✎</span></span></th>`;
-            });
+            
+            if (accountsCollapsed) {
+                // When collapsed, show only a "Shares" column
+                headerHtml += `<th style="text-align: center">Shares</th>`;
+            } else {
+                // When expanded, show all account columns
+                accounts.forEach(acc => {
+                    const accJson = escapeHtml(JSON.stringify(acc));
+                    const accType = acc.type ? acc.type.toUpperCase() : '';
+                    headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><span class='account-type'>${accType}</span> <span class="edit-icon">✎</span></span></th>`;
+                });
+            }
+            
             headerHtml += `<th>Prev Close</th><th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;
 
@@ -936,6 +967,7 @@
                 
                 let symTotalValue = 0;
                 let symTotalValueChange = 0;
+                let symTotalShares = 0;
 
                 accounts.forEach(acc => {
                     // Find position in stocks or bonds
@@ -957,6 +989,7 @@
                         const value = pos.quantity * calcPrice;
                         symTotalValue += value;
                         symTotalValueChange += pos.quantity * calcChange;
+                        symTotalShares += pos.quantity;
                         const posType = isBond ? 'bond' : 'stock';
                         const posData = { id: pos.id, account_id: acc.id, symbol: pos.symbol, type: posType, quantity: pos.quantity };
                         const posJson = escapeHtml(JSON.stringify(posData));
@@ -973,13 +1006,22 @@
                         }
                         previousValues[cellId] = newValue;
                         
-                        rowHtml += `<td id="${cellId}" class="${flashClass}"><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
+                        if (!accountsCollapsed) {
+                            rowHtml += `<td id="${cellId}" class="${flashClass}"><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
+                        }
                     } else {
-                        const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, type: 'stock', quantity: 0 };
-                        const addPosJson = escapeHtml(JSON.stringify(addPosData));
-                        rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
+                        if (!accountsCollapsed) {
+                            const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, type: 'stock', quantity: 0 };
+                            const addPosJson = escapeHtml(JSON.stringify(addPosData));
+                            rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
+                        }
                     }
                 });
+                
+                // If collapsed, add single Shares column
+                if (accountsCollapsed) {
+                    rowHtml += `<td style="text-align: center;">${symTotalShares.toFixed(0)}</td>`;
+                }
                 
                 // Check for price changes and apply flash animations
                 const priceCellId = `price-${sym}`;
@@ -1113,16 +1155,24 @@
                 let cashPos = acc.holdings.cash;
                 if (cashPos) {
                     cashVal = cashPos.value;
-                    const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: cashVal };
-                    const posJson = escapeHtml(JSON.stringify(posData));
-                    cashRowHtml += `<td><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(cashVal)}</span></td>`;
+                    if (!accountsCollapsed) {
+                        const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: cashVal };
+                        const posJson = escapeHtml(JSON.stringify(posData));
+                        cashRowHtml += `<td><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(cashVal)}</span></td>`;
+                    }
                 } else {
-                    const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0 };
-                    const posJson = escapeHtml(JSON.stringify(posData));
-                    cashRowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${posJson})">+</span></td>`;
+                    if (!accountsCollapsed) {
+                        const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0 };
+                        const posJson = escapeHtml(JSON.stringify(posData));
+                        cashRowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${posJson})">+</span></td>`;
+                    }
                 }
                 totalCash += cashVal;
             });
+            // If collapsed, add single cell for Shares column (show dash for cash)
+            if (accountsCollapsed) {
+                cashRowHtml += '<td style="text-align: center;">-</td>';
+            }
             cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
@@ -1142,8 +1192,14 @@
                     accTotal += p.quantity * (price / 100.0);
                 });
                 grandTotal += accTotal;
-                totalRowHtml += `<td id="total-row-acc-${acc.id}">${formatNumber(accTotal)}</td>`;
+                if (!accountsCollapsed) {
+                    totalRowHtml += `<td id="total-row-acc-${acc.id}">${formatNumber(accTotal)}</td>`;
+                }
             });
+            // If collapsed, add single cell for Shares column (show dash for totals)
+            if (accountsCollapsed) {
+                totalRowHtml += '<td style="text-align: center;">-</td>';
+            }
             let totalChangeColor = '#e0e0e0';
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
