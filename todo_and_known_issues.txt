@@ -17,7 +17,7 @@ when making a yahoo call, store entire response to file?
     dividend_urls: [{ domain, url }]
     news_urls: [{ domain, url }]
     trading_sessions: {regular:{}, pre_market:{}, after_hours{}, overnight:{} }
-2. create 'Settings' tab in dashboard with import/export options
+3. replace dynamic cycle in runCycle()
 2. Store stream of price updates to database keyed by ticker + source + capture_time
 2. change scrapers to work with ticker without url where possible (partially done)
 3. create demo assets_liabilities (without need for investing.com watchlist).

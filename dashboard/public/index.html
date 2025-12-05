@@ -166,18 +166,138 @@
         .icon-btn:hover .plus-icon {
             transform: scale(1.2);
         }
+
+        /* Settings Button */
+        .settings-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            color: #0d6efd;
+            font-size: 1.5em;
+            border-radius: 50%;
+            transition: background-color 0.3s, transform 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+        }
+
+        .settings-btn:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: scale(1.1);
+        }
+
+        .gear-icon {
+            font-size: 1.2em;
+            line-height: 1;
+        }
+
+        /* Settings Modal Styles */
+        .settings-content {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .settings-section {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+        
+        .settings-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .settings-section h3 {
+            margin: 0 0 15px 0;
+            color: #ffffff;
+            font-size: 1.1em;
+        }
+        
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 0;
+        }
+        
+        .setting-item label {
+            flex: 1;
+            color: #e0e0e0;
+            font-weight: normal;
+        }
+        
+        .setting-item input[type="checkbox"] {
+            margin-left: 10px;
+        }
+        
+        .setting-item select {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 6px 8px;
+            min-width: 120px;
+        }
+
+        /* Settings Dropdown */
+        .settings-dropdown {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+            min-width: 120px;
+            overflow: hidden;
+        }
+
+        .dropdown-item {
+            padding: 12px 16px;
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            border-bottom: 1px solid #444;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background-color: #3d3d3d;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Wealth Tracker Dashboard</h1>
+        <div style="position: relative;">
+            <h1>Wealth Tracker Dashboard</h1>
+            <button id="settingsBtn" class="settings-btn" title="Menu" onclick="toggleSettingsDropdown()">
+                <span class="gear-icon">⚙️</span>
+            </button>
+            <div id="settingsDropdown" class="settings-dropdown">
+                <div class="dropdown-item" onclick="showLogs()">Logs</div>
+                <div class="dropdown-item" onclick="openSettingsModal()">Settings</div>
+            </div>
+        </div>
         <div id="last-updated" style="color: #aaa; font-size: 0.9em; margin-bottom: 20px;"></div>
 
         <div class="tab">
             <button class="tablinks active" onclick="openTab(event, 'Accounts')">Accounts</button>
             <button class="tablinks" onclick="openTab(event, 'Historical')">Historical Values</button>
             <button class="tablinks" onclick="openTab(event, 'Projections')">Projections</button>
-            <button class="tablinks" onclick="openTab(event, 'Logs')">Logs</button>
         </div>
 
         <div id="Accounts" class="tab-content" style="display: block;">
@@ -242,28 +362,6 @@
         <div id="Projections" class="tab-content">
             <h2>Projections</h2>
             <p>Future wealth projections coming soon.</p>
-        </div>
-
-        <div id="Logs" class="tab-content">
-            <h2>System Logs</h2>
-            <div id="logs-container" style="display: flex; height: 600px; border: 1px solid #444;">
-                <div id="log-list-pane" style="width: 27.5%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
-                    <table id="log-table" style="width: 100%; font-size: 0.8em; table-layout: fixed;">
-                        <thead>
-                            <tr>
-                                <th id="col-file" style="text-align: left; padding: 5px; position: relative;">File</th>
-                                <th id="col-time" style="text-align: left; padding: 5px; width: 132px; white-space: nowrap;">Time</th>
-                                <th id="col-size" style="text-align: right; padding: 5px; width: 70px; white-space: nowrap;">Size</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-list"></tbody>
-                    </table>
-                </div>
-                <div id="pane-resizer" style="width: 5px; cursor: col-resize; background-color: #444; user-select: none; z-index: 10;"></div>
-                <div id="log-viewer-pane" style="flex: 1; min-width: 150px; overflow-y: auto; padding: 10px; background: #121212; font-family: monospace; white-space: pre-wrap;">
-                    Select a log file to view...
-                </div>
-            </div>
         </div>
     </div>
 
@@ -368,6 +466,79 @@
                     <button type="button" class="btn btn-danger" id="btnDeleteAsset" style="display:none;" onclick="deleteAsset()">Delete</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('settingsModal')">&times;</span>
+            <h2>Settings</h2>
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h3>Dashboard Preferences</h3>
+                    <div class="setting-item">
+                        <label for="autoRefresh">Auto refresh account and positions</label>
+                        <input type="checkbox" id="autoRefresh" checked>
+                    </div>
+                    <div class="setting-item">
+                        <label for="refreshInterval">Refresh interval (seconds)</label>
+                        <select id="refreshInterval">
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>1 minute</option>
+                            <option value="300">5 minutes</option>
+                            <option value="600">10 minutes</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="theme">Theme</label>
+                        <select id="theme">
+                            <option value="dark" selected>Dark</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>System</h3>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button class="btn btn-primary" onclick="exportData()">Export Data</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Import Data</button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(this)">
+                    </div>
+                    <button class="btn btn-danger" onclick="clearCache()">Clear Cache</button>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('settingsModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content logs-modal-content">
+            <span class="close" onclick="closeModal('logsModal')">&times;</span>
+            <h2>System Logs</h2>
+            <div id="logs-container" style="display: flex; height: 600px; border: 1px solid #444;">
+                <div id="log-list-pane" style="width: 27.5%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
+                    <table id="log-table" style="width: 100%; font-size: 0.8em; table-layout: fixed;">
+                        <thead>
+                            <tr>
+                                <th id="col-file" style="text-align: left; padding: 5px; position: relative;">File</th>
+                                <th id="col-time" style="text-align: left; padding: 5px; width: 132px; white-space: nowrap;">Time</th>
+                                <th id="col-size" style="text-align: right; padding: 5px; width: 70px; white-space: nowrap;">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-list"></tbody>
+                    </table>
+                </div>
+                <div id="pane-resizer" style="width: 5px; cursor: col-resize; background-color: #444; user-select: none; z-index: 10;"></div>
+                <div id="log-viewer-pane" style="flex: 1; min-width: 150px; overflow-y: auto; padding: 10px; background: #121212; font-family: monospace; white-space: pre-wrap;">
+                    Select a log file to view...
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1375,6 +1546,20 @@
             }
         }
 
+        // Add Escape key support to close modals
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                // Close any open modal
+                const modals = document.getElementsByClassName('modal');
+                for (let i = 0; i < modals.length; i++) {
+                    if (modals[i].style.display === 'block') {
+                        modals[i].style.display = 'none';
+                        break; // Close only the first open modal
+                    }
+                }
+            }
+        });
+
         // --- Modal Logic ---
         
         // Account
@@ -1741,6 +1926,195 @@
                 th.appendChild(resizer);
                 createResizableColumn(th, resizer);
             }
+        });
+
+        // --- Settings Dropdown ---
+        function toggleSettingsDropdown() {
+            const dropdown = document.getElementById('settingsDropdown');
+            const isVisible = dropdown.style.display === 'block';
+            
+            // Hide dropdown if visible
+            if (isVisible) {
+                dropdown.style.display = 'none';
+            } else {
+                // Show dropdown
+                dropdown.style.display = 'block';
+            }
+        }
+
+        function showLogs() {
+            const dropdown = document.getElementById('settingsDropdown');
+            dropdown.style.display = 'none';
+            
+            // Open logs modal
+            document.getElementById('logsModal').style.display = 'block';
+            
+            // Fetch logs if not already loaded
+            fetchLogs();
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('settingsDropdown');
+            const settingsBtn = document.getElementById('settingsBtn');
+            
+            if (!settingsBtn.contains(event.target) && !dropdown.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // --- Settings ---
+        function openSettingsModal() {
+            const dropdown = document.getElementById('settingsDropdown');
+            dropdown.style.display = 'none'; // Close dropdown when opening modal
+            
+            const modal = document.getElementById('settingsModal');
+            // Load current settings (from localStorage or defaults)
+            loadSettings();
+            modal.style.display = 'block';
+        }
+
+        function loadSettings() {
+            // Load settings from localStorage or set defaults
+            const autoRefresh = localStorage.getItem('autoRefresh') !== 'false'; // default true
+            const refreshInterval = localStorage.getItem('refreshInterval') || '60';
+            const theme = localStorage.getItem('theme') || 'dark';
+
+            document.getElementById('autoRefresh').checked = autoRefresh;
+            document.getElementById('refreshInterval').value = refreshInterval;
+            document.getElementById('theme').value = theme;
+        }
+
+        function saveSettings() {
+            // Save settings to localStorage
+            const autoRefresh = document.getElementById('autoRefresh').checked;
+            const refreshInterval = document.getElementById('refreshInterval').value;
+            const theme = document.getElementById('theme').value;
+
+            localStorage.setItem('autoRefresh', autoRefresh);
+            localStorage.setItem('refreshInterval', refreshInterval);
+            localStorage.setItem('theme', theme);
+
+            // Apply settings immediately
+            applySettings();
+            
+            closeModal('settingsModal');
+            
+            // Show success message
+            alert('Settings saved successfully!');
+        }
+
+        function applySettings() {
+            const theme = localStorage.getItem('theme') || 'dark';
+            const autoRefresh = localStorage.getItem('autoRefresh') !== 'false';
+            const refreshInterval = parseInt(localStorage.getItem('refreshInterval') || '60');
+            
+            // Apply theme (basic implementation - could be expanded)
+            if (theme === 'light') {
+                document.body.style.backgroundColor = '#ffffff';
+                document.body.style.color = '#000000';
+            } else {
+                document.body.style.backgroundColor = '#121212';
+                document.body.style.color = '#e0e0e0';
+            }
+            
+            // Apply auto-refresh
+            if (autoRefresh && window.refreshIntervalId) {
+                clearInterval(window.refreshIntervalId);
+            }
+            if (autoRefresh) {
+                window.refreshIntervalId = setInterval(fetchAssets, refreshInterval * 1000);
+            }
+        }
+
+        function exportData() {
+            // Basic data export functionality
+            if (confirm('Export all account and position data?')) {
+                fetch('/api/export')
+                    .then(response => response.json())
+                    .then(data => {
+                        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `wealth-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    })
+                    .catch(err => alert('Export failed: ' + err.message));
+            }
+        }
+
+        function importData(fileInput) {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            if (!confirm('Import data from file? This will REPLACE all existing account and position data. Continue?')) {
+                // Reset file input
+                fileInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importData = JSON.parse(e.target.result);
+                    
+                    // Validate the data structure
+                    if (!importData.data || !importData.data.accounts || !importData.data.positions) {
+                        throw new Error('Invalid file format. Expected exported wealth-tracker data.');
+                    }
+
+                    // Send to server for import
+                    fetch('/api/import', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(importData)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            alert('Data imported successfully!');
+                            // Refresh the dashboard data
+                            fetchAssets();
+                            closeModal('settingsModal');
+                        } else {
+                            alert('Import failed: ' + (result.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => {
+                        alert('Import failed: ' + err.message);
+                    });
+                } catch (err) {
+                    alert('Failed to parse file: ' + err.message);
+                }
+            };
+            
+            reader.readAsText(file);
+            // Reset file input
+            fileInput.value = '';
+        }
+
+        function clearCache() {
+            if (confirm('Clear all cached data? This will force a fresh reload of all data.')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                // Clear any cached ticker data
+                tickerList = [];
+                tickerData = [];
+                tickerLookup = {};
+                // Reload the page to apply changes
+                location.reload();
+            }
+        }
+
+        // Apply settings on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            applySettings();
         });
 
         // Init
