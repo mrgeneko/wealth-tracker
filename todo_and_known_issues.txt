@@ -1,5 +1,12 @@
 TODO:
 
+scrape list from
+https://api.nasdaq.com/api/screener/stocks?tableonly=true&download=true
+polygon/massive free account?
+https://publicapis.io/nasdaq-data-link-api
+
+https://investexcel.net/all-yahoo-finance-stock-tickers/ -> 
+
 0. BKLC price modeling
 3. when adding a new ticker to dashboard, check ust, nyse, and nasdaq.
    if not bond call yahoo to get price and stock/etf flag.
