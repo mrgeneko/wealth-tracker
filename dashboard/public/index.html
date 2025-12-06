@@ -1,38 +1,3 @@
-<!-- Add Symbol Modal -->
-    <div id="addSymbolModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('addSymbolModal')">&times;</span>
-            <h2>Add Symbol</h2>
-            <form id="addSymbolForm">
-                <div class="form-group">
-                    <label for="newSymbol">Symbol</label>
-                    <input type="text" id="newSymbol" required maxlength="10" style="text-transform:uppercase;" class="awesomplete" autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label for="newSymbolType">Type</label>
-                    <select id="newSymbolType">
-                        <option value="stock">Stock</option>
-                        <option value="etf">ETF</option>
-                        <option value="bond">Bond</option>
-                        <option value="crypto">Crypto</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="newSymbolAccount">Account</label>
-                    <select id="newSymbolAccount" required></select>
-                </div>
-                <div class="form-group">
-                    <label for="newSymbolQuantity">Quantity</label>
-                    <input type="number" id="newSymbolQuantity" min="0" step="any" value="0" required>
-                </div>
-                <div id="addSymbolError" style="color: #f44336; margin-bottom: 10px; display: none;"></div>
-                <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('addSymbolModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add</button>
-                </div>
-            </form>
-        </div>
-    </div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -74,7 +39,6 @@
         .close:hover { color: white; }
         
         .form-group { margin-bottom: 15px; }
-            }
 
             /* Prev-close small info icon (tooltip) */
             .prev-close-info {
@@ -83,6 +47,7 @@
                 color: #bbb;
                 cursor: help;
                 vertical-align: middle;
+            }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #e0e0e0; }
         .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #555; border-radius: 4px; background-color: #333; color: #fff; }
         
@@ -293,6 +258,7 @@
     <div class="container">
         <div style="position: relative;">
             <h1>Wealth Tracker Dashboard</h1>
+            <div id="no-assets-warning" style="display:none; color: #ffb74d; margin-top: 8px;">No accounts data available — check server/API connection.</div>
             <button id="settingsBtn" class="settings-btn" title="Menu" onclick="toggleSettingsDropdown()">
                 <span class="gear-icon">⚙️</span>
             </button>
@@ -551,6 +517,42 @@
         </div>
     </div>
 
+    <!-- Add Symbol Modal -->
+    <div id="addSymbolModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addSymbolModal')">&times;</span>
+            <h2>Add Symbol</h2>
+            <form id="addSymbolForm">
+                <div class="form-group">
+                    <label for="newSymbol">Symbol</label>
+                    <input type="text" id="newSymbol" required maxlength="10" style="text-transform:uppercase;" class="awesomplete" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="newSymbolType">Type</label>
+                    <select id="newSymbolType">
+                        <option value="stock">Stock</option>
+                        <option value="etf">ETF</option>
+                        <option value="bond">Bond</option>
+                        <option value="crypto">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newSymbolAccount">Account</label>
+                    <select id="newSymbolAccount" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="newSymbolQuantity">Quantity</label>
+                    <input type="number" id="newSymbolQuantity" min="0" step="any" value="0" required>
+                </div>
+                <div id="addSymbolError" style="color: #f44336; margin-bottom: 10px; display: none;"></div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('addSymbolModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
                 // Ticker autocomplete setup
                 let tickerList = [];
@@ -721,13 +723,22 @@
 
         // --- Data Fetching ---
         async function fetchAssets() {
+            console.log('Fetching assets...');
             try {
                 const response = await fetch('/api/assets');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
+                console.log('Assets received:', data);
                 lastAssetsData = data;
                 renderAll();
+                const warn = document.getElementById('no-assets-warning');
+                if (warn) warn.style.display = 'none';
             } catch (error) {
                 console.error('Error fetching assets:', error);
+                const warn = document.getElementById('no-assets-warning');
+                if (warn) warn.style.display = 'block';
             }
         }
 
@@ -2202,10 +2213,9 @@
         // Apply settings on page load
         document.addEventListener('DOMContentLoaded', function() {
             applySettings();
+            fetchAssets();
         });
 
-        // Init
-        window.onload = fetchAssets;
     </script>
 </body>
 </html>
