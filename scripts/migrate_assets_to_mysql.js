@@ -53,7 +53,7 @@ async function migrate() {
             CREATE TABLE IF NOT EXISTS positions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 account_id INT NOT NULL,
-                symbol VARCHAR(20),
+                symbol VARCHAR(50),
                 description VARCHAR(255),
                 quantity DECIMAL(20, 8),
                 type ENUM('stock', 'etf', 'bond', 'cash', 'crypto', 'other') NOT NULL,

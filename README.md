@@ -572,7 +572,7 @@ Stores information about bank and investment accounts.
 Stores individual holdings within an account.
 - `id`: Primary Key
 - `account_id`: Foreign Key to `accounts`
-- `symbol`: Ticker symbol (e.g., "AAPL", "CASH")
+- `symbol`: Ticker symbol (e.g., "AAPL", "CASH"). Now supports up to 50 characters for options and long tickers.
 - `quantity`: Number of shares or amount
 - `type`: 'stock', 'etf', 'bond', 'cash', 'crypto', 'other'
 - `exchange`: Stock exchange (optional)
