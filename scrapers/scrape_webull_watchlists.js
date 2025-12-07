@@ -1,4 +1,4 @@
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError, normalizedKey } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 const path = require('path');
 const fs = require('fs');
@@ -81,6 +81,10 @@ async function scrapeWebullWatchlists(browser, watchlist, outputDir) {
         const kafkaTopic = process.env.KAFKA_TOPIC || 'webull_watchlist';
         const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
         for (const data of dataObjects) {
+            if (!data.normalized_key) {
+                const keyCandidate = data.key || data.symbol || data.col0 || data.col1 || data.col2;
+                if (keyCandidate) data.normalized_key = normalizedKey(keyCandidate);
+            }
             publishToKafka(data, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
         }
     } catch (err) {

@@ -1,4 +1,4 @@
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError, normalizedKey } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 const { DateTime } = require('luxon');
 
@@ -188,10 +188,11 @@ async function scrapeTradingViewWatchlists(browser, watchlist, outputDir) {
             const lastPrice = cleanNumber(lastPriceStr);
             const chg = cleanNumber(chgStr);
 
-            if (lastPrice !== null) {
+                if (lastPrice !== null) {
                 let prevClose = (chg !== null) ? Math.round((lastPrice - chg) * 100) / 100 : null;
                 dataObjects.push({
                     key: symbol,
+                        normalized_key: normalizedKey(symbol),
                     regular_price: lastPrice,
                     regular_change_decimal: chgStr,
                     regular_change_percent: chgPctStr,

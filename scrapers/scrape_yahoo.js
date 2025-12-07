@@ -120,7 +120,7 @@ async function ensureYahoo() {
 }
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, normalizedKey } = require('./scraper_utils');
 
 // Helper to map Yahoo quote object to our internal data structure
 function mapYahooQuoteToData(quote, securityKey) {
@@ -131,6 +131,7 @@ function mapYahooQuoteToData(quote, securityKey) {
 
   return {
     key: sanitizeForFilename(securityKey),
+    normalized_key: normalizedKey(securityKey),
     regular_price: (p.regularMarketPrice != null) ? String(p.regularMarketPrice) : '',
     regular_change_decimal: (p.regularMarketChange != null) ? String(p.regularMarketChange) : '',
     regular_change_percent: (p.regularMarketChangePercent != null) ? (String(p.regularMarketChangePercent) + '%') : '',
@@ -402,7 +403,7 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
       delete commonData.source;
       delete commonData.capture_time;
 
-      for (const sec of targets) {
+        for (const sec of targets) {
         const data = Object.assign(
           { 
             key: sanitizeForFilename(sec.key), 
@@ -411,7 +412,10 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
           }, 
           commonData
         );
-        
+          // ensure normalized_key is set per-security (batch used 'temp' as placeholder earlier)
+          // Overwrite the placeholder from commonData — always set the correct per-security normalized key
+          data.normalized_key = normalizedKey(sec.key);
+
         // publish per-security
         try {
           const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeYahoo';

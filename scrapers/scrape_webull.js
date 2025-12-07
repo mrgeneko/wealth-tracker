@@ -6,7 +6,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, gotoWithRetries, attachRequestFailureCounters } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, gotoWithRetries, attachRequestFailureCounters, normalizedKey } = require('./scraper_utils');
 const { createPreparedPage, savePageSnapshot } = require('./scraper_utils');
 
 function parseToIso(val) {
@@ -149,6 +149,7 @@ async function scrapeWebull(browser, security, outputDir) {
 
         data = {
             key: ticker,
+            normalized_key: normalizedKey(security.key),
             regular_price,
             regular_change_decimal,
             regular_change_percent,

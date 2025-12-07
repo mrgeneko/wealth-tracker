@@ -6,7 +6,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, normalizedKey } = require('./scraper_utils');
 
 function cleanNumberText(s) {
   if (!s && s !== 0) return '';
@@ -48,6 +48,7 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
 
     // Parse the HTML to extract data
     data = parseStockAnalysisHtml(html || await page.content(), { key: ticker });
+    data.normalized_key = data.normalized_key || normalizedKey(security.key);
 
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeStockAnalysis';

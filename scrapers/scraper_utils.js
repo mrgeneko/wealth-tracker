@@ -339,6 +339,18 @@ function cleanNumberText(s) {
     return String(s).replace(/[,\s]/g, '').replace(/[^0-9.\-]/g, '');
 }
 
+// Create a deterministic, reversible normalized key for symbols
+// We use percent-encoding so the key is reversible and avoids collisions where
+// the original symbol contains characters not suitable for DB/index keys.
+function normalizedKey(symbol) {
+    if (symbol == null) return '';
+    try {
+        return encodeURIComponent(String(symbol));
+    } catch (e) {
+        return String(symbol);
+    }
+}
+
 function parseToIso(timeStr) {
     if (!timeStr) return '';
     let clean = String(timeStr).trim().replace(/\s+/g, ' ');
@@ -398,6 +410,24 @@ function isRegularTradingSession() {
     const marketClose = now.set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
     return now >= marketOpen && now < marketClose;
 }
+
+module.exports = {
+    sanitizeForFilename,
+    getDateTimeString,
+    getTimestampedLogPath,
+    logDebug,
+    attachRequestFailureCounters,
+    gotoWithRetries,
+    getMetrics,
+    resetMetrics,
+    cleanNumberText,
+    parseToIso,
+    isWeekday,
+    isPreMarketSession,
+    isRegularTradingSession,
+    // new helper
+    normalizedKey
+};
 
 function isAfterHoursSession() {
     const now = DateTime.now().setZone('America/New_York');
@@ -661,7 +691,9 @@ module.exports = {
     isPreMarketSession,
     isRegularTradingSession,
     isAfterHoursSession,
-    getConstructibleUrls
+    getConstructibleUrls,
+    // exported helper (percent-encoding reversible normalization)
+    normalizedKey
 };
 
 // Check if error message indicates a protocol timeout

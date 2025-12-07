@@ -2,8 +2,8 @@
   "description": "Source priority configuration for previous_close_price merging. Lower index = higher priority.",
   "priority": [
     "yahoo",
-    "google",
     "nasdaq",
+    "google",
     "cnbc",
     "wsj",
     "ycharts",
@@ -17,8 +17,8 @@
   ],
   "weights": {
     "yahoo": 1.0,
-    "google": 0.98,
     "nasdaq": 0.95,
+    "google": 0.93,
     "cnbc": 0.9,
     "wsj": 0.9,
     "ycharts": 0.8,

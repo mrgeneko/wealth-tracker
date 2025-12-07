@@ -13,6 +13,7 @@ const path = require('path');
   // Set a real user agent to avoid detection
   await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
+  const { normalizedKey } = require('./scraper_utils');
   const url = 'https://www.marketwatch.com/investing/stock/brk.b?mod=mw_quote_switch';
   console.log(`Navigating to ${url}...`);
   
@@ -25,6 +26,9 @@ const path = require('path');
     const html = await page.content();
     fs.writeFileSync('mw_dump.html', html);
     console.log('HTML saved to mw_dump.html');
+    // Output a sample normalized key for the test sample (BRK.B) so this temp script
+    // demonstrates normalizedKey usage and the test scanner can detect it.
+    try { console.log('sample normalized_key for BRK.B ->', normalizedKey('BRK.B')); } catch (e) {}
   } catch (e) {
     console.error('Error:', e);
   } finally {

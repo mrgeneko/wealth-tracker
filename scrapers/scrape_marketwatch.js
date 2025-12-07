@@ -6,7 +6,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, normalizedKey } = require('./scraper_utils');
 
 function parseToIso(timeStr) {
   if (!timeStr) return '';
@@ -141,6 +141,7 @@ function parseMarketWatchHtml(html, security) {
 
   const data = {
     key: ticker,
+    normalized_key: normalizedKey(security.key),
     regular_price: '',
     regular_change_decimal: '',
     regular_change_percent: '',
