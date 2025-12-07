@@ -12,9 +12,11 @@ const { scrapeMarketWatch } = require('./scrape_marketwatch');
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
   
+  const { normalizedKey } = require('./scraper_utils');
   const security = {
     key: 'BRK.B',
-    marketwatchUrl: 'https://www.marketwatch.com/investing/stock/brk.b?mod=mw_quote_switch'
+    marketwatchUrl: 'https://www.marketwatch.com/investing/stock/brk.b?mod=mw_quote_switch',
+    normalized_key: normalizedKey('BRK.B')
   };
   
   try {

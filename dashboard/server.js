@@ -65,8 +65,8 @@ const KAFKA_GROUP_ID = config.KAFKA_GROUP_ID;
 // Source priority configuration for previous_close_price merging
 // Lower index in priority array = higher priority source
 let sourcePriorityConfig = {
-    priority: ['google', 'nasdaq', 'cnbc', 'wsj', 'ycharts', 'marketbeat', 'stockanalysis', 'moomoo', 'robinhood', 'investingcom', 'stockmarketwatch', 'stocktwits'],
-    weights: { google: 1.0, nasdaq: 0.95, cnbc: 0.9, wsj: 0.9, ycharts: 0.8, marketbeat: 0.75, stockanalysis: 0.75, moomoo: 0.7, robinhood: 0.7, investingcom: 0.65, stockmarketwatch: 0.6, stocktwits: 0.5 },
+    priority: ['yahoo', 'nasdaq', 'google','cnbc', 'wsj', 'ycharts', 'marketbeat', 'stockanalysis', 'moomoo', 'robinhood', 'investingcom', 'stockmarketwatch', 'stocktwits'],
+    weights: { yahoo:1.0, nasdaq: 0.95, google: .93, cnbc: 0.9, wsj: 0.9, ycharts: 0.8, marketbeat: 0.75, stockanalysis: 0.75, moomoo: 0.7, robinhood: 0.7, investingcom: 0.65, stockmarketwatch: 0.6, stocktwits: 0.5 },
     default_weight: 0.5,
     recency_threshold_minutes: 60
 };
@@ -310,7 +310,10 @@ loadAssets();
 // Helper to update cache from price data object
 // Supports extended hours pricing (pre-market, after-hours)
 function updatePriceCache(item) {
-    if (!item.key) return false;
+    // Determine a normalized key for this incoming item.
+    // Priority: item.normalized_key -> item.key -> encodeURIComponent(item.symbol)
+    const normalizedKey = item.normalized_key || item.key || (item.symbol ? encodeURIComponent(String(item.symbol)) : null);
+    if (!normalizedKey) return false;
 
     // Determine the best price to use
     // Prefer extended hours prices during pre/post market
@@ -409,7 +412,7 @@ function updatePriceCache(item) {
     let prevCloseTime = null;
 
     // Get cached prev-close data (if any)
-    const cached = priceCache[item.key] || null;
+    const cached = priceCache[normalizedKey] || null;
 
     // Use source-priority merge logic to decide whether to accept incoming prev-close
     const incomingData = {
@@ -425,7 +428,7 @@ function updatePriceCache(item) {
             prevCloseSource = incomingPrevSource;
             prevCloseTime = incomingPrevTime;
             if (cached && cached.previous_close_price && cached.previous_close_price !== incomingPrevClosePrice) {
-                console.log(`[PrevClose] ${item.key}: Updated from ${cached.previous_close_price} (${cached.prev_close_source}) to ${previousClosePrice} (${prevCloseSource})`);
+                console.log(`[PrevClose] ${normalizedKey}: Updated from ${cached.previous_close_price} (${cached.prev_close_source}) to ${previousClosePrice} (${prevCloseSource})`);
             }
         }
     } else {
@@ -435,14 +438,14 @@ function updatePriceCache(item) {
             prevCloseSource = cached.prev_close_source || null;
             prevCloseTime = cached.prev_close_time || null;
             if (incomingPrevClosePrice !== null) {
-                console.log(`[PrevClose] ${item.key}: Rejected ${incomingPrevClosePrice} from ${incomingPrevSource}, keeping ${previousClosePrice} from ${prevCloseSource}`);
+                console.log(`[PrevClose] ${normalizedKey}: Rejected ${incomingPrevClosePrice} from ${incomingPrevSource}, keeping ${previousClosePrice} from ${prevCloseSource}`);
             } else {
-                console.warn(`Preserving existing previous_close_price for ${item.key} (incoming update had none)`);
+                console.warn(`Preserving existing previous_close_price for ${normalizedKey} (incoming update had none)`);
             }
         }
     }
 
-    priceCache[item.key] = {
+    priceCache[normalizedKey] = {
         price: price,
         previous_close_price: previousClosePrice,
         // prev_close_source and prev_close_time record where and when the
@@ -452,6 +455,9 @@ function updatePriceCache(item) {
         prev_close_time: prevCloseTime,
         currency: 'USD',
         time: item.capture_time || new Date().toISOString(),
+        // Keep both the original symbol and the normalized key for consumers
+        symbol: item.symbol || null,
+        normalized_key: normalizedKey,
         source: item.source ? `${item.source} (${priceSource})` : priceSource
     };
 
@@ -480,7 +486,8 @@ async function startKafkaConsumer() {
                 try {
                     const value = message.value.toString();
                     const data = JSON.parse(value);
-                    console.log(`Received update for ${data.key}`);
+                    const displayKey = data.normalized_key || data.key || (data.symbol ? encodeURIComponent(String(data.symbol)) : '<no-key>');
+                    console.log(`Received update for ${displayKey}`);
 
                     if (updatePriceCache(data)) {
                         // Broadcast updated prices to all connected clients

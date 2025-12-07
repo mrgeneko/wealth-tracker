@@ -13,6 +13,7 @@ const {
   getDateTimeString,
   logDebug,
   createPreparedPage,
+  normalizedKey,
   savePageSnapshot
 } = require('./scraper_utils');
 
@@ -122,6 +123,7 @@ async function scrapeWSJ(browser, security, outputDir) {
 
     data = {
       key: ticker,
+      normalized_key: normalizedKey(security.key),
       regular_price: regular_price || '',
       regular_change_decimal: regular_change_decimal || '',
       regular_change_percent: regular_change_percent || '',

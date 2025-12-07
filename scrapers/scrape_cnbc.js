@@ -6,7 +6,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, normalizedKey } = require('./scraper_utils');
 
 function parseToIso(timeStr) {
   if (!timeStr) return '';
@@ -55,6 +55,8 @@ async function scrapeCNBC(browser, security, outputDir) {
 
     const result = parseCNBCHtml(html || '', { key: ticker });
     data = result;
+    // ensure we include a reversible normalized key for downstream indexing
+    data.normalized_key = data.normalized_key || normalizedKey(security.key);
 
     const config = require('./config');
     const kafkaTopic = config.KAFKA_TOPIC;

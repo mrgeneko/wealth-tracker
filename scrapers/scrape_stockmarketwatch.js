@@ -6,7 +6,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, normalizedKey } = require('./scraper_utils');
 
 function cleanNumberText(s) {
   if (!s && s !== 0) return '';
@@ -190,6 +190,7 @@ function parseStockMarketWatchHtml(html, security) {
 
   return {
     key: ticker,
+    normalized_key: normalizedKey(security.key),
     regular_price: regular_price || '',
     regular_change_decimal: regular_change_decimal || '',
     regular_change_percent: regular_change_percent || '',

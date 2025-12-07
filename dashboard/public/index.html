@@ -788,11 +788,11 @@
             lastAssetsData.accounts.forEach(acc => {
                 if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     netWorth += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     // Bonds use price/100
                     netWorth += p.quantity * (price / 100.0);
                 });
@@ -816,8 +816,9 @@
             let grandTotalValueChange = 0;
             
             allSymbols.forEach(sym => {
-                const oldPriceData = oldPrices[sym];
-                const newPriceData = currentPrices[sym];
+                const normalized = normalizeTicker(sym);
+                const oldPriceData = oldPrices[sym] || oldPrices[normalized];
+                const newPriceData = getPriceDataForSymbol(sym);
                 
                 if (!newPriceData) return;
                 
@@ -1029,12 +1030,12 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const priceData = currentPrices[p.symbol];
+                    const priceData = getPriceDataForSymbol(p.symbol);
                     let price = priceData?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const priceData = currentPrices[p.symbol];
+                    const priceData = getPriceDataForSymbol(p.symbol);
                     let price = priceData?.price || 0;
                     // Bonds use price/100
                     accTotal += p.quantity * (price / 100.0);
@@ -1176,8 +1177,11 @@
                 let sourceStr = '-';
                 let color = '#e0e0e0';
                 
-                if (currentPrices[sym]) {
-                    price = currentPrices[sym].price;
+                const normalized = normalizeTicker(sym);
+                const newPriceData = getPriceDataForSymbol(sym);
+                const oldPricesLookup = oldPrices[sym] || oldPrices[normalized];
+                if (newPriceData) {
+                    price = newPriceData.price;
                     // Prefer a valid previous_close_price from the currentPrices object.
                     // NOTE: When the dashboard performs a full render (e.g. page refresh)
                     // or is fed a fresh snapshot of `currentPrices`, some scrapers may
@@ -1189,16 +1193,16 @@
                     // known value (from oldPrices) — this mirrors server-side cache
                     // behavior and prevents accidental erasure of a valid Prev Close.
                     prevClose = 0;
-                    if (currentPrices[sym].previous_close_price !== undefined && currentPrices[sym].previous_close_price !== null && currentPrices[sym].previous_close_price !== '') {
-                        const parsedPrev = parseFloat(currentPrices[sym].previous_close_price);
+                    if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
+                        const parsedPrev = parseFloat(newPriceData.previous_close_price);
                         if (!isNaN(parsedPrev) && parsedPrev > 0) {
                                 prevClose = parsedPrev;
-                            } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                            } else if (oldPricesLookup && oldPricesLookup.previous_close_price) {
                                 // fallback to prev value if current data doesn't provide valid prev close
                                 prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
                                 console.warn(`[PrevClose] Current data for ${sym} missing valid prev close — falling back to previous value ${prevClose}`);
                             }
-                    } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                    } else if (oldPricesLookup && oldPricesLookup.previous_close_price) {
                         // Fall back to previously known value when current has none
                         prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
                     }
@@ -1206,8 +1210,8 @@
                     changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                     console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
                     
-                    if (currentPrices[sym].time) {
-                        const d = new Date(currentPrices[sym].time);
+                    if (newPriceData.time) {
+                        const d = new Date(newPriceData.time);
                         if (!isNaN(d.getTime())) {
                             // Format as 'M/D HH:mm:ss'
                             const month = d.getMonth() + 1;
@@ -1217,11 +1221,11 @@
                             const seconds = d.getSeconds().toString().padStart(2, '0');
                             timeStr = `${month}/${day} ${hours}:${minutes}:${seconds}`;
                         } else {
-                            timeStr = currentPrices[sym].time;
+                            timeStr = newPriceData.time;
                         }
                     }
                     
-                    sourceStr = currentPrices[sym].source || '-';
+                    sourceStr = newPriceData.source || '-';
                     if (changeVal > 0) color = '#4caf50';
                     if (changeVal < 0) color = '#f44336';
                 }
@@ -1288,12 +1292,12 @@
                 
                 // Check for price changes and apply flash animations
                 const priceCellId = `price-${sym}`;
-                const oldPriceData = oldPrices[sym];
+                const oldPriceData = oldPricesLookup; // use either raw or normalized key
                 let priceFlashClass = '';
                 
-                if (oldPriceData && currentPrices[sym]) {
+                if (oldPriceData && newPriceData) {
                     const oldPrice = oldPriceData.price;
-                    const newPrice = currentPrices[sym].price;
+                    const newPrice = newPriceData.price;
                     if (oldPrice !== 0 && newPrice !== oldPrice) {
                         priceFlashClass = newPrice > oldPrice ? 'flash-positive' : 'flash-negative';
                     }
@@ -1311,8 +1315,8 @@
                 // Build a tooltip showing prev-close source & time (if available)
                 let prevCloseTooltip = '';
                 if (prevClose && prevClose !== 0) {
-                    const prevCloseSource = (currentPrices[sym] && (currentPrices[sym].prev_close_source || currentPrices[sym].previous_close_source)) || (oldPrices[sym] && (oldPrices[sym].prev_close_source || oldPrices[sym].previous_close_source)) || '';
-                    const prevCloseTime = (currentPrices[sym] && (currentPrices[sym].prev_close_time || currentPrices[sym].previous_close_time || currentPrices[sym].capture_time)) || (oldPrices[sym] && (oldPrices[sym].prev_close_time || oldPrices[sym].previous_close_time || oldPrices[sym].capture_time)) || '';
+                    const prevCloseSource = (newPriceData && (newPriceData.prev_close_source || newPriceData.previous_close_source)) || (oldPrices[sym] && (oldPrices[sym].prev_close_source || oldPrices[sym].previous_close_source)) || '';
+                    const prevCloseTime = (newPriceData && (newPriceData.prev_close_time || newPriceData.previous_close_time || newPriceData.capture_time)) || (oldPrices[sym] && (oldPrices[sym].prev_close_time || oldPrices[sym].previous_close_time || oldPrices[sym].capture_time)) || '';
                     if (prevCloseSource) prevCloseTooltip += `Source: ${prevCloseSource}`;
                     if (prevCloseTime) prevCloseTooltip += (prevCloseTooltip ? '\n' : '') + `Time: ${prevCloseTime}`;
                 }
@@ -1325,7 +1329,7 @@
                 let changeFlashClass = '';
                 let changePctFlashClass = '';
                 
-                if (oldPriceData && currentPrices[sym]) {
+                if (oldPriceData && newPriceData) {
                     const oldChange = oldPriceData.change || 0;
                     const newChange = changeVal;
                     if (oldChange !== 0 && newChange !== oldChange) {
@@ -1352,7 +1356,7 @@
                 let timeFlashClass = '';
                 let sourceFlashClass = '';
                 
-                if (oldPriceData && currentPrices[sym]) {
+                if (oldPriceData && newPriceData) {
                     const oldTime = oldPriceData.time || '-';
                     const newTime = timeStr;
                     const oldSource = oldPriceData.source || '-';
@@ -1377,7 +1381,7 @@
                 let valueChangeFlashClass = '';
                 let totalFlashClass = '';
                 
-                if (oldPriceData && currentPrices[sym]) {
+                if (oldPriceData && newPriceData) {
                     const oldValueChange = previousValues[valueChangeCellId] || 0;
                     const newValueChange = symTotalValueChange;
                     if (oldValueChange !== 0 && newValueChange !== oldValueChange) {
@@ -1455,11 +1459,11 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     accTotal += p.quantity * (price / 100.0);
                 });
                 grandTotal += accTotal;
@@ -1626,6 +1630,49 @@
         }
 
         // --- Helpers ---
+        // Normalize ticker strings to the same key format used by scrapers/price messages
+        // (underscore-sanitized form for filename compatibility)
+        function normalizeTicker(sym) {
+            if (!sym && sym !== 0) return sym;
+            try {
+                return String(sym).toUpperCase().replace(/[^A-Z0-9._-]/g, '_');
+            } catch (e) {
+                return String(sym).toUpperCase();
+            }
+        }
+
+        // Percent-encode ticker to match server-side normalized_key format
+        // (e.g., GC=F -> GC%3DF)
+        function percentEncodeTicker(sym) {
+            if (!sym && sym !== 0) return sym;
+            try {
+                return encodeURIComponent(String(sym).toUpperCase());
+            } catch (e) {
+                return String(sym).toUpperCase();
+            }
+        }
+
+        // Safe accessor for currentPrices that falls back to normalized/encoded keys
+        // Server's priceCache uses percent-encoded keys (normalized_key), so we try:
+        // 1. Direct symbol lookup (e.g., "AAPL")
+        // 2. Percent-encoded form (e.g., "GC=F" -> "GC%3DF")
+        // 3. Underscore-sanitized form (e.g., "GC=F" -> "GC_F") for legacy compatibility
+        function getPriceDataForSymbol(sym) {
+            if (!sym && sym !== 0) return undefined;
+            // direct lookup
+            let data = currentPrices[sym];
+            if (data) return data;
+            // try percent-encoded form (server's normalized_key)
+            const encoded = percentEncodeTicker(sym);
+            if (encoded !== sym) {
+                data = currentPrices[encoded];
+                if (data) return data;
+            }
+            // try underscore-sanitized form (legacy/filename compatibility)
+            const norm = normalizeTicker(sym);
+            if (norm !== sym && norm !== encoded) data = currentPrices[norm];
+            return data;
+        }
         function formatNumber(num, decimals = 2) {
             return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
         }

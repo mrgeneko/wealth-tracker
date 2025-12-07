@@ -6,7 +6,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, normalizedKey } = require('./scraper_utils');
 
 function parseToIso(timeStr) {
   if (!timeStr) return '';
@@ -49,6 +49,7 @@ async function scrapeStocktwits(browser, security, outputDir) {
 
     const result = parseStocktwitsHtml(html || '', { key: ticker });
     data = result;
+    data.normalized_key = data.normalized_key || normalizedKey(security.key);
     // publish & save
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeStocktwits';

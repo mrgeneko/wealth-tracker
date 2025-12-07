@@ -3,7 +3,7 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, cleanNumberText, parseToIso } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, cleanNumberText, parseToIso, normalizedKey } = require('./scraper_utils');
 
 async function scrapeMoomoo(browser, security, outputDir) {
     let page = null;
@@ -26,6 +26,7 @@ async function scrapeMoomoo(browser, security, outputDir) {
 
         const result = parseMoomooHtml(html || '', { key: ticker });
         data = result;
+        data.normalized_key = data.normalized_key || normalizedKey(security.key);
         // publish & save
         try {
             const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeMoomoo';
