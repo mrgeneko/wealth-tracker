@@ -32,7 +32,12 @@ function parseArg(name, defaultValue) {
     console.log(`Running ${scriptPath} ...`);
 
     const start = Date.now();
-    const child = spawn('node', [scriptPath], { env: process.env });
+    // Some tests are written for Jest (use describe/test/expect). Detect those and run via jest.
+    const content = fs.readFileSync(scriptPath, 'utf8');
+    const usesJest = /\bdescribe\(|\btest\(|\bexpect\(/.test(content);
+    const child = usesJest
+      ? spawn('npx', ['jest', '--runInBand', '--testTimeout=60000', scriptPath], { env: process.env })
+      : spawn('node', [scriptPath], { env: process.env });
 
     let stdout = '';
     let stderr = '';

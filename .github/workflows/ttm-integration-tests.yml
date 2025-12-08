@@ -63,6 +63,11 @@ jobs:
             mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE < "$f" || true
           done
 
+      - name: Ensure accounts/positions exist (migrate assets)
+        run: |
+          echo "Populating accounts and positions from config/assets_liabilities.json"
+          node scripts/migrate_assets_to_mysql.js || true
+
       - name: Run integration tests and produce JUnit XML
         run: |
           mkdir -p artifacts/test-results
