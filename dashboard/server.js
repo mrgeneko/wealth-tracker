@@ -151,7 +151,17 @@ const metadataRouter = require('../api/metadata');
 app.use('/api/metadata', metadataRouter);
 
 app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
+// Disable caching for static files (Debugging purposes)
+app.use(express.static(path.join(__dirname, 'public'), {
+    etl: false,
+    maxAge: 0,
+    setHeaders: function (res, path, stat) {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+        res.set('Surrogate-Control', 'no-store');
+    }
+}));
 
 // In-memory cache for latest prices: { "AAPL": { price: 150.00, currency: "USD", time: "..." } }
 const priceCache = {};
