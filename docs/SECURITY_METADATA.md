@@ -27,6 +27,17 @@ This system stores comprehensive metadata about securities (stocks, ETFs, bonds,
    - Dividend amounts
    - Status tracking (estimated/confirmed/paid)
 
+  ### Trailing-12-Month (TTM) aggregates
+
+  The system can compute trailing-12-month aggregates from stored historical events:
+  - `ttm_dividend_amount` — the sum of dividend payments over the last 12 months (per share)
+  - `ttm_eps` — the sum of EPS (earnings per share) reported in the last 12 months
+   - `ttm_eps` — the sum of EPS (earnings per share) reported in the last 12 months
+
+  Note: some data sources (Yahoo) return inconsistent yield fields — e.g., `dividendYield` can be a fraction or a percent-like number. To reduce false/absurd yields, the metadata population logic now prefers `trailingAnnualDividendYield` when available and ignores (treats as NULL) any final yield greater than a configurable threshold (default 15%). Set `MAX_ACCEPTABLE_DIVIDEND_YIELD` in `.env` to change the threshold.
+
+  These values are stored on `securities_metadata` and are used by the dashboard to calculate real-time dividend yield and P/E using the latest price. Historical data must be fetched (see below) in order for the TTM values to be meaningful.
+
 4. **`positions.metadata_symbol`** - Foreign key linking positions to metadata
 
 ## Setup Instructions
@@ -70,7 +81,8 @@ This will:
 - Fetch metadata from Yahoo Finance for each unique symbol in the `positions` table
 - Populate `securities_metadata` with comprehensive security information
 - Extract and store upcoming earnings events in `securities_earnings`
-- Extract and store dividend information in `securities_dividends`
+  - Extract and store dividend information in `securities_dividends` (see scripts/fetch_history_yahoo.js)
+  - Compute TTM aggregates and write them into `securities_metadata.ttm_dividend_amount` and `securities_metadata.ttm_eps` (via scripts/fetch_history_yahoo.js)
 
 **Note**: The script includes rate limiting (500ms delay between symbols) to avoid overwhelming Yahoo Finance API.
 

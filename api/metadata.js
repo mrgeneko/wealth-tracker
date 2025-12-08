@@ -48,7 +48,8 @@ router.get('/lookup/:symbol', async (req, res) => {
         const [rows] = await connection.execute(
             `SELECT 
         symbol, quote_type, type_display, short_name, long_name,
-        exchange, currency, market_cap, dividend_yield, trailing_pe
+            exchange, currency, market_cap, dividend_yield, trailing_pe,
+            ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
        WHERE symbol = ?`,
             [symbol]
@@ -109,7 +110,8 @@ router.post('/prefetch', async (req, res) => {
             const [metadata] = await connection.execute(
                 `SELECT 
           symbol, quote_type, type_display, short_name, long_name,
-          exchange, currency, region, market_cap, dividend_yield
+              exchange, currency, region, market_cap, dividend_yield,
+              ttm_dividend_amount, ttm_eps
          FROM securities_metadata 
          WHERE symbol = ?`,
                 [normalizedSymbol]
@@ -136,7 +138,8 @@ router.post('/prefetch', async (req, res) => {
         const [metadata] = await connection.execute(
             `SELECT 
         symbol, quote_type, type_display, short_name, long_name,
-        exchange, currency, region, market_cap, dividend_yield
+        exchange, currency, region, market_cap, dividend_yield,
+        ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
        WHERE symbol = ?`,
             [normalizedSymbol]

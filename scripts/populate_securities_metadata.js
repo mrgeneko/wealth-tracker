@@ -210,13 +210,30 @@ async function upsertSecurityMetadata(connection, symbol, data) {
                         ? price.trailingAnnualDividendYield
                         : (price && price.dividendYield !== undefined && price.dividendYield !== null ? price.dividendYield : null)));
 
+            // Configurable max acceptable dividend yield (fraction). Values above
+            // this threshold are treated as suspicious and will be ignored.
+            // Default: 15% (0.15)
+            const MAX_ACCEPTABLE_YIELD = parseFloat(process.env.MAX_ACCEPTABLE_DIVIDEND_YIELD || '0.15');
+
             if (cand === null || cand === undefined) return null;
             const parsed = parseFloat(cand);
             if (isNaN(parsed)) return null;
             // If value seems to be a percentage (e.g., > 1 and <= 100), convert to fraction
-            if (parsed > 1 && parsed <= 100) return parsed / 100.0;
+            if (parsed > 1 && parsed <= 100) {
+                const frac = parsed / 100.0;
+                if (frac > MAX_ACCEPTABLE_YIELD) {
+                    console.warn(`Suspicious dividend yield for ${symbol}: ${parsed} (converted ${frac}) > ${MAX_ACCEPTABLE_YIELD} — ignoring`);
+                    return null;
+                }
+                return frac;
+            }
             // If value is absurdly large (e.g., >100), treat as null to avoid bad data
             if (parsed > 100) return null;
+            // If parsed is fractional already, check threshold
+            if (parsed > MAX_ACCEPTABLE_YIELD) {
+                console.warn(`Suspicious dividend yield for ${symbol}: ${parsed} > ${MAX_ACCEPTABLE_YIELD} — ignoring`);
+                return null;
+            }
             // Otherwise assume it's a fractional value already
             return parsed;
         })(),

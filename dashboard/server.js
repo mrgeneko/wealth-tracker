@@ -257,6 +257,7 @@ async function fetchAssetsFromDB() {
             SELECT p.*, 
                    sm.short_name, sm.sector, sm.market_cap, 
                    sm.dividend_yield, sm.trailing_pe, 
+                   sm.ttm_dividend_amount, sm.ttm_eps,
                    sm.quote_type, sm.exchange as meta_exchange
             FROM positions p
             LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol COLLATE utf8mb4_unicode_ci
@@ -316,6 +317,8 @@ async function fetchAssetsFromDB() {
                     sector: pos.sector || null,
                     market_cap: pos.market_cap ? parseFloat(pos.market_cap) : null,
                     dividend_yield: pos.dividend_yield ? parseFloat(pos.dividend_yield) : null,
+                    ttm_dividend_amount: pos.ttm_dividend_amount ? parseFloat(pos.ttm_dividend_amount) : null,
+                    ttm_eps: pos.ttm_eps ? parseFloat(pos.ttm_eps) : null,
                     trailing_pe: pos.trailing_pe ? parseFloat(pos.trailing_pe) : null,
                     quote_type: pos.quote_type || null,
                     exchange: pos.exchange || pos.meta_exchange || null
