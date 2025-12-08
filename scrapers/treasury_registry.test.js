@@ -40,4 +40,13 @@ describe('treasury_registry', () => {
         expect(isTreasury('')).toBe(false);
         expect(isTreasury(null)).toBe(false);
     });
+
+    test('normalized identifier helper matches encodeURIComponent', () => {
+        const { normalizedIdentifier } = require('./treasury_registry');
+        const { normalizedKey } = require('./scraper_utils');
+        expect(typeof normalizedIdentifier).toBe('function');
+        expect(normalizedIdentifier('US91282CGE57')).toBe(encodeURIComponent('US91282CGE57'));
+        // confirm the base helper from scraper_utils behaves as expected
+        expect(normalizedKey('US91282CGE57')).toBe(encodeURIComponent('US91282CGE57'));
+    });
 });

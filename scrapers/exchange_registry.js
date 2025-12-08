@@ -74,6 +74,16 @@ function getExchange(ticker) {
     return null;
 }
 
+// Small helper: return a normalized representation of a ticker for
+// any callers that wish to use the same percent-encoding naming used
+// by scrapers and message keys. This is intentionally non-invasive and
+// only provides a convenience wrapper for other modules/tests.
+function normalizedTickerForLookup(ticker) {
+    if (!ticker) return '';
+    // Use encodeURIComponent directly to avoid circular dependency with scraper_utils
+    return encodeURIComponent(String(ticker));
+}
+
 /**
  * Forces a reload of the exchange data from disk.
  * Useful if the files have been updated while the process is running.
@@ -87,4 +97,5 @@ module.exports = {
     getExchange,
     reloadExchangeData,
     loadExchangeData
+    , normalizedTickerForLookup
 };

@@ -21,10 +21,12 @@ const path = require('path');
 
     try {
         // Test data
+        const { normalizedKey } = require('./scraper_utils');
         const security = {
             ticker: 'QQQ',
             ycharts: 'https://ycharts.com/companies/QQQ',
-            type: 'etf'
+            type: 'etf',
+            normalized_key: normalizedKey('QQQ')
         };
 
         const outputDir = path.join(__dirname, 'logs'); // Save logs to local logs folder

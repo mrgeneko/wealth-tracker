@@ -1,0 +1,313 @@
+// api/metadata.js
+// API endpoints for security metadata operations
+// Supports: symbol lookup, autocomplete, metadata prefetch, batch import
+
+const express = require('express');
+const router = express.Router();
+const mysql = require('mysql2/promise');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+
+// Database connection helper
+async function getDbConnection() {
+    return await mysql.createConnection({
+        host: process.env.MYSQL_HOST || 'localhost',
+        port: parseInt(process.env.MYSQL_PORT || '3306'),
+        user: process.env.MYSQL_USER,
+        password: process.env.MYSQL_PASSWORD,
+        database: process.env.MYSQL_DATABASE
+    });
+}
+
+// Helper to fetch metadata using the populate script
+async function fetchMetadataForSymbol(symbol) {
+    try {
+        const { stdout, stderr } = await execPromise(
+            `node scripts/populate_securities_metadata.js --symbol ${symbol}`,
+            { cwd: __dirname + '/..' }
+        );
+        return { success: true, output: stdout };
+    } catch (error) {
+        console.error(`Failed to fetch metadata for ${symbol}:`, error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * GET /api/metadata/lookup/:symbol
+ * Quick lookup - returns metadata if exists, triggers fetch if not
+ * Used for: Autocomplete, symbol validation, "Add Position" modal
+ */
+router.get('/lookup/:symbol', async (req, res) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const connection = await getDbConnection();
+
+    try {
+        // Check if metadata exists
+        const [rows] = await connection.execute(
+            `SELECT 
+        symbol, quote_type, type_display, short_name, long_name,
+            exchange, currency, market_cap, dividend_yield, trailing_pe,
+            ttm_dividend_amount, ttm_eps
+       FROM securities_metadata 
+       WHERE symbol = ?`,
+            [symbol]
+        );
+
+        if (rows.length > 0) {
+            // Metadata exists - return immediately
+            res.json({
+                exists: true,
+                metadata: rows[0]
+            });
+        } else {
+            // Metadata doesn't exist - trigger fetch in background
+            res.json({
+                exists: false,
+                message: 'Fetching metadata...',
+                symbol: symbol
+            });
+
+            // Fetch asynchronously (don't wait)
+            fetchMetadataForSymbol(symbol).then(result => {
+                if (result.success) {
+                    console.log(`✓ Background fetch completed for ${symbol}`);
+                }
+            });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        await connection.end();
+    }
+});
+
+/**
+ * POST /api/metadata/prefetch
+ * Prefetch metadata for a symbol (blocks until complete)
+ * Used for: "Add Position" modal when user selects symbol
+ */
+router.post('/prefetch', async (req, res) => {
+    const { symbol } = req.body;
+
+    if (!symbol) {
+        return res.status(400).json({ error: 'Symbol is required' });
+    }
+
+    const normalizedSymbol = symbol.toUpperCase();
+    const connection = await getDbConnection();
+
+    try {
+        // Check if already exists
+        const [existing] = await connection.execute(
+            'SELECT symbol FROM securities_metadata WHERE symbol = ?',
+            [normalizedSymbol]
+        );
+
+        if (existing.length > 0) {
+            // Already have it
+            const [metadata] = await connection.execute(
+                `SELECT 
+          symbol, quote_type, type_display, short_name, long_name,
+              exchange, currency, region, market_cap, dividend_yield,
+              ttm_dividend_amount, ttm_eps
+         FROM securities_metadata 
+         WHERE symbol = ?`,
+                [normalizedSymbol]
+            );
+
+            return res.json({
+                cached: true,
+                metadata: metadata[0]
+            });
+        }
+
+        // Fetch it now (user waits ~1-2 seconds)
+        console.log(`Prefetching metadata for ${normalizedSymbol}...`);
+        const result = await fetchMetadataForSymbol(normalizedSymbol);
+
+        if (!result.success) {
+            return res.status(404).json({
+                error: 'Symbol not found in Yahoo Finance',
+                symbol: normalizedSymbol
+            });
+        }
+
+        // Retrieve the newly inserted metadata
+        const [metadata] = await connection.execute(
+            `SELECT 
+        symbol, quote_type, type_display, short_name, long_name,
+        exchange, currency, region, market_cap, dividend_yield,
+        ttm_dividend_amount, ttm_eps
+       FROM securities_metadata 
+       WHERE symbol = ?`,
+            [normalizedSymbol]
+        );
+
+        res.json({
+            cached: false,
+            metadata: metadata[0] || null
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        await connection.end();
+    }
+});
+
+/**
+ * GET /api/metadata/autocomplete?q=AAPL
+ * Autocomplete search for symbols
+ * Searches both securities_metadata and can trigger Yahoo search
+ */
+router.get('/autocomplete', async (req, res) => {
+    const query = (req.query.q || '').toUpperCase();
+
+    if (query.length < 1) {
+        return res.json({ results: [] });
+    }
+
+    const connection = await getDbConnection();
+
+    try {
+        // Search existing metadata
+        const [rows] = await connection.execute(
+            `SELECT 
+        symbol, short_name, long_name, quote_type, exchange
+       FROM securities_metadata 
+       WHERE symbol LIKE ? OR short_name LIKE ? OR long_name LIKE ?
+       ORDER BY 
+         CASE 
+           WHEN symbol = ? THEN 1
+           WHEN symbol LIKE ? THEN 2
+           ELSE 3
+         END,
+         symbol
+       LIMIT 20`,
+            [`${query}%`, `%${query}%`, `%${query}%`, query, `${query}%`]
+        );
+
+        const results = rows.map(row => ({
+            symbol: row.symbol,
+            name: row.long_name || row.short_name,
+            type: row.quote_type,
+            exchange: row.exchange,
+            source: 'cached'
+        }));
+
+        res.json({ results });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        await connection.end();
+    }
+});
+
+/**
+ * POST /api/metadata/batch-prefetch
+ * Prefetch metadata for multiple symbols (for import feature)
+ * Returns status for each symbol
+ */
+router.post('/batch-prefetch', async (req, res) => {
+    const { symbols } = req.body;
+
+    if (!Array.isArray(symbols) || symbols.length === 0) {
+        return res.status(400).json({ error: 'Symbols array is required' });
+    }
+
+    const connection = await getDbConnection();
+    const results = [];
+
+    try {
+        for (const symbol of symbols) {
+            const normalizedSymbol = symbol.toUpperCase();
+
+            // Check if exists
+            const [existing] = await connection.execute(
+                'SELECT symbol FROM securities_metadata WHERE symbol = ?',
+                [normalizedSymbol]
+            );
+
+            if (existing.length > 0) {
+                results.push({
+                    symbol: normalizedSymbol,
+                    status: 'cached',
+                    message: 'Metadata already exists'
+                });
+                continue;
+            }
+
+            // Fetch it
+            console.log(`Fetching metadata for ${normalizedSymbol}...`);
+            const result = await fetchMetadataForSymbol(normalizedSymbol);
+
+            if (result.success) {
+                results.push({
+                    symbol: normalizedSymbol,
+                    status: 'fetched',
+                    message: 'Metadata retrieved successfully'
+                });
+            } else {
+                results.push({
+                    symbol: normalizedSymbol,
+                    status: 'failed',
+                    message: 'Symbol not found in Yahoo Finance'
+                });
+            }
+
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        const summary = {
+            total: symbols.length,
+            cached: results.filter(r => r.status === 'cached').length,
+            fetched: results.filter(r => r.status === 'fetched').length,
+            failed: results.filter(r => r.status === 'failed').length
+        };
+
+        res.json({ summary, results });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        await connection.end();
+    }
+});
+
+/**
+ * GET /api/metadata/check-missing
+ * Check which positions don't have metadata
+ * Used for: Dashboard health check, maintenance
+ */
+router.get('/check-missing', async (req, res) => {
+    const connection = await getDbConnection();
+
+    try {
+        const [rows] = await connection.execute(`
+      SELECT DISTINCT p.symbol
+      FROM positions p
+      LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol
+      WHERE p.symbol IS NOT NULL 
+        AND p.symbol != 'CASH'
+        AND sm.symbol IS NULL
+    `);
+
+        const missingSymbols = rows.map(r => r.symbol);
+
+        res.json({
+            count: missingSymbols.length,
+            symbols: missingSymbols
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        await connection.end();
+    }
+});
+
+module.exports = router;

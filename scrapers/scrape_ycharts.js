@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, parseToIso } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, parseToIso, normalizedKey } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 
 async function scrapeYCharts(browser, security, outputDir) {
@@ -163,6 +163,7 @@ async function scrapeYCharts(browser, security, outputDir) {
 
         const data = {
             ...extractedData,
+            normalized_key: normalizedKey(ticker),
             regular_time: parseToIso(extractedData.regular_time),
             after_hours_time: parseToIso(extractedData.after_hours_time),
             capture_time: new Date().toISOString()

@@ -7,7 +7,7 @@ const { execSync } = require('child_process');
 const cheerio = require('cheerio');
 const { DateTime } = require('luxon');
 const { publishToKafka } = require('./publish_to_kafka');
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, normalizedKey } = require('./scraper_utils');
 
 function parseToIso(timeStr) {
   if (!timeStr) return '';
@@ -147,7 +147,8 @@ async function scrapeNasdaq(browser, security, outputDir) {
         logDebug(`nasdaq scrape path used for ${ticker}: ${usedBrowser ? 'browser' : 'cheap+api'}`);
       } catch (e) { /* ignore logging errors */ }
 
-    // publish & save
+    // ensure normalized_key then publish & save
+    data.normalized_key = data.normalized_key || normalizedKey(security.key);
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeNasdaq';
       const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');

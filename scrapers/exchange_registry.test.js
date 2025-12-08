@@ -53,6 +53,16 @@ describe('loadExchangeData', () => {
     expect(getExchange('JPM')).toBe('NYSE');
   });
 
+  test('exposes normalized helper (encodeURIComponent) for callers', () => {
+    const { normalizedTickerForLookup } = require('./exchange_registry');
+    const { normalizedKey } = require('./scraper_utils');
+    // BRK.B doesn't contain reserved URI characters, so encoded form equals original
+    expect(typeof normalizedTickerForLookup).toBe('function');
+    expect(normalizedTickerForLookup('BRK.B')).toBe(encodeURIComponent('BRK.B'));
+    // also verify the raw helper is available and works as expected
+    expect(normalizedKey('GC=F')).toBe(encodeURIComponent('GC=F'));
+  });
+
   test('returns null for unknown tickers', () => {
     fs.writeFileSync(NASDAQ_FILE, 'Symbol,Security Name\nAAPL,Apple');
     expect(getExchange('UNKNOWN')).toBe(null);

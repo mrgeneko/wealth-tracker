@@ -1,37 +1,37 @@
 services:
   scrapers:
-      build:
-        context: .
-        dockerfile: docker/Dockerfile.scrapers
-      platform: linux/amd64
-      container_name: wealth-tracker-scrapers
-      environment:
-        # Use internal Docker DNS hostname for Kafka instead of localhost
-        KAFKA_BROKERS: kafka:9092
-        # Unified topic for all published price data
-        KAFKA_TOPIC: price_data
-        # Health endpoint port exposed by the daemon
-        HEALTH_PORT: "3002"
-        # Yahoo batch tuning (chunking, delays, retries)
-        YAHOO_CHUNK_SIZE: "2"
-        YAHOO_DELAY_MS: "5000"
-        YAHOO_MAX_RETRIES: "4"
-        YAHOO_BACKOFF_BASE_MS: "1000"
-      volumes:
-        - ./logs:/usr/src/app/logs
-        - ./data:/usr/src/app/data
-      ports:
-        - "5901:5901"
-        - "3002:3002"
-      deploy:
-        resources:
-          limits:
-            memory: 8g
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.scrapers
+    platform: linux/amd64
+    container_name: wealth-tracker-scrapers
+    environment:
+      # Use internal Docker DNS hostname for Kafka instead of localhost
+      KAFKA_BROKERS: kafka:9092
+      # Unified topic for all published price data
+      KAFKA_TOPIC: price_data
+      # Health endpoint port exposed by the daemon
+      HEALTH_PORT: "3002"
+      # Yahoo batch tuning (chunking, delays, retries)
+      YAHOO_CHUNK_SIZE: "2"
+      YAHOO_DELAY_MS: "5000"
+      YAHOO_MAX_RETRIES: "4"
+      YAHOO_BACKOFF_BASE_MS: "1000"
+    volumes:
+      - ./logs:/usr/src/app/logs
+      - ./data:/usr/src/app/data
+    ports:
+      - "5901:5901"
+      - "3002:3002"
+    deploy:
+      resources:
+        limits:
+          memory: 8g
 
   dashboard:
     build:
-      context: ./dashboard
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dashboard/Dockerfile
     container_name: wealth-tracker-dashboard
     restart: unless-stopped
     depends_on:
@@ -70,7 +70,7 @@ services:
     ports:
       - "3306:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -82,7 +82,6 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
-
 
   kafka:
     container_name: wealth-tracker-kafka
@@ -103,7 +102,7 @@ services:
       - "9094:9092"
       - "9093:9093"
     healthcheck:
-      test: ["CMD", "bash", "-c", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      test: [ "CMD", "bash", "-c", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1" ]
       interval: 10s
       retries: 10
       start_period: 10s
@@ -134,9 +133,9 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
       - ./scripts/rotate-logs.sh:/usr/local/bin/rotate-logs.sh:ro
-    entrypoint: ["sh", "/usr/local/bin/rotate-logs.sh", "/usr/src/app/logs", "7", "1", "300"]
+    entrypoint: [ "sh", "/usr/local/bin/rotate-logs.sh", "/usr/src/app/logs", "7", "1", "300" ]
     healthcheck:
-      test: ["CMD", "sh", "-c", "test -x /usr/local/bin/rotate-logs.sh || exit 1"]
+      test: [ "CMD", "sh", "-c", "test -x /usr/local/bin/rotate-logs.sh || exit 1" ]
       interval: 1m
       timeout: 10s
       retries: 3

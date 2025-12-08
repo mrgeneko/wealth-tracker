@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,96 +13,381 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; }
-        h1, h2 { color: #ffffff; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        
-        /* Grid Styles */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #1e1e1e; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-        th, td { padding: 10px; border: 1px solid #333; text-align: right; color: #e0e0e0; }
-        th { background-color: #2d2d2d; font-weight: bold; text-align: center; color: #ffffff; }
-        td:first-child, th:first-child { text-align: left; }
-        
-        /* Buttons */
-        .btn { padding: 8px 12px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px; }
-        .btn-primary { background-color: #0d6efd; color: white; }
-        .btn-primary:hover { background-color: #0b5ed7; }
-        .btn-danger { background-color: #dc3545; color: white; }
-        .btn-danger:hover { background-color: #bb2d3b; }
-        
-        /* Section Headers */
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; margin-bottom: 10px; }
-        
-        /* Modals */
-        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); }
-        .modal-content { background-color: #2d2d2d; margin: 10% auto; padding: 20px; border: 1px solid #444; width: 400px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); color: #e0e0e0; }
-        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .close:hover { color: white; }
-        
-        .form-group { margin-bottom: 15px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
 
-            /* Prev-close small info icon (tooltip) */
-            .prev-close-info {
-                font-size: 0.75em;
-                margin-left: 6px;
-                color: #bbb;
-                cursor: help;
-                vertical-align: middle;
-            }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #e0e0e0; }
-        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #555; border-radius: 4px; background-color: #333; color: #fff; }
-        
+        h1,
+        h2 {
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Grid Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background: #1e1e1e;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border: 1px solid #333;
+            text-align: right;
+            color: #e0e0e0;
+        }
+
+        th {
+            background-color: #2d2d2d;
+            font-weight: bold;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        td:first-child,
+        th:first-child {
+            text-align: left;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background-color: #0d6efd;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #bb2d3b;
+        }
+
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+            margin-bottom: 10px;
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-content {
+            background-color: #2d2d2d;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #444;
+            width: 400px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            color: #e0e0e0;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        /* Prev-close small info icon (tooltip) */
+        .prev-close-info {
+            font-size: 0.75em;
+            margin-left: 6px;
+            color: #bbb;
+            cursor: help;
+            vertical-align: middle;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #333;
+            color: #fff;
+        }
+
         /* Awesomplete Autocomplete Styles (Dark Theme) */
-        .awesomplete > ul { background: #2d2d2d; border: 1px solid #555; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); max-height: 350px; overflow-y: auto; }
-        .awesomplete > ul > li { color: #e0e0e0; padding: 10px 12px; border-bottom: 1px solid #444; }
-        .awesomplete > ul > li:last-child { border-bottom: none; }
-        .awesomplete > ul > li:hover { background: #3d3d3d; color: #fff; }
-        .awesomplete > ul > li[aria-selected="true"] { background: #0d6efd; color: #fff; }
-        .awesomplete > ul > li[aria-selected="true"] .ticker-exchange { background: rgba(255,255,255,0.3); }
-        .awesomplete mark { background: #0d6efd; color: #fff; }
+        .awesomplete>ul {
+            background: #2d2d2d;
+            border: 1px solid #555;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .awesomplete>ul>li {
+            color: #e0e0e0;
+            padding: 10px 12px;
+            border-bottom: 1px solid #444;
+        }
+
+        .awesomplete>ul>li:last-child {
+            border-bottom: none;
+        }
+
+        .awesomplete>ul>li:hover {
+            background: #3d3d3d;
+            color: #fff;
+        }
+
+        .awesomplete>ul>li[aria-selected="true"] {
+            background: #0d6efd;
+            color: #fff;
+        }
+
+        .awesomplete>ul>li[aria-selected="true"] .ticker-exchange {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .awesomplete mark {
+            background: #0d6efd;
+            color: #fff;
+        }
+
         /* Ticker item styling */
-        .ticker-item { display: flex; flex-direction: column; gap: 2px; }
-        .ticker-main { display: flex; align-items: center; gap: 8px; }
-        .ticker-symbol { font-weight: bold; font-size: 1.1em; }
-        .ticker-exchange { font-size: 0.7em; padding: 2px 6px; border-radius: 3px; font-weight: bold; text-transform: uppercase; }
-        .ticker-exchange.nasdaq { background: #0d6efd; color: #fff; }
-        .ticker-exchange.nyse { background: #198754; color: #fff; }
-        .ticker-exchange.nyse-mkt { background: #20c997; color: #000; }
-        .ticker-exchange.nyse-arca { background: #6f42c1; color: #fff; }
-        .ticker-exchange.bats { background: #fd7e14; color: #000; }
-        .ticker-exchange.iex { background: #6610f2; color: #fff; }
-        .ticker-exchange.other { background: #6c757d; color: #fff; }
-        .ticker-exchange.treasury { background: #dc3545; color: #fff; }
-        .ticker-name { font-size: 0.85em; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
-        
+        .ticker-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .ticker-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ticker-symbol {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .ticker-exchange {
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .ticker-exchange.nasdaq {
+            background: #0d6efd;
+            color: #fff;
+        }
+
+        .ticker-exchange.nyse {
+            background: #198754;
+            color: #fff;
+        }
+
+        .ticker-exchange.nyse-mkt {
+            background: #20c997;
+            color: #000;
+        }
+
+        .ticker-exchange.nyse-arca {
+            background: #6f42c1;
+            color: #fff;
+        }
+
+        .ticker-exchange.bats {
+            background: #fd7e14;
+            color: #000;
+        }
+
+        .ticker-exchange.iex {
+            background: #6610f2;
+            color: #fff;
+        }
+
+        .ticker-exchange.other {
+            background: #6c757d;
+            color: #fff;
+        }
+
+        .ticker-exchange.treasury {
+            background: #dc3545;
+            color: #fff;
+        }
+
+        .ticker-name {
+            font-size: 0.85em;
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 350px;
+        }
+
         /* Clickable Cells */
-        .clickable-cell { cursor: pointer; color: #6ea8fe; text-decoration: none; display: block; width: 100%; height: 100%; }
-        .clickable-cell:hover { text-decoration: underline; background-color: #2c3e50; }
-        .edit-icon { font-size: 0.8em; margin-left: 5px; color: #888; visibility: hidden; }
-        .clickable-cell:hover .edit-icon { visibility: visible; }
-        
-        .row-total { font-weight: bold; background-color: #252525; }
-        .total-row td { font-weight: bold; background-color: #333; border-top: 2px solid #555; }
-        
-        .positive { color: #4caf50; }
-        .negative { color: #f44336; }
+        .clickable-cell {
+            cursor: pointer;
+            color: #6ea8fe;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .clickable-cell:hover {
+            text-decoration: underline;
+            background-color: #2c3e50;
+        }
+
+        .edit-icon {
+            font-size: 0.8em;
+            margin-left: 5px;
+            color: #888;
+            visibility: hidden;
+        }
+
+        .clickable-cell:hover .edit-icon {
+            visibility: visible;
+        }
+
+        .row-total {
+            font-weight: bold;
+            background-color: #252525;
+        }
+
+        .total-row td {
+            font-weight: bold;
+            background-color: #333;
+            border-top: 2px solid #555;
+        }
+
+        .positive {
+            color: #4caf50;
+        }
+
+        .negative {
+            color: #f44336;
+        }
 
         /* Tabs */
-        .tab { overflow: hidden; border-bottom: 1px solid #444; margin-bottom: 20px; }
-        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; transition: 0.3s; font-size: 17px; color: #aaa; }
-        .tab button:hover { background-color: #333; color: white; }
-        .tab button.active { background-color: #2d2d2d; color: white; border-bottom: 2px solid #0d6efd; }
-        .tab-content { display: none; animation: fadeEffect 1s; }
-        @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
+        .tab {
+            overflow: hidden;
+            border-bottom: 1px solid #444;
+            margin-bottom: 20px;
+        }
+
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            font-size: 17px;
+            color: #aaa;
+        }
+
+        .tab button:hover {
+            background-color: #333;
+            color: white;
+        }
+
+        .tab button.active {
+            background-color: #2d2d2d;
+            color: white;
+            border-bottom: 2px solid #0d6efd;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeEffect 1s;
+        }
+
+        @keyframes fadeEffect {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
 
         /* Sortable Headers */
-        .sortable-header { cursor: pointer; user-select: none; }
-        .sortable-header:hover { background-color: #3d3d3d; }
-        .sort-indicator { margin-left: 5px; font-size: 0.8em; color: #888; }
-        .sort-indicator.active { color: #0d6efd; }
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .sortable-header:hover {
+            background-color: #3d3d3d;
+        }
+
+        .sort-indicator {
+            margin-left: 5px;
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        .sort-indicator.active {
+            color: #0d6efd;
+        }
 
         /* Log Table Overrides */
-        #log-table th:first-child, 
+        #log-table th:first-child,
         #log-table td:first-child {
             position: static !important;
             background-color: transparent !important;
@@ -176,24 +462,24 @@
             max-height: 60vh;
             overflow-y: auto;
         }
-        
+
         .settings-section {
             margin-bottom: 25px;
             padding-bottom: 15px;
             border-bottom: 1px solid #444;
         }
-        
+
         .settings-section:last-child {
             border-bottom: none;
             margin-bottom: 0;
         }
-        
+
         .settings-section h3 {
             margin: 0 0 15px 0;
             color: #ffffff;
             font-size: 1.1em;
         }
-        
+
         .setting-item {
             display: flex;
             justify-content: space-between;
@@ -201,17 +487,17 @@
             margin-bottom: 12px;
             padding: 8px 0;
         }
-        
+
         .setting-item label {
             flex: 1;
             color: #e0e0e0;
             font-weight: normal;
         }
-        
+
         .setting-item input[type="checkbox"] {
             margin-left: 10px;
         }
-        
+
         .setting-item select {
             background-color: #333;
             color: #fff;
@@ -230,7 +516,7 @@
             background-color: #2d2d2d;
             border: 1px solid #444;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             z-index: 1000;
             min-width: 120px;
             overflow: hidden;
@@ -254,11 +540,13 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div style="position: relative;">
             <h1>Wealth Tracker Dashboard</h1>
-            <div id="no-assets-warning" style="display:none; color: #ffb74d; margin-top: 8px;">No accounts data available — check server/API connection.</div>
+            <div id="no-assets-warning" style="display:none; color: #ffb74d; margin-top: 8px;">No accounts data
+                available — check server/API connection.</div>
             <button id="settingsBtn" class="settings-btn" title="Menu" onclick="toggleSettingsDropdown()">
                 <span class="gear-icon">⚙️</span>
             </button>
@@ -280,16 +568,20 @@
             <div class="section-header">
                 <h2 style="display: flex; align-items: center; gap: 10px;">
                     <span>Investment Accounts</span>
-                    <button class="icon-btn" title="Add Account" onclick="openAccountModal('investment')" style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
+                    <button class="icon-btn" title="Add Account" onclick="openAccountModal('investment')"
+                        style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
                         <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Account</span>
                     </button>
                     <span style="color: white; margin: 0 16px;">&nbsp;|&nbsp;</span>
-                    <button class="icon-btn" title="Add Symbol" onclick="openAddSymbolModal()" style="font-size: inherit; white-space: nowrap;">
+                    <button class="icon-btn" title="Add Symbol" onclick="openAddSymbolModal()"
+                        style="font-size: inherit; white-space: nowrap;">
                         <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Symbol</span>
                     </button>
                     <span style="color: white; margin: 0 16px;">&nbsp;|&nbsp;</span>
-                    <button class="icon-btn" title="Expand Accounts" onclick="toggleAccountsCollapse()" style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
-                        <span id="collapse-toggle" class="plus-icon" style="font-size: inherit; white-space: nowrap;">Expand Accounts</span>
+                    <button class="icon-btn" title="Expand Accounts" onclick="toggleAccountsCollapse()"
+                        style="font-size: inherit; white-space: nowrap; margin-left: 32px;">
+                        <span id="collapse-toggle" class="plus-icon"
+                            style="font-size: inherit; white-space: nowrap;">Expand Accounts</span>
                     </button>
                 </h2>
             </div>
@@ -326,7 +618,8 @@
                 <tbody></tbody>
             </table>
 
-            <div id="total-net-worth" style="font-size: 1.5em; font-weight: bold; margin-top: 30px; margin-bottom: 20px;"></div>
+            <div id="total-net-worth"
+                style="font-size: 1.5em; font-weight: bold; margin-top: 30px; margin-bottom: 20px;"></div>
         </div>
 
         <div id="Historical" class="tab-content">
@@ -346,7 +639,8 @@
             <h2 id="confirmModalTitle">Confirm</h2>
             <p id="confirmModalMessage" style="margin-bottom: 20px;"></p>
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('confirmModal')">Cancel</button>
+                <button type="button" class="btn" style="background-color: #555; color: white;"
+                    onclick="closeModal('confirmModal')">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmModalOk">Delete</button>
             </div>
         </div>
@@ -370,7 +664,8 @@
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" class="btn btn-danger" id="btnDeleteAccount" style="display:none;" onclick="deleteAccount()">Delete</button>
+                    <button type="button" class="btn btn-danger" id="btnDeleteAccount" style="display:none;"
+                        onclick="deleteAccount()">Delete</button>
                 </div>
             </form>
         </div>
@@ -388,18 +683,24 @@
                 <input type="hidden" id="posType">
                 <div class="form-group" id="posSymbolGroup">
                     <label for="posSymbol">Symbol</label>
-                    <div id="posSymbolDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
+                    <div id="posSymbolDisplay"
+                        style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;">
+                    </div>
                 </div>
                 <div class="form-group">
                     <div id="posTypeGroup">
                         <label for="posType">Type</label>
-                        <div id="posTypeDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
+                        <div id="posTypeDisplay"
+                            style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;">
+                        </div>
                     </div>
                 </div>
                 <div class="form-group">
                     <div id="posAccountGroup">
                         <label for="posAccount">Account</label>
-                        <div id="posAccountDisplay" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;"></div>
+                        <div id="posAccountDisplay"
+                            style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;">
+                        </div>
                     </div>
                     <label for="posQuantity">Quantity</label>
                     <input type="number" step="any" id="posQuantity" required>
@@ -407,7 +708,8 @@
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" class="btn btn-danger" id="btnDeletePosition" style="display:none;" onclick="deletePosition()">Delete</button>
+                    <button type="button" class="btn btn-danger" id="btnDeletePosition" style="display:none;"
+                        onclick="deletePosition()">Delete</button>
                 </div>
             </form>
         </div>
@@ -438,7 +740,8 @@
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" class="btn btn-danger" id="btnDeleteAsset" style="display:none;" onclick="deleteAsset()">Delete</button>
+                    <button type="button" class="btn btn-danger" id="btnDeleteAsset" style="display:none;"
+                        onclick="deleteAsset()">Delete</button>
                 </div>
             </form>
         </div>
@@ -473,19 +776,22 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="settings-section">
                     <h3>System</h3>
                     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <button class="btn btn-primary" onclick="exportData()">Export Data</button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Import Data</button>
-                        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(this)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Import
+                            Data</button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;"
+                            onchange="importData(this)">
                     </div>
                     <button class="btn btn-danger" onclick="clearCache()">Clear Cache</button>
                 </div>
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('settingsModal')">Cancel</button>
+                <button type="button" class="btn" style="background-color: #555; color: white;"
+                    onclick="closeModal('settingsModal')">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
@@ -497,20 +803,26 @@
             <span class="close" onclick="closeModal('logsModal')">&times;</span>
             <h2>System Logs</h2>
             <div id="logs-container" style="display: flex; height: 600px; border: 1px solid #444;">
-                <div id="log-list-pane" style="width: 27.5%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
+                <div id="log-list-pane"
+                    style="width: 27.5%; min-width: 150px; overflow-y: auto; overflow-x: auto; background: #1e1e1e;">
                     <table id="log-table" style="width: 100%; font-size: 0.8em; table-layout: fixed;">
                         <thead>
                             <tr>
                                 <th id="col-file" style="text-align: left; padding: 5px; position: relative;">File</th>
-                                <th id="col-time" style="text-align: left; padding: 5px; width: 132px; white-space: nowrap;">Time</th>
-                                <th id="col-size" style="text-align: right; padding: 5px; width: 70px; white-space: nowrap;">Size</th>
+                                <th id="col-time"
+                                    style="text-align: left; padding: 5px; width: 132px; white-space: nowrap;">Time</th>
+                                <th id="col-size"
+                                    style="text-align: right; padding: 5px; width: 70px; white-space: nowrap;">Size</th>
                             </tr>
                         </thead>
                         <tbody id="log-list"></tbody>
                     </table>
                 </div>
-                <div id="pane-resizer" style="width: 5px; cursor: col-resize; background-color: #444; user-select: none; z-index: 10;"></div>
-                <div id="log-viewer-pane" style="flex: 1; min-width: 150px; overflow-y: auto; padding: 10px; background: #121212; font-family: monospace; white-space: pre-wrap;">
+                <div id="pane-resizer"
+                    style="width: 5px; cursor: col-resize; background-color: #444; user-select: none; z-index: 10;">
+                </div>
+                <div id="log-viewer-pane"
+                    style="flex: 1; min-width: 150px; overflow-y: auto; padding: 10px; background: #121212; font-family: monospace; white-space: pre-wrap;">
                     Select a log file to view...
                 </div>
             </div>
@@ -525,7 +837,8 @@
             <form id="addSymbolForm">
                 <div class="form-group">
                     <label for="newSymbol">Symbol</label>
-                    <input type="text" id="newSymbol" required maxlength="50" style="text-transform:uppercase;" class="awesomplete" autocomplete="off">
+                    <input type="text" id="newSymbol" required maxlength="50" style="text-transform:uppercase;"
+                        class="awesomplete" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="newSymbolType">Type</label>
@@ -546,7 +859,8 @@
                 </div>
                 <div id="addSymbolError" style="color: #f44336; margin-bottom: 10px; display: none;"></div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn" style="background-color: #555; color: white;" onclick="closeModal('addSymbolModal')">Cancel</button>
+                    <button type="button" class="btn" style="background-color: #555; color: white;"
+                        onclick="closeModal('addSymbolModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add</button>
                 </div>
             </form>
@@ -554,153 +868,161 @@
     </div>
 
     <script>
-                // Ticker autocomplete setup
-                let tickerList = [];
-                let tickerData = []; // Full ticker objects with all fields
-                let tickerLookup = {}; // Map symbol to full data
-                let symbolAutocomplete = null;
+        // Ticker autocomplete setup
+        let symbolAutocomplete = null;
+        let autocompleteTimeout = null;
 
-                async function loadTickerList() {
-                    if (tickerData.length > 0) return tickerData;
-                    try {
-                        const res = await fetch('/api/tickers');
-                        tickerData = await res.json();
-                        tickerList = tickerData.map(t => t.symbol);
-                        // Build lookup map
-                        tickerLookup = {};
-                        tickerData.forEach(t => {
-                            tickerLookup[t.symbol] = t;
-                        });
-                        return tickerData;
-                    } catch (err) {
-                        console.error('Failed to load tickers:', err);
-                        return [];
-                    }
-                }
+        function openAddSymbolModal() {
+            document.getElementById('addSymbolError').style.display = 'none';
+            document.getElementById('addSymbolForm').reset();
+            // Populate account dropdown
+            const accountSelect = document.getElementById('newSymbolAccount');
+            accountSelect.innerHTML = '';
+            if (lastAssetsData && lastAssetsData.accounts) {
+                const investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
+                investmentAccounts.forEach(acc => {
+                    const opt = document.createElement('option');
+                    opt.value = acc.id;
+                    opt.textContent = acc.name + (acc.type ? ` (${acc.type})` : '');
+                    accountSelect.appendChild(opt);
+                });
+            }
 
-                function openAddSymbolModal() {
-                    document.getElementById('addSymbolError').style.display = 'none';
-                    document.getElementById('addSymbolForm').reset();
-                    // Populate account dropdown
-                    const accountSelect = document.getElementById('newSymbolAccount');
-                    accountSelect.innerHTML = '';
-                    if (lastAssetsData && lastAssetsData.accounts) {
-                        const investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
-                        investmentAccounts.forEach(acc => {
-                            const opt = document.createElement('option');
-                            opt.value = acc.id;
-                            opt.textContent = acc.name + (acc.type ? ` (${acc.type})` : '');
-                            accountSelect.appendChild(opt);
-                        });
-                    }
-                    // Initialize autocomplete on symbol input
-                    loadTickerList().then(tickers => {
-                        const input = document.getElementById('newSymbol');
-                        if (!symbolAutocomplete) {
-                            symbolAutocomplete = new Awesomplete(input, {
-                                minChars: 1,
-                                maxItems: 15,
-                                autoFirst: true,
-                                data: function(item, input) {
-                                    // item is { label, value } - return the object for filtering
-                                    return { label: item.label, value: item.value };
-                                },
-                                filter: function(item, input) {
-                                    const searchTerm = input.toLowerCase();
-                                    return item.label.toLowerCase().includes(searchTerm);
-                                },
-                                item: function(item, input) {
-                                    const li = document.createElement('li');
-                                    // Look up full ticker data from our map
-                                    const ticker = tickerLookup[item.value] || {};
-                                    // Convert exchange name to CSS class (e.g., "NYSE MKT" -> "nyse-mkt")
-                                    const exchangeClass = (ticker.exchange || '').toLowerCase().replace(/\\s+/g, '-');
-                                    li.innerHTML = `
-                                        <div class="ticker-item">
-                                            <div class="ticker-main">
-                                                <span class="ticker-symbol">${ticker.symbol || item.value}</span>
-                                                <span class="ticker-exchange ${exchangeClass}">${ticker.exchange || ''}</span>
-                                            </div>
-                                            <div class="ticker-name">${ticker.name || ''}</div>
+            // Initialize Awesomplete
+            const input = document.getElementById('newSymbol');
+            // Store metadata by symbol to bypass Awesomplete's data stripping
+            let metadataStore = {};
+
+            if (!symbolAutocomplete) {
+                symbolAutocomplete = new Awesomplete(input, {
+                    minChars: 1,
+                    maxItems: 15,
+                    autoFirst: true,
+                    filter: () => true, // We filter on server
+                    sort: false, // We sort on server
+                    data: function (item) {
+                        return { label: item.value, value: item.value };
+                    },
+                    item: function (item) {
+                        // Retrieve full metadata from our side-channel store
+                        const meta = metadataStore[item.value] || {};
+                        const name = meta.name || 'Unknown Name';
+                        const exchange = meta.exchange || 'Unknown';
+                        const exchangeClass = (exchange || '').toLowerCase().replace(/\s+/g, '-');
+
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                                    <div class="ticker-item">
+                                        <div class="ticker-main">
+                                            <span class="ticker-symbol">${item.value}</span>
+                                            <span class="ticker-exchange ${exchangeClass}">${exchange}</span>
                                         </div>
-                                    `;
-                                    return li;
-                                },
-                                replace: function(item) {
-                                    this.input.value = item.value;
-                                }
+                                        <div class="ticker-name">${name}</div>
+                                    </div>
+                                `;
+                        return li;
+                    }
+                });
+
+                // Dynamic fetch listener
+                input.addEventListener('input', function () {
+                    const query = this.value;
+                    if (query.length < 1) return;
+
+                    if (autocompleteTimeout) clearTimeout(autocompleteTimeout);
+                    autocompleteTimeout = setTimeout(async () => {
+                        try {
+                            const res = await fetch(`/api/metadata/autocomplete?q=${encodeURIComponent(query)}`);
+                            const data = await res.json();
+
+                            // Update the side-channel store
+                            data.results.forEach(t => {
+                                metadataStore[t.symbol] = t;
                             });
-                            // Set the list with label (for search) and value (symbol)
-                            symbolAutocomplete.list = tickers.map(t => ({
-                                label: `${t.symbol} ${t.name} ${t.exchange}`,
+
+                            const list = data.results.map(t => ({
+                                label: t.symbol,
                                 value: t.symbol
                             }));
-                        } else {
-                            symbolAutocomplete.list = tickers.map(t => ({
-                                label: `${t.symbol} ${t.name} ${t.exchange}`,
-                                value: t.symbol
-                            }));
+
+                            symbolAutocomplete.list = list;
+                        } catch (err) {
+                            console.error('Autocomplete error:', err);
                         }
+                    }, 300); // 300ms debounce
+                });
+            }
+
+            document.getElementById('addSymbolModal').style.display = 'block';
+        }
+
+        document.getElementById('addSymbolForm').onsubmit = async function (e) {
+            e.preventDefault();
+            const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+            const type = document.getElementById('newSymbolType').value;
+            const accountId = document.getElementById('newSymbolAccount').value;
+            const quantity = parseFloat(document.getElementById('newSymbolQuantity').value);
+            if (!symbol || !accountId || isNaN(quantity)) return;
+            // Check if symbol already exists in this account
+            let symbolExists = false;
+            if (lastAssetsData && lastAssetsData.accounts) {
+                const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
+                if (acc) {
+                    acc.holdings.stocks.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
+                    acc.holdings.bonds.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
+                }
+            }
+            if (symbolExists) {
+                document.getElementById('addSymbolError').innerText = 'Symbol already exists in this account.';
+                document.getElementById('addSymbolError').style.display = 'block';
+                return;
+            }
+            // Add symbol to selected account with specified quantity
+            try {
+                let currency = 'USD';
+                if (lastAssetsData && lastAssetsData.accounts) {
+                    const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
+                    if (acc && acc.currency) currency = acc.currency;
+                }
+                // Prefetch metadata for the new symbol
+                try {
+                    await fetch('/api/metadata/prefetch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol })
                     });
-                    document.getElementById('addSymbolModal').style.display = 'block';
+                } catch (e) {
+                    console.warn('Metadata prefetch failed:', e);
                 }
 
-                document.getElementById('addSymbolForm').onsubmit = async function(e) {
-                    e.preventDefault();
-                    const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
-                    const type = document.getElementById('newSymbolType').value;
-                    const accountId = document.getElementById('newSymbolAccount').value;
-                    const quantity = parseFloat(document.getElementById('newSymbolQuantity').value);
-                    if (!symbol || !accountId || isNaN(quantity)) return;
-                    // Check if symbol already exists in this account
-                    let symbolExists = false;
-                    if (lastAssetsData && lastAssetsData.accounts) {
-                        const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
-                        if (acc) {
-                            acc.holdings.stocks.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
-                            acc.holdings.bonds.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
-                        }
-                    }
-                    if (symbolExists) {
-                        document.getElementById('addSymbolError').innerText = 'Symbol already exists in this account.';
-                        document.getElementById('addSymbolError').style.display = 'block';
-                        return;
-                    }
-                    // Add symbol to selected account with specified quantity
-                    try {
-                        let currency = 'USD';
-                        if (lastAssetsData && lastAssetsData.accounts) {
-                            const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
-                            if (acc && acc.currency) currency = acc.currency;
-                        }
-                        await fetch('/api/positions', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                account_id: accountId,
-                                symbol,
-                                type,
-                                quantity,
-                                currency
-                            })
-                        });
-                        closeModal('addSymbolModal');
-                        fetchAssets();
-                    } catch (err) {
-                        document.getElementById('addSymbolError').innerText = 'Error adding symbol.';
-                        document.getElementById('addSymbolError').style.display = 'block';
-                    }
-                };
+                await fetch('/api/positions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        account_id: accountId,
+                        symbol,
+                        type,
+                        quantity,
+                        currency
+                    })
+                });
+                closeModal('addSymbolModal');
+                fetchAssets();
+            } catch (err) {
+                document.getElementById('addSymbolError').innerText = 'Error adding symbol.';
+                document.getElementById('addSymbolError').style.display = 'block';
+            }
+        };
         const socket = io();
         let currentPrices = {};
         let lastAssetsData = null;
         let previousPrices = {}; // Store previous prices for comparison
         let previousValues = {}; // Store previous values for comparison
-        
+
         // --- Sorting State ---
         let investmentGridSort = { column: 'symbol', direction: 'asc' };
         let accountOrder = [];
-        
+
         // --- Accounts Collapse State ---
         let accountsCollapsed = true; // Start with accounts collapsed by default
 
@@ -709,7 +1031,7 @@
             console.log('Price update received');
             const oldPrices = { ...currentPrices };
             currentPrices = data;
-            
+
             if (lastAssetsData) {
                 // Use in-place update for smoother animations
                 updateInvestmentGridInPlace('investment-grid', lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category), oldPrices);
@@ -748,7 +1070,7 @@
 
             // Filter accounts
             let investmentAccounts = lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category);
-            
+
             // Initialize or update accountOrder
             if (accountOrder.length === 0) {
                 accountOrder = investmentAccounts.map(a => a.id);
@@ -759,7 +1081,7 @@
                     if (!accountOrder.includes(a.id)) accountOrder.push(a.id);
                 });
             }
-            
+
             // Sort investmentAccounts based on accountOrder
             investmentAccounts.sort((a, b) => {
                 const idxA = accountOrder.findIndex(id => String(id) === String(a.id));
@@ -768,11 +1090,11 @@
             });
 
             const bankAccounts = lastAssetsData.accounts.filter(a => a.category === 'bank');
-            
+
             // Combine fixed assets
             const fixedAssets = [
-                ...(lastAssetsData.real_estate || []).map(a => ({...a, type: 'real_estate'})),
-                ...(lastAssetsData.vehicles || []).map(a => ({...a, type: 'vehicle'}))
+                ...(lastAssetsData.real_estate || []).map(a => ({ ...a, type: 'real_estate' })),
+                ...(lastAssetsData.vehicles || []).map(a => ({ ...a, type: 'vehicle' }))
             ];
 
             renderInvestmentGridWithFlashes('investment-grid', investmentAccounts, {});
@@ -788,11 +1110,11 @@
             lastAssetsData.accounts.forEach(acc => {
                 if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     netWorth += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     // Bonds use price/100
                     netWorth += p.quantity * (price / 100.0);
                 });
@@ -805,22 +1127,23 @@
         // In-place update function for smooth animations
         function updateInvestmentGridInPlace(tableId, accounts, oldPrices) {
             if (!accounts || accounts.length === 0) return;
-            
+
             // Collect all unique symbols
             const allSymbols = new Set();
             accounts.forEach(acc => {
                 acc.holdings.stocks.forEach(pos => allSymbols.add(pos.symbol));
                 acc.holdings.bonds.forEach(pos => allSymbols.add(pos.symbol));
             });
-            
+
             let grandTotalValueChange = 0;
-            
+
             allSymbols.forEach(sym => {
-                const oldPriceData = oldPrices[sym];
-                const newPriceData = currentPrices[sym];
-                
+                const normalized = normalizeTicker(sym);
+                const oldPriceData = oldPrices[sym] || oldPrices[normalized];
+                const newPriceData = getPriceDataForSymbol(sym);
+
                 if (!newPriceData) return;
-                
+
                 let price = newPriceData.price;
                 // Prefer a valid previous_close_price from the incoming data.
                 // RATIONALE: Some scrapers (or intermittent updates) may not provide
@@ -851,7 +1174,7 @@
                 let changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                 let timeStr = '-';
                 let sourceStr = newPriceData.source || '-';
-                
+
                 if (newPriceData.time) {
                     const d = new Date(newPriceData.time);
                     if (!isNaN(d.getTime())) {
@@ -866,20 +1189,20 @@
                         timeStr = newPriceData.time;
                     }
                 }
-                
+
                 let color = '#e0e0e0';
                 if (changeVal > 0) color = '#4caf50';
                 if (changeVal < 0) color = '#f44336';
-                
+
                 let changePctNum = 0;
                 if (changePct && changePct !== '0%') {
                     changePctNum = parseFloat(changePct.replace('%', '').replace(',', '')) || 0;
                 }
-                
+
                 // Calculate totals for this symbol
                 let symTotalValue = 0;
                 let symTotalValueChange = 0;
-                
+
                 accounts.forEach(acc => {
                     let pos = acc.holdings.stocks.find(p => p.symbol === sym);
                     let isBond = false;
@@ -887,7 +1210,7 @@
                         pos = acc.holdings.bonds.find(p => p.symbol === sym);
                         if (pos) isBond = true;
                     }
-                    
+
                     if (pos) {
                         let calcPrice = price;
                         let calcChange = changeVal;
@@ -895,11 +1218,11 @@
                             calcPrice = price / 100.0;
                             calcChange = changeVal / 100.0;
                         }
-                        
+
                         const value = pos.quantity * calcPrice;
                         symTotalValue += value;
                         symTotalValueChange += pos.quantity * calcChange;
-                        
+
                         // Update account cell in-place
                         const cellId = `cell-${sym}-${acc.id}`;
                         const cell = document.getElementById(cellId);
@@ -917,9 +1240,9 @@
                         }
                     }
                 });
-                
+
                 grandTotalValueChange += symTotalValueChange;
-                
+
                 // Update price cell
                 const priceCell = document.getElementById(`price-${sym}`);
                 if (priceCell) {
@@ -928,7 +1251,7 @@
                     }
                     priceCell.textContent = formatNumber(price);
                 }
-                
+
                 // Update prevClose cell
                 const prevCloseCell = document.getElementById(`prevClose-${sym}`);
                 if (prevCloseCell) {
@@ -957,7 +1280,7 @@
                         }
                     }
                 }
-                
+
                 // Update change cell
                 const changeCell = document.getElementById(`change-${sym}`);
                 if (changeCell) {
@@ -967,7 +1290,7 @@
                     changeCell.textContent = formatNumber(changeVal);
                     changeCell.style.color = color;
                 }
-                
+
                 // Update change% cell
                 const changePctCell = document.getElementById(`changePct-${sym}`);
                 if (changePctCell) {
@@ -980,7 +1303,7 @@
                     changePctCell.textContent = `${changePctNum.toFixed(3)}%`;
                     changePctCell.style.color = color;
                 }
-                
+
                 // Update time cell (text flash)
                 const timeCell = document.getElementById(`time-${sym}`);
                 if (timeCell) {
@@ -989,7 +1312,7 @@
                     }
                     timeCell.textContent = timeStr;
                 }
-                
+
                 // Update source cell (text flash)
                 const sourceCell = document.getElementById(`source-${sym}`);
                 if (sourceCell) {
@@ -998,7 +1321,7 @@
                     }
                     sourceCell.textContent = sourceStr;
                 }
-                
+
                 // Update value change cell
                 const valueChangeCell = document.getElementById(`valueChange-${sym}`);
                 if (valueChangeCell) {
@@ -1010,7 +1333,7 @@
                     valueChangeCell.textContent = formatNumber(symTotalValueChange);
                     valueChangeCell.style.color = color;
                 }
-                
+
                 // Update total cell
                 const totalCell = document.getElementById(`total-${sym}`);
                 if (totalCell) {
@@ -1022,32 +1345,32 @@
                     totalCell.textContent = formatNumber(symTotalValue, 0);
                 }
             });
-            
+
             // Calculate grand total for all accounts and update account totals
             let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const priceData = currentPrices[p.symbol];
+                    const priceData = getPriceDataForSymbol(p.symbol);
                     let price = priceData?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const priceData = currentPrices[p.symbol];
+                    const priceData = getPriceDataForSymbol(p.symbol);
                     let price = priceData?.price || 0;
                     // Bonds use price/100
                     accTotal += p.quantity * (price / 100.0);
                 });
                 grandTotal += accTotal;
-                
+
                 // Update account total cell in Total row
                 const accTotalCell = document.getElementById(`total-row-acc-${acc.id}`);
                 if (accTotalCell) {
                     accTotalCell.textContent = formatNumber(accTotal);
                 }
             });
-            
+
             // Update Total row Value Change cell
             const totalRowValueChangeCell = document.getElementById('total-row-value-change');
             if (totalRowValueChangeCell) {
@@ -1057,13 +1380,13 @@
                 totalRowValueChangeCell.textContent = formatNumber(grandTotalValueChange);
                 totalRowValueChangeCell.style.color = totalChangeColor;
             }
-            
+
             // Update Total row Grand Total cell
             const totalRowGrandTotalCell = document.getElementById('total-row-grand-total');
             if (totalRowGrandTotalCell) {
                 totalRowGrandTotalCell.textContent = formatNumber(grandTotal, 0);
             }
-            
+
             // Update Total Net Worth (includes fixed assets and bank accounts)
             let netWorth = grandTotal;
             // Add fixed assets
@@ -1076,11 +1399,11 @@
                 });
             }
             document.getElementById('total-net-worth').innerText = `Total Net Worth: $${formatNumber(netWorth)}`;
-            
+
             // Update last updated timestamp
             document.getElementById('last-updated').innerText = `Last Updated: ${new Date().toLocaleString()}`;
         }
-        
+
         // Helper function to apply background flash animation
         function applyFlash(element, isPositive) {
             element.classList.remove('flash-positive', 'flash-negative');
@@ -1088,7 +1411,7 @@
             void element.offsetWidth;
             element.classList.add(isPositive ? 'flash-positive' : 'flash-negative');
         }
-        
+
         // Helper function to apply text flash animation
         function applyTextFlash(element) {
             element.classList.remove('flash-text');
@@ -1145,7 +1468,9 @@
                 return '<span class="sort-indicator">⇅</span>';
             };
             let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Symbol${sortIndicator('symbol')}</th>`;
-            
+            headerHtml += `<th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('name')">Name${sortIndicator('name')}</th>`;
+            headerHtml += `<th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('sector')">Sector${sortIndicator('sector')}</th>`;
+
             if (accountsCollapsed) {
                 // When collapsed, show only a "Shares" column
                 headerHtml += `<th style="text-align: center">Shares</th>`;
@@ -1157,17 +1482,17 @@
                     headerHtml += `<th style="text-align: center" draggable="true" ondragstart="dragStart(event, '${acc.id}')" ondragover="allowDrop(event)" ondrop="drop(event, '${acc.id}')"><span class="clickable-cell" onclick="openAccountModal(null, ${accJson})">${acc.name}<br><span class='account-type'>${accType}</span> <span class="edit-icon">✎</span></span></th>`;
                 });
             }
-            
-            headerHtml += `<th>Prev Close</th><th>Price</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
+
+            headerHtml += `<th>Prev Close</th><th>Price</th><th>P/E</th><th>Yield</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;
 
             let bodyHtml = '';
             let grandTotalValueChange = 0;
-            
+
             // Build row data for sorting
             const rowData = [];
             sortedSymbols.forEach(sym => {
-                let rowInfo = { symbol: sym, changePct: 0, valueChange: 0, total: 0 };
+                let rowInfo = { symbol: sym, changePct: 0, valueChange: 0, total: 0, name: '', sector: '' };
                 let price = 0;
                 let changePct = '0%';
                 let changeVal = 0;
@@ -1175,9 +1500,12 @@
                 let timeStr = '-';
                 let sourceStr = '-';
                 let color = '#e0e0e0';
-                
-                if (currentPrices[sym]) {
-                    price = currentPrices[sym].price;
+
+                const normalized = normalizeTicker(sym);
+                const newPriceData = getPriceDataForSymbol(sym);
+                const oldPricesLookup = oldPrices[sym] || oldPrices[normalized];
+                if (newPriceData) {
+                    price = newPriceData.price;
                     // Prefer a valid previous_close_price from the currentPrices object.
                     // NOTE: When the dashboard performs a full render (e.g. page refresh)
                     // or is fed a fresh snapshot of `currentPrices`, some scrapers may
@@ -1189,25 +1517,25 @@
                     // known value (from oldPrices) — this mirrors server-side cache
                     // behavior and prevents accidental erasure of a valid Prev Close.
                     prevClose = 0;
-                    if (currentPrices[sym].previous_close_price !== undefined && currentPrices[sym].previous_close_price !== null && currentPrices[sym].previous_close_price !== '') {
-                        const parsedPrev = parseFloat(currentPrices[sym].previous_close_price);
+                    if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
+                        const parsedPrev = parseFloat(newPriceData.previous_close_price);
                         if (!isNaN(parsedPrev) && parsedPrev > 0) {
-                                prevClose = parsedPrev;
-                            } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
-                                // fallback to prev value if current data doesn't provide valid prev close
-                                prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
-                                console.warn(`[PrevClose] Current data for ${sym} missing valid prev close — falling back to previous value ${prevClose}`);
-                            }
-                    } else if (oldPrices && oldPrices[sym] && oldPrices[sym].previous_close_price) {
+                            prevClose = parsedPrev;
+                        } else if (oldPricesLookup && oldPricesLookup.previous_close_price) {
+                            // fallback to prev value if current data doesn't provide valid prev close
+                            prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
+                            console.warn(`[PrevClose] Current data for ${sym} missing valid prev close — falling back to previous value ${prevClose}`);
+                        }
+                    } else if (oldPricesLookup && oldPricesLookup.previous_close_price) {
                         // Fall back to previously known value when current has none
                         prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
                     }
                     changeVal = price - prevClose;
                     changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                     console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
-                    
-                    if (currentPrices[sym].time) {
-                        const d = new Date(currentPrices[sym].time);
+
+                    if (newPriceData.time) {
+                        const d = new Date(newPriceData.time);
                         if (!isNaN(d.getTime())) {
                             // Format as 'M/D HH:mm:ss'
                             const month = d.getMonth() + 1;
@@ -1217,17 +1545,72 @@
                             const seconds = d.getSeconds().toString().padStart(2, '0');
                             timeStr = `${month}/${day} ${hours}:${minutes}:${seconds}`;
                         } else {
-                            timeStr = currentPrices[sym].time;
+                            timeStr = newPriceData.time;
                         }
                     }
-                    
-                    sourceStr = currentPrices[sym].source || '-';
+
+                    sourceStr = newPriceData.source || '-';
                     if (changeVal > 0) color = '#4caf50';
                     if (changeVal < 0) color = '#f44336';
                 }
 
+                // Metadata placeholders
+                let metaName = '';
+                let metaSector = '';
+                let metaPE = '-';
+                let metaYield = '-';
+
+                // Find metadata from position (if any account has valid metadata)
+                for (const acc of accounts) {
+                    const stockPos = acc.holdings.stocks.find(p => p.symbol === sym);
+                    if (stockPos) {
+                        if (stockPos.short_name) metaName = stockPos.short_name;
+                        if (stockPos.sector) metaSector = stockPos.sector;
+                        // Prefer real-time calculations when we have TTM data and a current price
+                        const priceNow = (typeof price === 'number' && isFinite(price)) ? price : null;
+                        if (stockPos.ttm_eps && priceNow && Number(stockPos.ttm_eps) !== 0) {
+                            try {
+                                const v = priceNow / Number(stockPos.ttm_eps);
+                                if (isFinite(v) && v > 0 && v < 10000) metaPE = v.toFixed(2);
+                            } catch (e) {}
+                        } else if (stockPos.trailing_pe) metaPE = stockPos.trailing_pe.toFixed(2);
+
+                        if (stockPos.ttm_dividend_amount && priceNow) {
+                            try {
+                                const yieldPct = (Number(stockPos.ttm_dividend_amount) / priceNow) * 100.0;
+                                if (isFinite(yieldPct) && yieldPct >= 0 && yieldPct <= 100) {
+                                    metaYield = yieldPct.toFixed(2) + '%';
+                                }
+                            } catch (e) {}
+                        } else if (stockPos.dividend_yield) {
+                            // Stored dividend_yield may be either a fraction (0.0123) or a
+                            // percent-like value (1.23 or 123). Normalize for display:
+                            // - If value looks like a percent (1..100) show as-is with %
+                            // - Otherwise assume a fractional value and multiply by 100
+                            const raw = parseFloat(stockPos.dividend_yield);
+                            if (!isNaN(raw)) {
+                                if (raw > 1 && raw <= 100) {
+                                    metaYield = raw.toFixed(2) + '%';
+                                } else if (raw > 100) {
+                                    // absurdly large numbers are considered bad data
+                                    metaYield = '-';
+                                } else {
+                                    metaYield = (raw * 100).toFixed(2) + '%';
+                                }
+                            }
+                        }
+                        if (metaName && metaSector) break; // Found enough info
+                    }
+                }
+
+                // Store for sorting
+                rowInfo.name = metaName;
+                rowInfo.sector = metaSector;
+
                 let rowHtml = `<tr><td style="text-align: left; font-weight: bold;">${sym}</td>`;
-                
+                rowHtml += `<td style="text-align: left; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(metaName)}">${metaName}</td>`;
+                rowHtml += `<td style="text-align: left">${metaSector}</td>`;
+
                 let symTotalValue = 0;
                 let symTotalValueChange = 0;
                 let symTotalShares = 0;
@@ -1240,7 +1623,7 @@
                         pos = acc.holdings.bonds.find(p => p.symbol === sym);
                         if (pos) isBond = true;
                     }
-                    
+
                     if (pos) {
                         let calcPrice = price;
                         let calcChange = changeVal;
@@ -1248,7 +1631,7 @@
                             calcPrice = price / 100.0;
                             calcChange = changeVal / 100.0;
                         }
-                        
+
                         const value = pos.quantity * calcPrice;
                         symTotalValue += value;
                         symTotalValueChange += pos.quantity * calcChange;
@@ -1256,11 +1639,11 @@
                         const posType = isBond ? 'bond' : 'stock';
                         const posData = { id: pos.id, account_id: acc.id, symbol: pos.symbol, type: posType, quantity: pos.quantity };
                         const posJson = escapeHtml(JSON.stringify(posData));
-                        
+
                         // Check for value changes and apply flash animations
                         const cellId = `cell-${sym}-${acc.id}`;
                         let flashClass = '';
-                        
+
                         // Check if this cell value has changed
                         const oldValue = previousValues[cellId] || 0;
                         const newValue = value;
@@ -1268,7 +1651,7 @@
                             flashClass = newValue > oldValue ? 'flash-positive' : 'flash-negative';
                         }
                         previousValues[cellId] = newValue;
-                        
+
                         if (!accountsCollapsed) {
                             rowHtml += `<td id="${cellId}" class="${flashClass}"><span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(value)}<br><small>${pos.quantity.toFixed(0)}</small></span></td>`;
                         }
@@ -1280,25 +1663,25 @@
                         }
                     }
                 });
-                
+
                 // If collapsed, add single Shares column
                 if (accountsCollapsed) {
                     rowHtml += `<td style="text-align: center;">${symTotalShares.toFixed(0)}</td>`;
                 }
-                
+
                 // Check for price changes and apply flash animations
                 const priceCellId = `price-${sym}`;
-                const oldPriceData = oldPrices[sym];
+                const oldPriceData = oldPricesLookup; // use either raw or normalized key
                 let priceFlashClass = '';
-                
-                if (oldPriceData && currentPrices[sym]) {
+
+                if (oldPriceData && newPriceData) {
                     const oldPrice = oldPriceData.price;
-                    const newPrice = currentPrices[sym].price;
+                    const newPrice = newPriceData.price;
                     if (oldPrice !== 0 && newPrice !== oldPrice) {
                         priceFlashClass = newPrice > oldPrice ? 'flash-positive' : 'flash-negative';
                     }
                 }
-                
+
                 // Parse changePct to number for sorting
                 let changePctNum = 0;
                 if (changePct && changePct !== '0%') {
@@ -1307,31 +1690,33 @@
                 rowInfo.changePct = changePctNum;
                 rowInfo.valueChange = symTotalValueChange;
                 rowInfo.total = symTotalValue;
-                
+
                 // Build a tooltip showing prev-close source & time (if available)
                 let prevCloseTooltip = '';
                 if (prevClose && prevClose !== 0) {
-                    const prevCloseSource = (currentPrices[sym] && (currentPrices[sym].prev_close_source || currentPrices[sym].previous_close_source)) || (oldPrices[sym] && (oldPrices[sym].prev_close_source || oldPrices[sym].previous_close_source)) || '';
-                    const prevCloseTime = (currentPrices[sym] && (currentPrices[sym].prev_close_time || currentPrices[sym].previous_close_time || currentPrices[sym].capture_time)) || (oldPrices[sym] && (oldPrices[sym].prev_close_time || oldPrices[sym].previous_close_time || oldPrices[sym].capture_time)) || '';
+                    const prevCloseSource = (newPriceData && (newPriceData.prev_close_source || newPriceData.previous_close_source)) || (oldPrices[sym] && (oldPrices[sym].prev_close_source || oldPrices[sym].previous_close_source)) || '';
+                    const prevCloseTime = (newPriceData && (newPriceData.prev_close_time || newPriceData.previous_close_time || newPriceData.capture_time)) || (oldPrices[sym] && (oldPrices[sym].prev_close_time || oldPrices[sym].previous_close_time || oldPrices[sym].capture_time)) || '';
                     if (prevCloseSource) prevCloseTooltip += `Source: ${prevCloseSource}`;
                     if (prevCloseTime) prevCloseTooltip += (prevCloseTooltip ? '\n' : '') + `Time: ${prevCloseTime}`;
                 }
                 rowHtml += `<td id="prevClose-${sym}" ${prevCloseTooltip ? `title="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}${prevCloseTooltip ? ` <span class="prev-close-info" title="${escapeHtml(prevCloseTooltip)}">ℹ</span>` : ''}</td>`;
                 rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
-                
+                rowHtml += `<td>${metaPE}</td>`;
+                rowHtml += `<td>${metaYield}</td>`;
+
                 // Check for change and change% column changes
                 const changeCellId = `change-${sym}`;
                 const changePctCellId = `changePct-${sym}`;
                 let changeFlashClass = '';
                 let changePctFlashClass = '';
-                
-                if (oldPriceData && currentPrices[sym]) {
+
+                if (oldPriceData && newPriceData) {
                     const oldChange = oldPriceData.change || 0;
                     const newChange = changeVal;
                     if (oldChange !== 0 && newChange !== oldChange) {
                         changeFlashClass = newChange > oldChange ? 'flash-positive' : 'flash-negative';
                     }
-                    
+
                     const oldChangePct = oldPriceData.change_percent || '0%';
                     const newChangePct = changePct;
                     if (oldChangePct !== '0%' && newChangePct !== oldChangePct) {
@@ -1342,22 +1727,22 @@
                         }
                     }
                 }
-                
+
                 rowHtml += `<td id="${changeCellId}" class="${changeFlashClass}" style="color: ${color}">${formatNumber(changeVal)}</td>`;
                 rowHtml += `<td id="${changePctCellId}" class="${changePctFlashClass}" style="color: ${color}">${changePctNum.toFixed(3)}%</td>`;
-                
+
                 // Check for time and source changes (text flash)
                 const timeCellId = `time-${sym}`;
                 const sourceCellId = `source-${sym}`;
                 let timeFlashClass = '';
                 let sourceFlashClass = '';
-                
-                if (oldPriceData && currentPrices[sym]) {
+
+                if (oldPriceData && newPriceData) {
                     const oldTime = oldPriceData.time || '-';
                     const newTime = timeStr;
                     const oldSource = oldPriceData.source || '-';
                     const newSource = sourceStr;
-                    
+
                     if (oldTime !== newTime) {
                         timeFlashClass = 'flash-text';
                     }
@@ -1365,26 +1750,26 @@
                         sourceFlashClass = 'flash-text';
                     }
                 }
-                
+
                 rowHtml += `<td id="${timeCellId}" class="${timeFlashClass}" style="font-size: 0.50em; color: #888;">${timeStr}</td>`;
                 rowHtml += `<td id="${sourceCellId}" class="${sourceFlashClass}" style="font-size: 0.50em; color: #888;">${sourceStr}</td>`;
-                
+
                 grandTotalValueChange += symTotalValueChange;
-                
+
                 // Check for value change and total changes
                 const valueChangeCellId = `valueChange-${sym}`;
                 const totalCellId = `total-${sym}`;
                 let valueChangeFlashClass = '';
                 let totalFlashClass = '';
-                
-                if (oldPriceData && currentPrices[sym]) {
+
+                if (oldPriceData && newPriceData) {
                     const oldValueChange = previousValues[valueChangeCellId] || 0;
                     const newValueChange = symTotalValueChange;
                     if (oldValueChange !== 0 && newValueChange !== oldValueChange) {
                         valueChangeFlashClass = newValueChange > oldValueChange ? 'flash-positive' : 'flash-negative';
                     }
                     previousValues[valueChangeCellId] = newValueChange;
-                    
+
                     const oldTotal = previousValues[totalCellId] || 0;
                     const newTotal = symTotalValue;
                     if (oldTotal !== 0 && newTotal !== oldTotal) {
@@ -1392,27 +1777,27 @@
                     }
                     previousValues[totalCellId] = newTotal;
                 }
-                
+
                 rowHtml += `<td id="${valueChangeCellId}" class="${valueChangeFlashClass}" style="color: ${color}">${formatNumber(symTotalValueChange)}</td>`;
                 rowHtml += `<td id="${totalCellId}" class="${totalFlashClass} row-total">${formatNumber(symTotalValue, 0)}</td></tr>`;
-                
+
                 rowInfo.html = rowHtml;
                 rowData.push(rowInfo);
             });
-            
+
             // Sort rows based on current sort state
             rowData.sort((a, b) => {
                 let aVal = a[investmentGridSort.column];
                 let bVal = b[investmentGridSort.column];
-                if (investmentGridSort.column === 'symbol') {
-                    aVal = aVal.toLowerCase();
-                    bVal = bVal.toLowerCase();
+                if (investmentGridSort.column === 'symbol' || investmentGridSort.column === 'name' || investmentGridSort.column === 'sector') {
+                    aVal = (aVal || '').toLowerCase();
+                    bVal = (bVal || '').toLowerCase();
                 }
                 if (aVal < bVal) return investmentGridSort.direction === 'asc' ? -1 : 1;
                 if (aVal > bVal) return investmentGridSort.direction === 'asc' ? 1 : -1;
                 return 0;
             });
-            
+
             // Build body HTML from sorted rows
             rowData.forEach(row => {
                 bodyHtml += row.html;
@@ -1444,7 +1829,7 @@
             if (accountsCollapsed) {
                 cashRowHtml += '<td style="text-align: center;">-</td>';
             }
-            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
 
@@ -1455,11 +1840,11 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = currentPrices[p.symbol]?.price || 0;
+                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
                     accTotal += p.quantity * (price / 100.0);
                 });
                 grandTotal += accTotal;
@@ -1475,12 +1860,12 @@
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
-            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td>';
+            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
             totalRowHtml += `<td id="total-row-value-change" style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
             totalRowHtml += `<td id="total-row-grand-total">${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
 
-              // Removed Add Position Buttons row
+            // Removed Add Position Buttons row
 
             tbody.innerHTML = bodyHtml;
         }
@@ -1524,7 +1909,7 @@
                 total += val;
 
                 const accJson = escapeHtml(JSON.stringify(acc));
-                
+
                 let valCell = '';
                 if (cashPos) {
                     const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: val, isBankAccount: true };
@@ -1616,7 +2001,7 @@
                     body: JSON.stringify({ display_order: index })
                 });
             });
-            
+
             try {
                 await Promise.all(updates);
                 console.log('Account order saved');
@@ -1626,6 +2011,49 @@
         }
 
         // --- Helpers ---
+        // Normalize ticker strings to the same key format used by scrapers/price messages
+        // (underscore-sanitized form for filename compatibility)
+        function normalizeTicker(sym) {
+            if (!sym && sym !== 0) return sym;
+            try {
+                return String(sym).toUpperCase().replace(/[^A-Z0-9._-]/g, '_');
+            } catch (e) {
+                return String(sym).toUpperCase();
+            }
+        }
+
+        // Percent-encode ticker to match server-side normalized_key format
+        // (e.g., GC=F -> GC%3DF)
+        function percentEncodeTicker(sym) {
+            if (!sym && sym !== 0) return sym;
+            try {
+                return encodeURIComponent(String(sym).toUpperCase());
+            } catch (e) {
+                return String(sym).toUpperCase();
+            }
+        }
+
+        // Safe accessor for currentPrices that falls back to normalized/encoded keys
+        // Server's priceCache uses percent-encoded keys (normalized_key), so we try:
+        // 1. Direct symbol lookup (e.g., "AAPL")
+        // 2. Percent-encoded form (e.g., "GC=F" -> "GC%3DF")
+        // 3. Underscore-sanitized form (e.g., "GC=F" -> "GC_F") for legacy compatibility
+        function getPriceDataForSymbol(sym) {
+            if (!sym && sym !== 0) return undefined;
+            // direct lookup
+            let data = currentPrices[sym];
+            if (data) return data;
+            // try percent-encoded form (server's normalized_key)
+            const encoded = percentEncodeTicker(sym);
+            if (encoded !== sym) {
+                data = currentPrices[encoded];
+                if (data) return data;
+            }
+            // try underscore-sanitized form (legacy/filename compatibility)
+            const norm = normalizeTicker(sym);
+            if (norm !== sym && norm !== encoded) data = currentPrices[norm];
+            return data;
+        }
         function formatNumber(num, decimals = 2) {
             return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
         }
@@ -1638,14 +2066,14 @@
             document.getElementById(modalId).style.display = 'none';
         }
 
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = "none";
             }
         }
 
         // Add Escape key support to close modals
-        document.addEventListener('keydown', function(event) {
+        document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 // Close any open modal
                 const modals = document.getElementsByClassName('modal');
@@ -1659,7 +2087,7 @@
         });
 
         // --- Modal Logic ---
-        
+
         // Account
         function openAccountModal(category, account = null) {
             const modal = document.getElementById('accountModal');
@@ -1681,7 +2109,7 @@
             modal.style.display = 'block';
         }
 
-        document.getElementById('accountForm').onsubmit = async function(e) {
+        document.getElementById('accountForm').onsubmit = async function (e) {
             e.preventDefault();
             const id = document.getElementById('accId').value;
             const body = {
@@ -1692,7 +2120,7 @@
             const method = id ? 'PUT' : 'POST';
             const url = id ? `/api/accounts/${id}` : '/api/accounts';
 
-            await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             closeModal('accountModal');
             fetchAssets();
         };
@@ -1776,7 +2204,7 @@
             modal.style.display = 'block';
         }
 
-        document.getElementById('positionForm').onsubmit = async function(e) {
+        document.getElementById('positionForm').onsubmit = async function (e) {
             e.preventDefault();
             const id = document.getElementById('posId').value;
             const body = {
@@ -1789,7 +2217,7 @@
             const method = id ? 'PUT' : 'POST';
             const url = id ? `/api/positions/${id}` : '/api/positions';
 
-            await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             closeModal('positionModal');
             fetchAssets();
         };
@@ -1822,7 +2250,7 @@
             modal.style.display = 'block';
         }
 
-        document.getElementById('assetForm').onsubmit = async function(e) {
+        document.getElementById('assetForm').onsubmit = async function (e) {
             e.preventDefault();
             const id = document.getElementById('assetId').value;
             const body = {
@@ -1835,7 +2263,7 @@
             const method = id ? 'PUT' : 'POST';
             const url = id ? `/api/fixed_assets/${id}` : '/api/fixed_assets';
 
-            await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             closeModal('assetModal');
             fetchAssets();
         };
@@ -1933,22 +2361,22 @@
             let x = 0;
             let leftWidth = 0;
 
-            const onMouseDownPane = function(e) {
+            const onMouseDownPane = function (e) {
                 x = e.clientX;
                 leftWidth = leftPane.getBoundingClientRect().width;
 
                 document.addEventListener('mousemove', onMouseMovePane);
                 document.addEventListener('mouseup', onMouseUpPane);
-                
+
                 // Visual feedback
                 paneResizer.style.backgroundColor = '#666';
             };
 
-            const onMouseMovePane = function(e) {
+            const onMouseMovePane = function (e) {
                 const dx = e.clientX - x;
                 const containerWidth = logsContainer.getBoundingClientRect().width;
                 const newLeftWidth = ((leftWidth + dx) / containerWidth) * 100;
-                
+
                 // Limits (10% to 90%)
                 if (newLeftWidth > 10 && newLeftWidth < 90) {
                     leftPane.style.width = `${newLeftWidth}%`;
@@ -1961,10 +2389,10 @@
                 rightPane.style.pointerEvents = 'none';
             };
 
-            const onMouseUpPane = function() {
+            const onMouseUpPane = function () {
                 document.removeEventListener('mousemove', onMouseMovePane);
                 document.removeEventListener('mouseup', onMouseUpPane);
-                
+
                 document.body.style.cursor = 'default';
                 leftPane.style.removeProperty('user-select');
                 leftPane.style.removeProperty('pointer-events');
@@ -1981,7 +2409,7 @@
             let x = 0;
             let w = 0;
 
-            const onMouseDownCol = function(e) {
+            const onMouseDownCol = function (e) {
                 e.stopPropagation(); // Prevent bubbling
                 x = e.clientX;
                 w = col.getBoundingClientRect().width;
@@ -1991,13 +2419,13 @@
                 resizer.style.backgroundColor = '#888';
             };
 
-            const onMouseMoveCol = function(e) {
+            const onMouseMoveCol = function (e) {
                 const dx = e.clientX - x;
                 // Set width in pixels to override percentage
                 col.style.width = `${w + dx}px`;
             };
 
-            const onMouseUpCol = function() {
+            const onMouseUpCol = function () {
                 document.removeEventListener('mousemove', onMouseMoveCol);
                 document.removeEventListener('mouseup', onMouseUpCol);
                 resizer.style.backgroundColor = '#555';
@@ -2020,7 +2448,7 @@
                 resizer.style.backgroundColor = '#555'; // Visible handle
                 resizer.style.userSelect = 'none';
                 resizer.style.zIndex = '5';
-                
+
                 th.appendChild(resizer);
                 createResizableColumn(th, resizer);
             }
@@ -2030,7 +2458,7 @@
         function toggleSettingsDropdown() {
             const dropdown = document.getElementById('settingsDropdown');
             const isVisible = dropdown.style.display === 'block';
-            
+
             // Hide dropdown if visible
             if (isVisible) {
                 dropdown.style.display = 'none';
@@ -2043,19 +2471,19 @@
         function showLogs() {
             const dropdown = document.getElementById('settingsDropdown');
             dropdown.style.display = 'none';
-            
+
             // Open logs modal
             document.getElementById('logsModal').style.display = 'block';
-            
+
             // Fetch logs if not already loaded
             fetchLogs();
         }
 
         // Close dropdown when clicking outside
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const dropdown = document.getElementById('settingsDropdown');
             const settingsBtn = document.getElementById('settingsBtn');
-            
+
             if (!settingsBtn.contains(event.target) && !dropdown.contains(event.target)) {
                 dropdown.style.display = 'none';
             }
@@ -2065,7 +2493,7 @@
         function openSettingsModal() {
             const dropdown = document.getElementById('settingsDropdown');
             dropdown.style.display = 'none'; // Close dropdown when opening modal
-            
+
             const modal = document.getElementById('settingsModal');
             // Load current settings (from localStorage or defaults)
             loadSettings();
@@ -2095,9 +2523,9 @@
 
             // Apply settings immediately
             applySettings();
-            
+
             closeModal('settingsModal');
-            
+
             // Show success message
             alert('Settings saved successfully!');
         }
@@ -2106,7 +2534,7 @@
             const theme = localStorage.getItem('theme') || 'dark';
             const autoRefresh = localStorage.getItem('autoRefresh') !== 'false';
             const refreshInterval = parseInt(localStorage.getItem('refreshInterval') || '60');
-            
+
             // Apply theme (basic implementation - could be expanded)
             if (theme === 'light') {
                 document.body.style.backgroundColor = '#ffffff';
@@ -2115,7 +2543,7 @@
                 document.body.style.backgroundColor = '#121212';
                 document.body.style.color = '#e0e0e0';
             }
-            
+
             // Apply auto-refresh
             if (autoRefresh && window.refreshIntervalId) {
                 clearInterval(window.refreshIntervalId);
@@ -2131,7 +2559,7 @@
                 fetch('/api/export')
                     .then(response => response.json())
                     .then(data => {
-                        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
@@ -2156,10 +2584,10 @@
             }
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const importData = JSON.parse(e.target.result);
-                    
+
                     // Validate the data structure
                     if (!importData.data || !importData.data.accounts || !importData.data.positions) {
                         throw new Error('Invalid file format. Expected exported wealth-tracker data.');
@@ -2173,25 +2601,25 @@
                         },
                         body: JSON.stringify(importData)
                     })
-                    .then(response => response.json())
-                    .then(result => {
-                        if (result.success) {
-                            alert('Data imported successfully!');
-                            // Refresh the dashboard data
-                            fetchAssets();
-                            closeModal('settingsModal');
-                        } else {
-                            alert('Import failed: ' + (result.error || 'Unknown error'));
-                        }
-                    })
-                    .catch(err => {
-                        alert('Import failed: ' + err.message);
-                    });
+                        .then(response => response.json())
+                        .then(result => {
+                            if (result.success) {
+                                alert('Data imported successfully!');
+                                // Refresh the dashboard data
+                                fetchAssets();
+                                closeModal('settingsModal');
+                            } else {
+                                alert('Import failed: ' + (result.error || 'Unknown error'));
+                            }
+                        })
+                        .catch(err => {
+                            alert('Import failed: ' + err.message);
+                        });
                 } catch (err) {
                     alert('Failed to parse file: ' + err.message);
                 }
             };
-            
+
             reader.readAsText(file);
             // Reset file input
             fileInput.value = '';
@@ -2211,11 +2639,12 @@
         }
 
         // Apply settings on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             applySettings();
             fetchAssets();
         });
 
     </script>
 </body>
+
 </html>
