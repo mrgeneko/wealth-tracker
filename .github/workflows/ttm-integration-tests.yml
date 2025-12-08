@@ -1,0 +1,70 @@
+name: TTM Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testdb
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot -e 'SELECT 1' && break || sleep 2
+          done
+
+      - name: Apply SQL migrations
+        run: |
+          echo "Applying SQL migrations from scripts/sql"
+          for f in $(ls -1 scripts/sql/*.sql | sort); do
+            echo "-> applying $f"
+            mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE < "$f" || true
+          done
+
+      - name: Run integration tests (migration flow)
+        run: |
+          node tests/integration/ttm_migration.test.js
+          node tests/integration/ttm_weekly_monthly.test.js
+          node tests/integration/ttm_eps_adjusted.test.js
