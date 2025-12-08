@@ -2,10 +2,13 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY dashboard/package*.json ./
 RUN npm install
 
-COPY . .
+COPY dashboard/ .
+COPY api/ /api/
+
+ENV NODE_PATH=/app/node_modules
 
 EXPOSE 3001
 

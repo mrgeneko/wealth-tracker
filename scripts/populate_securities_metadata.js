@@ -146,6 +146,9 @@ async function upsertSecurityMetadata(connection, symbol, data) {
         short_name: quoteType.shortName || price.shortName,
         long_name: quoteType.longName || price.longName,
 
+        sector: summaryDetail.sector || price.sector,
+        industry: summaryDetail.industry || price.industry,
+
         region: price.region,
         exchange: quoteType.exchange || price.exchange,
         full_exchange_name: price.fullExchangeName,
@@ -183,6 +186,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
     const sql = `
     INSERT INTO securities_metadata (
       symbol, quote_type, type_display, short_name, long_name,
+      sector, industry,
       region, exchange, full_exchange_name, currency, timezone_name, timezone_short,
       market, market_state, tradeable,
       net_assets, net_expense_ratio,
@@ -191,12 +195,14 @@ async function upsertSecurityMetadata(connection, symbol, data) {
       trailing_pe, forward_pe, price_to_book, beta,
       fifty_two_week_low, fifty_two_week_high,
       first_trade_date, data_source
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       quote_type = VALUES(quote_type),
       type_display = VALUES(type_display),
       short_name = VALUES(short_name),
       long_name = VALUES(long_name),
+      sector = VALUES(sector),
+      industry = VALUES(industry),
       region = VALUES(region),
       exchange = VALUES(exchange),
       full_exchange_name = VALUES(full_exchange_name),
@@ -225,6 +231,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
 
     const values = [
         metadata.symbol, metadata.quote_type, metadata.type_display, metadata.short_name, metadata.long_name,
+        metadata.sector, metadata.industry,
         metadata.region, metadata.exchange, metadata.full_exchange_name, metadata.currency, metadata.timezone_name, metadata.timezone_short,
         metadata.market, metadata.market_state, metadata.tradeable,
         metadata.net_assets, metadata.net_expense_ratio,
