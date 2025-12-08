@@ -890,6 +890,9 @@
 
             // Initialize Awesomplete
             const input = document.getElementById('newSymbol');
+            // Store metadata by symbol to bypass Awesomplete's data stripping
+            let metadataStore = {};
+
             if (!symbolAutocomplete) {
                 symbolAutocomplete = new Awesomplete(input, {
                     minChars: 1,
@@ -898,17 +901,23 @@
                     filter: () => true, // We filter on server
                     sort: false, // We sort on server
                     data: function (item) {
-                        return { label: item.label, value: item.value };
+                        return { label: item.value, value: item.value };
                     },
                     item: function (item) {
+                        // Retrieve full metadata from our side-channel store
+                        const meta = metadataStore[item.value] || {};
+                        const name = meta.name || 'Unknown Name';
+                        const exchange = meta.exchange || 'Unknown';
+                        const exchangeClass = (exchange || '').toLowerCase().replace(/\s+/g, '-');
+
                         const li = document.createElement('li');
                         li.innerHTML = `
                                     <div class="ticker-item">
                                         <div class="ticker-main">
                                             <span class="ticker-symbol">${item.value}</span>
-                                            <span class="ticker-exchange ${item.exchangeClass}">${item.exchange}</span>
+                                            <span class="ticker-exchange ${exchangeClass}">${exchange}</span>
                                         </div>
-                                        <div class="ticker-name">${item.name}</div>
+                                        <div class="ticker-name">${name}</div>
                                     </div>
                                 `;
                         return li;
@@ -923,20 +932,23 @@
                     if (autocompleteTimeout) clearTimeout(autocompleteTimeout);
                     autocompleteTimeout = setTimeout(async () => {
                         try {
+                            console.log('[v3-fix] Fetching for:', query);
                             const res = await fetch(`/api/metadata/autocomplete?q=${encodeURIComponent(query)}`);
                             const data = await res.json();
 
+                            // Update the side-channel store
+                            data.results.forEach(t => {
+                                metadataStore[t.symbol] = t;
+                            });
+
                             const list = data.results.map(t => ({
                                 label: t.symbol,
-                                value: t.symbol,
-                                name: t.name,
-                                exchange: t.exchange,
-                                exchangeClass: (t.exchange || '').toLowerCase().replace(/\\s+/g, '-')
+                                value: t.symbol
                             }));
 
                             symbolAutocomplete.list = list;
                         } catch (err) {
-                            console.error('Autocomplete error:', err);
+                            console.error('[v3-fix] Error:', err);
                         }
                     }, 300); // 300ms debounce
                 });
