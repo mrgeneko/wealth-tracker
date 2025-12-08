@@ -3,6 +3,13 @@ Lightweight scrapers and processors for personal portfolio tracking.
 
 ## Recent Feature Updates
 
+- **Security Metadata System:**
+  - Complete system for rich security data: Names, Sectors, Market Caps, P/E Ratios, Dividends, Earnings.
+  - **Automated Population**: Fetches metadata from Yahoo Finance for all positions automatically.
+  - **Background Refresh**: Keeps popular securities (S&P 500, ETFs) updated via cron jobs.
+  - **API Integration**: REST API for autocomplete, prefetch, and batch operations.
+  - **Documentation**: See `docs/SECURITY_METADATA.md` for full details.
+
 - **New StockEvents Scraper:**
   - Added support for stockevents.app as a new data source for stocks, ETFs, bonds, and mutual funds
   - Implements text-based parsing for price and change data extraction
@@ -588,4 +595,29 @@ Stores non-financial assets like real estate and vehicles.
 - `value`: Estimated value
 - `currency`: Valuation currency
 - `display_order`: Integer for sorting
+
+#### `securities_metadata`
+Stores rich metadata for securities (stocks, ETFs, etc.).
+- `symbol`: Primary Key (e.g., "AAPL")
+- `long_name`: Full company name
+- `quote_type`: 'EQUITY', 'ETF', 'MUTUALFUND'
+- `sector`: Industry sector
+- `market_cap`: Market capitalization
+- `dividend_yield`: Annual dividend yield
+- `trailing_pe`: P/E Ratio
+- `exchange`: Stock exchange (e.g., "Nms", "Nyi")
+
+#### `securities_earnings`
+Stores upcoming and past earnings events.
+- `symbol`: Foreign Key to `securities_metadata`
+- `earnings_date`: Date of earnings release
+- `eps_estimate`: Consensus EPS estimate
+- `revenue_estimate`: Consensus revenue estimate
+
+#### `securities_dividends`
+Stores dividend history and upcoming payments.
+- `symbol`: Foreign Key to `securities_metadata`
+- `ex_dividend_date`: Ex-dividend date
+- `payment_date`: Payment date
+- `dividend_amount`: Amount per share
 
