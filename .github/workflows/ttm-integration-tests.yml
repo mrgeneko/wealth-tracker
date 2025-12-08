@@ -63,8 +63,21 @@ jobs:
             mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE < "$f" || true
           done
 
-      - name: Run integration tests (migration flow)
+      - name: Run integration tests and produce JUnit XML
         run: |
-          node tests/integration/ttm_migration.test.js
-          node tests/integration/ttm_weekly_monthly.test.js
-          node tests/integration/ttm_eps_adjusted.test.js
+          mkdir -p artifacts/test-results
+          node scripts/ci/run_tests_with_junit.js --outdir=artifacts/test-results --testsdir=tests/integration
+
+      - name: Upload test results artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ttm-integration-test-results
+          path: artifacts/test-results/
+
+      - name: Publish test results (JUnit)
+        uses: dorny/test-reporter@v1
+        with:
+          name: TTM integration tests
+          path: artifacts/test-results
+          reporter: junit
+          fail-on-error: true
