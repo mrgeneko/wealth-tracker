@@ -65,8 +65,8 @@ const KAFKA_GROUP_ID = config.KAFKA_GROUP_ID;
 // Source priority configuration for previous_close_price merging
 // Lower index in priority array = higher priority source
 let sourcePriorityConfig = {
-    priority: ['yahoo', 'nasdaq', 'google','cnbc', 'wsj', 'ycharts', 'marketbeat', 'stockanalysis', 'moomoo', 'robinhood', 'investingcom', 'stockmarketwatch', 'stocktwits'],
-    weights: { yahoo:1.0, nasdaq: 0.95, google: .93, cnbc: 0.9, wsj: 0.9, ycharts: 0.8, marketbeat: 0.75, stockanalysis: 0.75, moomoo: 0.7, robinhood: 0.7, investingcom: 0.65, stockmarketwatch: 0.6, stocktwits: 0.5 },
+    priority: ['yahoo', 'nasdaq', 'google', 'cnbc', 'wsj', 'ycharts', 'marketbeat', 'stockanalysis', 'moomoo', 'robinhood', 'investingcom', 'stockmarketwatch', 'stocktwits'],
+    weights: { yahoo: 1.0, nasdaq: 0.95, google: .93, cnbc: 0.9, wsj: 0.9, ycharts: 0.8, marketbeat: 0.75, stockanalysis: 0.75, moomoo: 0.7, robinhood: 0.7, investingcom: 0.65, stockmarketwatch: 0.6, stocktwits: 0.5 },
     default_weight: 0.5,
     recency_threshold_minutes: 60
 };
@@ -146,6 +146,10 @@ const MYSQL_USER = process.env.MYSQL_USER || 'test';
 const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'test';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'testdb';
 
+// Mount Metadata API
+const metadataRouter = require('../api/metadata');
+app.use('/api/metadata', metadataRouter);
+
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -214,10 +218,40 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
+// Self-healing: Ensure new columns exist
+async function ensureSchema() {
+    try {
+        console.log('[Schema] Checking for sector/industry columns...');
+        await pool.query("ALTER TABLE securities_metadata ADD COLUMN sector VARCHAR(100) AFTER long_name");
+        console.log('[Schema] Added sector column');
+    } catch (e) {
+        // Ignore duplicate column error
+        if (e.code !== 'ER_DUP_FIELDNAME') console.warn('[Schema] Sector column check:', e.message);
+    }
+
+    try {
+        await pool.query("ALTER TABLE securities_metadata ADD COLUMN industry VARCHAR(100) AFTER sector");
+        console.log('[Schema] Added industry column');
+    } catch (e) {
+        if (e.code !== 'ER_DUP_FIELDNAME') console.warn('[Schema] Industry column check:', e.message);
+    }
+}
+
 async function fetchAssetsFromDB() {
     try {
         const [accounts] = await pool.query('SELECT * FROM accounts ORDER BY display_order');
-        const [positions] = await pool.query('SELECT * FROM positions');
+
+        // Fetch positions with metadata
+        // Use COLLATE to ensure compatibility between tables
+        const [positions] = await pool.query(`
+            SELECT p.*, 
+                   sm.short_name, sm.sector, sm.market_cap, 
+                   sm.dividend_yield, sm.trailing_pe, 
+                   sm.quote_type, sm.exchange as meta_exchange
+            FROM positions p
+            LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol COLLATE utf8mb4_unicode_ci
+        `);
+
         const [fixedAssets] = await pool.query('SELECT * FROM fixed_assets ORDER BY display_order');
 
         const result = {
@@ -258,6 +292,25 @@ async function fetchAssetsFromDB() {
             const accPositions = positions.filter(p => p.account_id === acc.id);
 
             for (const pos of accPositions) {
+                // Determine display type
+                const displayType = pos.type; // Default to stored type
+
+                // Common position object
+                const positionData = {
+                    id: pos.id,
+                    symbol: pos.symbol,
+                    quantity: parseFloat(pos.quantity),
+                    cost_basis: pos.cost_basis ? parseFloat(pos.cost_basis) : 0,
+                    // Metadata fields (from JOIN)
+                    short_name: pos.short_name || null,
+                    sector: pos.sector || null,
+                    market_cap: pos.market_cap ? parseFloat(pos.market_cap) : null,
+                    dividend_yield: pos.dividend_yield ? parseFloat(pos.dividend_yield) : null,
+                    trailing_pe: pos.trailing_pe ? parseFloat(pos.trailing_pe) : null,
+                    quote_type: pos.quote_type || null,
+                    exchange: pos.exchange || pos.meta_exchange || null
+                };
+
                 if (pos.type === 'cash') {
                     accountObj.holdings.cash = {
                         id: pos.id,
@@ -265,18 +318,10 @@ async function fetchAssetsFromDB() {
                         currency: pos.currency
                     };
                 } else if (pos.type === 'bond') {
-                    accountObj.holdings.bonds.push({
-                        id: pos.id,
-                        symbol: pos.symbol,
-                        quantity: parseFloat(pos.quantity)
-                    });
+                    accountObj.holdings.bonds.push(positionData);
                 } else {
                     // Stocks, ETFs, Crypto, etc.
-                    accountObj.holdings.stocks.push({
-                        id: pos.id,
-                        symbol: pos.symbol,
-                        quantity: parseFloat(pos.quantity)
-                    });
+                    accountObj.holdings.stocks.push(positionData);
                 }
             }
 
@@ -287,6 +332,13 @@ async function fetchAssetsFromDB() {
 
     } catch (err) {
         console.error('Error fetching assets from DB:', err);
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            fs.writeFileSync(path.join(__dirname, 'logs/db_error.txt'), err.message + '\n' + err.stack);
+        } catch (e) {
+            console.error('Failed to write error log:', e);
+        }
         return null;
     }
 }
@@ -603,7 +655,7 @@ app.get('/api/export', async (req, res) => {
 app.post('/api/import', async (req, res) => {
     try {
         const importData = req.body;
-        
+
         // Validate the data structure
         if (!importData.data || !importData.data.accounts || !importData.data.positions) {
             return res.status(400).json({ error: 'Invalid data format' });
@@ -832,9 +884,30 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start
-server.listen(PORT, async () => {
-    console.log(`Dashboard server running on ${protocol}://localhost:${PORT}`);
-    await fetchInitialPrices();
-    startKafkaConsumer();
-});
+// Start logic with debug logging
+const isMainModule = require.main === module;
+const isTestEnv = process.env.NODE_ENV === 'test';
+
+console.log(`[Startup] Checks: require.main===module? ${isMainModule}, NODE_ENV=${process.env.NODE_ENV}`);
+
+// Start if running directly OR if not in test environment (fallback for Docker)
+if (isMainModule || !isTestEnv) {
+    if (!isMainModule) {
+        console.log('[Startup] require.main !== module, but starting because not in test env.');
+    }
+    // Self-execute async start wrapper
+    (async () => {
+        try {
+            await ensureSchema();
+            server.listen(PORT, async () => {
+                console.log(`Dashboard server running on ${protocol}://localhost:${PORT}`);
+                await fetchInitialPrices();
+                startKafkaConsumer();
+            });
+        } catch (e) {
+            console.error('Startup failed:', e);
+        }
+    })();
+}
+
+module.exports = { app, server, pool };
