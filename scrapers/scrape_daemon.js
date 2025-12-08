@@ -2,9 +2,18 @@ const fs = require('fs');
 require('dotenv').config();
 const version = 'VERSION:33'
 console.log(version);
+// Diagnostic: record startup timestamps of key files so we can trace which
+// version of code is actually running (helps detect stale in-memory loads).
+try {
+	const df = '/usr/src/app/scrapers/scrape_yahoo.js';
+	const pf = '/usr/src/app/scrapers/publish_to_kafka.js';
+	const stDF = fs.existsSync(df) ? fs.statSync(df).mtime.toISOString() : '<missing>';
+	const stPF = fs.existsSync(pf) ? fs.statSync(pf).mtime.toISOString() : '<missing>';
+	console.log(`Startup files: scrape_yahoo.js@${stDF}, publish_to_kafka.js@${stPF}`);
+} catch (e) { console.warn('Startup diagnostics failed: ' + (e && e.message ? e.message : e)); }
 
 const { scrapeGoogle } = require('./scrape_google');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls, normalizedKey } = require('./scraper_utils');
 const mysql = require('mysql2/promise');
 const puppeteer = require('puppeteer');
 const debugLogPath = getTimestampedLogPath();
@@ -115,7 +124,7 @@ async function fetchStockPositions() {
 		const [rows] = await pool.query(
 			"SELECT DISTINCT symbol, type FROM positions WHERE type IN ('stock', 'etf') AND symbol IS NOT NULL AND symbol != ''"
 		);
-		return rows.map(r => ({ symbol: r.symbol, type: r.type }));
+		return rows.map(r => ({ symbol: r.symbol, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
 	} catch (e) {
 		logDebug('Error fetching stock positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -128,7 +137,7 @@ async function fetchBondPositions() {
 		const [rows] = await pool.query(
 			"SELECT DISTINCT symbol, type FROM positions WHERE type = 'bond' AND symbol IS NOT NULL AND symbol != ''"
 		);
-		return rows.map(r => ({ symbol: r.symbol, type: r.type }));
+		return rows.map(r => ({ symbol: r.symbol, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
 	} catch (e) {
 		logDebug('Error fetching bond positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse/sync');
+const { normalizedKey } = require('./scraper_utils');
 
 const CONFIG_DIR = path.join(__dirname, '../config');
 const TREASURY_FILE = path.join(CONFIG_DIR, 'us-treasury-auctions.csv');
@@ -45,6 +46,14 @@ function isTreasury(ticker) {
     return data.has(normalized);
 }
 
+// Utility: return a normalized identifier for a treasury ticker/CUSIP.
+// This is provided mainly for tests and external callers that want
+// to match the encoding used by scrapers/publishers.
+function normalizedIdentifier(ticker) {
+    if (!ticker) return '';
+    return normalizedKey(ticker);
+}
+
 function reloadTreasuryData() {
     treasuryCache = null;
     loadTreasuryData();
@@ -54,4 +63,5 @@ module.exports = {
     isTreasury,
     reloadTreasuryData,
     loadTreasuryData
+    , normalizedIdentifier
 };

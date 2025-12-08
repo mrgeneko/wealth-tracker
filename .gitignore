@@ -7,9 +7,9 @@ nohup.out
 .env
 run_scrape_nasdaq.js
 docker_chrome_profile/
-logs/*
 mysql/*
 data/*
+logs/*
 assets_liabilities.json
 config.json
 20251*.json

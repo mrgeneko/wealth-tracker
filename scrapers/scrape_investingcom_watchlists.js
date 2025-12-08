@@ -1,4 +1,4 @@
-const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError, normalizedKey } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 const { DateTime } = require('luxon');
 
@@ -248,6 +248,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 
 					dataObjects.push({
 						key: rowData["symbol"],
+						normalized_key: normalizedKey(rowData["symbol"]),
 						regular_price: rowData["last"],
 						regular_change_decimal: rowData["chg"],
 						regular_change_percent: rowData["chgpercent"],
