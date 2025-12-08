@@ -30,6 +30,10 @@ for f in scripts/sql/*.sql; do
   mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < "$f" || true
 done
 
+# Populate accounts/positions from config if needed
+echo "Running asset migration to create accounts/positions/fixed_assets (if necessary)"
+node scripts/migrate_assets_to_mysql.js || true
+
 # Run tests
 node tests/integration/ttm_migration.test.js
 node tests/integration/ttm_weekly_monthly.test.js
