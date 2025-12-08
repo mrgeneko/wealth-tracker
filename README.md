@@ -9,6 +9,7 @@ Lightweight scrapers and processors for personal portfolio tracking.
   - **Background Refresh**: Keeps popular securities (S&P 500, ETFs) updated via cron jobs.
   - **API Integration**: REST API for autocomplete, prefetch, and batch operations.
   - **Documentation**: See `docs/SECURITY_METADATA.md` for full details.
+    - **P/E (trailing_pe) refresh cadence**: trailing P/E values are loaded from Yahoo metadata and refreshed as part of the metadata population workflow (see details below).
 
 - **New StockEvents Scraper:**
   - Added support for stockevents.app as a new data source for stocks, ETFs, bonds, and mutual funds
@@ -118,6 +119,30 @@ If you are using Docker Desktop, you can manage the application through the GUI:
 
 ---
 ## Managing Configuration
+
+---
+### Metadata refresh / trailing P/E updates
+
+- Source: trailing P/E (stored in `securities_metadata.trailing_pe`) is populated by running `scripts/populate_securities_metadata.js` which calls the Yahoo Finance APIs (via `yahoo-finance2`) and upserts metadata including `trailing_pe`.
+
+- Default automated schedule: the repository ships a cron configuration at `config/metadata_cron.conf` which — by default — runs the daily and weekly metadata jobs. Example entries:
+
+  - `0 2 * * * cd /path/to/wealth-tracker && node scripts/populate_securities_metadata.js --all >> logs/metadata_daily.log 2>&1` (runs once daily)
+  - `0 3 * * 0 cd /path/to/wealth-tracker && node scripts/populate_popular_securities.js --sp500 >> logs/metadata_sp500.log 2>&1` (weekly for S&P500 list)
+  - `0 4 * * 0 cd /path/to/wealth-tracker && node scripts/populate_popular_securities.js --etfs >> logs/metadata_etfs.log 2>&1` (weekly for ETFs)
+  - `0 1 1 * * cd /path/to/wealth-tracker && node scripts/populate_popular_securities.js --all --force >> logs/metadata_monthly.log 2>&1` (monthly full refresh)
+
+- On-demand / manual refresh options:
+  - API: POST /api/metadata/prefetch (prefetch metadata for a single symbol and update DB immediately)
+  - CLI:
+    - `node scripts/populate_securities_metadata.js --symbol SYMBOL` (single symbol)
+    - `node scripts/populate_securities_metadata.js --all` (all positions)
+    - `node scripts/populate_securities_metadata.js --all-metadata` (repopulate every symbol in `securities_metadata`)
+
+- Notes & best practices:
+  - Some instruments (e.g., futures, certain ETFs, or crypto pairs) may not expose a `trailingPE` value — those will be stored as `NULL` until Yahoo provides a value.
+  - Increasing the metadata refresh frequency will give more up-to-date trailing P/E values but may increase rate-limiting risk when hitting Yahoo APIs. Use on-demand prefetch for a small set of symbols if you need near-real-time refreshes.
+  - To change schedules, edit `config/metadata_cron.conf` and re-install the cron jobs (see `docs/CRON_REINSTALL.md` for details).
 
 ### 1. Environment Variables (`.env`)
 The `.env` file in the project root contains secrets and environment settings (e.g., database passwords).
