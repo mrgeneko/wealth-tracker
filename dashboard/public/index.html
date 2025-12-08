@@ -1566,8 +1566,23 @@
                     if (stockPos) {
                         if (stockPos.short_name) metaName = stockPos.short_name;
                         if (stockPos.sector) metaSector = stockPos.sector;
-                        if (stockPos.trailing_pe) metaPE = stockPos.trailing_pe.toFixed(2);
-                        if (stockPos.dividend_yield) {
+                        // Prefer real-time calculations when we have TTM data and a current price
+                        const priceNow = (typeof price === 'number' && isFinite(price)) ? price : null;
+                        if (stockPos.ttm_eps && priceNow && Number(stockPos.ttm_eps) !== 0) {
+                            try {
+                                const v = priceNow / Number(stockPos.ttm_eps);
+                                if (isFinite(v) && v > 0 && v < 10000) metaPE = v.toFixed(2);
+                            } catch (e) {}
+                        } else if (stockPos.trailing_pe) metaPE = stockPos.trailing_pe.toFixed(2);
+
+                        if (stockPos.ttm_dividend_amount && priceNow) {
+                            try {
+                                const yieldPct = (Number(stockPos.ttm_dividend_amount) / priceNow) * 100.0;
+                                if (isFinite(yieldPct) && yieldPct >= 0 && yieldPct <= 100) {
+                                    metaYield = yieldPct.toFixed(2) + '%';
+                                }
+                            } catch (e) {}
+                        } else if (stockPos.dividend_yield) {
                             // Stored dividend_yield may be either a fraction (0.0123) or a
                             // percent-like value (1.23 or 123). Normalize for display:
                             // - If value looks like a percent (1..100) show as-is with %
