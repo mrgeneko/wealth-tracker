@@ -932,7 +932,6 @@
                     if (autocompleteTimeout) clearTimeout(autocompleteTimeout);
                     autocompleteTimeout = setTimeout(async () => {
                         try {
-                            console.log('[v3-fix] Fetching for:', query);
                             const res = await fetch(`/api/metadata/autocomplete?q=${encodeURIComponent(query)}`);
                             const data = await res.json();
 
@@ -948,7 +947,7 @@
 
                             symbolAutocomplete.list = list;
                         } catch (err) {
-                            console.error('[v3-fix] Error:', err);
+                            console.error('Autocomplete error:', err);
                         }
                     }, 300); // 300ms debounce
                 });
@@ -1568,7 +1567,23 @@
                         if (stockPos.short_name) metaName = stockPos.short_name;
                         if (stockPos.sector) metaSector = stockPos.sector;
                         if (stockPos.trailing_pe) metaPE = stockPos.trailing_pe.toFixed(2);
-                        if (stockPos.dividend_yield) metaYield = (stockPos.dividend_yield * 100).toFixed(2) + '%';
+                        if (stockPos.dividend_yield) {
+                            // Stored dividend_yield may be either a fraction (0.0123) or a
+                            // percent-like value (1.23 or 123). Normalize for display:
+                            // - If value looks like a percent (1..100) show as-is with %
+                            // - Otherwise assume a fractional value and multiply by 100
+                            const raw = parseFloat(stockPos.dividend_yield);
+                            if (!isNaN(raw)) {
+                                if (raw > 1 && raw <= 100) {
+                                    metaYield = raw.toFixed(2) + '%';
+                                } else if (raw > 100) {
+                                    // absurdly large numbers are considered bad data
+                                    metaYield = '-';
+                                } else {
+                                    metaYield = (raw * 100).toFixed(2) + '%';
+                                }
+                            }
+                        }
                         if (metaName && metaSector) break; // Found enough info
                     }
                 }

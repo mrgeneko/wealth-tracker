@@ -106,24 +106,50 @@ async function fetchSecurityMetadata(symbol) {
     }
 
     try {
-        // Use quote method instead of quoteSummary (quoteSummary not available in this version)
-        const result = await yahoo.quote(symbol);
-
-        if (!result) {
-            console.error(`No data returned for ${symbol}`);
-            return null;
+        // Try to use quoteSummary with explicit modules — this returns structured
+        // sections like summaryDetail, summaryProfile/assetProfile etc which are
+        // more reliable for fields like sector and dividend_yield.
+        let result = null;
+        try {
+            const modules = ['price', 'summaryDetail', 'summaryProfile', 'assetProfile', 'defaultKeyStatistics', 'calendarEvents'];
+            // quoteSummary sometimes requires an options object in different package versions
+            if (typeof yahoo.quoteSummary === 'function') {
+                result = await yahoo.quoteSummary(symbol, { modules });
+            } else if (typeof yahoo.quote === 'function') {
+                // Fallback to older quote wrapper
+                const q = await yahoo.quote(symbol);
+                result = { price: q, summaryDetail: q, quoteType: q, defaultKeyStatistics: q, calendarEvents: { earnings: q.earningsTimestamp ? { earningsDate: q.earningsTimestamp } : null, dividendDate: q.dividendDate } };
+            }
+        } catch (e) {
+            // Some versions / environments may not support quoteSummary; fall back
+            console.warn(`quoteSummary failed for ${symbol} — falling back to quote(): ${e.message}`);
+            const q = await yahoo.quote(symbol);
+            if (!q) {
+                console.error(`No data returned for ${symbol}`);
+                return null;
+            }
+            result = { price: q, summaryDetail: q, quoteType: q, defaultKeyStatistics: q, calendarEvents: { earnings: q.earningsTimestamp ? { earningsDate: q.earningsTimestamp } : null, dividendDate: q.dividendDate } };
         }
 
-        // Restructure quote data to match the expected format
+        // Normalize quoteSummary return shape: yahoo.quoteSummary often returns
+        // { price: {...}, summaryDetail: {...}, summaryProfile: {...} }
+        // If the library wrapped returned the full response under `result` with nested .price etc
+        // treat 'result' as the structured payload; otherwise try to map top-level properties
+        const price = result.price || result;
+        const summaryDetail = result.summaryDetail || result.summarydetail || {};
+        const summaryProfile = result.summaryProfile || result.summaryprofile || {};
+        const assetProfile = result.assetProfile || result.assetprofile || {};
+        const defaultKeyStatistics = result.defaultKeyStatistics || result.defaultkeystatistics || {};
+        const calendarEvents = result.calendarEvents || result.calendarevents || {};
+
         return {
-            price: result,
-            summaryDetail: result,
-            quoteType: result,
-            calendarEvents: {
-                earnings: result.earningsTimestamp ? { earningsDate: result.earningsTimestamp } : null,
-                dividendDate: result.dividendDate
-            },
-            defaultKeyStatistics: result
+            price,
+            summaryDetail,
+            quoteType: price || {},
+            summaryProfile,
+            assetProfile,
+            calendarEvents,
+            defaultKeyStatistics
         };
     } catch (error) {
         console.error(`Error fetching ${symbol}:`, error.message);
@@ -146,7 +172,11 @@ async function upsertSecurityMetadata(connection, symbol, data) {
         short_name: quoteType.shortName || price.shortName,
         long_name: quoteType.longName || price.longName,
 
-        sector: summaryDetail.sector || price.sector,
+        // Sector may appear in different parts of the yahoo-finance2 response
+        // (summaryProfile, assetProfile, summaryDetail). Try useful candidates
+        // in order of likelihood.
+        sector: (summaryDetail && (summaryDetail.sector || summaryDetail.summaryProfile?.sector || summaryDetail.assetProfile?.sector))
+            || (price && (price.sector || price.summaryProfile?.sector || price.assetProfile?.sector)) || null,
         industry: summaryDetail.industry || price.industry,
 
         region: price.region,
@@ -167,7 +197,29 @@ async function upsertSecurityMetadata(connection, symbol, data) {
         market_cap: price.marketCap || summaryDetail.marketCap,
 
         dividend_rate: summaryDetail.dividendRate,
-        dividend_yield: summaryDetail.dividendYield || price.dividendYield,
+        // Normalize dividend_yield to a fraction (e.g. 0.0435 for 4.35%).
+        // Different Yahoo data fields sometimes return inconsistent units
+        // (e.g., "dividendYield" may be '1.14' meaning 1.14% or '0.0114' meaning 1.14%).
+        // Prefer trailingAnnualDividendYield if available (it's a fractional value)
+        dividend_yield: (function() {
+            const cand = summaryDetail && summaryDetail.trailingAnnualDividendYield !== undefined && summaryDetail.trailingAnnualDividendYield !== null
+                ? summaryDetail.trailingAnnualDividendYield
+                : (summaryDetail && summaryDetail.dividendYield !== undefined && summaryDetail.dividendYield !== null
+                    ? summaryDetail.dividendYield
+                    : (price && price.trailingAnnualDividendYield !== undefined && price.trailingAnnualDividendYield !== null
+                        ? price.trailingAnnualDividendYield
+                        : (price && price.dividendYield !== undefined && price.dividendYield !== null ? price.dividendYield : null)));
+
+            if (cand === null || cand === undefined) return null;
+            const parsed = parseFloat(cand);
+            if (isNaN(parsed)) return null;
+            // If value seems to be a percentage (e.g., > 1 and <= 100), convert to fraction
+            if (parsed > 1 && parsed <= 100) return parsed / 100.0;
+            // If value is absurdly large (e.g., >100), treat as null to avoid bad data
+            if (parsed > 100) return null;
+            // Otherwise assume it's a fractional value already
+            return parsed;
+        })(),
         trailing_annual_dividend_rate: summaryDetail.trailingAnnualDividendRate || price.trailingAnnualDividendRate,
         trailing_annual_dividend_yield: summaryDetail.trailingAnnualDividendYield || price.trailingAnnualDividendYield,
 
@@ -354,10 +406,18 @@ async function getUniqueSymbols(connection) {
     return rows.map(r => r.symbol);
 }
 
+async function getAllMetadataSymbols(connection) {
+        const [rows] = await connection.execute(`
+        SELECT DISTINCT symbol FROM securities_metadata WHERE symbol IS NOT NULL AND symbol != ''
+    `);
+        return rows.map(r => r.symbol);
+}
+
 async function main() {
     const args = process.argv.slice(2);
     const symbolArg = args.includes('--symbol') ? args[args.indexOf('--symbol') + 1] : null;
     const allFlag = args.includes('--all');
+    const allMetadataFlag = args.includes('--all-metadata') || args.includes('--all_metadata');
 
     // Connect to MySQL
     const connection = await mysql.createConnection({
@@ -379,6 +439,9 @@ async function main() {
         } else if (allFlag) {
             symbols = await getUniqueSymbols(connection);
             console.log(`Processing ${symbols.length} symbols from positions table`);
+        } else if (allMetadataFlag) {
+            symbols = await getAllMetadataSymbols(connection);
+            console.log(`Processing ${symbols.length} symbols from securities_metadata table`);
         } else {
             console.log('Usage:');
             console.log('  node scripts/populate_securities_metadata.js --symbol AAPL');
