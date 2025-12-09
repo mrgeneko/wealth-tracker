@@ -653,7 +653,7 @@ function getConstructibleUrls(ticker, type = 'stock') {
         { source: 'cnbc', url: `https://www.cnbc.com/quotes/${normalizedTicker}` },
         //{ source: 'moomoo', url: `https://www.moomoo.com/stock/${normalizedTicker}-US` },
         { source: 'robinhood', url: `https://robinhood.com/us/en/stocks/${normalizedTicker}/` },
-        { source: 'stocktwits', url: `https://stocktwits.com/symbol/${normalizedTicker}` },
+        //{ source: 'stocktwits', url: `https://stocktwits.com/symbol/${normalizedTicker}` },
         { source: 'ycharts', url: `https://ycharts.com/companies/${normalizedTicker}` }
         // stockmarketwatch removed - not all securities have full quote pages (some have chart-only template)
     ];
