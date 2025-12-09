@@ -23,8 +23,9 @@ module.exports = {
   // Test match patterns
   testMatch: [
     '**/tests/unit/**/*.test.js',
-    '**/scrapers/**/*.test.js',
-    '!**/tests/integration/**'
+    '**/tests/unit/**/*.unit.test.js',
+    '!**/tests/integration/**',
+    '!**/tests/unit/**/deprecated/**'
   ],
   
   // Coverage thresholds (start conservative, increase over time)
