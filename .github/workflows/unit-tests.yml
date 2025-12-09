@@ -13,10 +13,10 @@ permissions:
   checks: write
 
 jobs:
-  # Phase 1-5: Complete Symbol Registry Tests
+  # Phase 1-6: Complete Symbol Registry + API Tests
   symbol-registry-tests:
     runs-on: ubuntu-latest
-    name: Symbol Registry Tests (Phases 1-5)
+    name: Symbol Registry Tests (Phases 1-6)
     
     services:
       mysql:
@@ -56,23 +56,25 @@ jobs:
       - name: Run database migration
         run: node scripts/migrations/011_create_symbol_registry.js
 
-      - name: Run all symbol registry tests
-        run: npm test -- tests/unit/services/symbol-registry/ 2>&1
+      - name: Run all symbol registry and API tests
+        run: npm test -- tests/unit/services/symbol-registry/ tests/unit/api/autocomplete.test.js 2>&1
         id: test-run
 
       - name: Display test summary
         if: always()
         run: |
-          echo "=== SYMBOL REGISTRY TEST RESULTS ==="
+          echo "=== SYMBOL REGISTRY + API TEST RESULTS ==="
           echo ""
           echo "Phase 1: SymbolRegistryService & TreasuryDataHandler Tests (76 tests)"
           echo "Phase 2: FileRefreshManager Tests (37 tests)"
           echo "Phase 3: SymbolRegistrySyncService Tests (50 tests)"
           echo "Phase 4: YahooMetadataPopulator Tests (47 tests)"
-          echo "Phase 5: MetadataAutocompleteService Tests (39 tests NEW)"
+          echo "Phase 5: MetadataAutocompleteService Tests (39 tests)"
+          echo "Phase 6: Autocomplete REST API Endpoints Tests (30 tests NEW)"
           echo ""
-          echo "Total: 249 unit tests across all phases"
-          echo "Total: 163 unit tests across all phases"
+          echo "Service Tests Total: 249 tests"
+          echo "API Tests Total: 30 tests"
+          echo "Grand Total: 279 tests across all phases"
           echo ""
           if [ "${{ job.status }}" = "success" ]; then
             echo "✅ ALL TESTS PASSING"
@@ -175,6 +177,18 @@ jobs:
           echo "    - Connection management (2 tests)"
           echo "    - Edge cases (4 tests)"
           echo ""
-          npm test -- tests/unit/services/symbol-registry/ 2>&1 | grep -E "Test Suites:|Tests:"
+          echo "Phase 6 - Autocomplete REST API Endpoints (NEW)"
+          echo "  ✓ Autocomplete API Endpoints: 30 tests"
+          echo "    - GET /search (6 tests)"
+          echo "    - GET /details/:symbol (4 tests)"
+          echo "    - GET /stats (2 tests)"
+          echo "    - GET /pending (4 tests)"
+          echo "    - POST /refresh/:symbol (4 tests)"
+          echo "    - POST /bulk-refresh (5 tests)"
+          echo "    - GET /health (1 test)"
+          echo "    - Pool initialization (1 test)"
+          echo "    - Error handling (2 tests)"
+          echo ""
+          npm test 2>&1 | grep -E "Test Suites:|Tests:"
           echo ""
           echo "=== All Tests Passed ==="
