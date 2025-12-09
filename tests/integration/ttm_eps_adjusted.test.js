@@ -61,11 +61,11 @@ async function main() {
 
   // Backfill adjusted EPS
   console.log('\n[TEST] Running backfill_adjusted_eps.js --symbol=TTM_EPS_ADJ --apply');
-  await runScript('node', ['scripts/backfill_adjusted_eps.js', '--symbol=TTM_EPS_ADJ', '--apply']);
+  await runScript('node', ['scripts/archive/backfill_adjusted_eps.js', '--symbol=TTM_EPS_ADJ', '--apply']);
 
   // Now recompute ttm to pick up adjusted eps
   console.log('\n[TEST] Running recompute_ttm.js --symbol=TTM_EPS_ADJ --apply');
-  await runScript('node', ['scripts/recompute_ttm.js', '--symbol=TTM_EPS_ADJ', '--apply']);
+  await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTM_EPS_ADJ', '--apply']);
 
   // expected adjusted eps: for pre-split entries (250 and 170 days ago and 90 days ago?), let's calculate:
   // splitDate = 75 days ago, so earnings at 250 and 170 and 90 days are before split; 30 days is after split
