@@ -6,7 +6,13 @@
   "scripts": {
     "start": "node scrapers/scrape_security_data.js",
     "migrate": "node scripts/migrate_assets_to_mysql.js",
-    "check-normalized": "node scripts/check_scrapers_normalized_key.js"
+    "check-normalized": "node scripts/check_scrapers_normalized_key.js",
+    "test": "jest",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "node scripts/ci/run_tests_with_junit.js --testsdir=tests/integration",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --ci --coverage --maxWorkers=2"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",

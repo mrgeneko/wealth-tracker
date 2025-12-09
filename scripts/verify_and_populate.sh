@@ -37,7 +37,7 @@ if [ "$POSITION_COUNT" -gt 0 ]; then
   echo "This will fetch metadata for $POSITION_COUNT symbols from Yahoo Finance..."
   echo ""
   
-  node scripts/populate_securities_metadata.js --all
+  node scripts/populate/populate_securities_metadata.js --all
   
   echo ""
   echo "========================================="

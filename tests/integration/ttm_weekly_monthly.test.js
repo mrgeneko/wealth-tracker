@@ -65,7 +65,7 @@ async function testWeeklyDividends(conn) {
   }
 
   // Run recompute for symbol
-  await runScript('node', ['scripts/recompute_ttm.js', '--symbol=TTM_WEEKLY', '--apply']);
+  await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTM_WEEKLY', '--apply']);
 
   // verify TTM dividend amount equals sum of payments within 12 months
   const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE symbol = ?', [sym]);
@@ -99,10 +99,10 @@ async function testMonthlyDividends(conn) {
   await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, dividend_type, status, data_source) VALUES (?, ?, ?, 'STOCK', 'paid', 'test')`, [sym, await isoDateDaysAgo(15), 5.0]);
 
   // Backfill adjusted_dividend_amount (no splits present, so same as raw)
-  await runScript('node', ['scripts/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
+  await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
 
   // Recompute TTM (should include only cash payments by current recompute logic)
-  await runScript('node', ['scripts/recompute_ttm.js', '--symbol=' + sym, '--apply']);
+  await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=' + sym, '--apply']);
 
   // Check stored TTM dividend amount
   const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE symbol = ?', [sym]);
