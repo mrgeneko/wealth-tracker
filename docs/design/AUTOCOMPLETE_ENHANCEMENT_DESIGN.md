@@ -131,6 +131,7 @@ When a symbol exists in multiple sources, `source` is determined by priority:
 
 The `sort_rank` field determines autocomplete ordering:
 
+
 ```javascript
 function calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume) {
     let rank = 1000;
