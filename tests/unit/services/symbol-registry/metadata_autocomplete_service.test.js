@@ -15,7 +15,8 @@ describe('MetadataAutocompleteService', () => {
     beforeEach(() => {
         mockConnection = {
             execute: jest.fn(),
-            end: jest.fn().mockResolvedValue(undefined)
+            end: jest.fn().mockResolvedValue(undefined),
+            release: jest.fn().mockResolvedValue(undefined)
         };
 
         mockPool = {
@@ -292,9 +293,9 @@ describe('MetadataAutocompleteService', () => {
         test('should return symbols needing metadata', async () => {
             mockConnection.execute.mockResolvedValueOnce([
                 [
-                    { ticker: 'AAPL' },
-                    { ticker: 'GOOGL' },
-                    { ticker: 'MSFT' }
+                    { symbol: 'AAPL' },
+                    { symbol: 'GOOGL' },
+                    { symbol: 'MSFT' }
                 ],
                 []
             ]);
@@ -356,12 +357,12 @@ describe('MetadataAutocompleteService', () => {
             const stats = await service.getStatistics();
             
             expect(stats.summary).toBeDefined();
-            expect(stats.summary.total).toBe(1000);
-            expect(stats.summary.completed).toBe(750);
-            expect(stats.summary.pending).toBe(250);
-            expect(stats.summary.completionPercentage).toBe(75);
+            expect(stats.summary.total_symbols).toBe(1000);
+            expect(stats.summary.with_metadata).toBe(750);
+            expect(stats.summary.without_metadata).toBe(250);
+            expect(stats.summary.completion_percentage).toBe(75);
             expect(stats.byType).toHaveLength(2);
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should calculate pending correctly', async () => {
@@ -374,7 +375,7 @@ describe('MetadataAutocompleteService', () => {
             
             const stats = await service.getStatistics();
             
-            expect(stats.summary.pending).toBe(70);
+            expect(stats.summary.without_metadata).toBe(70);
         });
     });
 
