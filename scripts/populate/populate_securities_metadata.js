@@ -1,6 +1,6 @@
 // populate_securities_metadata.js
 // Fetch and populate security metadata from Yahoo Finance into MySQL
-// Usage: node scripts/populate_securities_metadata.js [--symbol AAPL] [--all]
+// Usage: node scripts/populate/populate_securities_metadata.js [--symbol AAPL] [--all]
 
 require('dotenv').config();
 const mysql = require('mysql2/promise');
@@ -463,8 +463,8 @@ async function main() {
             console.log(`Processing ${symbols.length} symbols from securities_metadata table`);
         } else {
             console.log('Usage:');
-            console.log('  node scripts/populate_securities_metadata.js --symbol AAPL');
-            console.log('  node scripts/populate_securities_metadata.js --all');
+            console.log('  node scripts/populate/populate_securities_metadata.js --symbol AAPL');
+            console.log('  node scripts/populate/populate_securities_metadata.js --all');
             process.exit(1);
         }
 

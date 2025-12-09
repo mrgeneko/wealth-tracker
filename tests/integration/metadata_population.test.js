@@ -79,7 +79,7 @@ class IntegrationTest {
 
     async testSingleSymbolPopulation() {
         await this.test('Populate single valid symbol (AAPL)', async () => {
-            await runCommandStream('node', ['scripts/populate_securities_metadata.js', '--symbol', 'AAPL'], { timeout: 10000 });
+            await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--symbol', 'AAPL'], { timeout: 10000 });
 
             // Check if metadata was inserted
             const [rows] = await this.connection.execute(
@@ -95,7 +95,7 @@ class IntegrationTest {
 
         await this.test('Handle invalid symbol gracefully', async () => {
             try {
-                await runCommandStream('node', ['scripts/populate_securities_metadata.js', '--symbol', 'INVALID_SYMBOL_123'], { timeout: 10000 });
+                await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--symbol', 'INVALID_SYMBOL_123'], { timeout: 10000 });
             } catch (error) {
                 // Script should exit with error but not crash
                 assert.ok(true, 'Should handle invalid symbol');
@@ -113,8 +113,8 @@ class IntegrationTest {
             );
 
             // Populate each symbol individually to avoid --all which processes everything
-            await runCommandStream('node', ['scripts/populate_securities_metadata.js', '--symbol', 'MSFT'], { timeout: 30000 });
-            await runCommandStream('node', ['scripts/populate_securities_metadata.js', '--symbol', 'GOOGL'], { timeout: 30000 });
+            await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--symbol', 'MSFT'], { timeout: 30000 });
+            await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--symbol', 'GOOGL'], { timeout: 30000 });
 
             // Check if both were populated
             const [rows] = await this.connection.execute(
@@ -133,7 +133,7 @@ class IntegrationTest {
             const testSymbols = ['NVDA', 'AMZN', 'TSLA'];
             for (const sym of testSymbols) {
                 try {
-                    await runCommandStream('node', ['scripts/populate_securities_metadata.js', '--symbol', sym], { timeout: 30000 });
+                    await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--symbol', sym], { timeout: 30000 });
                 } catch (e) {
                     console.warn(`  Warning: Failed to populate ${sym}: ${e.message}`);
                 }

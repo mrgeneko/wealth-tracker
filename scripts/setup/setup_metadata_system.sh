@@ -105,7 +105,7 @@ REQUIRED_SCRIPTS=(
   "scripts/sql/003_create_securities_earnings.sql"
   "scripts/sql/004_create_securities_dividends.sql"
   "scripts/sql/005_add_positions_metadata_link.sql"
-  "scripts/populate_securities_metadata.js"
+  "scripts/populate/populate_securities_metadata.js"
 )
 
 for script in "${REQUIRED_SCRIPTS[@]}"; do
@@ -210,7 +210,7 @@ if [ "$SKIP_POPULATION" = false ] && [ "$POSITION_COUNT" -gt 0 ]; then
   
   cd "$PROJECT_DIR"
   
-  if node scripts/populate_securities_metadata.js --all >> "$SETUP_LOG" 2>> "$ERROR_LOG"; then
+  if node scripts/populate/populate_securities_metadata.js --all >> "$SETUP_LOG" 2>> "$ERROR_LOG"; then
     log_success "✓ Metadata population completed"
     
     # Check how many were populated
@@ -235,7 +235,7 @@ if [ "$POPULATE_POPULAR" = true ]; then
   
   cd "$PROJECT_DIR"
   
-  if node scripts/populate_popular_securities.js --all >> "$SETUP_LOG" 2>> "$ERROR_LOG"; then
+  if node scripts/populate/populate_popular_securities.js --all >> "$SETUP_LOG" 2>> "$ERROR_LOG"; then
     log_success "✓ Popular securities population completed"
   else
     log_error "✗ Popular securities population failed"
@@ -245,7 +245,7 @@ if [ "$POPULATE_POPULAR" = true ]; then
 else
   log_info "Step 6: Skipping popular securities population"
   log "  To populate later, run:"
-  log "    node scripts/populate_popular_securities.js --all"
+  log "    node scripts/populate/populate_popular_securities.js --all"
 fi
 
 log ""
