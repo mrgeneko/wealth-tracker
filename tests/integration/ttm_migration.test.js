@@ -72,11 +72,11 @@ async function main() {
 
   // Run backfill to compute adjusted_dividend_amount
   console.log('\n[TEST] Running backfill_adjusted_dividends.js --symbol=TTMTEST --apply');
-  await runScript('node', ['scripts/backfill_adjusted_dividends.js', '--symbol=TTMTEST', '--apply']);
+  await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=TTMTEST', '--apply']);
 
   // Now recompute TTM
   console.log('\n[TEST] Running recompute_ttm.js --symbol=TTMTEST --apply');
-  await runScript('node', ['scripts/recompute_ttm.js', '--symbol=TTMTEST', '--apply']);
+  await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTMTEST', '--apply']);
 
   // Verify results
   const [metaRows] = await conn.execute('SELECT ttm_dividend_amount, ttm_eps, ttm_last_calculated_at FROM securities_metadata WHERE symbol = ?', [sym]);

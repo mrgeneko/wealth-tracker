@@ -81,8 +81,8 @@ async function checkIfMetadataExists(connection, symbol) {
 async function fetchMetadataForSymbol(symbol) {
     try {
         const { stdout, stderr } = await execPromise(
-            `node scripts/populate_securities_metadata.js --symbol ${symbol}`,
-            { cwd: path.join(__dirname, '..'), timeout: 10000 }
+            `node scripts/populate/populate_securities_metadata.js --symbol ${symbol}`,
+            { cwd: path.join(__dirname, '../..'), timeout: 10000 }
         );
         return { success: true, output: stdout };
     } catch (error) {

@@ -24,7 +24,7 @@ async function getDbConnection() {
 async function fetchMetadataForSymbol(symbol) {
     try {
         const { stdout, stderr } = await execPromise(
-            `node scripts/populate_securities_metadata.js --symbol ${symbol}`,
+            `node scripts/populate/populate_securities_metadata.js --symbol ${symbol}`,
             { cwd: __dirname + '/..' }
         );
         return { success: true, output: stdout };
