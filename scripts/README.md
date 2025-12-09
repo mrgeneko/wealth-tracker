@@ -117,8 +117,13 @@ node scripts/utilities/debug_schema.js
 ## Notes
 
 - **Python Files**: `pyproject.toml` and `requirements.txt` are legacy from Python prototyping. The project is now Node.js-based.
-- **Migration Archives**: One-time backfill scripts like `backfill_adjusted_eps.js` have been moved to `migrations/archive/` with completion dates documented.
+- **Migration Archives**: One-time backfill scripts have been moved to `archive/` with detailed documentation in `archive/MIGRATIONS_COMPLETED.md`.
+- **Archive Structure**: 
+  - `archive/` - Completed migrations and historical backfills
+  - `archive/experimental/` - Incomplete experimental features (do not use)
+  - See `archive/ARCHIVE_README.md` for detailed context
 - **Development Scripts**: Scripts in `utilities/` are for local debugging and development. They are not part of production workflows.
+- **Canonical Populate Script**: Always use `scripts/populate/populate_securities_metadata.js` for metadata population. Other populate variants are experimental/incomplete.
 
 ---
 
