@@ -4,6 +4,10 @@
  * 1. MySQL running with proper schema
  * 2. Environment variables set (MYSQL_HOST, MYSQL_USER, etc.)
  * 3. NODE_ENV=test to prevent server auto-start
+ * 
+ * NOTE: This file should NOT be included in Jest unit tests.
+ * It is meant to run only as part of the integration test suite via CI.
+ * Jest is configured to exclude integration tests (see jest.config.js).
  */
 
 // Set test env before importing server
