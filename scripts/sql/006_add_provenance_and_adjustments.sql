@@ -1,20 +1,48 @@
 -- Migration: Add provenance columns and adjusted_dividend_amount + security_splits
 -- Date: 2025-12-08
+-- Note: Uses stored procedure to handle IF NOT EXISTS for older MySQL versions
 
--- Non-destructive: add provenance columns to dividends and earnings
-ALTER TABLE securities_dividends
-  ADD COLUMN IF NOT EXISTS source_event_id VARCHAR(255) NULL,
-  ADD COLUMN IF NOT EXISTS source_name VARCHAR(100) NULL,
-  ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMP NULL,
-  ADD COLUMN IF NOT EXISTS adjusted_dividend_amount DECIMAL(12,6) NULL;
+DELIMITER //
 
-ALTER TABLE securities_earnings
-  ADD COLUMN IF NOT EXISTS source_event_id VARCHAR(255) NULL,
-  ADD COLUMN IF NOT EXISTS source_name VARCHAR(100) NULL,
-  ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMP NULL;
+DROP PROCEDURE IF EXISTS add_provenance_columns//
 
-ALTER TABLE securities_metadata
-  ADD COLUMN IF NOT EXISTS ttm_last_calculated_at DATETIME NULL;
+CREATE PROCEDURE add_provenance_columns()
+BEGIN
+    -- securities_dividends columns
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_dividends' AND column_name = 'source_event_id') THEN
+        ALTER TABLE securities_dividends ADD COLUMN source_event_id VARCHAR(255) NULL;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_dividends' AND column_name = 'source_name') THEN
+        ALTER TABLE securities_dividends ADD COLUMN source_name VARCHAR(100) NULL;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_dividends' AND column_name = 'ingested_at') THEN
+        ALTER TABLE securities_dividends ADD COLUMN ingested_at TIMESTAMP NULL;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_dividends' AND column_name = 'adjusted_dividend_amount') THEN
+        ALTER TABLE securities_dividends ADD COLUMN adjusted_dividend_amount DECIMAL(12,6) NULL;
+    END IF;
+
+    -- securities_earnings columns
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_earnings' AND column_name = 'source_event_id') THEN
+        ALTER TABLE securities_earnings ADD COLUMN source_event_id VARCHAR(255) NULL;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_earnings' AND column_name = 'source_name') THEN
+        ALTER TABLE securities_earnings ADD COLUMN source_name VARCHAR(100) NULL;
+    END IF;
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_earnings' AND column_name = 'ingested_at') THEN
+        ALTER TABLE securities_earnings ADD COLUMN ingested_at TIMESTAMP NULL;
+    END IF;
+
+    -- securities_metadata column
+    IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'securities_metadata' AND column_name = 'ttm_last_calculated_at') THEN
+        ALTER TABLE securities_metadata ADD COLUMN ttm_last_calculated_at DATETIME NULL;
+    END IF;
+END//
+
+DELIMITER ;
+
+CALL add_provenance_columns();
+DROP PROCEDURE IF EXISTS add_provenance_columns;
 
 -- Track corporate splits separately so we can compute adjusted_dividend_amount
 CREATE TABLE IF NOT EXISTS security_splits (
