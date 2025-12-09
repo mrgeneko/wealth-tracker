@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dashboard_integration.test" tests="1" failures="0" time="0.879">
+  <testcase classname="integration" name="dashboard_integration.test.js" time="0.879">
+    
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[Test Suites: 1 skipped, 0 of 1 total
+Tests:       2 skipped, 2 total
+Snapshots:   0 total
+Time:        0.166 s, estimated 1 s
+Ran all test suites matching /tests\/integration\/dashboard_integration.test.js/i.
+]]></system-err>
+  </testcase>
+</testsuite>
