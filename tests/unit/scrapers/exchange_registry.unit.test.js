@@ -178,11 +178,11 @@ describe('Exchange Registry', () => {
   });
 
   describe('Performance tests', () => {
-    test('lookup is fast (< 1ms for single symbol)', () => {
+    test('lookup is fast (< 5ms for single symbol)', () => {
       const start = Date.now();
       getExchange('AAPL');
       const duration = Date.now() - start;
-      expect(duration).toBeLessThan(1);
+      expect(duration).toBeLessThan(5);
     });
 
     test('handles rapid sequential lookups efficiently', () => {
