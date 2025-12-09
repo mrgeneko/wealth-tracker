@@ -20,7 +20,9 @@ function parseArg(name, defaultValue) {
   fs.mkdirSync(outDir, { recursive: true });
 
   // find test files ending in .js in testsDir
-  const files = fs.readdirSync(testsDir).filter(f => f.endsWith('.js'));
+  // Skip dashboard_integration.test.js as it's a Jest test meant to run via npm test
+  const files = fs.readdirSync(testsDir)
+    .filter(f => f.endsWith('.js') && f !== 'dashboard_integration.test.js');
   if (!files.length) {
     console.error('No integration tests found in', testsDir);
     process.exit(1);
