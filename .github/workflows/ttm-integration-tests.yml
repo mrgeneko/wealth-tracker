@@ -1,0 +1,142 @@
+name: TTM Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Required for dorny/test-reporter to create check runs
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testdb
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: |
+          cd dashboard && npm ci
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot -e 'SELECT 1' && break || sleep 2
+          done
+
+      - name: Create base schema (accounts, positions, fixed_assets)
+        run: |
+          echo "Creating base tables for CI testing..."
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE << 'EOF'
+          CREATE TABLE IF NOT EXISTS accounts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(50),
+            category VARCHAR(50) DEFAULT 'investment',
+            currency VARCHAR(10) DEFAULT 'USD',
+            display_order INT DEFAULT 0
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+          CREATE TABLE IF NOT EXISTS positions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            account_id INT NOT NULL,
+            symbol VARCHAR(50) NOT NULL,
+            quantity DECIMAL(18,8) NOT NULL DEFAULT 0,
+            cost_basis DECIMAL(18,8),
+            type VARCHAR(50) DEFAULT 'stock',
+            currency VARCHAR(10) DEFAULT 'USD',
+            normalized_key VARCHAR(128),
+            metadata_symbol VARCHAR(50),
+            INDEX idx_positions_account (account_id),
+            INDEX idx_positions_symbol (symbol)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+          CREATE TABLE IF NOT EXISTS fixed_assets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(50),
+            value DECIMAL(18,2),
+            currency VARCHAR(10) DEFAULT 'USD',
+            display_order INT DEFAULT 0
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+          -- Insert a test account for CI
+          INSERT INTO accounts (id, name, type, category) VALUES (1, 'Test Account', 'brokerage', 'investment')
+          ON DUPLICATE KEY UPDATE name = VALUES(name);
+          EOF
+
+      - name: Apply SQL migrations
+        run: |
+          echo "Applying SQL migrations from scripts/sql"
+          for f in $(ls -1 scripts/sql/*.sql | sort); do
+            echo "-> applying $f"
+            if ! mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE < "$f" 2>&1; then
+              echo "   Warning: Migration $f had errors (may be expected for IF NOT EXISTS)"
+            fi
+          done
+          echo ""
+          echo "Verifying key tables and columns exist..."
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE -e "SHOW TABLES;"
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE -e "DESCRIBE securities_metadata;" || true
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u root -proot $MYSQL_DATABASE -e "DESCRIBE security_splits;" || echo "WARNING: security_splits table missing!"
+
+      - name: Run integration tests and produce JUnit XML
+        run: |
+          mkdir -p artifacts/test-results
+          node scripts/ci/run_tests_with_junit.js --outdir=artifacts/test-results --testsdir=tests/integration
+
+      - name: Upload test results artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ttm-integration-test-results
+          path: artifacts/test-results/
+
+      - name: Publish test results (JUnit)
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: TTM integration tests
+          path: artifacts/test-results/*.xml
+          reporter: java-junit
+          fail-on-error: true

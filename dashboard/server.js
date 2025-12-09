@@ -367,10 +367,13 @@ async function loadAssets() {
     }
 }
 
-// Poll assets every 30 seconds
-setInterval(loadAssets, 30000);
-// Initial load
-loadAssets();
+// Poll assets every 30 seconds (skip in test mode)
+let assetsPollingInterval = null;
+if (process.env.NODE_ENV !== 'test') {
+    assetsPollingInterval = setInterval(loadAssets, 30000);
+    // Initial load
+    loadAssets();
+}
 
 // Helper to update cache from price data object
 // Supports extended hours pricing (pre-market, after-hours)
@@ -923,4 +926,4 @@ if (isMainModule || !isTestEnv) {
     })();
 }
 
-module.exports = { app, server, pool };
+module.exports = { app, server, pool, assetsPollingInterval };
