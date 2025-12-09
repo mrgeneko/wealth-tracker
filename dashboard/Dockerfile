@@ -7,6 +7,7 @@ RUN npm install
 
 COPY dashboard/ .
 COPY api/ /api/
+COPY services/ /services/
 
 ENV NODE_PATH=/app/node_modules
 

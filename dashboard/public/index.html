@@ -461,12 +461,25 @@
         .settings-content {
             max-height: 60vh;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .settings-section {
             margin-bottom: 25px;
             padding-bottom: 15px;
             border-bottom: 1px solid #444;
+        }
+
+        /* Statistics table inside settings - reset global table styles */
+        #metadataStats table {
+            background: transparent;
+            box-shadow: none;
+            margin-bottom: 0;
+        }
+        
+        #metadataStats td {
+            border: none;
+            padding: 4px 0;
         }
 
         .settings-section:last-child {
@@ -791,27 +804,25 @@
                     
                     <!-- Metadata Statistics -->
                     <div id="metadataStats" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-                        <p style="margin: 0; font-size: 0.9em; color: #aaa;">Statistics (auto-updating)</p>
-                        <table style="width: 100%; font-size: 0.85em; margin-top: 8px;">
-                            <tbody>
-                                <tr style="border-bottom: 1px solid #444;">
-                                    <td style="text-align: left; padding: 4px 0;">Total Symbols</td>
-                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-total">0</span></td>
-                                </tr>
-                                <tr style="border-bottom: 1px solid #444;">
-                                    <td style="text-align: left; padding: 4px 0;">With Metadata</td>
-                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-with">0</span></td>
-                                </tr>
-                                <tr style="border-bottom: 1px solid #444;">
-                                    <td style="text-align: left; padding: 4px 0;">Without Metadata</td>
-                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-without">0</span></td>
-                                </tr>
-                                <tr>
-                                    <td style="text-align: left; padding: 4px 0; font-weight: bold;">Completion</td>
-                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-completion">0</span>%</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa;">Statistics (auto-updating)</p>
+                        <div style="font-size: 0.85em;">
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Total</span>
+                                <span id="stat-total" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">With Data</span>
+                                <span id="stat-with" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Without Data</span>
+                                <span id="stat-without" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                <span style="color: #e0e0e0; font-weight: bold;">Complete %</span>
+                                <span style="color: #fff; font-weight: bold;"><span id="stat-completion">0</span>%</span>
+                            </div>
+                        </div>
                     </div>
                     <p id="metadataStatus" style="font-size: 0.85em; color: #aaa; margin-top: 8px;"></p>
                 </div>
@@ -2717,17 +2728,48 @@
          */
         async function updateMetadataStats() {
             try {
+                console.log('[updateMetadataStats] Fetching statistics...');
                 const response = await fetch('/api/autocomplete/stats');
-                if (!response.ok) throw new Error('Failed to fetch stats');
+                console.log('[updateMetadataStats] Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
                 
                 const data = await response.json();
+                console.log('[updateMetadataStats] Data received:', data);
+                
                 const summary = data.summary || {};
                 
                 // Update statistics display
-                document.getElementById('stat-total').textContent = summary.total_symbols || 0;
-                document.getElementById('stat-with').textContent = summary.with_metadata || 0;
-                document.getElementById('stat-without').textContent = summary.without_metadata || 0;
-                document.getElementById('stat-completion').textContent = (summary.completion_percentage || 0).toFixed(1);
+                const totalElement = document.getElementById('stat-total');
+                const withElement = document.getElementById('stat-with');
+                const withoutElement = document.getElementById('stat-without');
+                const completionElement = document.getElementById('stat-completion');
+                
+                const totalValue = summary.total_symbols || 0;
+                const withValue = summary.with_metadata || 0;
+                const withoutValue = summary.without_metadata || 0;
+                const completionValue = (summary.completion_percentage || 0).toFixed(1);
+                
+                console.log('[updateMetadataStats] Setting values:', { totalValue, withValue, withoutValue, completionValue });
+                
+                if (totalElement) {
+                    totalElement.textContent = totalValue;
+                    console.log('[updateMetadataStats] stat-total element text set to:', totalElement.textContent);
+                }
+                if (withElement) {
+                    withElement.textContent = withValue;
+                    console.log('[updateMetadataStats] stat-with element text set to:', withElement.textContent);
+                }
+                if (withoutElement) {
+                    withoutElement.textContent = withoutValue;
+                    console.log('[updateMetadataStats] stat-without element text set to:', withoutElement.textContent);
+                }
+                if (completionElement) {
+                    completionElement.textContent = completionValue;
+                    console.log('[updateMetadataStats] stat-completion element text set to:', completionElement.textContent);
+                }
                 
                 // Update status message
                 const completion = summary.completion_percentage || 0;
@@ -2741,11 +2783,16 @@
                 } else {
                     statusMsg = '⏳ Starting metadata population...';
                 }
-                document.getElementById('metadataStatus').textContent = statusMsg;
+                const statusElement = document.getElementById('metadataStatus');
+                if (statusElement) statusElement.textContent = statusMsg;
+                console.log('[updateMetadataStats] Status set to:', statusMsg);
                 
             } catch (error) {
-                console.error('Error updating metadata stats:', error);
-                document.getElementById('metadataStatus').textContent = '⚠️ Could not load statistics';
+                console.error('[updateMetadataStats] Error:', error.message);
+                const statusElement = document.getElementById('metadataStatus');
+                if (statusElement) {
+                    statusElement.textContent = '⚠️ Could not load statistics: ' + error.message;
+                }
             }
         }
 
