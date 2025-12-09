@@ -258,14 +258,14 @@ class MetadataAutocompleteService {
             connection = await this.pool.getConnection();
 
             const [results] = await connection.execute(`
-                SELECT ticker
+                SELECT symbol
                 FROM symbol_registry
-                WHERE metadata_fetched = 0
-                ORDER BY display_name ASC
+                WHERE has_yahoo_metadata = 0
+                ORDER BY symbol ASC
                 LIMIT ?
             `, [limit]);
 
-            return results.map(row => row.ticker);
+            return results.map(row => row.symbol);
         } catch (error) {
             console.error(`Error getting symbols needing metadata: ${error.message}`);
             throw error;
@@ -289,9 +289,9 @@ class MetadataAutocompleteService {
 
             await connection.execute(`
                 UPDATE symbol_registry
-                SET metadata_fetched = 1,
-                    metadata_updated_at = NOW()
-                WHERE ticker = ?
+                SET has_yahoo_metadata = 1,
+                    updated_at = NOW()
+                WHERE symbol = ?
             `, [normalizedSymbol]);
 
             return true;
@@ -312,55 +312,63 @@ class MetadataAutocompleteService {
     async getStatistics() {
         let connection;
         try {
+            console.log('[getStatistics] Requesting connection from pool...');
             connection = await this.pool.getConnection();
+            console.log('[getStatistics] Connection acquired');
 
             // Get overall stats
+            console.log('[getStatistics] Executing summary query...');
             const [registry] = await connection.execute(`
                 SELECT 
                     COUNT(*) as total_symbols,
-                    SUM(CASE WHEN metadata_fetched = 1 THEN 1 ELSE 0 END) as with_metadata,
-                    MAX(metadata_updated_at) as last_update
+                    SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
+                    MAX(updated_at) as last_update
                 FROM symbol_registry
             `);
+            console.log('[getStatistics] Summary query complete:', registry[0]);
 
             // Get by type
+            console.log('[getStatistics] Executing by-type query...');
             const [byType] = await connection.execute(`
                 SELECT 
                     security_type,
                     COUNT(*) as count,
-                    SUM(CASE WHEN metadata_fetched = 1 THEN 1 ELSE 0 END) as with_metadata
+                    SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata
                 FROM symbol_registry
                 GROUP BY security_type
                 ORDER BY count DESC
             `);
+            console.log('[getStatistics] By-type query complete, rows:', byType.length);
 
             const stats = registry[0];
             const totalSymbols = stats.total_symbols || 0;
             const withMetadata = stats.with_metadata || 0;
             const completion = totalSymbols > 0 ? Math.round((withMetadata / totalSymbols) * 100) : 0;
 
-            return {
+            const result = {
                 summary: {
-                    total: totalSymbols,
-                    completed: withMetadata,
-                    pending: totalSymbols - withMetadata,
-                    completionPercentage: completion,
-                    lastUpdate: stats.last_update
+                    total_symbols: totalSymbols,
+                    with_metadata: withMetadata,
+                    without_metadata: totalSymbols - withMetadata,
+                    completion_percentage: completion,
+                    last_update: stats.last_update
                 },
                 byType: byType.map(row => ({
                     type: row.security_type,
                     total: row.count,
-                    completed: row.with_metadata,
-                    pending: row.count - row.with_metadata,
+                    with_metadata: row.with_metadata,
+                    without_metadata: row.count - row.with_metadata,
                     percentage: row.count > 0 ? Math.round((row.with_metadata / row.count) * 100) : 0
                 }))
             };
+            console.log('[getStatistics] Returning result');
+            return result;
         } catch (error) {
             console.error(`Error getting statistics: ${error.message}`);
             throw error;
         } finally {
             if (connection) {
-                await connection.end();
+                await connection.release();
             }
         }
     }
@@ -376,12 +384,12 @@ class MetadataAutocompleteService {
         try {
             connection = await this.pool.getConnection();
 
-            // Reset metadata_fetched flag to trigger re-fetch
+            // Reset has_yahoo_metadata flag to trigger re-fetch
             await connection.execute(`
                 UPDATE symbol_registry
-                SET metadata_fetched = 0,
-                    metadata_updated_at = NULL
-                WHERE ticker = ?
+                SET has_yahoo_metadata = 0,
+                    updated_at = NOW()
+                WHERE symbol = ?
             `, [normalizedSymbol]);
 
             // Also clear old metadata
