@@ -7,5 +7,6 @@
 module.exports = {
   SymbolRegistryService: require('./symbol_registry_service'),
   TreasuryDataHandler: require('./treasury_data_handler'),
-  FileRefreshManager: require('./file_refresh_manager')
+  FileRefreshManager: require('./file_refresh_manager'),
+  SymbolRegistrySyncService: require('./symbol_registry_sync')
 };
