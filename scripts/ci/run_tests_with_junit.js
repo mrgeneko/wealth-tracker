@@ -33,8 +33,12 @@ function parseArg(name, defaultValue) {
 
     const start = Date.now();
     // Some tests are written for Jest (use describe/test/expect). Detect those and run via jest.
+    // Look for Jest-style top-level describe() or test() calls, not method definitions
     const content = fs.readFileSync(scriptPath, 'utf8');
-    const usesJest = /\bdescribe\(|\btest\(|\bexpect\(/.test(content);
+    // More precise detection: look for `describe('` or `test('` or `it('` at statement level
+    // Also check for require('supertest') which is a good Jest test indicator
+    const usesJest = /^describe\s*\(|^test\s*\(|^it\s*\(/m.test(content) ||
+                     /require\s*\(\s*['"]supertest['"]\s*\)/.test(content);
     const child = usesJest
       ? spawn('npx', ['jest', '--runInBand', '--testTimeout=60000', scriptPath], { env: process.env })
       : spawn('node', [scriptPath], { env: process.env });
@@ -45,7 +49,16 @@ function parseArg(name, defaultValue) {
     child.stdout.on('data', d => { process.stdout.write(d); stdout += d; });
     child.stderr.on('data', d => { process.stderr.write(d); stderr += d; });
 
+    // Print a heartbeat every 15s while the test is running so CI logs show progress
+    const startTime = Date.now();
+    const heartbeatMs = 15000; // 15 seconds
+    const hb = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[progress] ${scriptPath} still running (${elapsed}s elapsed)`);
+    }, heartbeatMs);
+
     const code = await new Promise(resolve => child.on('exit', resolve));
+    clearInterval(hb);
     const duration = (Date.now() - start) / 1000.0;
 
     const testName = path.basename(file, '.js');

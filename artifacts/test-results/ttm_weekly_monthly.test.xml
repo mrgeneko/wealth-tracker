@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ttm_weekly_monthly.test" tests="1" failures="0" time="0.349">
+  <testcase classname="integration" name="ttm_weekly_monthly.test.js" time="0.349">
+    
+    <system-out><![CDATA[Running weekly dividend TTM test
+Updated TTM_WEEKLY: ttm_dividend_amount=1.04 ttm_eps=null
+TTM recompute complete.
+[OK] Weekly dividend TTM validated for TTM_WEEKLY expected=1.04 got=1.04
+Running monthly dividend TTM test
+[APPLY] Backfill adjusted_dividend_amount
+Found 13 dividend rows to process
+Updated id=728 adjusted=0.100000
+Updated id=727 adjusted=0.100000
+Updated id=726 adjusted=0.100000
+Updated id=725 adjusted=0.100000
+Updated id=724 adjusted=0.100000
+Updated id=723 adjusted=0.100000
+Updated id=722 adjusted=0.100000
+Updated id=721 adjusted=0.100000
+Updated id=720 adjusted=0.100000
+Updated id=719 adjusted=0.100000
+Updated id=718 adjusted=0.100000
+Updated id=729 adjusted=5.000000
+Updated id=717 adjusted=0.100000
+Backfill complete.
+Updated TTM_MONTHLY: ttm_dividend_amount=1.2 ttm_eps=null
+TTM recompute complete.
+[OK] Monthly dividend TTM validated for TTM_MONTHLY expected=1.2000000000000002 got=1.2
+
+All TTM weekly/monthly tests passed
+]]></system-out>
+    <system-err><![CDATA[(node:60217) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+]]></system-err>
+  </testcase>
+</testsuite>
