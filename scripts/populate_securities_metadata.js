@@ -173,10 +173,12 @@ async function upsertSecurityMetadata(connection, symbol, data) {
         long_name: quoteType.longName || price.longName,
 
         // Sector may appear in different parts of the yahoo-finance2 response
-        // (summaryProfile, assetProfile, summaryDetail). Try useful candidates
+        // (summaryProfile, assetProfile, summaryDetail, price). Try useful candidates
         // in order of likelihood.
-        sector: (summaryDetail && (summaryDetail.sector || summaryDetail.summaryProfile?.sector || summaryDetail.assetProfile?.sector))
-            || (price && (price.sector || price.summaryProfile?.sector || price.assetProfile?.sector)) || null,
+        sector: (data.assetProfile && data.assetProfile.sector)
+            || (data.summaryProfile && data.summaryProfile.sector)
+            || (summaryDetail && summaryDetail.sector)
+            || (price && price.sector) || null,
         industry: summaryDetail.industry || price.industry,
 
         region: price.region,
