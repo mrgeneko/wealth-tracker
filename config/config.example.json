@@ -217,6 +217,7 @@
     "has_bond_prices": false,
     "has_stock_prices": true,
     "has_previous_close": true,
+    "enabled": false,
     "update_rules": [
       {
         "key": "BKLC",
