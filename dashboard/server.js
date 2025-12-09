@@ -150,6 +150,10 @@ const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'testdb';
 const metadataRouter = require('../api/metadata');
 app.use('/api/metadata', metadataRouter);
 
+// Mount Autocomplete API (will be initialized after pool is created)
+const { router: autocompleteRouter } = require('../api/autocomplete');
+app.use('/api/autocomplete', autocompleteRouter);
+
 app.use(cors());
 // Disable caching for static files (Debugging purposes)
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -227,6 +231,10 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+// Initialize the autocomplete API with the pool
+const { initializePool } = require('../api/autocomplete');
+initializePool(pool);
 
 // Self-healing: Ensure new columns exist
 async function ensureSchema() {
