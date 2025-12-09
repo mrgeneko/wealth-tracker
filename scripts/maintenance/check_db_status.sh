@@ -47,7 +47,7 @@ else
   if [ "$LINKED" = "0" ]; then
     echo ""
     echo "Next step: Populate metadata"
-    echo "  node scripts/populate_securities_metadata.js --all"
+    echo "  node scripts/populate/populate_securities_metadata.js --all"
   fi
 fi
 
