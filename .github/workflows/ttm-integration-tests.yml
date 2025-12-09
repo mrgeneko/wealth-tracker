@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+# Required for dorny/test-reporter to create check runs
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
