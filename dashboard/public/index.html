@@ -778,6 +778,45 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>Symbol Registry Management</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Manage metadata population and refresh cycles</p>
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                        <button class="btn btn-primary" id="btnRefreshMetadata" onclick="refreshMetadata()" style="text-align: left;">
+                            🔄 Refresh Yahoo Metadata
+                        </button>
+                        <button class="btn btn-primary" id="btnCleanupExpired" onclick="cleanupExpired()" style="text-align: left;">
+                            🗑️ Cleanup Expired Securities
+                        </button>
+                    </div>
+                    
+                    <!-- Metadata Statistics -->
+                    <div id="metadataStats" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p style="margin: 0; font-size: 0.9em; color: #aaa;">Statistics (auto-updating)</p>
+                        <table style="width: 100%; font-size: 0.85em; margin-top: 8px;">
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #444;">
+                                    <td style="text-align: left; padding: 4px 0;">Total Symbols</td>
+                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-total">0</span></td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #444;">
+                                    <td style="text-align: left; padding: 4px 0;">With Metadata</td>
+                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-with">0</span></td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #444;">
+                                    <td style="text-align: left; padding: 4px 0;">Without Metadata</td>
+                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-without">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: left; padding: 4px 0; font-weight: bold;">Completion</td>
+                                    <td style="text-align: right; padding: 4px 0;"><span id="stat-completion">0</span>%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p id="metadataStatus" style="font-size: 0.85em; color: #aaa; margin-top: 8px;"></p>
+                </div>
+
+                <div class="settings-section">
                     <h3>System</h3>
                     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <button class="btn btn-primary" onclick="exportData()">Export Data</button>
@@ -837,9 +876,39 @@
             <form id="addSymbolForm">
                 <div class="form-group">
                     <label for="newSymbol">Symbol</label>
-                    <input type="text" id="newSymbol" required maxlength="50" style="text-transform:uppercase;"
-                        class="awesomplete" autocomplete="off">
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="newSymbol" required maxlength="50" style="text-transform:uppercase; flex: 1;"
+                            class="awesomplete" autocomplete="off" onchange="lookupSymbolMetadata()">
+                        <button type="button" class="btn btn-primary" id="btnLookupSymbol" onclick="lookupSymbolMetadata()" style="padding: 8px 12px;">🔍</button>
+                    </div>
+                    <p id="symbolLookupStatus" style="font-size: 0.85em; color: #aaa; margin-top: 5px; display: none;"></p>
                 </div>
+                
+                <!-- Symbol Metadata Display (Phase 7) -->
+                <div id="symbolMetadataDisplay" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none;">
+                    <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #888;">Symbol Information</p>
+                    <table style="width: 100%; font-size: 0.85em;">
+                        <tbody>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <td style="padding: 4px 0; color: #aaa;">Name:</td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataName">—</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <td style="padding: 4px 0; color: #aaa;">Type:</td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataType">—</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <td style="padding: 4px 0; color: #aaa;">Exchange:</td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataExchange">—</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; color: #aaa;">Verified:</td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataVerified">✓</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
                 <div class="form-group">
                     <label for="newSymbolType">Type</label>
                     <select id="newSymbolType">
@@ -2509,6 +2578,9 @@
             document.getElementById('autoRefresh').checked = autoRefresh;
             document.getElementById('refreshInterval').value = refreshInterval;
             document.getElementById('theme').value = theme;
+            
+            // Phase 7: Update metadata stats when modal opens
+            updateMetadataStats();
         }
 
         function saveSettings() {
@@ -2637,6 +2709,185 @@
                 location.reload();
             }
         }
+
+        // ========== PHASE 7: DASHBOARD INTEGRATION FUNCTIONS ==========
+
+        /**
+         * Fetch and display metadata statistics from the API
+         */
+        async function updateMetadataStats() {
+            try {
+                const response = await fetch('/api/autocomplete/stats');
+                if (!response.ok) throw new Error('Failed to fetch stats');
+                
+                const data = await response.json();
+                const summary = data.summary || {};
+                
+                // Update statistics display
+                document.getElementById('stat-total').textContent = summary.total_symbols || 0;
+                document.getElementById('stat-with').textContent = summary.with_metadata || 0;
+                document.getElementById('stat-without').textContent = summary.without_metadata || 0;
+                document.getElementById('stat-completion').textContent = (summary.completion_percentage || 0).toFixed(1);
+                
+                // Update status message
+                const completion = summary.completion_percentage || 0;
+                let statusMsg = '';
+                if (completion >= 95) {
+                    statusMsg = '✅ Metadata population nearly complete!';
+                } else if (completion >= 80) {
+                    statusMsg = '📊 Metadata population in progress...';
+                } else if (completion >= 50) {
+                    statusMsg = '🔄 Metadata population in progress...';
+                } else {
+                    statusMsg = '⏳ Starting metadata population...';
+                }
+                document.getElementById('metadataStatus').textContent = statusMsg;
+                
+            } catch (error) {
+                console.error('Error updating metadata stats:', error);
+                document.getElementById('metadataStatus').textContent = '⚠️ Could not load statistics';
+            }
+        }
+
+        /**
+         * Trigger metadata refresh for all symbols
+         */
+        async function refreshMetadata() {
+            const btn = document.getElementById('btnRefreshMetadata');
+            const originalText = btn.textContent;
+            
+            try {
+                btn.disabled = true;
+                btn.textContent = '⏳ Refreshing metadata...';
+                
+                // Call API to get pending symbols and mark them for refresh
+                const pendingResponse = await fetch('/api/autocomplete/pending?limit=100');
+                if (!pendingResponse.ok) throw new Error('Failed to get pending symbols');
+                
+                const pendingData = await pendingResponse.json();
+                const symbols = pendingData.pending || [];
+                
+                if (symbols.length === 0) {
+                    alert('✅ All symbols have metadata! No refresh needed.');
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+                
+                // Bulk refresh the pending symbols
+                const refreshResponse = await fetch('/api/autocomplete/bulk-refresh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols })
+                });
+                
+                if (!refreshResponse.ok) throw new Error('Failed to refresh metadata');
+                
+                const refreshData = await refreshResponse.json();
+                alert(`✅ Queued ${refreshData.symbols_refreshed} symbols for metadata refresh!`);
+                
+                // Update stats immediately
+                await updateMetadataStats();
+                
+            } catch (error) {
+                console.error('Error refreshing metadata:', error);
+                alert('❌ Error refreshing metadata: ' + error.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        /**
+         * Trigger cleanup of expired securities
+         */
+        async function cleanupExpired() {
+            const btn = document.getElementById('btnCleanupExpired');
+            const originalText = btn.textContent;
+            
+            if (!confirm('Are you sure you want to clean up expired securities? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                btn.disabled = true;
+                btn.textContent = '⏳ Cleaning up...';
+                
+                // In a real implementation, this would call an API endpoint
+                // For now, we'll just show a message
+                alert('⚠️ Cleanup feature coming soon (Phase 8)');
+                
+            } catch (error) {
+                console.error('Error during cleanup:', error);
+                alert('❌ Error during cleanup: ' + error.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        /**
+         * Lookup symbol metadata from autocomplete API (Phase 7)
+         */
+        async function lookupSymbolMetadata() {
+            const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+            const statusEl = document.getElementById('symbolLookupStatus');
+            const displayEl = document.getElementById('symbolMetadataDisplay');
+            const btn = document.getElementById('btnLookupSymbol');
+            
+            // Clear previous status
+            statusEl.style.display = 'none';
+            displayEl.style.display = 'none';
+            
+            if (!symbol) {
+                return;
+            }
+            
+            try {
+                btn.disabled = true;
+                statusEl.textContent = '🔍 Checking symbol...';
+                statusEl.style.display = 'block';
+                
+                const response = await fetch(`/api/autocomplete/details/${symbol}`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        statusEl.textContent = '⚠️ Symbol not recognized. Will add as new stock.';
+                        displayEl.style.display = 'none';
+                    } else {
+                        statusEl.textContent = '❌ Error checking symbol.';
+                    }
+                    statusEl.style.display = 'block';
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Populate metadata display
+                document.getElementById('symbolMetadataName').textContent = data.name || '—';
+                document.getElementById('symbolMetadataType').textContent = (data.type || 'STOCK').toUpperCase();
+                document.getElementById('symbolMetadataExchange').textContent = data.exchange || '—';
+                document.getElementById('symbolMetadataVerified').textContent = data.verified ? '✅ Yes' : '⚠️ Unverified';
+                
+                // Update form with metadata
+                const typeMap = { 'STOCK': 'stock', 'ETF': 'etf', 'BOND': 'bond', 'CRYPTO': 'crypto' };
+                const typeValue = typeMap[data.type] || 'stock';
+                document.getElementById('newSymbolType').value = typeValue;
+                
+                displayEl.style.display = 'block';
+                statusEl.textContent = '✅ Symbol found! Metadata loaded.';
+                statusEl.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error looking up symbol:', error);
+                statusEl.textContent = '❌ Error: ' + error.message;
+                statusEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ========== END PHASE 7 ==========
 
         // Apply settings on page load
         document.addEventListener('DOMContentLoaded', function () {
