@@ -295,30 +295,37 @@ describe('SymbolRegistrySyncService', () => {
       const registryFormat = syncService.symbolToRegistryFormat(symbol);
 
       expect(registryFormat).toEqual({
-        ticker: 'AAPL',
+        symbol: 'AAPL',
         name: 'Apple Inc.',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',
         source: 'NASDAQ_FILE',
-        cusip: null,
         has_yahoo_metadata: false,
-        last_updated: expect.any(Date)
+        usd_trading_volume: null,
+        issue_date: null,
+        maturity_date: null,
+        security_term: null,
+        underlying_symbol: null,
+        strike_price: null,
+        option_type: null,
+        expiration_date: null
       });
     });
 
     test('should include cusip if provided', () => {
+      // For treasury securities, the CUSIP is used as the ticker/symbol
       const symbol = {
-        ticker: 'TEST',
+        ticker: '912797SE8',  // CUSIP is the ticker for treasury
         name: 'Test Treasury',
         exchange: 'TREASURY',
         security_type: 'TREASURY',
-        source: 'TREASURY_FILE',
-        cusip: '912797SE8'
+        source: 'TREASURY_FILE'
       };
 
       const registryFormat = syncService.symbolToRegistryFormat(symbol);
 
-      expect(registryFormat.cusip).toBe('912797SE8');
+      // CUSIP is stored in the symbol field
+      expect(registryFormat.symbol).toBe('912797SE8');
     });
   });
 
@@ -335,7 +342,7 @@ describe('SymbolRegistrySyncService', () => {
     test('should return existing symbol', async () => {
       const existingSymbol = {
         id: 1,
-        ticker: 'AAPL',
+        symbol: 'AAPL',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',
         source: 'NASDAQ_FILE',
@@ -356,7 +363,7 @@ describe('SymbolRegistrySyncService', () => {
 
       expect(result).toEqual(existingSymbol);
       expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, ticker'),
+        expect.stringContaining('SELECT id, symbol'),
         ['AAPL', 'NASDAQ', 'EQUITY']
       );
     });
@@ -381,12 +388,11 @@ describe('SymbolRegistrySyncService', () => {
       mockConnection.query.mockResolvedValue([{ insertId: 1 }, []]);
 
       const symbolData = {
-        ticker: 'AAPL',
+        symbol: 'AAPL',
         name: 'Apple Inc.',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',
         source: 'NASDAQ_FILE',
-        cusip: null,
         has_yahoo_metadata: false
       };
 
@@ -396,7 +402,7 @@ describe('SymbolRegistrySyncService', () => {
         expect.stringContaining('INSERT INTO symbol_registry'),
         expect.arrayContaining(['AAPL', 'Apple Inc.', 'NASDAQ', 'EQUITY', 'NASDAQ_FILE'])
       );
-      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', false, null);
+      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', false, undefined);
     });
 
     test('should calculate sort rank correctly', async () => {
@@ -404,18 +410,17 @@ describe('SymbolRegistrySyncService', () => {
       mockConnection.query.mockResolvedValue([{ insertId: 1 }, []]);
 
       const symbolData = {
-        ticker: 'TEST',
+        symbol: 'TEST',
         name: 'Test',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',
         source: 'NASDAQ_FILE',
-        cusip: null,
         has_yahoo_metadata: true
       };
 
       await syncService.insertSymbol(mockConnection, symbolData);
 
-      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', true, null);
+      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', true, undefined);
     });
   });
 
@@ -425,12 +430,11 @@ describe('SymbolRegistrySyncService', () => {
       mockConnection.query.mockResolvedValue([{ affectedRows: 1 }, []]);
 
       const symbolData = {
-        ticker: 'AAPL',
+        symbol: 'AAPL',
         name: 'Apple Inc.',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',
         source: 'NASDAQ_FILE',
-        cusip: null,
         has_yahoo_metadata: false
       };
 
