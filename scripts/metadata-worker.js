@@ -21,13 +21,64 @@ try {
 
 const mysql = require('mysql2/promise');
 const path = require('path');
+const fs = require('fs');
+
+// Log file configuration - use same directory as scrapers
+const LOG_DIR = process.env.LOG_DIR || '/usr/src/app/logs';
+let logFilePath = null;
+
+/**
+ * Get or create the log file path for this worker session
+ */
+function getLogFilePath() {
+    if (!logFilePath) {
+        // Create log directory if it doesn't exist
+        try {
+            if (!fs.existsSync(LOG_DIR)) {
+                fs.mkdirSync(LOG_DIR, { recursive: true });
+            }
+        } catch (e) {
+            // Fall back to current directory
+        }
+        
+        // Use date-based log file name
+        const date = new Date();
+        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        logFilePath = path.join(LOG_DIR, `metadata_worker.${dateStr}.log`);
+    }
+    return logFilePath;
+}
+
+/**
+ * Write log message to file
+ */
+function log(level, ...args) {
+    const timestamp = new Date().toISOString();
+    const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    const line = `${timestamp} [MetadataWorker:${level}] ${message}\n`;
+    
+    // Write to file
+    try {
+        fs.appendFileSync(getLogFilePath(), line);
+    } catch (e) {
+        // Fall back to console if file write fails
+        console.error('Log file write failed:', e.message);
+    }
+    
+    // Also write to console for Docker logs
+    if (level === 'ERROR') {
+        console.error(line.trim());
+    } else {
+        console.log(line.trim());
+    }
+}
 
 // Debug flag - set via environment variable
 const DEBUG = process.env.METADATA_WORKER_DEBUG === 'true' || process.env.DEBUG === 'true';
 
 function debug(...args) {
     if (DEBUG) {
-        console.log('[MetadataWorker:DEBUG]', new Date().toISOString(), ...args);
+        log('DEBUG', ...args);
     }
 }
 
@@ -52,7 +103,7 @@ try {
     });
     debug('yahoo-finance2 v3 loaded and instantiated successfully');
 } catch (e) {
-    console.warn('[MetadataWorker] yahoo-finance2 not available:', e.message);
+    log('WARN', 'yahoo-finance2 not available:', e.message);
 }
 
 /**
@@ -136,13 +187,13 @@ class MetadataWorker {
             processOnStartup: process.env.METADATA_WORKER_STARTUP !== 'false'
         };
         
-        console.log('[MetadataWorker] Configuration:', this.config);
+        log('INFO', 'Configuration:', this.config);
         
         // Handle graceful shutdown
         process.on('SIGTERM', () => this.gracefulShutdown('SIGTERM'));
         process.on('SIGINT', () => this.gracefulShutdown('SIGINT'));
         process.on('uncaughtException', (error) => {
-            console.error('[MetadataWorker] Uncaught exception:', error);
+            log('ERROR', 'Uncaught exception:', error);
             this.gracefulShutdown('uncaughtException');
         });
     }
@@ -151,7 +202,7 @@ class MetadataWorker {
      * Initialize database connection and services
      */
     async initialize() {
-        console.log('[MetadataWorker] Initializing...');
+        log('INFO', 'Initializing...');
         debug('DEBUG mode enabled - verbose logging active');
         
         try {
@@ -171,14 +222,14 @@ class MetadataWorker {
             
             this.dbPool = mysql.createPool(dbConfig);
             
-            console.log('[MetadataWorker] Database pool created');
+            log('INFO', 'Database pool created');
             
             // Test database connection
             const connection = await this.dbPool.getConnection();
             await connection.ping();
             connection.release();
             
-            console.log('[MetadataWorker] Database connection verified');
+            log('INFO', 'Database connection verified');
             
             // Initialize dependencies for YahooMetadataPopulator
             const symbolRegistryService = new SymbolRegistryService(this.dbPool);
@@ -194,11 +245,11 @@ class MetadataWorker {
                 yahooFinanceClient
             );
             
-            console.log('[MetadataWorker] YahooMetadataPopulator initialized');
+            log('INFO', 'YahooMetadataPopulator initialized');
             
             return true;
         } catch (error) {
-            console.error('[MetadataWorker] Initialization failed:', error);
+            log('ERROR', 'Initialization failed:', error);
             throw error;
         }
     }
@@ -226,7 +277,7 @@ class MetadataWorker {
      */
     async processBatch() {
         if (this.currentRunning) {
-            console.log('[MetadataWorker] Already processing, skipping...');
+            log('INFO', 'Already processing, skipping...');
             return { status: 'skipped', reason: 'already_running' };
         }
         
@@ -238,18 +289,18 @@ class MetadataWorker {
             debug(`Queued symbols count: ${queuedCount}`);
             
             if (queuedCount === 0) {
-                console.log('[MetadataWorker] No symbols in queue');
+                log('INFO', 'No symbols in queue');
                 return { status: 'idle', queued_count: 0 };
             }
             
-            console.log(`[MetadataWorker] Processing batch: ${queuedCount} symbols queued, max ${this.config.maxSymbolsPerRun}`);
+            log('INFO', ` Processing batch: ${queuedCount} symbols queued, max ${this.config.maxSymbolsPerRun}`);
             debug('Calling populator.populateMetadata...');
             
             const startTime = Date.now();
             const result = await this.populator.populateMetadata(this.config.maxSymbolsPerRun);
             const duration = Date.now() - startTime;
             
-            console.log(`[MetadataWorker] Batch complete:`, {
+            log('INFO', ` Batch complete:`, {
                 duration_ms: duration,
                 duration_min: Math.round(duration / 60000 * 100) / 100,
                 ...result
@@ -264,7 +315,7 @@ class MetadataWorker {
             };
             
         } catch (error) {
-            console.error('[MetadataWorker] Error processing batch:', error);
+            log('ERROR', 'Error processing batch:', error);
             debug('Error stack:', error.stack);
             return {
                 status: 'error',
@@ -279,7 +330,7 @@ class MetadataWorker {
      * Main worker loop
      */
     async run() {
-        console.log('[MetadataWorker] Starting worker loop...');
+        log('INFO', 'Starting worker loop...');
         
         let consecutiveErrors = 0;
         const maxConsecutiveErrors = 5;
@@ -299,30 +350,30 @@ class MetadataWorker {
                 if (result.status === 'idle') {
                     // No symbols to process, wait longer
                     waitTime = this.config.idleWaitMs;
-                    console.log(`[MetadataWorker] Queue empty, waiting ${waitTime/1000}s...`);
+                    log('INFO', ` Queue empty, waiting ${waitTime/1000}s...`);
                 } else if (result.status === 'error') {
                     consecutiveErrors++;
                     // Exponential backoff on errors
                     waitTime = Math.min(this.config.checkIntervalMs * Math.pow(2, consecutiveErrors), 300000);
-                    console.log(`[MetadataWorker] Error #${consecutiveErrors}, waiting ${waitTime/1000}s...`);
+                    log('INFO', ` Error #${consecutiveErrors}, waiting ${waitTime/1000}s...`);
                     
                     if (consecutiveErrors >= maxConsecutiveErrors) {
-                        console.error('[MetadataWorker] Too many consecutive errors, shutting down');
+                        log('ERROR', 'Too many consecutive errors, shutting down');
                         break;
                     }
                 } else {
-                    console.log(`[MetadataWorker] Next check in ${waitTime/1000}s...`);
+                    log('INFO', ` Next check in ${waitTime/1000}s...`);
                 }
                 
                 // Wait before next iteration
                 await this.sleep(waitTime);
                 
             } catch (error) {
-                console.error('[MetadataWorker] Unexpected error in main loop:', error);
+                log('ERROR', 'Unexpected error in main loop:', error);
                 consecutiveErrors++;
                 
                 if (consecutiveErrors >= maxConsecutiveErrors) {
-                    console.error('[MetadataWorker] Too many errors, shutting down');
+                    log('ERROR', 'Too many errors, shutting down');
                     break;
                 }
                 
@@ -330,7 +381,7 @@ class MetadataWorker {
             }
         }
         
-        console.log('[MetadataWorker] Worker loop ended');
+        log('INFO', 'Worker loop ended');
     }
     
     /**
@@ -338,12 +389,12 @@ class MetadataWorker {
      */
     async start() {
         try {
-            console.log('[MetadataWorker] Starting...');
+            log('INFO', 'Starting...');
             
             await this.initialize();
             
             if (this.config.processOnStartup) {
-                console.log('[MetadataWorker] Running initial batch on startup...');
+                log('INFO', 'Running initial batch on startup...');
                 await this.processBatch();
             }
             
@@ -351,7 +402,7 @@ class MetadataWorker {
             await this.run();
             
         } catch (error) {
-            console.error('[MetadataWorker] Failed to start:', error);
+            log('ERROR', 'Failed to start:', error);
             process.exit(1);
         }
     }
@@ -360,25 +411,25 @@ class MetadataWorker {
      * Graceful shutdown
      */
     async gracefulShutdown(signal) {
-        console.log(`[MetadataWorker] Received ${signal}, shutting down gracefully...`);
+        log('INFO', ` Received ${signal}, shutting down gracefully...`);
         
         this.isShuttingDown = true;
         
         // Wait for current batch to complete
         let waitCount = 0;
         while (this.currentRunning && waitCount < 30) {
-            console.log('[MetadataWorker] Waiting for current batch to complete...');
+            log('INFO', 'Waiting for current batch to complete...');
             await this.sleep(1000);
             waitCount++;
         }
         
         // Close database pool
         if (this.dbPool) {
-            console.log('[MetadataWorker] Closing database pool...');
+            log('INFO', 'Closing database pool...');
             await this.dbPool.end();
         }
         
-        console.log('[MetadataWorker] Shutdown complete');
+        log('INFO', 'Shutdown complete');
         process.exit(0);
     }
     
@@ -394,7 +445,7 @@ class MetadataWorker {
 if (require.main === module) {
     const worker = new MetadataWorker();
     worker.start().catch(error => {
-        console.error('[MetadataWorker] Fatal error:', error);
+        log('ERROR', 'Fatal error:', error);
         process.exit(1);
     });
 }
