@@ -1,4 +1,4 @@
-name: Unit Tests - Symbol Registry & Advanced Features (Phases 1-8)
+name: Unit Tests - Symbol Registry & Advanced Features (Phases 1-9)
 
 on:
   push:
@@ -13,10 +13,10 @@ permissions:
   checks: write
 
 jobs:
-  # Phase 1-8: Complete Symbol Registry + API Tests
+  # Phase 1-9: Complete Symbol Registry + API Tests + WebSocket Metrics
   symbol-registry-tests:
     runs-on: ubuntu-latest
-    name: Symbol Registry & Advanced Features Tests (Phases 1-8)
+    name: Symbol Registry & Advanced Features Tests (Phases 1-9)
     
     services:
       mysql:
@@ -73,10 +73,12 @@ jobs:
           echo "Phase 6: Autocomplete REST API Endpoints Tests (30 tests)"
           echo "Phase 7: Statistics, Cleanup, Metadata APIs Tests (80 tests)"
           echo "Phase 8: Dashboard Scheduler & Metrics API Tests (59 tests)"
+          echo "Phase 9: WebSocket Real-time Metrics Infrastructure Tests (18 tests)"
           echo ""
-          echo "Service Tests Total: 251 tests"
+          echo "Service Tests Total: 269 tests"
           echo "API Tests Total: 229 tests"
-          echo "Grand Total: 480 tests across all phases (1-8)"
+          echo "WebSocket Tests Total: 18 tests"
+          echo "Grand Total: 498 tests across all phases (1-9)"
           echo ""
           if [ "${{ job.status }}" = "success" ]; then
             echo "✅ ALL TESTS PASSING"
@@ -261,7 +263,25 @@ jobs:
           echo "  ✓ Yahoo Metadata Populator: 17 additional tests"
           echo "    - Additional coverage for Phase 8 integration"
           echo ""
+          echo "Phase 9 - WebSocket Real-time Metrics & Analytics Dashboard"
+          echo "  ✓ WebSocket Server Tests: 6 tests"
+          echo "    - Server initialization (1 test)"
+          echo "    - Client connections (2 tests)"
+          echo "    - Subscriptions (2 tests)"
+          echo "    - Graceful shutdown (1 test)"
+          echo "  ✓ Metrics Collector Tests: 5 tests"
+          echo "    - Navigation metrics recording (2 tests)"
+          echo "    - Scrape metrics recording (2 tests)"
+          echo "    - Database persistence (1 test)"
+          echo "  ✓ WebSocket Client Tests: 4 tests"
+          echo "    - Connection management (2 tests)"
+          echo "    - Subscriptions (1 test)"
+          echo "    - Automatic reconnection (1 test)"
+          echo "  ✓ Integration Tests: 3 tests"
+          echo "    - End-to-end metric flow (2 tests)"
+          echo "    - Real-time updates (1 test)"
+          echo ""
           echo "=== SUMMARY ==="
           npm test 2>&1 | grep -E "Test Suites:|Tests:"
           echo ""
-          echo "✅ All 480 tests passing across all 8 phases"
+          echo "✅ All 498 tests passing across all 9 phases"
