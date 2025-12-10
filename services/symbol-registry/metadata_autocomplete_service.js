@@ -334,6 +334,31 @@ class MetadataAutocompleteService {
             const withMetadata = stats.with_metadata || 0;
             const completion = totalSymbols > 0 ? Math.round((withMetadata / totalSymbols) * 100) : 0;
 
+            // Get queue metrics (symbols needing metadata)
+            const [queueResult] = await connection.execute(`
+                SELECT COUNT(*) as queue_size
+                FROM symbol_registry 
+                WHERE has_yahoo_metadata = 0 
+                AND security_type IN ('EQUITY', 'ETF', 'MUTUAL_FUND')
+            `);
+            
+            // Get recent processing metrics from securities_metadata updates
+            const [processingResult] = await connection.execute(`
+                SELECT 
+                    COUNT(*) as recent_updates,
+                    AVG(TIMESTAMPDIFF(SECOND, created_at, last_updated)) as avg_processing_time_seconds
+                FROM securities_metadata 
+                WHERE last_updated >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                AND created_at IS NOT NULL
+            `);
+            
+            const queueSize = queueResult[0].queue_size;
+            const recentUpdates = processingResult[0].recent_updates || 0;
+            const avgProcessingTime = processingResult[0].avg_processing_time_seconds || 0;
+            
+            // Estimate time to complete queue (based on 2s throttling)
+            const estimatedMinutes = queueSize > 0 ? Math.ceil((queueSize * 2) / 60) : 0;
+
             const result = {
                 summary: {
                     total_symbols: totalSymbols,
@@ -341,6 +366,16 @@ class MetadataAutocompleteService {
                     without_metadata: totalSymbols - withMetadata,
                     completion_percentage: completion,
                     last_update: stats.last_update
+                },
+                queue: {
+                    size: queueSize,
+                    estimated_completion_minutes: estimatedMinutes,
+                    status: queueSize > 0 ? 'pending' : 'complete'
+                },
+                processing: {
+                    recent_updates_last_hour: recentUpdates,
+                    avg_processing_time_seconds: Math.round(avgProcessingTime * 100) / 100,
+                    throttling_delay_seconds: 2
                 },
                 byType: byType.map(row => ({
                     type: row.security_type,

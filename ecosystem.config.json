@@ -1,0 +1,42 @@
+{
+  "apps": [
+    {
+      "name": "metadata-worker",
+      "script": "scripts/metadata-worker.js",
+      "cwd": "/app",
+      "instances": 1,
+      "exec_mode": "fork",
+      "restart_delay": 5000,
+      "max_restarts": 10,
+      "min_uptime": "30s",
+      "kill_timeout": 30000,
+      "wait_ready": false,
+      "listen_timeout": 8000,
+      "env": {
+        "NODE_ENV": "production",
+        "METADATA_WORKER_DEBUG": "true",
+        "METADATA_WORKER_CHECK_INTERVAL_MS": "60000",
+        "METADATA_WORKER_MAX_PER_RUN": "500", 
+        "METADATA_WORKER_IDLE_WAIT_MS": "300000",
+        "METADATA_WORKER_STARTUP": "true",
+        "YAHOO_DELAY_MS": "2000",
+        "YAHOO_BATCH_SIZE": "50",
+        "YAHOO_MAX_SYMBOLS_PER_RUN": "500"
+      },
+      "env_development": {
+        "NODE_ENV": "development",
+        "METADATA_WORKER_DEBUG": "true",
+        "METADATA_WORKER_CHECK_INTERVAL_MS": "30000",
+        "METADATA_WORKER_IDLE_WAIT_MS": "120000",
+        "YAHOO_DELAY_MS": "1000"
+      },
+      "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+      "combine_logs": true,
+      "merge_logs": true,
+      "out_file": "./logs/metadata-worker.log",
+      "error_file": "./logs/metadata-worker-error.log",
+      "log_file": "./logs/metadata-worker-combined.log",
+      "time": true
+    }
+  ]
+}
