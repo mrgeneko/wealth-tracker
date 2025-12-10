@@ -277,7 +277,7 @@ class TreasuryDataHandler {
         // If we can't parse the date, keep the record
         return true;
       }
-      // Keep if maturity date is after cutoff
+      // Keep if maturity date is after cutoff (exclude anything on or before cutoff)
       return maturityDate > cutoffDate;
     });
   }

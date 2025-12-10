@@ -249,6 +249,11 @@ const { router: statisticsRouter, initializePool: initializeStatisticsPool } = r
 app.use('/api/statistics', statisticsRouter);
 initializeStatisticsPool(pool);
 
+// Initialize the metrics API with the pool
+const { router: metricsRouter, initializePool: initializeMetricsPool } = require('../api/metrics');
+app.use('/api/metrics', metricsRouter);
+initializeMetricsPool(pool);
+
 // Initialize symbol registry sync service to load CSV data on startup
 async function initializeSymbolRegistry() {
     try {
