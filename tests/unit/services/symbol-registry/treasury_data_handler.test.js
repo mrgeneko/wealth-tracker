@@ -208,12 +208,17 @@ describe('TreasuryDataHandler', () => {
     });
 
     test('filterMaturedTreasuries should handle edge case at exactly cutoff boundary', () => {
-      const boundaryDate = new Date();
-      boundaryDate.setDate(boundaryDate.getDate() - 59); // Exactly 59 days
+      // Create a maturity date exactly at the boundary
+      // The cutoff is "59 days ago" so anything on or before that date should be filtered
+      const now = new Date();
+      const boundaryDate = new Date(now);
+      boundaryDate.setDate(boundaryDate.getDate() - 59);
+      // Set to start of day to ensure it's not after the cutoff
+      boundaryDate.setHours(0, 0, 0, 0);
 
       const record = { 'Maturity Date': boundaryDate.toISOString().split('T')[0] };
       const filtered = handler.filterMaturedTreasuries([record], 59);
-      // At boundary, should still filter out (59 days ago is considered matured)
+      // At boundary or before, should filter out
       expect(filtered.length).toBe(0);
     });
   });

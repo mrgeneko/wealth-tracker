@@ -13,8 +13,8 @@ const csv = require('csv-parse/sync');
 class TreasuryDataHandler {
   static CONFIG = {
     TREASURY_EXPIRY_CUTOFF_DAYS: parseInt(process.env.TREASURY_EXPIRY_CUTOFF_DAYS || '59', 10),
-    RECENT_AUCTIONS_FILE: path.join(__dirname, '../../config/us-treasury-auctions.csv'),
-    HISTORICAL_AUCTIONS_FILE: path.join(__dirname, '../../config/Auctions_Query_19791115_20251215.csv')
+    RECENT_AUCTIONS_FILE: process.env.TREASURY_AUCTIONS_FILE || path.join(__dirname, '../../config/us-treasury-auctions.csv'),
+    HISTORICAL_AUCTIONS_FILE: process.env.TREASURY_HISTORICAL_FILE || path.join(__dirname, '../../config/Auctions_Query_19791115_20251215.csv')
   };
 
   constructor() {
@@ -28,11 +28,27 @@ class TreasuryDataHandler {
    */
   async loadTreasuryData() {
     try {
-      await this.loadRecentAuctions();
-      await this.loadHistoricalAuctions();
+      console.log('[Treasury] Loading recent auctions from:', this.constructor.CONFIG.RECENT_AUCTIONS_FILE);
+      const recentCount = await this.loadRecentAuctions();
+      console.log('[Treasury] Loaded', recentCount, 'recent auction records');
+      
+      console.log('[Treasury] Loading historical auctions from:', this.constructor.CONFIG.HISTORICAL_AUCTIONS_FILE);
+      const historicalCount = await this.loadHistoricalAuctions();
+      console.log('[Treasury] Loaded', historicalCount, 'historical auction records');
+      
       this.mergedTreasuries = this.mergeTreasuryData();
-      return this.mergedTreasuries;
+      console.log('[Treasury] Merged into', this.mergedTreasuries.length, 'treasury records');
+      
+      // Filter matured treasuries and convert to registry format
+      const filtered = this.filterMaturedTreasuries(this.mergedTreasuries);
+      console.log('[Treasury] After filtering matured (cutoff:', this.constructor.CONFIG.TREASURY_EXPIRY_CUTOFF_DAYS, 'days):', filtered.length, 'records');
+      
+      const formatted = filtered.map(record => this.treasuryToRegistryFormat(record));
+      console.log('[Treasury] Formatted to registry format:', formatted.length, 'records');
+      
+      return formatted;
     } catch (err) {
+      console.error('[Treasury] Error loading treasury data:', err.message);
       throw new Error(`Failed to load treasury data: ${err.message}`);
     }
   }
@@ -49,6 +65,7 @@ class TreasuryDataHandler {
         trim: true
       });
       this.recentTreasuries = records;
+      console.log('[Treasury] loadRecentAuctions: Loaded', records.length, 'records');
       return records.length;
     } catch (err) {
       console.warn(`⚠️  Could not load recent auctions: ${err.message}`);
@@ -69,6 +86,7 @@ class TreasuryDataHandler {
         trim: true
       });
       this.historicalTreasuries = records;
+      console.log('[Treasury] loadHistoricalAuctions: Loaded', records.length, 'records');
       return records.length;
     } catch (err) {
       console.warn(`⚠️  Could not load historical auctions: ${err.message}`);
@@ -84,21 +102,38 @@ class TreasuryDataHandler {
   mergeTreasuryData() {
     const merged = {};
 
+    // Debug: log sample records
+    if (this.historicalTreasuries.length > 0) {
+      console.log('[Treasury] Sample historical record keys:', Object.keys(this.historicalTreasuries[0]));
+      console.log('[Treasury] Sample historical record:', JSON.stringify(this.historicalTreasuries[0]));
+    }
+    if (this.recentTreasuries.length > 0) {
+      console.log('[Treasury] Sample recent record keys:', Object.keys(this.recentTreasuries[0]));
+      console.log('[Treasury] Sample recent record:', JSON.stringify(this.recentTreasuries[0]));
+    }
+
     // First, add all historical data
+    let historicalAdded = 0;
     for (const record of this.historicalTreasuries) {
       const cusip = this.extractCUSIP(record);
       if (cusip) {
         merged[cusip] = { ...record, _source: 'TREASURY_HISTORICAL' };
+        historicalAdded++;
       }
     }
+    console.log('[Treasury] Historical records added to merged:', historicalAdded);
 
     // Then, add recent data (overwrites historical if same CUSIP)
+    let recentAdded = 0;
     for (const record of this.recentTreasuries) {
       const cusip = this.extractCUSIP(record);
       if (cusip) {
         merged[cusip] = { ...record, _source: 'TREASURY_FILE' };
+        recentAdded++;
       }
     }
+    console.log('[Treasury] Recent records added/updated in merged:', recentAdded);
+    console.log('[Treasury] Final merged count:', Object.keys(merged).length);
 
     return Object.values(merged);
   }
@@ -107,8 +142,21 @@ class TreasuryDataHandler {
    * Extract CUSIP from record (typically in 'CUSIP' or 'cusip' column)
    */
   extractCUSIP(record) {
-    // Try various column name variations
-    const cusip = record.CUSIP || record.cusip || record['CUSIP Number'] || record['cusip_number'];
+    // Handle BOM and various column name variations
+    // First check exact matches, then iterate keys to handle BOM prefix
+    let cusip = record.CUSIP || record.cusip || record['CUSIP Number'] || record['cusip_number'];
+    
+    // If not found, search keys for one containing 'CUSIP' (handles BOM)
+    if (!cusip) {
+      const keys = Object.keys(record);
+      for (const key of keys) {
+        if (key.toUpperCase().includes('CUSIP') || key.endsWith('CUSIP')) {
+          cusip = record[key];
+          break;
+        }
+      }
+    }
+    
     return cusip ? cusip.trim() : null;
   }
 
@@ -229,7 +277,7 @@ class TreasuryDataHandler {
         // If we can't parse the date, keep the record
         return true;
       }
-      // Keep if maturity date is after cutoff
+      // Keep if maturity date is after cutoff (exclude anything on or before cutoff)
       return maturityDate > cutoffDate;
     });
   }
@@ -243,7 +291,8 @@ class TreasuryDataHandler {
     const issueDate = this.parseIssueDate(record);
 
     return {
-      symbol: cusip,
+      ticker: cusip,  // Used by processBatch to check existence
+      symbol: cusip,  // Used by insertSymbol
       name: this.formatTreasuryName(record),
       exchange: 'OTC',
       security_type: this.extractSecurityType(record),
