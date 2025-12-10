@@ -40,11 +40,32 @@ class MetadataRefreshScheduler {
                 const config = JSON.parse(saved);
                 this.currentInterval = config.interval;
                 this.lastRefresh = config.lastRefresh ? new Date(config.lastRefresh) : null;
-                this.nextRefresh = config.nextRefresh ? new Date(config.nextRefresh) : null;
+                // Don't load nextRefresh - we'll recalculate it if we resume
+                // this.nextRefresh = config.nextRefresh ? new Date(config.nextRefresh) : null;
+                
+                // Auto-resume scheduler if there was a saved interval
+                if (this.currentInterval) {
+                    console.log('[MetadataRefreshScheduler] Resuming with saved interval:', this.currentInterval);
+                    this.resume();
+                }
             }
         } catch (error) {
             console.error('[MetadataRefreshScheduler] Error loading config:', error);
         }
+    }
+
+    /**
+     * Resume scheduler with current interval (recalculate next refresh)
+     */
+    resume() {
+        if (!this.currentInterval) {
+            console.log('[MetadataRefreshScheduler] No interval set, not resuming');
+            return;
+        }
+        
+        this.isRunning = true;
+        this.scheduleNext();
+        console.log(`[MetadataRefreshScheduler] Resumed with interval ${this.currentInterval}ms`);
     }
 
     /**
