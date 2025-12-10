@@ -15,6 +15,7 @@ describe('MetadataAutocompleteService', () => {
     beforeEach(() => {
         mockConnection = {
             execute: jest.fn(),
+            query: jest.fn(),
             end: jest.fn().mockResolvedValue(undefined),
             release: jest.fn().mockResolvedValue(undefined)
         };
@@ -88,7 +89,7 @@ describe('MetadataAutocompleteService', () => {
             expect(results).toHaveLength(1);
             expect(results[0].symbol).toBe('AAPL');
             expect(mockPool.getConnection).toHaveBeenCalled();
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should search symbols with metadata', async () => {
@@ -124,7 +125,7 @@ describe('MetadataAutocompleteService', () => {
             mockConnection.execute.mockRejectedValueOnce(new Error('Database error'));
             
             await expect(service.searchSymbols('TEST')).rejects.toThrow();
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
     });
 
@@ -219,7 +220,7 @@ describe('MetadataAutocompleteService', () => {
             const details = await service.getSymbolDetails('NOTFOUND');
             
             expect(details).toBeNull();
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should return symbol details without metadata', async () => {
@@ -280,16 +281,16 @@ describe('MetadataAutocompleteService', () => {
     describe('getSymbolsNeedingMetadata', () => {
         test('should return empty array when no symbols need metadata', async () => {
             // mysql2/promise returns [results, fields]
-            mockConnection.execute.mockResolvedValueOnce([[], []]);
+            mockConnection.query.mockResolvedValueOnce([[], []]);
             
             const results = await service.getSymbolsNeedingMetadata();
             
             expect(results).toEqual([]);
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should return symbols needing metadata', async () => {
-            mockConnection.execute.mockResolvedValueOnce([
+            mockConnection.query.mockResolvedValueOnce([
                 [
                     { symbol: 'AAPL' },
                     { symbol: 'GOOGL' },
@@ -304,12 +305,14 @@ describe('MetadataAutocompleteService', () => {
         });
 
         test('should respect limit parameter', async () => {
-            mockConnection.execute.mockResolvedValueOnce([[], []]);
+            mockConnection.query.mockResolvedValueOnce([[], []]);
             
             await service.getSymbolsNeedingMetadata(50);
             
-            const callArgs = mockConnection.execute.mock.calls[0];
-            expect(callArgs[1][0]).toBe(50);
+            // Since we now use query with embedded limit, check it was called
+            expect(mockConnection.query).toHaveBeenCalled();
+            const sql = mockConnection.query.mock.calls[0][0];
+            expect(sql).toContain('LIMIT 50');
         });
     });
 
@@ -323,7 +326,7 @@ describe('MetadataAutocompleteService', () => {
             const result = await service.markMetadataFetched('AAPL');
             
             expect(result).toBe(true);
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should normalize symbol to uppercase', async () => {
@@ -391,7 +394,7 @@ describe('MetadataAutocompleteService', () => {
             expect(result.symbol).toBe('AAPL');
             expect(result.status).toBe('reset');
             expect(mockConnection.execute).toHaveBeenCalledTimes(2);
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should normalize symbol to uppercase', async () => {
@@ -474,7 +477,7 @@ describe('MetadataAutocompleteService', () => {
             
             await service.searchSymbols('TEST', { includeMetadata: false });
             
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should always close connection on error', async () => {
@@ -486,7 +489,7 @@ describe('MetadataAutocompleteService', () => {
                 // Expected
             }
             
-            expect(mockConnection.end).toHaveBeenCalled();
+            expect(mockConnection.release).toHaveBeenCalled();
         });
     });
 

@@ -64,7 +64,7 @@ class MetadataAutocompleteService {
             throw error;
         } finally {
             if (connection) {
-                await connection.end();
+                await connection.release();
             }
         }
     }
@@ -226,7 +226,7 @@ class MetadataAutocompleteService {
             throw error;
         } finally {
             if (connection) {
-                await connection.end();
+                await connection.release();
             }
         }
     }
@@ -243,13 +243,16 @@ class MetadataAutocompleteService {
         try {
             connection = await this.pool.getConnection();
 
-            const [results] = await connection.execute(`
+            // Ensure limit is a safe integer (mysql2 has issues with parameterized LIMIT)
+            const numLimit = Math.max(1, Math.min(parseInt(limit, 10) || 100, 1000));
+
+            const [results] = await connection.query(`
                 SELECT symbol
                 FROM symbol_registry
                 WHERE has_yahoo_metadata = 0
                 ORDER BY symbol ASC
-                LIMIT ?
-            `, [limit]);
+                LIMIT ${numLimit}
+            `);
 
             return results.map(row => row.symbol);
         } catch (error) {
@@ -257,7 +260,7 @@ class MetadataAutocompleteService {
             throw error;
         } finally {
             if (connection) {
-                await connection.end();
+                await connection.release();
             }
         }
     }
@@ -286,7 +289,7 @@ class MetadataAutocompleteService {
             throw error;
         } finally {
             if (connection) {
-                await connection.end();
+                await connection.release();
             }
         }
     }
@@ -390,7 +393,7 @@ class MetadataAutocompleteService {
             throw error;
         } finally {
             if (connection) {
-                await connection.end();
+                await connection.release();
             }
         }
     }
