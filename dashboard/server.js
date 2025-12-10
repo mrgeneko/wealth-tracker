@@ -10,6 +10,10 @@ const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
 const { loadAllTickers } = require('./ticker_registry');
 
+// Phase 9.2: WebSocket Real-time Metrics
+const MetricsWebSocketServer = require('../services/websocket-server');
+const ScraperMetricsCollector = require('../services/scraper-metrics-collector');
+
 const app = express();
 
 // Load SSL Certificates if available
@@ -36,6 +40,23 @@ if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
     server = http.createServer(app);
 }
 const io = socketIo(server);
+
+// Phase 9.2: Initialize WebSocket Real-time Metrics System
+let metricsWebSocketServer;
+let metricsCollector;
+
+try {
+    metricsWebSocketServer = new MetricsWebSocketServer(server);
+    metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer);
+    
+    // Make metricsCollector available globally for scrapers
+    global.metricsCollector = metricsCollector;
+    
+    console.log('[Phase 9.2] WebSocket metrics system initialized');
+} catch (err) {
+    console.error('[Phase 9.2] Failed to initialize WebSocket metrics system:', err.message);
+    console.warn('[Phase 9.2] Continuing without real-time metrics. Metrics will not be recorded.');
+}
 
 const PORT = process.env.PORT || 3001;
 // Path to assets file - adjust relative to where you run the script
@@ -157,6 +178,11 @@ app.use('/api/autocomplete', autocompleteRouter);
 // Mount Cleanup API (will be initialized after pool is created)
 const { router: cleanupRouter } = require('../api/cleanup');
 app.use('/api/cleanup', cleanupRouter);
+
+// Phase 9.3: Analytics Dashboard Route
+app.get('/analytics', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'analytics.html'));
+});
 
 app.use(cors());
 // Disable caching for static files (Debugging purposes)

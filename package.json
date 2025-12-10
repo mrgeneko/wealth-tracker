@@ -27,10 +27,9 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "socket.io": "^4.8.1",
-    "ws": "^8.14.2",
+    "ws": "^8.18.3",
     "yahoo-finance2": "^3.10.2"
-  }
-  ,
+  },
   "devDependencies": {
     "jest": "^29.7.0",
     "supertest": "^6.3.3"
