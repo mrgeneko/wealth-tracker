@@ -74,53 +74,40 @@ class MetadataAutocompleteService {
      * Uses three-tier matching: exact > prefix > fuzzy
      */
     async _searchWithRanking(connection, query, limit, includeMetadata) {
-        const metadataFields = includeMetadata ? `
-            , sm.quote_type
-            , sm.market_cap
-            , sm.trailing_pe
-            , sm.dividend_yield
-            , sm.ttm_dividend_amount
-            , sm.ttm_eps
-            , sm.currency
-            , COALESCE(sm.market_cap, 0) as market_cap_numeric
-        ` : '';
-
-        const [results] = await connection.execute(`
+        // Ensure limit is an integer
+        const limitNum = parseInt(limit, 10) || 20;
+        
+        // Escape query for LIKE patterns
+        const escapedQuery = query.replace(/[%_]/g, '\\$&');
+        
+        // Simple query without metadata join for now to avoid collation issues
+        const sql = `
             SELECT 
-                sr.ticker as symbol,
-                sr.display_name,
+                sr.symbol,
+                sr.name,
                 sr.security_type,
-                sr.industry,
-                sr.sector,
-                sr.symbol_verified
-                ${metadataFields}
+                sr.exchange,
+                sr.source
             FROM symbol_registry sr
-            LEFT JOIN securities_metadata sm ON sr.ticker = sm.symbol
-            WHERE sr.ticker LIKE ? OR sr.display_name LIKE ?
+            WHERE sr.symbol LIKE ? OR sr.name LIKE ?
             ORDER BY 
                 CASE 
-                    WHEN sr.ticker = ? THEN 1
-                    WHEN sr.ticker LIKE ? THEN 2
-                    WHEN sr.display_name LIKE ? THEN 3
+                    WHEN sr.symbol = ? THEN 1
+                    WHEN sr.symbol LIKE ? THEN 2
+                    WHEN sr.name LIKE ? THEN 3
                     ELSE 4
                 END,
-                ${includeMetadata ? 'COALESCE(sm.market_cap, 0) DESC,' : ''}
-                sr.ticker ASC
-            LIMIT ?
-        `, [
-            `${query}%`,           // LIKE for WHERE
-            `%${query}%`,          // LIKE for WHERE (name search)
-            query,                 // Exact match
-            `${query}%`,           // Prefix match
-            `%${query}%`,          // Partial name match
-            limit
-        ]);
+                sr.symbol ASC
+            LIMIT ${limitNum}
+        `;
 
-        // Enrich results with completion percentage if applicable
-        if (includeMetadata) {
-            const populationStats = await this._getMetadataStats(connection);
-            return results.map(row => this._formatResult(row, populationStats));
-        }
+        const [results] = await connection.execute(sql, [
+            `${escapedQuery}%`,    // LIKE for WHERE (prefix)
+            `%${escapedQuery}%`,   // LIKE for WHERE (name contains)
+            query,                  // Exact match
+            `${escapedQuery}%`,    // Prefix match
+            `%${escapedQuery}%`    // Partial name match
+        ]);
 
         return results.map(row => this._formatResult(row));
     }
@@ -155,10 +142,10 @@ class MetadataAutocompleteService {
     _formatResult(row, stats = null) {
         const base = {
             symbol: row.symbol,
-            name: row.display_name || row.symbol,
+            name: row.name || row.symbol,
             type: row.security_type || 'UNKNOWN',
-            exchange: this._getExchange(row.symbol),
-            verified: row.symbol_verified || false
+            exchange: row.exchange || this._getExchange(row.symbol),
+            verified: true
         };
 
         // Add metadata if available
@@ -183,7 +170,6 @@ class MetadataAutocompleteService {
 
         return base;
     }
-
     /**
      * Infer exchange from symbol patterns
      * Used when exchange data not available
@@ -212,7 +198,7 @@ class MetadataAutocompleteService {
             const [registry] = await connection.execute(`
                 SELECT *
                 FROM symbol_registry
-                WHERE ticker = ?
+                WHERE symbol = ?
             `, [normalizedSymbol]);
 
             if (registry.length === 0) {
@@ -229,10 +215,10 @@ class MetadataAutocompleteService {
             `, [normalizedSymbol]);
 
             return {
-                symbol: symbolData.ticker,
-                name: symbolData.display_name,
+                symbol: symbolData.symbol,
+                name: symbolData.name,
                 type: symbolData.security_type,
-                verified: symbolData.symbol_verified,
+                verified: true,
                 metadata: metadata.length > 0 ? metadata[0] : null
             };
         } catch (error) {

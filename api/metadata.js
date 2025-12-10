@@ -160,7 +160,7 @@ router.post('/prefetch', async (req, res) => {
 /**
  * GET /api/metadata/autocomplete?q=AAPL
  * Autocomplete search for symbols
- * Searches both securities_metadata and can trigger Yahoo search
+ * Searches symbol_registry (populated from exchange CSV files)
  */
 router.get('/autocomplete', async (req, res) => {
     const query = (req.query.q || '').toUpperCase();
@@ -172,34 +172,36 @@ router.get('/autocomplete', async (req, res) => {
     const connection = await getDbConnection();
 
     try {
-        // Search existing metadata
+        // Search symbol_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
         const [rows] = await connection.execute(
             `SELECT 
-        symbol, short_name, long_name, quote_type, exchange
-       FROM securities_metadata 
-       WHERE symbol LIKE ? OR short_name LIKE ? OR long_name LIKE ?
-       ORDER BY 
-         CASE 
-           WHEN symbol = ? THEN 1
-           WHEN symbol LIKE ? THEN 2
-           ELSE 3
-         END,
-         symbol
-       LIMIT 20`,
-            [`${query}%`, `%${query}%`, `%${query}%`, query, `${query}%`]
+                symbol, name, security_type, exchange
+            FROM symbol_registry 
+            WHERE symbol LIKE ? OR name LIKE ?
+            ORDER BY 
+                CASE 
+                    WHEN symbol = ? THEN 1
+                    WHEN symbol LIKE ? THEN 2
+                    WHEN name LIKE ? THEN 3
+                    ELSE 4
+                END,
+                symbol
+            LIMIT 20`,
+            [`${query}%`, `%${query}%`, query, `${query}%`, `%${query}%`]
         );
 
         const results = rows.map(row => ({
             symbol: row.symbol,
-            name: row.long_name || row.short_name,
-            type: row.quote_type,
+            name: row.name || row.symbol,
+            type: row.security_type,
             exchange: row.exchange,
-            source: 'cached'
+            source: 'registry'
         }));
 
         res.json({ results });
 
     } catch (error) {
+        console.error('Autocomplete error:', error.message);
         res.status(500).json({ error: error.message });
     } finally {
         await connection.end();

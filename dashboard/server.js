@@ -154,6 +154,10 @@ app.use('/api/metadata', metadataRouter);
 const { router: autocompleteRouter } = require('../api/autocomplete');
 app.use('/api/autocomplete', autocompleteRouter);
 
+// Mount Cleanup API (will be initialized after pool is created)
+const { router: cleanupRouter } = require('../api/cleanup');
+app.use('/api/cleanup', cleanupRouter);
+
 app.use(cors());
 // Disable caching for static files (Debugging purposes)
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -235,6 +239,35 @@ const pool = mysql.createPool({
 // Initialize the autocomplete API with the pool
 const { initializePool } = require('../api/autocomplete');
 initializePool(pool);
+
+// Initialize the cleanup API with the pool
+const { initializePool: initializeCleanupPool } = require('../api/cleanup');
+initializeCleanupPool(pool);
+
+// Initialize the statistics API with the pool
+const { router: statisticsRouter, initializePool: initializeStatisticsPool } = require('../api/statistics');
+app.use('/api/statistics', statisticsRouter);
+initializeStatisticsPool(pool);
+
+// Initialize symbol registry sync service to load CSV data on startup
+async function initializeSymbolRegistry() {
+    try {
+        const { SymbolRegistrySyncService, SymbolRegistryService } = require('../services/symbol-registry');
+        const symbolService = new SymbolRegistryService(pool);
+        const syncService = new SymbolRegistrySyncService(pool, symbolService);
+        
+        console.log('[Symbol Registry] Starting initial sync of CSV files...');
+        const stats = await syncService.syncAll();
+        console.log('[Symbol Registry] Full sync results:', JSON.stringify(stats, null, 2));
+        
+        // Verify data was inserted
+        const [checkResult] = await pool.query('SELECT COUNT(*) as count FROM symbol_registry');
+        console.log('[Symbol Registry] Verification - records in database:', checkResult[0].count);
+    } catch (err) {
+        console.error('[Symbol Registry] Sync error:', err.message);
+        console.error('[Symbol Registry] Stack:', err.stack);
+    }
+}
 
 // Self-healing: Ensure new columns exist
 async function ensureSchema() {
@@ -923,6 +956,7 @@ if (isMainModule || !isTestEnv) {
     (async () => {
         try {
             await ensureSchema();
+            await initializeSymbolRegistry();
             server.listen(PORT, async () => {
                 console.log(`Dashboard server running on ${protocol}://localhost:${PORT}`);
                 await fetchInitialPrices();

@@ -13,9 +13,10 @@ const TreasuryDataHandler = require('./treasury_data_handler');
 
 class SymbolRegistrySyncService {
   static CONFIG = {
-    NASDAQ_FILE: path.join(__dirname, '../../config/nasdaq-listed.csv'),
-    NYSE_FILE: path.join(__dirname, '../../config/nyse-listed.csv'),
-    OTHER_FILE: path.join(__dirname, '../../config/other-listed.csv'),
+    // Support both local dev and Docker paths
+    NASDAQ_FILE: process.env.NASDAQ_FILE || path.join(__dirname, '../../config/nasdaq-listed.csv'),
+    NYSE_FILE: process.env.NYSE_FILE || path.join(__dirname, '../../config/nyse-listed.csv'),
+    OTHER_FILE: process.env.OTHER_FILE || path.join(__dirname, '../../config/other-listed.csv'),
     BATCH_SIZE: parseInt(process.env.SYNC_BATCH_SIZE || '500', 10),
     ENABLE_SYNC_ON_STARTUP: process.env.ENABLE_SYNC_ON_STARTUP !== 'false'
   };
@@ -94,14 +95,20 @@ class SymbolRegistrySyncService {
   parseNasdaqSymbols(records) {
     return records
       .filter(r => r.Symbol && r['Security Name'])
-      .map(r => ({
-        ticker: r.Symbol.trim(),
-        name: r['Security Name'].trim(),
-        exchange: 'NASDAQ',
-        source: 'NASDAQ_FILE',
-        security_type: this.inferSecurityType(r['Security Name']),
-        cusip: null
-      }));
+      .map(r => {
+        const name = r['Security Name'].trim();
+        // Determine security type: ETF if 'ETF' in name, otherwise EQUITY
+        const securityType = name.toUpperCase().includes('ETF') ? 'ETF' : 'EQUITY';
+        
+        return {
+          ticker: r.Symbol.trim(),
+          name: name,
+          exchange: 'NASDAQ',
+          source: 'NASDAQ_FILE',
+          security_type: securityType,
+          cusip: null
+        };
+      });
   }
 
   /**
@@ -110,14 +117,20 @@ class SymbolRegistrySyncService {
   parseNyseSymbols(records) {
     return records
       .filter(r => r['ACT Symbol'] && r['Company Name'])
-      .map(r => ({
-        ticker: r['ACT Symbol'].trim(),
-        name: r['Company Name'].trim(),
-        exchange: 'NYSE',
-        source: 'NYSE_FILE',
-        security_type: this.inferSecurityType(r['Company Name']),
-        cusip: null
-      }));
+      .map(r => {
+        const name = r['Company Name'].trim();
+        // Determine security type: ETF if 'ETF' in name, otherwise EQUITY (no bonds/treasuries in NYSE)
+        const securityType = name.toUpperCase().includes('ETF') ? 'ETF' : 'EQUITY';
+        
+        return {
+          ticker: r['ACT Symbol'].trim(),
+          name: name,
+          exchange: 'NYSE',
+          source: 'NYSE_FILE',
+          security_type: securityType,
+          cusip: null
+        };
+      });
   }
 
   /**
@@ -126,14 +139,25 @@ class SymbolRegistrySyncService {
   parseOtherSymbols(records) {
     return records
       .filter(r => r['ACT Symbol'] && r['Company Name'])
-      .map(r => ({
-        ticker: r['ACT Symbol'].trim(),
-        name: r['Company Name'].trim(),
-        exchange: 'OTHER',
-        source: 'OTHER_FILE',
-        security_type: this.inferSecurityType(r['Company Name']),
-        cusip: null
-      }));
+      .map(r => {
+        const name = r['Company Name'].trim();
+        // Use the ETF column if available, otherwise check name
+        let securityType = 'EQUITY';
+        if (r['ETF'] && r['ETF'].toUpperCase() === 'Y') {
+          securityType = 'ETF';
+        } else if (name.toUpperCase().includes('ETF')) {
+          securityType = 'ETF';
+        }
+        
+        return {
+          ticker: r['ACT Symbol'].trim(),
+          name: name,
+          exchange: 'OTHER',
+          source: 'OTHER_FILE',
+          security_type: securityType,
+          cusip: null
+        };
+      });
   }
 
   /**
@@ -162,14 +186,20 @@ class SymbolRegistrySyncService {
    */
   symbolToRegistryFormat(symbolData) {
     return {
-      ticker: symbolData.ticker,
+      symbol: symbolData.ticker,  // 'ticker' from CSV is mapped to 'symbol' in DB
       name: symbolData.name,
       exchange: symbolData.exchange,
       security_type: symbolData.security_type,
       source: symbolData.source,
-      cusip: symbolData.cusip || null,
       has_yahoo_metadata: false,
-      last_updated: new Date()
+      usd_trading_volume: null,
+      issue_date: null,
+      maturity_date: null,
+      security_term: null,
+      underlying_symbol: null,
+      strike_price: null,
+      option_type: null,
+      expiration_date: null
     };
   }
 
@@ -264,10 +294,16 @@ class SymbolRegistrySyncService {
             }
           } else {
             // Insert new symbol
-            await this.insertSymbol(conn, registryData);
-            stats.inserted++;
+            try {
+              await this.insertSymbol(conn, registryData);
+              stats.inserted++;
+            } catch (insertErr) {
+              console.error('[SymbolRegistrySync] Insert error for symbol', symbol.ticker, ':', insertErr.message);
+              stats.errors++;
+            }
           }
         } catch (err) {
+          console.error('[SymbolRegistrySync] Symbol processing error:', err.message);
           stats.errors++;
         }
       }
@@ -283,9 +319,9 @@ class SymbolRegistrySyncService {
    */
   async getExistingSymbol(conn, ticker, exchange, securityType) {
     const sql = `
-      SELECT id, ticker, exchange, security_type, source, has_yahoo_metadata
+      SELECT id, symbol, exchange, security_type, source, has_yahoo_metadata
       FROM symbol_registry
-      WHERE ticker = ? AND exchange = ? AND security_type = ?
+      WHERE symbol = ? AND exchange = ? AND security_type = ?
       LIMIT 1
     `;
 
@@ -299,26 +335,34 @@ class SymbolRegistrySyncService {
   async insertSymbol(conn, symbolData) {
     const sql = `
       INSERT INTO symbol_registry (
-        ticker, name, exchange, security_type, source, cusip,
-        has_yahoo_metadata, sort_rank, created_at, last_updated
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        symbol, name, exchange, security_type, source, has_yahoo_metadata, 
+        usd_trading_volume, sort_rank, issue_date, maturity_date, security_term, 
+        underlying_symbol, strike_price, option_type, expiration_date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const sortRank = this.symbolRegistryService.calculateSortRank(
       symbolData.security_type,
       symbolData.has_yahoo_metadata,
-      null
+      symbolData.usd_trading_volume
     );
 
     await conn.query(sql, [
-      symbolData.ticker,
+      symbolData.symbol,
       symbolData.name,
       symbolData.exchange,
       symbolData.security_type,
       symbolData.source,
-      symbolData.cusip,
       symbolData.has_yahoo_metadata ? 1 : 0,
-      sortRank
+      symbolData.usd_trading_volume || null,
+      sortRank,
+      symbolData.issue_date || null,
+      symbolData.maturity_date || null,
+      symbolData.security_term || null,
+      symbolData.underlying_symbol || null,
+      symbolData.strike_price || null,
+      symbolData.option_type || null,
+      symbolData.expiration_date || null
     ]);
   }
 
@@ -329,14 +373,14 @@ class SymbolRegistrySyncService {
     const sql = `
       UPDATE symbol_registry
       SET name = ?, exchange = ?, security_type = ?, source = ?,
-          cusip = ?, sort_rank = ?, last_updated = NOW()
+          usd_trading_volume = ?, sort_rank = ?, updated_at = NOW()
       WHERE id = ?
     `;
 
     const sortRank = this.symbolRegistryService.calculateSortRank(
       symbolData.security_type,
       symbolData.has_yahoo_metadata,
-      null
+      symbolData.usd_trading_volume
     );
 
     await conn.query(sql, [
@@ -344,7 +388,7 @@ class SymbolRegistrySyncService {
       symbolData.exchange,
       symbolData.security_type,
       symbolData.source,
-      symbolData.cusip,
+      symbolData.usd_trading_volume || null,
       sortRank,
       symbolId
     ]);
@@ -368,7 +412,9 @@ class SymbolRegistrySyncService {
 
     for (const fileType of ['NASDAQ', 'NYSE', 'OTHER', 'TREASURY']) {
       try {
+        console.log('[SymbolRegistrySync] Starting sync for', fileType);
         const stats = await this.syncFileType(fileType);
+        console.log('[SymbolRegistrySync]', fileType, 'sync complete:', JSON.stringify(stats, null, 2));
         allStats.files.push(stats);
         allStats.total_records += stats.total_records;
         allStats.total_inserted += stats.inserted;
@@ -376,6 +422,8 @@ class SymbolRegistrySyncService {
         allStats.total_skipped += stats.skipped;
         allStats.total_errors += stats.errors;
       } catch (err) {
+        console.error('[SymbolRegistrySync] Error syncing', fileType, ':', err.message);
+        console.error('[SymbolRegistrySync] Stack:', err.stack);
         allStats.total_errors++;
         allStats.files.push({
           file_type: fileType,

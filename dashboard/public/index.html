@@ -825,6 +825,69 @@
                         </div>
                     </div>
                     <p id="metadataStatus" style="font-size: 0.85em; color: #aaa; margin-top: 8px;"></p>
+                    
+                    <!-- Per-Type Statistics Filtering (Phase 8.3) -->
+                    <div style="background: #3a3a3a; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">Filter by Type</p>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;" id="typeFilterButtons"></div>
+                        <div id="typeStats" style="font-size: 0.85em; display: none;">
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid #555; border-bottom: 1px solid #444; color: #e0e0e0;">
+                                <span id="typeStatsLabel">Type: </span>
+                                <span style="color: #aaa;"></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Total</span>
+                                <span id="typeStat-total" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">With Data</span>
+                                <span id="typeStat-with" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Without Data</span>
+                                <span id="typeStat-without" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Complete %</span>
+                                <span style="color: #fff; font-weight: bold;"><span id="typeStat-completion">0</span>%</span>
+                            </div>
+                            <div style="display: flex; gap: 5px; margin-top: 8px;">
+                                <button class="btn btn-primary" id="btnRefreshType" style="flex: 1; padding: 6px; font-size: 0.8em;" onclick="refreshSelectedType()">🔄 Refresh</button>
+                                <button class="btn btn-danger" id="btnResetType" style="flex: 1; padding: 6px; font-size: 0.8em;" onclick="resetSelectedType()">⚠️ Reset</button>
+                                <button class="btn" id="btnClearType" style="flex: 1; padding: 6px; font-size: 0.8em; background-color: #555; color: white;" onclick="clearTypeFilter()">✕ Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Scheduled Metadata Refresh</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Automatically refresh metadata at specified intervals</p>
+                    <div class="setting-item">
+                        <label for="refreshSchedule">Refresh Schedule</label>
+                        <select id="refreshSchedule" onchange="updateScheduleStatus()">
+                            <option value="3600000">Every Hour</option>
+                            <option value="10800000">Every 3 Hours</option>
+                            <option value="21600000">Every 6 Hours</option>
+                            <option value="43200000">Every 12 Hours</option>
+                            <option value="86400000">Every 24 Hours</option>
+                            <option value="null" selected>Never</option>
+                        </select>
+                    </div>
+                    <div id="scheduleStatus" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 0.85em;">
+                        <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #aaa;">
+                            <span>Status</span>
+                            <span id="schedule-status" style="color: #e0e0e0;">Disabled</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #aaa;">
+                            <span>Next Refresh</span>
+                            <span id="schedule-next" style="color: #e0e0e0;">—</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #aaa;">
+                            <span>Last Refresh</span>
+                            <span id="schedule-last" style="color: #e0e0e0;">—</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -2773,15 +2836,21 @@
                 
                 // Update status message
                 const completion = summary.completion_percentage || 0;
+                const totalSymbols = summary.total_symbols || 0;
                 let statusMsg = '';
-                if (completion >= 95) {
+                
+                if (totalSymbols === 0) {
+                    statusMsg = 'ℹ️ No symbols in registry yet.';
+                } else if (completion >= 95) {
                     statusMsg = '✅ Metadata population nearly complete!';
                 } else if (completion >= 80) {
                     statusMsg = '📊 Metadata population in progress...';
                 } else if (completion >= 50) {
                     statusMsg = '🔄 Metadata population in progress...';
+                } else if (completion > 0) {
+                    statusMsg = '⏳ Metadata population started...';
                 } else {
-                    statusMsg = '⏳ Starting metadata population...';
+                    statusMsg = 'ℹ️ Ready to start metadata population.';
                 }
                 const statusElement = document.getElementById('metadataStatus');
                 if (statusElement) statusElement.textContent = statusMsg;
@@ -2852,7 +2921,7 @@
             const btn = document.getElementById('btnCleanupExpired');
             const originalText = btn.textContent;
             
-            if (!confirm('Are you sure you want to clean up expired securities? This cannot be undone.')) {
+            if (!confirm('This will remove symbols with no metadata and no holdings. Continue?')) {
                 return;
             }
             
@@ -2860,9 +2929,26 @@
                 btn.disabled = true;
                 btn.textContent = '⏳ Cleaning up...';
                 
-                // In a real implementation, this would call an API endpoint
-                // For now, we'll just show a message
-                alert('⚠️ Cleanup feature coming soon (Phase 8)');
+                // Call cleanup API endpoint
+                const response = await fetch('/api/cleanup/cleanup', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.symbols_deleted > 0) {
+                    alert(`✅ Cleanup complete!\n\nRemoved: ${data.symbols_deleted} symbols\n\n` +
+                          data.by_type.map(t => `${t.type}: ${t.count}`).join('\n'));
+                } else {
+                    alert('ℹ️ No expired symbols to clean up.');
+                }
+                
+                // Update statistics after cleanup
+                await updateMetadataStats();
                 
             } catch (error) {
                 console.error('Error during cleanup:', error);
@@ -2936,13 +3022,294 @@
 
         // ========== END PHASE 7 ==========
 
+        // ========== PHASE 8.2: SCHEDULED METADATA REFRESH ==========
+
+        // Global scheduler instance
+        let metadataRefreshScheduler = null;
+
+        /**
+         * Initialize the metadata refresh scheduler
+         */
+        function initializeScheduler() {
+            // MetadataRefreshScheduler class will be loaded from scheduler.js
+            if (typeof MetadataRefreshScheduler !== 'undefined') {
+                metadataRefreshScheduler = new MetadataRefreshScheduler();
+                
+                // Set initial UI state
+                updateScheduleStatus();
+                
+                console.log('[Dashboard] Metadata refresh scheduler initialized');
+                
+                // Update schedule status every minute
+                setInterval(updateScheduleStatus, 60000);
+            } else {
+                console.error('[Dashboard] MetadataRefreshScheduler class not available');
+            }
+        }
+
+        /**
+         * Update the schedule status display
+         */
+        function updateScheduleStatus() {
+            if (!metadataRefreshScheduler) return;
+
+            const status = metadataRefreshScheduler.getStatus();
+            const statusEl = document.getElementById('schedule-status');
+            const nextEl = document.getElementById('schedule-next');
+            const lastEl = document.getElementById('schedule-last');
+
+            // Update status
+            statusEl.textContent = status.enabled ? '✅ Enabled' : '⏸️ Disabled';
+            statusEl.style.color = status.enabled ? '#4ade80' : '#f87171';
+
+            // Update next refresh time
+            if (status.nextRefresh) {
+                const nextTime = new Date(status.nextRefresh);
+                const timeUntil = metadataRefreshScheduler.getTimeUntilNextRefresh();
+                nextEl.textContent = `${nextTime.toLocaleTimeString()} (in ${timeUntil})`;
+            } else {
+                nextEl.textContent = '—';
+            }
+
+            // Update last refresh time
+            if (status.lastRefresh) {
+                const lastTime = new Date(status.lastRefresh);
+                lastEl.textContent = lastTime.toLocaleString();
+            } else {
+                lastEl.textContent = '—';
+            }
+
+            // Update dropdown to match current schedule
+            const selectEl = document.getElementById('refreshSchedule');
+            if (selectEl) {
+                const currentValue = status.interval ? status.interval.toString() : 'null';
+                selectEl.value = currentValue;
+            }
+        }
+
+        /**
+         * Handle refresh schedule change
+         */
+        document.addEventListener('DOMContentLoaded', function () {
+            const scheduleSelect = document.getElementById('refreshSchedule');
+            if (scheduleSelect) {
+                scheduleSelect.addEventListener('change', function () {
+                    if (!metadataRefreshScheduler) return;
+
+                    const value = this.value === 'null' ? null : parseInt(this.value);
+                    metadataRefreshScheduler.start(value);
+                    updateScheduleStatus();
+
+                    // Show notification
+                    const label = metadataRefreshScheduler.getIntervalLabel(value);
+                    console.log(`[Dashboard] Metadata refresh schedule changed to: ${label}`);
+                });
+            }
+        });
+
+        // ========== END PHASE 8.2 ==========
+
+        // ========== PHASE 8.3: ADVANCED STATISTICS FILTERING ==========
+
+        // Global statistics filter instance
+        let statisticsFilter = null;
+
+        /**
+         * Initialize the statistics filter
+         */
+        function initializeStatisticsFilter() {
+            if (typeof StatisticsFilter !== 'undefined') {
+                statisticsFilter = new StatisticsFilter();
+                
+                // Load available types and populate buttons
+                statisticsFilter.loadAvailableTypes().then(types => {
+                    populateTypeFilterButtons(types);
+                    console.log('[Dashboard] Statistics filter initialized with', types.length, 'types');
+                });
+            } else {
+                console.error('[Dashboard] StatisticsFilter class not available');
+            }
+        }
+
+        /**
+         * Populate type filter buttons
+         */
+        function populateTypeFilterButtons(types) {
+            const container = document.getElementById('typeFilterButtons');
+            if (!container) return;
+
+            container.innerHTML = '';
+            
+            types.forEach(type => {
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.style.padding = '6px 10px';
+                btn.style.fontSize = '0.85em';
+                btn.style.backgroundColor = '#3a3a3a';
+                btn.style.color = '#e0e0e0';
+                btn.style.border = '1px solid #555';
+                btn.textContent = type;
+                
+                btn.onclick = () => {
+                    selectTypeFilter(type);
+                    btn.style.backgroundColor = '#0d6efd';
+                    btn.style.color = 'white';
+                    
+                    // Deselect other buttons
+                    container.querySelectorAll('button').forEach(b => {
+                        if (b !== btn) {
+                            b.style.backgroundColor = '#3a3a3a';
+                            b.style.color = '#e0e0e0';
+                            b.style.borderColor = '#555';
+                        }
+                    });
+                };
+                
+                container.appendChild(btn);
+            });
+        }
+
+        /**
+         * Select a type filter and display its stats
+         */
+        async function selectTypeFilter(type) {
+            if (!statisticsFilter) return;
+
+            statisticsFilter.selectedType = type;
+            statisticsFilter.save();
+
+            try {
+                const stats = await statisticsFilter.getTypeStats(type);
+                if (!stats) {
+                    console.error('[Dashboard] Failed to fetch stats for type:', type);
+                    return;
+                }
+
+                // Update UI
+                document.getElementById('typeStats').style.display = 'block';
+                document.getElementById('typeStatsLabel').textContent = `Type: ${type}`;
+                document.getElementById('typeStat-total').textContent = stats.total_symbols;
+                document.getElementById('typeStat-with').textContent = stats.with_metadata;
+                document.getElementById('typeStat-without').textContent = stats.without_metadata;
+                document.getElementById('typeStat-completion').textContent = stats.completion_percentage;
+
+                console.log('[Dashboard] Type stats loaded:', stats);
+            } catch (error) {
+                console.error('[Dashboard] Error selecting type:', error);
+            }
+        }
+
+        /**
+         * Clear type filter
+         */
+        function clearTypeFilter() {
+            if (!statisticsFilter) return;
+
+            statisticsFilter.selectedType = null;
+            statisticsFilter.save();
+
+            document.getElementById('typeStats').style.display = 'none';
+            
+            // Deselect all type buttons
+            document.getElementById('typeFilterButtons').querySelectorAll('button').forEach(btn => {
+                btn.style.backgroundColor = '#3a3a3a';
+                btn.style.color = '#e0e0e0';
+                btn.style.borderColor = '#555';
+            });
+
+            console.log('[Dashboard] Type filter cleared');
+        }
+
+        /**
+         * Refresh metadata for selected type
+         */
+        async function refreshSelectedType() {
+            if (!statisticsFilter || !statisticsFilter.selectedType) return;
+
+            const type = statisticsFilter.selectedType;
+            const btn = document.getElementById('btnRefreshType');
+            const originalText = btn.textContent;
+
+            try {
+                btn.disabled = true;
+                btn.textContent = '⏳ Refreshing...';
+
+                const result = await statisticsFilter.refreshType(type);
+                if (result) {
+                    btn.textContent = '✅ Refreshed!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        // Reload stats
+                        selectTypeFilter(type);
+                    }, 1500);
+                } else {
+                    throw new Error('Failed to refresh');
+                }
+            } catch (error) {
+                console.error('[Dashboard] Error refreshing type:', error);
+                btn.textContent = '❌ Error';
+                btn.disabled = false;
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }
+        }
+
+        /**
+         * Reset metadata for selected type
+         */
+        async function resetSelectedType() {
+            if (!statisticsFilter || !statisticsFilter.selectedType) return;
+
+            const type = statisticsFilter.selectedType;
+            const confirmed = confirm(`Reset all ${type} metadata? This will archive and clear all metadata for this type.`);
+            if (!confirmed) return;
+
+            const btn = document.getElementById('btnResetType');
+            const originalText = btn.textContent;
+
+            try {
+                btn.disabled = true;
+                btn.textContent = '⏳ Resetting...';
+
+                const result = await statisticsFilter.resetType(type);
+                if (result) {
+                    btn.textContent = '✅ Reset!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        // Reload stats
+                        selectTypeFilter(type);
+                        // Also refresh overall stats
+                        updateMetadataStats();
+                    }, 1500);
+                } else {
+                    throw new Error('Failed to reset');
+                }
+            } catch (error) {
+                console.error('[Dashboard] Error resetting type:', error);
+                btn.textContent = '❌ Error';
+                btn.disabled = false;
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }
+        }
+
+        // ========== END PHASE 8.3 ==========
+
         // Apply settings on page load
         document.addEventListener('DOMContentLoaded', function () {
             applySettings();
             fetchAssets();
+            initializeScheduler();
+            initializeStatisticsFilter();
         });
 
     </script>
+    <script src="scheduler.js"></script>
+    <script src="statistics-filter.js"></script>
 </body>
 
 </html>
