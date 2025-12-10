@@ -54,10 +54,15 @@ describe('Statistics API', () => {
     });
 
     describe('GET /statistics', () => {
-        test('should return overall statistics', async () => {
+        test('should return overall statistics with queue and processing metrics', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{ count: 1000 }]]) // total
-                .mockResolvedValueOnce([[{ count: 750 }]]);  // with metadata
+                .mockResolvedValueOnce([[{ count: 750 }]])  // with metadata
+                .mockResolvedValueOnce([[{ queue_size: 250 }]]) // queue size
+                .mockResolvedValueOnce([[{ // processing metrics
+                    recent_updates: 15,
+                    avg_processing_time_seconds: 1.8
+                }]]);
 
             const res = await request(app)
                 .get('/api/statistics')
@@ -68,12 +73,63 @@ describe('Statistics API', () => {
             expect(res.body.summary.with_metadata).toBe(750);
             expect(res.body.summary.without_metadata).toBe(250);
             expect(res.body.summary.completion_percentage).toBe(75);
+            
+            // Test queue metrics
+            expect(res.body.queue).toBeDefined();
+            expect(res.body.queue.size).toBe(250);
+            expect(res.body.queue.estimated_completion_minutes).toBe(9); // 250 * 2 / 60 = 8.33, rounded up
+            expect(res.body.queue.status).toBe('pending');
+            
+            // Test processing metrics
+            expect(res.body.processing).toBeDefined();
+            expect(res.body.processing.recent_updates_last_hour).toBe(15);
+            expect(res.body.processing.avg_processing_time_seconds).toBe(1.8);
+            expect(res.body.processing.throttling_delay_seconds).toBe(2);
+        });
+
+        test('should return queue complete status when no symbols pending', async () => {
+            mockConnection.execute
+                .mockResolvedValueOnce([[{ count: 1000 }]]) // total
+                .mockResolvedValueOnce([[{ count: 1000 }]]) // all with metadata
+                .mockResolvedValueOnce([[{ queue_size: 0 }]]) // empty queue
+                .mockResolvedValueOnce([[{ // processing metrics
+                    recent_updates: 20,
+                    avg_processing_time_seconds: 1.5
+                }]]);
+
+            const res = await request(app)
+                .get('/api/statistics')
+                .expect(200);
+
+            expect(res.body.queue.size).toBe(0);
+            expect(res.body.queue.estimated_completion_minutes).toBe(0);
+            expect(res.body.queue.status).toBe('complete');
+        });
+
+        test('should handle null processing metrics gracefully', async () => {
+            mockConnection.execute
+                .mockResolvedValueOnce([[{ count: 500 }]]) // total
+                .mockResolvedValueOnce([[{ count: 300 }]]) // with metadata
+                .mockResolvedValueOnce([[{ queue_size: 200 }]]) // queue size
+                .mockResolvedValueOnce([[{ // null processing metrics
+                    recent_updates: null,
+                    avg_processing_time_seconds: null
+                }]]);
+
+            const res = await request(app)
+                .get('/api/statistics')
+                .expect(200);
+
+            expect(res.body.processing.recent_updates_last_hour).toBe(0);
+            expect(res.body.processing.avg_processing_time_seconds).toBe(0);
         });
 
         test('should filter statistics by type', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{ count: 500 }]])  // total EQUITY
-                .mockResolvedValueOnce([[{ count: 400 }]]); // with metadata EQUITY
+                .mockResolvedValueOnce([[{ count: 400 }]])  // with metadata EQUITY
+                .mockResolvedValueOnce([[{ queue_size: 100 }]]) // queue size
+                .mockResolvedValueOnce([[{ recent_updates: 5, avg_processing_time_seconds: 1.2 }]]); // processing
 
             const res = await request(app)
                 .get('/api/statistics?type=EQUITY')
@@ -88,7 +144,9 @@ describe('Statistics API', () => {
         test('should filter by multiple types', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{ count: 700 }]])  // total
-                .mockResolvedValueOnce([[{ count: 550 }]]); // with metadata
+                .mockResolvedValueOnce([[{ count: 550 }]])  // with metadata
+                .mockResolvedValueOnce([[{ queue_size: 150 }]]) // queue size
+                .mockResolvedValueOnce([[{ recent_updates: 8, avg_processing_time_seconds: 1.6 }]]); // processing
 
             const res = await request(app)
                 .get('/api/statistics?type=EQUITY,ETF')
@@ -102,7 +160,9 @@ describe('Statistics API', () => {
         test('should handle empty registry', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{ count: 0 }]]) // total
-                .mockResolvedValueOnce([[{ count: 0 }]]); // with metadata
+                .mockResolvedValueOnce([[{ count: 0 }]]) // with metadata
+                .mockResolvedValueOnce([[{ queue_size: 0 }]]) // queue size
+                .mockResolvedValueOnce([[{ recent_updates: 0, avg_processing_time_seconds: 0 }]]); // processing
 
             const res = await request(app)
                 .get('/api/statistics')
@@ -459,7 +519,9 @@ describe('Statistics API', () => {
         test('should handle null completion gracefully', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{ count: 0 }]])
-                .mockResolvedValueOnce([[{ count: 0 }]]);
+                .mockResolvedValueOnce([[{ count: 0 }]])
+                .mockResolvedValueOnce([[{ queue_size: 0 }]])
+                .mockResolvedValueOnce([[{ recent_updates: 0, avg_processing_time_seconds: 0 }]]);
 
             const res = await request(app)
                 .get('/api/statistics')
@@ -472,8 +534,10 @@ describe('Statistics API', () => {
     describe('Type Parameter Handling', () => {
         test('should trim whitespace in type filter', async () => {
             mockConnection.execute
-                .mockResolvedValueOnce([[{ count: 500 }]])
-                .mockResolvedValueOnce([[{ count: 400 }]]);
+                .mockResolvedValueOnce([[{ count: 800 }]])
+                .mockResolvedValueOnce([[{ count: 650 }]])
+                .mockResolvedValueOnce([[{ queue_size: 150 }]])
+                .mockResolvedValueOnce([[{ recent_updates: 12, avg_processing_time_seconds: 1.4 }]]);
 
             const res = await request(app)
                 .get('/api/statistics?type=EQUITY, ETF')
@@ -485,8 +549,10 @@ describe('Statistics API', () => {
 
         test('should uppercase type values', async () => {
             mockConnection.execute
-                .mockResolvedValueOnce([[{ count: 500 }]])
-                .mockResolvedValueOnce([[{ count: 400 }]]);
+                .mockResolvedValueOnce([[{ count: 300 }]])
+                .mockResolvedValueOnce([[{ count: 200 }]])
+                .mockResolvedValueOnce([[{ queue_size: 100 }]])
+                .mockResolvedValueOnce([[{ recent_updates: 7, avg_processing_time_seconds: 1.1 }]]);
 
             const res = await request(app)
                 .get('/api/statistics?type=equity')
@@ -499,8 +565,10 @@ describe('Statistics API', () => {
     describe('Statistics Calculations', () => {
         test('should calculate completion percentage correctly', async () => {
             mockConnection.execute
-                .mockResolvedValueOnce([[{ count: 1000 }]])
-                .mockResolvedValueOnce([[{ count: 333 }]]);
+                .mockResolvedValueOnce([[{ count: 300 }]])
+                .mockResolvedValueOnce([[{ count: 100 }]])
+                .mockResolvedValueOnce([[{ queue_size: 200 }]])
+                .mockResolvedValueOnce([[{ recent_updates: 5, avg_processing_time_seconds: 1.3 }]]);
 
             const res = await request(app)
                 .get('/api/statistics')
@@ -511,8 +579,10 @@ describe('Statistics API', () => {
 
         test('should round completion percentage', async () => {
             mockConnection.execute
-                .mockResolvedValueOnce([[{ count: 1000 }]])
-                .mockResolvedValueOnce([[{ count: 666 }]]);
+                .mockResolvedValueOnce([[{ count: 300 }]])
+                .mockResolvedValueOnce([[{ count: 200 }]])
+                .mockResolvedValueOnce([[{ queue_size: 100 }]])
+                .mockResolvedValueOnce([[{ recent_updates: 10, avg_processing_time_seconds: 1.5 }]]);
 
             const res = await request(app)
                 .get('/api/statistics')
@@ -523,8 +593,10 @@ describe('Statistics API', () => {
 
         test('should handle 100% completion', async () => {
             mockConnection.execute
-                .mockResolvedValueOnce([[{ count: 1000 }]])
-                .mockResolvedValueOnce([[{ count: 1000 }]]);
+                .mockResolvedValueOnce([[{ count: 100 }]])
+                .mockResolvedValueOnce([[{ count: 100 }]])
+                .mockResolvedValueOnce([[{ queue_size: 0 }]])
+                .mockResolvedValueOnce([[{ recent_updates: 15, avg_processing_time_seconds: 1.2 }]]);
 
             const res = await request(app)
                 .get('/api/statistics')
