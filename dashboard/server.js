@@ -250,6 +250,24 @@ async function fetchInitialPrices() {
     console.error('Failed to fetch initial prices after multiple attempts. Continuing with empty cache.');
 }
 
+// Run database migrations on startup
+async function runDatabaseMigrations() {
+    try {
+        console.log('\n🔄 Running database migrations...');
+        const { runAllMigrations } = require('../scripts/run-migrations');
+        const success = await runAllMigrations();
+        
+        if (!success) {
+            console.warn('⚠️  Some migrations failed, but continuing startup');
+        } else {
+            console.log('✅ All migrations completed successfully');
+        }
+    } catch (err) {
+        console.error('❌ Failed to run migrations:', err.message);
+        console.warn('⚠️  Continuing startup without migrations. Database schema may be incomplete.');
+    }
+}
+
 const pool = mysql.createPool({
     host: process.env.MYSQL_HOST,
     port: process.env.MYSQL_PORT,
@@ -998,6 +1016,7 @@ if (isMainModule || !isTestEnv) {
     // Self-execute async start wrapper
     (async () => {
         try {
+            await runDatabaseMigrations();
             await ensureSchema();
             await initializeSymbolRegistry();
             server.listen(PORT, async () => {

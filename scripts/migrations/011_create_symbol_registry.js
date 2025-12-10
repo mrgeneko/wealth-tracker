@@ -39,6 +39,9 @@ const SQL_STATEMENTS = [
     security_type ENUM('EQUITY', 'ETF', 'BOND', 'TREASURY', 'MUTUAL_FUND', 'OPTION', 'CRYPTO', 'FX', 'FUTURES', 'INDEX', 'OTHER') DEFAULT 'EQUITY',
     source ENUM('NASDAQ_FILE', 'NYSE_FILE', 'OTHER_FILE', 'TREASURY_FILE', 'TREASURY_HISTORICAL', 'YAHOO', 'USER_ADDED') NOT NULL,
     has_yahoo_metadata BOOLEAN DEFAULT FALSE,
+    permanently_failed BOOLEAN DEFAULT FALSE,
+    permanent_failure_reason VARCHAR(255) NULL,
+    permanent_failure_at TIMESTAMP NULL,
     usd_trading_volume DECIMAL(20, 2) NULL,
     sort_rank INT DEFAULT 1000,
     
@@ -64,6 +67,7 @@ const SQL_STATEMENTS = [
     INDEX idx_maturity_date (maturity_date),
     INDEX idx_expiration_date (expiration_date),
     INDEX idx_underlying_symbol (underlying_symbol),
+    INDEX idx_permanently_failed (permanently_failed),
     CONSTRAINT fk_underlying_symbol FOREIGN KEY (underlying_symbol) REFERENCES symbol_registry(symbol) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
