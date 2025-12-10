@@ -72,6 +72,7 @@ class YahooMetadataPopulator {
 
   /**
    * Fetch metadata from Yahoo Finance with retry logic
+   * Stops retrying immediately on permanent failures (delisted, invalid ticker, etc)
    */
   async fetchYahooMetadata(ticker, attempt = 1) {
     try {
@@ -80,9 +81,21 @@ class YahooMetadataPopulator {
         ticker,
         metadata,
         success: true,
-        error: null
+        error: null,
+        isPermanentFailure: false
       };
     } catch (err) {
+      // Check if this is a permanent failure - don't retry
+      if (err.isPermanentFailure === true) {
+        return {
+          ticker,
+          metadata: null,
+          success: false,
+          error: err.message,
+          isPermanentFailure: true
+        };
+      }
+      
       if (attempt < this.constructor.CONFIG.RETRY_ATTEMPTS) {
         // Exponential backoff: wait longer between retries
         const delayMs = this.constructor.CONFIG.RETRY_DELAY_MS * attempt;
@@ -94,7 +107,8 @@ class YahooMetadataPopulator {
         ticker,
         metadata: null,
         success: false,
-        error: err.message
+        error: err.message,
+        isPermanentFailure: false
       };
     }
   }
@@ -242,7 +256,13 @@ class YahooMetadataPopulator {
             this.stats.successfully_updated++;
             debug(`✓ Successfully processed ${symbol.symbol}`);
           } else {
-            debug(`✗ Failed to get metadata for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
+            // Check if this was a permanent failure
+            if (result.isPermanentFailure) {
+              console.log(`[YahooPopulator] ✗ PERMANENT FAILURE for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
+              debug(`Permanent failure for ${symbol.symbol} (will not retry): ${result.error}`);
+            } else {
+              debug(`✗ Failed to get metadata for ${symbol.symbol} (transient error, will retry): ${result.error || 'no metadata returned'}`);
+            }
             batchStats.failed++;
             this.stats.failed++;
           }
