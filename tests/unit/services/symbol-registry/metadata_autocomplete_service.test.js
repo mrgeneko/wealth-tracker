@@ -76,7 +76,7 @@ describe('MetadataAutocompleteService', () => {
             const mockResults = [
                 {
                     symbol: 'AAPL',
-                    display_name: 'Apple Inc.',
+                    name: 'Apple Inc.',
                     security_type: 'STOCK'
                 }
             ];
@@ -95,7 +95,7 @@ describe('MetadataAutocompleteService', () => {
             const mockResults = [
                 {
                     symbol: 'AAPL',
-                    display_name: 'Apple Inc.',
+                    name: 'Apple Inc.',
                     security_type: 'STOCK',
                     quote_type: 'EQUITY',
                     market_cap: '2.5T',
@@ -163,7 +163,7 @@ describe('MetadataAutocompleteService', () => {
         test('should format basic result without metadata', () => {
             const row = {
                 symbol: 'AAPL',
-                display_name: 'Apple Inc.',
+                name: 'Apple Inc.',
                 security_type: 'STOCK',
                 symbol_verified: true
             };
@@ -179,7 +179,7 @@ describe('MetadataAutocompleteService', () => {
         test('should include metadata when available', () => {
             const row = {
                 symbol: 'AAPL',
-                display_name: 'Apple Inc.',
+                name: 'Apple Inc.',
                 security_type: 'STOCK',
                 market_cap_numeric: 2500000000000,
                 quote_type: 'EQUITY',
@@ -199,7 +199,7 @@ describe('MetadataAutocompleteService', () => {
         test('should use symbol as fallback for name', () => {
             const row = {
                 symbol: 'XYZ',
-                display_name: null,
+                name: null,
                 security_type: 'STOCK'
             };
             
@@ -224,10 +224,9 @@ describe('MetadataAutocompleteService', () => {
 
         test('should return symbol details without metadata', async () => {
             const symbolData = {
-                ticker: 'AAPL',
-                display_name: 'Apple Inc.',
-                security_type: 'STOCK',
-                symbol_verified: true
+                symbol: 'AAPL',
+                name: 'Apple Inc.',
+                security_type: 'STOCK'
             };
             
             mockConnection.execute
@@ -243,10 +242,9 @@ describe('MetadataAutocompleteService', () => {
 
         test('should return symbol details with metadata', async () => {
             const symbolData = {
-                ticker: 'AAPL',
-                display_name: 'Apple Inc.',
-                security_type: 'STOCK',
-                symbol_verified: true
+                symbol: 'AAPL',
+                name: 'Apple Inc.',
+                security_type: 'STOCK'
             };
             const metadataData = {
                 symbol: 'AAPL',
@@ -524,7 +522,7 @@ describe('MetadataAutocompleteService', () => {
         test('should handle null metadata values', () => {
             const row = {
                 symbol: 'TEST',
-                display_name: 'Test Corp',
+                name: 'Test Corp',
                 security_type: 'STOCK',
                 market_cap_numeric: null,
                 trailing_pe: null,

@@ -218,6 +218,9 @@ class SymbolRegistrySyncService {
     };
 
     try {
+      // Record sync start
+      await this.updateFileRefreshStatus(fileType, 'IN_PROGRESS', null, 0, 0, null);
+
       let records = [];
 
       if (fileType === 'NASDAQ') {
@@ -249,13 +252,65 @@ class SymbolRegistrySyncService {
       stats.end_time = new Date();
       stats.duration_ms = stats.end_time - stats.start_time;
 
+      // Record successful sync
+      await this.updateFileRefreshStatus(
+        fileType, 
+        'SUCCESS', 
+        stats.duration_ms, 
+        stats.inserted, 
+        stats.updated, 
+        null
+      );
+
       return stats;
     } catch (err) {
       stats.errors++;
       stats.error_message = err.message;
       stats.end_time = new Date();
       stats.duration_ms = stats.end_time - stats.start_time;
+
+      // Record failed sync
+      await this.updateFileRefreshStatus(
+        fileType,
+        'FAILED',
+        stats.duration_ms,
+        stats.inserted,
+        stats.updated,
+        err.message
+      );
+
       throw err;
+    }
+  }
+
+  /**
+   * Update file refresh status in the database
+   */
+  async updateFileRefreshStatus(fileType, status, durationMs, symbolsAdded, symbolsUpdated, errorMessage) {
+    const conn = await this.dbPool.getConnection();
+    try {
+      await conn.execute(`
+        INSERT INTO file_refresh_status (
+          file_type,
+          last_refresh_at,
+          last_refresh_duration_ms,
+          last_refresh_status,
+          last_error_message,
+          symbols_added,
+          symbols_updated
+        ) VALUES (?, NOW(), ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          last_refresh_at = NOW(),
+          last_refresh_duration_ms = VALUES(last_refresh_duration_ms),
+          last_refresh_status = VALUES(last_refresh_status),
+          last_error_message = VALUES(last_error_message),
+          symbols_added = VALUES(symbols_added),
+          symbols_updated = VALUES(symbols_updated)
+      `, [fileType, durationMs, status, errorMessage, symbolsAdded || 0, symbolsUpdated || 0]);
+    } catch (err) {
+      console.error('[SymbolRegistrySync] Error updating file refresh status:', err.message);
+    } finally {
+      conn.release();
     }
   }
 

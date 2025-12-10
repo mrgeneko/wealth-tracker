@@ -891,6 +891,50 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>System Health & Performance</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Monitor sync status and system performance metrics</p>
+                    
+                    <!-- File Refresh Status -->
+                    <div id="fileRefreshStatus" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">📁 File Sync Status</p>
+                        <div id="fileStatusList" style="font-size: 0.85em;">
+                            <div style="color: #888; text-align: center; padding: 10px;">Loading...</div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Metrics -->
+                    <div id="performanceMetrics" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">📊 Performance Metrics</p>
+                        <div style="font-size: 0.85em;">
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Overall Health</span>
+                                <span id="metric-health" style="font-weight: bold;">—</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Success Rate</span>
+                                <span id="metric-success-rate" style="color: #fff; font-weight: bold;">—</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Total Symbols</span>
+                                <span id="metric-total-symbols" style="color: #fff; font-weight: bold;">—</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #e0e0e0;">Recent Errors</span>
+                                <span id="metric-recent-errors" style="color: #fff; font-weight: bold;">—</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                <span style="color: #e0e0e0;">Last Updated</span>
+                                <span id="metric-last-updated" style="color: #888; font-size: 0.8em;">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="loadPerformanceMetrics()" style="width: 100%;">
+                        🔄 Refresh Metrics
+                    </button>
+                </div>
+
+                <div class="settings-section">
                     <h3>System</h3>
                     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <button class="btn btn-primary" onclick="exportData()">Export Data</button>
@@ -2783,6 +2827,127 @@
                 location.reload();
             }
         }
+
+        // ========== PHASE 8.4: PERFORMANCE METRICS FUNCTIONS ==========
+
+        /**
+         * Load and display performance metrics
+         */
+        async function loadPerformanceMetrics() {
+            try {
+                // Fetch metrics summary
+                const summaryResponse = await fetch('/api/metrics/summary');
+                if (!summaryResponse.ok) {
+                    throw new Error(`HTTP ${summaryResponse.status}`);
+                }
+                const summaryData = await summaryResponse.json();
+
+                // Fetch success rate
+                const successResponse = await fetch('/api/metrics/success-rate?days=7');
+                const successData = successResponse.ok ? await successResponse.json() : { successRate: 0 };
+
+                // Update metrics display
+                updateMetricsDisplay(summaryData, successData);
+
+                // Update file status display
+                updateFileStatusDisplay(summaryData.fileRefreshStatus || []);
+
+            } catch (error) {
+                console.error('Error loading performance metrics:', error);
+                document.getElementById('metric-health').textContent = '⚠️ Error';
+                document.getElementById('metric-health').style.color = '#ff6b6b';
+            }
+        }
+
+        /**
+         * Update the metrics display panel
+         */
+        function updateMetricsDisplay(summaryData, successData) {
+            const summary = summaryData.summary || {};
+            
+            // Health status
+            const healthEl = document.getElementById('metric-health');
+            const overallHealth = summaryData.fileRefreshStatus?.every(s => s.last_refresh_status === 'SUCCESS');
+            if (overallHealth) {
+                healthEl.textContent = '✅ Healthy';
+                healthEl.style.color = '#4ade80';
+            } else if (summaryData.fileRefreshStatus?.some(s => s.last_refresh_status === 'SUCCESS')) {
+                healthEl.textContent = '⚠️ Degraded';
+                healthEl.style.color = '#fbbf24';
+            } else {
+                healthEl.textContent = '❌ Issues';
+                healthEl.style.color = '#ff6b6b';
+            }
+
+            // Success rate
+            const successRateEl = document.getElementById('metric-success-rate');
+            const successRate = successData.successRate || 0;
+            successRateEl.textContent = `${successRate}%`;
+            successRateEl.style.color = successRate >= 90 ? '#4ade80' : successRate >= 70 ? '#fbbf24' : '#ff6b6b';
+
+            // Total symbols
+            document.getElementById('metric-total-symbols').textContent = 
+                (summary.totalSymbols || 0).toLocaleString();
+
+            // Recent errors
+            const errorsEl = document.getElementById('metric-recent-errors');
+            const recentErrors = summary.recentErrors || 0;
+            errorsEl.textContent = recentErrors.toString();
+            errorsEl.style.color = recentErrors === 0 ? '#4ade80' : recentErrors < 10 ? '#fbbf24' : '#ff6b6b';
+
+            // Last updated
+            document.getElementById('metric-last-updated').textContent = 
+                new Date(summaryData.timestamp).toLocaleString();
+        }
+
+        /**
+         * Update the file sync status display
+         */
+        function updateFileStatusDisplay(fileStatus) {
+            const container = document.getElementById('fileStatusList');
+            if (!fileStatus || fileStatus.length === 0) {
+                container.innerHTML = '<div style="color: #888; text-align: center; padding: 10px;">No sync data available</div>';
+                return;
+            }
+
+            const statusIcons = {
+                'SUCCESS': '✅',
+                'FAILED': '❌',
+                'IN_PROGRESS': '🔄'
+            };
+
+            container.innerHTML = fileStatus.map(status => {
+                const icon = statusIcons[status.last_refresh_status] || '❓';
+                const duration = status.last_refresh_duration_ms 
+                    ? `${(status.last_refresh_duration_ms / 1000).toFixed(1)}s` 
+                    : '—';
+                const lastRefresh = status.last_refresh_at 
+                    ? new Date(status.last_refresh_at).toLocaleString() 
+                    : 'Never';
+                const added = status.symbols_added || 0;
+                const updated = status.symbols_updated || 0;
+
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #444;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span>${icon}</span>
+                            <span style="color: #e0e0e0; font-weight: bold;">${status.file_type}</span>
+                        </div>
+                        <div style="text-align: right; color: #888; font-size: 0.8em;">
+                            <div>+${added} / ~${updated} | ${duration}</div>
+                            <div style="font-size: 0.75em;">${lastRefresh}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Load metrics when settings modal opens
+        const originalOpenSettingsModal = openSettingsModal;
+        openSettingsModal = function() {
+            originalOpenSettingsModal();
+            loadPerformanceMetrics();
+        };
 
         // ========== PHASE 7: DASHBOARD INTEGRATION FUNCTIONS ==========
 
