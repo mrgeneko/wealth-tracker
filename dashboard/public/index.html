@@ -113,7 +113,7 @@
             margin: 10% auto;
             padding: 20px;
             border: 1px solid #444;
-            width: 400px;
+            width: 600px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             color: #e0e0e0;
@@ -462,6 +462,7 @@
             max-height: 60vh;
             overflow-y: auto;
             overflow-x: hidden;
+            padding-right: 12px;
         }
 
         .settings-section {
@@ -865,7 +866,7 @@
                     <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Automatically refresh metadata at specified intervals</p>
                     <div class="setting-item">
                         <label for="refreshSchedule">Refresh Schedule</label>
-                        <select id="refreshSchedule" onchange="updateScheduleStatus()">
+                        <select id="refreshSchedule">
                             <option value="3600000">Every Hour</option>
                             <option value="10800000">Every 3 Hours</option>
                             <option value="21600000">Every 6 Hours</option>
@@ -924,7 +925,7 @@
                             </div>
                             <div style="display: flex; justify-content: space-between; padding: 4px 0;">
                                 <span style="color: #e0e0e0;">Last Updated</span>
-                                <span id="metric-last-updated" style="color: #888; font-size: 0.8em;">—</span>
+                                <span id="metric-last-updated" style="color: #888; font-size: 1.4em;">—</span>
                             </div>
                         </div>
                     </div>
@@ -2933,9 +2934,9 @@
                             <span>${icon}</span>
                             <span style="color: #e0e0e0; font-weight: bold;">${status.file_type}</span>
                         </div>
-                        <div style="text-align: right; color: #888; font-size: 0.8em;">
-                            <div>+${added} / ~${updated} | ${duration}</div>
-                            <div style="font-size: 0.75em;">${lastRefresh}</div>
+                        <div style="text-align: right; color: #888; font-size: 1.6em;">
+                            <div><span style="color: #aaa; font-size: 0.6em;">Added/Updated | Duration:</span> +${added} / ~${updated} | ${duration}</div>
+                            <div style="font-size: 1em;"><span style="color: #aaa; font-size: 0.6em;">Last Sync:</span> ${lastRefresh}</div>
                         </div>
                     </div>
                 `;
