@@ -343,7 +343,7 @@ describe('MetadataAutocompleteService', () => {
     // Statistics Tests
     // ============================================================================
     describe('getStatistics', () => {
-        test('should return statistics with correct structure', async () => {
+        test('should return statistics with correct structure including queue metrics', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{
                     total_symbols: 1000,
@@ -353,7 +353,12 @@ describe('MetadataAutocompleteService', () => {
                 .mockResolvedValueOnce([[
                     { security_type: 'STOCK', count: 600, with_metadata: 500 },
                     { security_type: 'ETF', count: 400, with_metadata: 250 }
-                ], []]);
+                ], []])
+                .mockResolvedValueOnce([[{ queue_size: 250 }], []])
+                .mockResolvedValueOnce([[{ 
+                    recent_updates: 10,
+                    avg_processing_time_seconds: 1.5
+                }], []]);
             
             const stats = await service.getStatistics();
             
@@ -362,21 +367,60 @@ describe('MetadataAutocompleteService', () => {
             expect(stats.summary.with_metadata).toBe(750);
             expect(stats.summary.without_metadata).toBe(250);
             expect(stats.summary.completion_percentage).toBe(75);
+            
+            // Test queue metrics
+            expect(stats.queue).toBeDefined();
+            expect(stats.queue.size).toBe(250);
+            expect(stats.queue.estimated_completion_minutes).toBe(9); // 250 * 2 / 60 = 8.33, rounded up
+            expect(stats.queue.status).toBe('pending');
+            
+            // Test processing metrics
+            expect(stats.processing).toBeDefined();
+            expect(stats.processing.recent_updates_last_hour).toBe(10);
+            expect(stats.processing.avg_processing_time_seconds).toBe(1.5);
+            expect(stats.processing.throttling_delay_seconds).toBe(2);
+            
             expect(stats.byType).toHaveLength(2);
             expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        test('should calculate pending correctly', async () => {
+        test('should handle queue complete status when no symbols pending', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[{
                     total_symbols: 100,
-                    with_metadata: 30
+                    with_metadata: 100
                 }], []])
-                .mockResolvedValueOnce([[], []]);
+                .mockResolvedValueOnce([[], []])
+                .mockResolvedValueOnce([[{ queue_size: 0 }], []])
+                .mockResolvedValueOnce([[{ 
+                    recent_updates: 5,
+                    avg_processing_time_seconds: 2.1
+                }], []]);
             
             const stats = await service.getStatistics();
             
-            expect(stats.summary.without_metadata).toBe(70);
+            expect(stats.queue.size).toBe(0);
+            expect(stats.queue.estimated_completion_minutes).toBe(0);
+            expect(stats.queue.status).toBe('complete');
+        });
+
+        test('should handle null processing metrics gracefully', async () => {
+            mockConnection.execute
+                .mockResolvedValueOnce([[{
+                    total_symbols: 50,
+                    with_metadata: 30
+                }], []])
+                .mockResolvedValueOnce([[], []])
+                .mockResolvedValueOnce([[{ queue_size: 20 }], []])
+                .mockResolvedValueOnce([[{ 
+                    recent_updates: null,
+                    avg_processing_time_seconds: null
+                }], []]);
+            
+            const stats = await service.getStatistics();
+            
+            expect(stats.processing.recent_updates_last_hour).toBe(0);
+            expect(stats.processing.avg_processing_time_seconds).toBe(0);
         });
     });
 
