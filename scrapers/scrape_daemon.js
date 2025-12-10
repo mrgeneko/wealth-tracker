@@ -14,6 +14,7 @@ try {
 
 const { scrapeGoogle } = require('./scrape_google');
 const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls, normalizedKey } = require('./scraper_utils');
+const { recordScraperMetrics, getMetricsCollector } = require('./metrics-integration');
 const mysql = require('mysql2/promise');
 const puppeteer = require('puppeteer');
 const debugLogPath = getTimestampedLogPath();
@@ -531,7 +532,12 @@ async function runCycle(browser, outputDir) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`investingcom watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
-					await scrapeInvestingComWatchlists(browser, record, outputDir, updateRules);
+					// Phase 9: Record metrics during scraper execution
+					await recordScraperMetrics('investing', async () => {
+						return await scrapeInvestingComWatchlists(browser, record, outputDir, updateRules);
+					}, {
+						url: record.url
+					});
 				} else {
 					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
 				}
@@ -571,7 +577,12 @@ async function runCycle(browser, outputDir) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`webull watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
-					await scrapeWebullWatchlists(browser, record, outputDir);
+					// Phase 9: Record metrics during scraper execution
+					await recordScraperMetrics('webull', async () => {
+						return await scrapeWebullWatchlists(browser, record, outputDir);
+					}, {
+						url: record.url
+					});
 				} else {
 					logDebug(`Skipping record with missing or invalid webull URL: ${JSON.stringify(record)}`);
 				}
@@ -595,7 +606,12 @@ async function runCycle(browser, outputDir) {
 				const record = { key: item.key, interval: item.interval, url: attrs.url };
 				logDebug(`tradingview watchlist (from attributes): ${record.key} ${record.interval} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
-					await scrapeTradingViewWatchlists(browser, record, outputDir);
+					// Phase 9: Record metrics during scraper execution
+					await recordScraperMetrics('tradingview', async () => {
+						return await scrapeTradingViewWatchlists(browser, record, outputDir);
+					}, {
+						url: record.url
+					});
 				} else {
 					logDebug(`Skipping record with missing or invalid tradingview URL: ${JSON.stringify(record)}`);
 				}
@@ -627,7 +643,12 @@ async function runCycle(browser, outputDir) {
 		
 		if (yahooSecurities.length) {
 			try {
-				const batchResults = await scrapeYahooBatch(browser, yahooSecurities, outputDir, { chunkSize: 50, delayMs: 500 });
+				// Phase 9: Record metrics during scraper execution
+				const batchResults = await recordScraperMetrics('yahoo_batch', async () => {
+					return await scrapeYahooBatch(browser, yahooSecurities, outputDir, { chunkSize: 50, delayMs: 500 });
+				}, {
+					url: 'https://query1.finance.yahoo.com'
+				});
 				logDebug(`Yahoo batch fetched ${batchResults.length} items`);
 			} catch (e) {
 				logDebug('Yahoo batch fetch error: ' + e);
@@ -671,7 +692,12 @@ async function runCycle(browser, outputDir) {
 					if (isValidSession) {
 						try {
 							logDebug(`Scraping bond ${security.key} with ${sourceName}`);
-							const data = await scraperFunc(browser, security, outputDir);
+							// Phase 9: Record metrics during scraper execution
+							const data = await recordScraperMetrics(sourceName, async () => {
+								return await scraperFunc(browser, security, outputDir);
+							}, {
+								url: securityUrl
+							});
 							logDebug(`${sourceName} scrape result: ${JSON.stringify(data)}`);
 							break; // Scrape successful (or at least attempted), move to next bond
 						} catch (e) {
@@ -758,7 +784,12 @@ async function runCycle(browser, outputDir) {
                 // If we found a source, execute it
                 if (selectedSource && scraperMap[selectedSource]) {
                     try {
-                        const data = await scraperMap[selectedSource](browser, security, outputDir);
+                        // Phase 9: Record metrics during scraper execution
+                        const data = await recordScraperMetrics(selectedSource, async () => {
+                            return await scraperMap[selectedSource](browser, security, outputDir);
+                        }, {
+                            url: security[selectedSource] || ''
+                        });
                         logDebug(`${selectedSource} scrape result: ${JSON.stringify(data)}`);
                     } catch (e) {
                         logDebug(`Error scraping ${security.key} with ${selectedSource}: ${e.message}`);
@@ -799,7 +830,12 @@ async function runCycle(browser, outputDir) {
                     if (securityUrl && securityUrl.startsWith('http') && isTypeSupported) {
                         try {
                             logDebug(`Scraping ${security.key} with ${sourceName}`);
-                            const data = await scraperFunc(browser, security, outputDir);
+                            // Phase 9: Record metrics during scraper execution
+                            const data = await recordScraperMetrics(sourceName, async () => {
+                                return await scraperFunc(browser, security, outputDir);
+                            }, {
+                                url: securityUrl
+                            });
                             logDebug(`${sourceName} scrape result: ${JSON.stringify(data)}`);
                         } catch (e) {
                             logDebug(`Error scraping ${security.key} with ${sourceName}: ${e.message}`);
@@ -877,7 +913,12 @@ async function runCycle(browser, outputDir) {
 									[sourceName]: urlInfo.url
 								};
 								logDebug(`Scraping position ${symbol} with ${sourceName}: ${urlInfo.url}`);
-								const data = await scraperFunc(browser, security, outputDir);
+								// Phase 9: Record metrics during scraper execution
+								const data = await recordScraperMetrics(sourceName, async () => {
+									return await scraperFunc(browser, security, outputDir);
+								}, {
+									url: urlInfo.url
+								});
 								logDebug(`${sourceName} scrape result for ${symbol}: ${JSON.stringify(data)}`);
 								scraped = true;
 								break; // Successfully scraped, move to next symbol
@@ -953,7 +994,12 @@ async function runCycle(browser, outputDir) {
 									[sourceName]: urlInfo.url
 								};
 								logDebug(`Scraping bond ${symbol} with ${sourceName}: ${urlInfo.url}`);
-								const data = await scraperFunc(browser, security, outputDir);
+								// Phase 9: Record metrics during scraper execution
+								const data = await recordScraperMetrics(sourceName, async () => {
+									return await scraperFunc(browser, security, outputDir);
+								}, {
+									url: urlInfo.url
+								});
 								logDebug(`${sourceName} scrape result for bond ${symbol}: ${JSON.stringify(data)}`);
 								scraped = true;
 								break; // Successfully scraped, move to next bond
