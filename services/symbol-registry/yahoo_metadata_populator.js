@@ -6,6 +6,15 @@
  * Implements batch processing with configurable throttling to avoid rate limits.
  */
 
+// Debug flag - set via environment variable
+const DEBUG = process.env.METADATA_WORKER_DEBUG === 'true' || process.env.DEBUG === 'true';
+
+function debug(...args) {
+    if (DEBUG) {
+        console.log('[YahooPopulator:DEBUG]', new Date().toISOString(), ...args);
+    }
+}
+
 class YahooMetadataPopulator {
   static CONFIG = {
     BATCH_SIZE: parseInt(process.env.YAHOO_BATCH_SIZE || '50', 10),
@@ -46,7 +55,7 @@ class YahooMetadataPopulator {
     const conn = await this.dbPool.getConnection();
     try {
       const sql = `
-        SELECT id, ticker, name, exchange, security_type, has_yahoo_metadata
+        SELECT id, symbol, name, exchange, security_type, has_yahoo_metadata
         FROM symbol_registry
         WHERE has_yahoo_metadata = 0
         AND security_type IN ('EQUITY', 'ETF')
@@ -126,7 +135,7 @@ class YahooMetadataPopulator {
       UPDATE symbol_registry
       SET has_yahoo_metadata = 1,
           sort_rank = ?,
-          last_updated = NOW()
+          updated_at = NOW()
       WHERE id = ?
     `;
 
@@ -139,7 +148,7 @@ class YahooMetadataPopulator {
    */
   async storeExtendedMetadata(conn, symbolId, ticker, metadata) {
     const sql = `
-      INSERT INTO symbol_registry_metrics (
+      INSERT INTO symbol_yahoo_metrics (
         symbol_id, ticker, market_cap, trailing_pe, dividend_yield,
         fifty_two_week_high, fifty_two_week_low, beta, trailing_revenue,
         trailing_eps, currency, recorded_at
@@ -178,6 +187,7 @@ class YahooMetadataPopulator {
    * Process a batch of symbols
    */
   async processBatch(symbols) {
+    debug(`Processing batch of ${symbols.length} symbols`);
     const conn = await this.dbPool.getConnection();
     const batchStats = {
       processed: 0,
@@ -188,19 +198,24 @@ class YahooMetadataPopulator {
     try {
       for (const symbol of symbols) {
         try {
+          debug(`[${batchStats.processed + 1}/${symbols.length}] Processing ${symbol.symbol} (id: ${symbol.id}, type: ${symbol.security_type})`);
+          
           // Fetch metadata from Yahoo
-          const result = await this.fetchYahooMetadata(symbol.ticker);
+          const result = await this.fetchYahooMetadata(symbol.symbol);
 
+          debug(`Fetch result for ${symbol.symbol}: success=${result.success}, hasMetadata=${!!result.metadata}`);
+          
           if (result.success && result.metadata) {
             // Extract and store metadata
             const extracted = this.extractMetadata(result.metadata);
+            debug(`Extracted metadata for ${symbol.symbol}:`, extracted ? `name=${extracted.name}, marketCap=${extracted.market_cap}` : 'null');
 
             // Update symbol with Yahoo metadata flag
             const rankSql = `
               UPDATE symbol_registry
               SET has_yahoo_metadata = 1,
                   sort_rank = ?,
-                  last_updated = NOW()
+                  updated_at = NOW()
               WHERE id = ?
             `;
 
@@ -209,15 +224,25 @@ class YahooMetadataPopulator {
               true, // has Yahoo metadata
               extracted?.market_cap
             );
+            debug(`Calculated new rank for ${symbol.symbol}: ${newRank}`);
 
             await conn.query(rankSql, [newRank, symbol.id]);
+            debug(`Updated symbol_registry for ${symbol.symbol} (id: ${symbol.id})`);
 
-            // Store extended metrics
-            await this.storeExtendedMetadata(conn, symbol.id, symbol.ticker, result.metadata);
+            // Store extended metrics (non-critical - don't fail the whole symbol if this fails)
+            try {
+              await this.storeExtendedMetadata(conn, symbol.id, symbol.symbol, result.metadata);
+              debug(`Stored extended metadata for ${symbol.symbol}`);
+            } catch (extErr) {
+              // Log but don't fail - the symbol_registry update already succeeded
+              debug(`Warning: Failed to store extended metrics for ${symbol.symbol}: ${extErr.message}`);
+            }
 
             batchStats.successful++;
             this.stats.successfully_updated++;
+            debug(`✓ Successfully processed ${symbol.symbol}`);
           } else {
+            debug(`✗ Failed to get metadata for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
             batchStats.failed++;
             this.stats.failed++;
           }
@@ -230,6 +255,8 @@ class YahooMetadataPopulator {
             await this.sleep(this.constructor.CONFIG.DELAY_MS);
           }
         } catch (err) {
+          console.error(`[YahooPopulator] Error processing ${symbol.symbol}:`, err.message);
+          debug(`Error stack for ${symbol.symbol}:`, err.stack);
           batchStats.failed++;
           this.stats.failed++;
           batchStats.processed++;
@@ -238,6 +265,7 @@ class YahooMetadataPopulator {
       }
     } finally {
       conn.release();
+      debug(`Batch complete: ${batchStats.successful} successful, ${batchStats.failed} failed out of ${batchStats.processed} processed`);
     }
 
     return batchStats;
@@ -400,7 +428,7 @@ class YahooMetadataPopulator {
     try {
       // Find symbol
       const selectSql = `
-        SELECT id, security_type FROM symbol_registry WHERE ticker = ? LIMIT 1
+        SELECT id, security_type FROM symbol_registry WHERE symbol = ? LIMIT 1
       `;
 
       const results = await conn.query(selectSql, [ticker]);
@@ -421,7 +449,7 @@ class YahooMetadataPopulator {
           UPDATE symbol_registry
           SET has_yahoo_metadata = 1,
               sort_rank = ?,
-              last_updated = NOW()
+              updated_at = NOW()
           WHERE id = ?
         `;
 
@@ -432,7 +460,14 @@ class YahooMetadataPopulator {
         );
 
         await conn.query(updateSql, [newRank, symbol.id]);
-        await this.storeExtendedMetadata(conn, symbol.id, ticker, result.metadata);
+        
+        // Store extended metrics (non-critical)
+        try {
+          await this.storeExtendedMetadata(conn, symbol.id, ticker, result.metadata);
+        } catch (extErr) {
+          // Log but don't fail - the symbol_registry update already succeeded
+          console.warn(`Warning: Failed to store extended metrics for ${ticker}: ${extErr.message}`);
+        }
 
         return { success: true, metadata: extracted };
       } else {

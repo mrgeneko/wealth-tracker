@@ -306,7 +306,7 @@ describe('YahooMetadataPopulator', () => {
       await populator.storeExtendedMetadata(mockConnection, 1, 'AAPL', metadata);
 
       expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('symbol_registry_metrics'),
+        expect.stringContaining('symbol_yahoo_metrics'),
         expect.arrayContaining([1, 'AAPL'])
       );
     });

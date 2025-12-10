@@ -819,9 +819,27 @@
                                 <span style="color: #e0e0e0;">Without Data</span>
                                 <span id="stat-without" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0; font-weight: bold;">Complete %</span>
                                 <span style="color: #fff; font-weight: bold;"><span id="stat-completion">0</span>%</span>
+                            </div>
+                            <!-- Queue Metrics -->
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444; border-top: 1px solid #555; margin-top: 8px; padding-top: 8px;">
+                                <span style="color: #ffb74d;">Queue Size</span>
+                                <span id="stat-queue-size" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                                <span style="color: #ffb74d;">Est. Time</span>
+                                <span id="stat-queue-time" style="color: #fff; font-weight: bold;">0 min</span>
+                            </div>
+                            <!-- Processing Metrics -->
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444; border-top: 1px solid #555; margin-top: 8px; padding-top: 8px;">
+                                <span style="color: #81c784;">Recent Updates</span>
+                                <span id="stat-recent-updates" style="color: #fff; font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                <span style="color: #81c784;">Avg Time/Symbol</span>
+                                <span id="stat-avg-time" style="color: #fff; font-weight: bold;">0s</span>
                             </div>
                         </div>
                     </div>
@@ -2976,6 +2994,14 @@
                 const withoutElement = document.getElementById('stat-without');
                 const completionElement = document.getElementById('stat-completion');
                 
+                // Queue metrics elements
+                const queueSizeElement = document.getElementById('stat-queue-size');
+                const queueTimeElement = document.getElementById('stat-queue-time');
+                
+                // Processing metrics elements  
+                const recentUpdatesElement = document.getElementById('stat-recent-updates');
+                const avgTimeElement = document.getElementById('stat-avg-time');
+                
                 const totalValue = summary.total_symbols || 0;
                 const withValue = summary.with_metadata || 0;
                 const withoutValue = summary.without_metadata || 0;
@@ -2998,6 +3024,26 @@
                 if (completionElement) {
                     completionElement.textContent = completionValue;
                     console.log('[updateMetadataStats] stat-completion element text set to:', completionElement.textContent);
+                }
+                
+                // Update queue metrics
+                const queue = data.queue || {};
+                if (queueSizeElement) {
+                    queueSizeElement.textContent = queue.size || 0;
+                }
+                if (queueTimeElement) {
+                    const estMinutes = queue.estimated_completion_minutes || 0;
+                    queueTimeElement.textContent = estMinutes > 0 ? `${estMinutes} min` : '0 min';
+                }
+                
+                // Update processing metrics
+                const processing = data.processing || {};
+                if (recentUpdatesElement) {
+                    recentUpdatesElement.textContent = processing.recent_updates_last_hour || 0;
+                }
+                if (avgTimeElement) {
+                    const avgTime = processing.avg_processing_time_seconds || 0;
+                    avgTimeElement.textContent = avgTime > 0 ? `${avgTime}s` : '0s';
                 }
                 
                 // Update status message
