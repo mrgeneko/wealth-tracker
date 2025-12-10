@@ -46,11 +46,10 @@ let metricsWebSocketServer;
 let metricsCollector;
 
 try {
+    // Pool will be created below and passed to the collector
     metricsWebSocketServer = new MetricsWebSocketServer(server);
-    metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer);
-    
-    // Make metricsCollector available globally for scrapers
-    global.metricsCollector = metricsCollector;
+    // Pool will be assigned after creation
+    metricsCollector = null; // Will be initialized after pool creation
     
     console.log('[Phase 9.2] WebSocket metrics system initialized');
 } catch (err) {
@@ -261,6 +260,19 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+// Now that pool is created, initialize the metrics collector
+try {
+    if (metricsWebSocketServer) {
+        metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer, pool);
+        // Make metricsCollector available globally for scrapers
+        global.metricsCollector = metricsCollector;
+        console.log('[Phase 9.2] Metrics collector initialized with database pool');
+    }
+} catch (err) {
+    console.error('[Phase 9.2] Failed to initialize metrics collector:', err.message);
+    console.warn('[Phase 9.2] Continuing without metrics persistence.');
+}
 
 // Initialize the autocomplete API with the pool
 const { initializePool } = require('../api/autocomplete');

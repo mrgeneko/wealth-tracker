@@ -41,10 +41,12 @@ function getLogFilePath() {
             // Fall back to current directory
         }
         
-        // Use date-based log file name
+        // Use date and time-based log file name (YYYY-MM-DD.HH-mm)
         const date = new Date();
-        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
-        logFilePath = path.join(LOG_DIR, `metadata_worker.${dateStr}.log`);
+        const isoStr = date.toISOString(); // 2025-12-10T22:43:15.123Z
+        const dateStr = isoStr.split('T')[0]; // YYYY-MM-DD
+        const timeStr = isoStr.split('T')[1].substring(0, 5).replace(':', '-'); // HH-mm
+        logFilePath = path.join(LOG_DIR, `metadata_worker.${dateStr}.${timeStr}.log`);
     }
     return logFilePath;
 }
@@ -109,16 +111,30 @@ try {
 /**
  * Minimal Yahoo Finance client wrapper
  * Uses yahoo-finance2 if available, otherwise returns null metadata
+ * 
+ * Special error handling:
+ * - Schema validation errors: marked as PERMANENT (delisted/acquired securities)
+ * - Quote not found: marked as PERMANENT (invalid ticker or delisted)
+ * - Other errors: treated as transient (network, rate limit, etc)
  */
 class YahooFinanceClient {
     constructor() {
         this.quoteSummaryModules = ['assetProfile', 'summaryDetail', 'price', 'defaultKeyStatistics'];
+        // Tickers that have permanently failed (delisted, acquired, or invalid)
+        this.permanentFailures = new Set();
     }
     
     async getMetadata(ticker) {
         if (!yahooFinance) {
             debug(`[YahooClient] No yahoo-finance2 available, skipping ${ticker}`);
             return null;
+        }
+        
+        // Check if this ticker has already permanently failed
+        if (this.permanentFailures.has(ticker)) {
+            const error = new Error('Permanently failed: ticker is delisted, acquired, or has invalid data structure');
+            error.isPermanentFailure = true;
+            throw error;
         }
         
         try {
@@ -159,9 +175,41 @@ class YahooFinanceClient {
             debug(`[YahooClient] Got metadata for ${ticker}:`, metadata.shortName || metadata.longName);
             return metadata;
         } catch (error) {
+            // Detect permanent failures
+            if (this.isPermamentFailure(error)) {
+                this.permanentFailures.add(ticker);
+                error.isPermanentFailure = true;
+                log('WARN', `[YahooClient] Permanent failure for ${ticker}: ${error.message} (will not retry)`);
+                throw error;
+            }
+            
             debug(`[YahooClient] Error fetching ${ticker}:`, error.message);
             throw error;
         }
+    }
+    
+    /**
+     * Determine if an error is permanent (won't be resolved by retrying)
+     */
+    isPermamentFailure(error) {
+        const msg = error.message || '';
+        
+        // Schema validation errors = ticker has incomplete/malformed data
+        if (msg.includes('Failed Yahoo Schema validation')) {
+            return true;
+        }
+        
+        // Quote not found = invalid ticker or delisted
+        if (msg.includes('Quote not found for symbol')) {
+            return true;
+        }
+        
+        // Invalid ticker symbol
+        if (msg.includes('No result')) {
+            return true;
+        }
+        
+        return false;
     }
 }
 
