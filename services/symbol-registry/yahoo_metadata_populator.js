@@ -55,7 +55,7 @@ class YahooMetadataPopulator {
     const conn = await this.dbPool.getConnection();
     try {
       const sql = `
-        SELECT id, symbol, name, exchange, security_type, has_yahoo_metadata
+        SELECT id, ticker, name, exchange, security_type, has_yahoo_metadata
         FROM ticker_registry
         WHERE has_yahoo_metadata = 0
         AND permanently_failed = 0

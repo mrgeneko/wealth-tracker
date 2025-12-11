@@ -309,7 +309,7 @@ router.post('/reset-type', async (req, res) => {
             INSERT INTO ticker_registry_metadata_archive 
             SELECT * FROM securities_metadata 
             WHERE ticker IN (
-                SELECT symbol FROM ticker_registry WHERE security_type = ?
+                SELECT ticker FROM ticker_registry WHERE security_type = ?
             )
         `, [securityType]);
 
@@ -317,7 +317,7 @@ router.post('/reset-type', async (req, res) => {
         await connection.execute(`
             DELETE FROM securities_metadata 
             WHERE ticker IN (
-                SELECT symbol FROM ticker_registry WHERE security_type = ?
+                SELECT ticker FROM ticker_registry WHERE security_type = ?
             )
         `, [securityType]);
 
