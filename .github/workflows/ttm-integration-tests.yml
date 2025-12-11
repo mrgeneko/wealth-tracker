@@ -93,7 +93,7 @@ jobs:
           CREATE TABLE IF NOT EXISTS positions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             account_id INT NOT NULL,
-            symbol VARCHAR(50) NOT NULL,
+            ticker VARCHAR(50) NOT NULL,
             quantity DECIMAL(18,8) NOT NULL DEFAULT 0,
             cost_basis DECIMAL(18,8),
             type VARCHAR(50) DEFAULT 'stock',
@@ -101,7 +101,7 @@ jobs:
             normalized_key VARCHAR(128),
             metadata_symbol VARCHAR(50),
             INDEX idx_positions_account (account_id),
-            INDEX idx_positions_symbol (symbol)
+            INDEX idx_positions_ticker (ticker)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
           CREATE TABLE IF NOT EXISTS fixed_assets (

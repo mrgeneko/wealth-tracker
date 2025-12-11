@@ -72,7 +72,7 @@ async function getDbConnection() {
 
 async function checkIfMetadataExists(connection, symbol) {
     const [rows] = await connection.execute(
-        'SELECT symbol, last_updated FROM securities_metadata WHERE symbol = ?',
+        'SELECT ticker, last_updated FROM securities_metadata WHERE ticker = ?',
         [symbol]
     );
     return rows.length > 0 ? rows[0] : null;

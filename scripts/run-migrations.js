@@ -7,7 +7,7 @@
  * Called during dashboard startup before the server begins.
  * 
  * Migrations are run in order:
- * - 011_create_symbol_registry.js
+ * - 011_create_ticker_registry.js
  * 
  * Environment variables:
  * - MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE

@@ -71,7 +71,7 @@ async function main() {
 }
 
 async function validateMigration(connection) {
-  const tables = ['positions', 'securities_metadata', 'symbol_registry', 'securities_dividends'];
+  const tables = ['positions', 'securities_metadata', 'ticker_registry', 'securities_dividends'];
   
   for (const table of tables) {
     const query = `
@@ -109,9 +109,9 @@ async function backfillTickers(connection) {
   totalBackfilled += metaResult.affectedRows;
   console.log(`  • Securities Metadata: ${metaResult.affectedRows} backfilled`);
 
-  // Backfill symbol_registry
+  // Backfill ticker_registry
   const [regResult] = await connection.execute(`
-    UPDATE symbol_registry 
+    UPDATE ticker_registry 
     SET ticker = UPPER(symbol) 
     WHERE ticker IS NULL AND symbol IS NOT NULL
   `);
@@ -143,7 +143,7 @@ async function normalizeTickers(connection) {
 
   // Ensure uppercase
   const [upperResult] = await connection.execute(`
-    UPDATE symbol_registry 
+    UPDATE ticker_registry 
     SET ticker = UPPER(ticker) 
     WHERE ticker != UPPER(ticker)
   `);
@@ -164,7 +164,7 @@ async function validateRelationships(connection) {
     FROM positions p 
     WHERE p.ticker IS NOT NULL 
     AND NOT EXISTS (
-      SELECT 1 FROM symbol_registry sr WHERE sr.ticker = p.ticker
+      SELECT 1 FROM ticker_registry sr WHERE sr.ticker = p.ticker
     )
   `);
   
@@ -178,7 +178,7 @@ async function validateRelationships(connection) {
     FROM securities_dividends d 
     WHERE d.ticker IS NOT NULL 
     AND NOT EXISTS (
-      SELECT 1 FROM symbol_registry sr WHERE sr.ticker = d.ticker
+      SELECT 1 FROM ticker_registry sr WHERE sr.ticker = d.ticker
     )
   `);
   
@@ -190,12 +190,12 @@ async function validateRelationships(connection) {
 }
 
 async function finalIntegrityCheck(connection) {
-  const [[totalCheck]] = await connection.execute('SELECT COUNT(*) as count FROM symbol_registry');
-  const [[nullCheck]] = await connection.execute('SELECT COUNT(*) as count FROM symbol_registry WHERE ticker IS NULL');
+  const [[totalCheck]] = await connection.execute('SELECT COUNT(*) as count FROM ticker_registry');
+  const [[nullCheck]] = await connection.execute('SELECT COUNT(*) as count FROM ticker_registry WHERE ticker IS NULL');
   const [[dupCheck]] = await connection.execute(`
     SELECT COUNT(*) as count 
     FROM (
-      SELECT ticker FROM symbol_registry GROUP BY ticker HAVING COUNT(*) > 1
+      SELECT ticker FROM ticker_registry GROUP BY ticker HAVING COUNT(*) > 1
     ) duplicates
   `);
 

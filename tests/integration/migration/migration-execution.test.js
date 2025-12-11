@@ -37,7 +37,7 @@ beforeAll(async () => {
     // Check if required tables exist
     const [tables] = await connection.query(`
       SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'symbol_registry')
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'ticker_registry')
     `);
     
     if (tables.length === 0) {
@@ -147,7 +147,7 @@ describe('Migration Execution', () => {
     expect(indexes).toBeDefined();
   });
 
-  it('should apply migration to symbol_registry table', async () => {
+  it('should apply migration to ticker_registry table', async () => {
     if (skipTests) {
       console.warn(`⏭️  Test skipped (${skipReason})`);
       return;
@@ -155,7 +155,7 @@ describe('Migration Execution', () => {
     const [columns] = await connection.query(`
       SELECT COLUMN_NAME 
       FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'symbol_registry' AND COLUMN_NAME = 'ticker'
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ticker_registry' AND COLUMN_NAME = 'ticker'
     `);
     // Ticker column may not exist yet if migration hasn't run
     expect(columns).toBeDefined();

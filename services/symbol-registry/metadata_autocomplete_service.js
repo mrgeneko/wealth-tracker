@@ -88,7 +88,7 @@ class MetadataAutocompleteService {
                 sr.security_type,
                 sr.exchange,
                 sr.source
-            FROM symbol_registry sr
+            FROM ticker_registry sr
             WHERE sr.ticker LIKE ? OR sr.name LIKE ?
             ORDER BY 
                 CASE 
@@ -121,7 +121,7 @@ class MetadataAutocompleteService {
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN metadata_fetched = 1 THEN 1 ELSE 0 END) as with_metadata
-            FROM symbol_registry
+            FROM ticker_registry
         `);
 
         if (stats.length === 0) {
@@ -197,7 +197,7 @@ class MetadataAutocompleteService {
             // Get ticker registry data
             const [registry] = await connection.execute(`
                 SELECT *
-                FROM symbol_registry
+                FROM ticker_registry 
                 WHERE ticker = ?
             `, [normalizedTicker]);
 
@@ -248,7 +248,7 @@ class MetadataAutocompleteService {
 
             const [results] = await connection.query(`
                 SELECT ticker
-                FROM symbol_registry
+                FROM ticker_registry
                 WHERE has_yahoo_metadata = 0
                 ORDER BY ticker ASC
                 LIMIT ${numLimit}
@@ -277,7 +277,7 @@ class MetadataAutocompleteService {
             connection = await this.pool.getConnection();
 
             await connection.execute(`
-                UPDATE symbol_registry
+                UPDATE ticker_registry
                 SET has_yahoo_metadata = 1,
                     updated_at = NOW()
                 WHERE ticker = ?
@@ -312,7 +312,7 @@ class MetadataAutocompleteService {
                     COUNT(*) as total_symbols,
                     SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
                     MAX(updated_at) as last_update
-                FROM symbol_registry
+                FROM ticker_registry
             `);
             console.log('[getStatistics] Summary query complete:', registry[0]);
 
@@ -323,7 +323,7 @@ class MetadataAutocompleteService {
                     security_type,
                     COUNT(*) as count,
                     SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata
-                FROM symbol_registry
+                FROM ticker_registry
                 GROUP BY security_type
                 ORDER BY count DESC
             `);
@@ -337,7 +337,7 @@ class MetadataAutocompleteService {
             // Get queue metrics (symbols needing metadata)
             const [queueResult] = await connection.execute(`
                 SELECT COUNT(*) as queue_size
-                FROM symbol_registry 
+                FROM ticker_registry 
                 WHERE has_yahoo_metadata = 0 
                 AND security_type IN ('EQUITY', 'ETF', 'MUTUAL_FUND')
             `);
@@ -410,7 +410,7 @@ class MetadataAutocompleteService {
 
             // Reset has_yahoo_metadata flag to trigger re-fetch
             await connection.execute(`
-                UPDATE symbol_registry
+                UPDATE ticker_registry
                 SET has_yahoo_metadata = 0,
                     updated_at = NOW()
                 WHERE ticker = ?

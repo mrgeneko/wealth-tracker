@@ -83,12 +83,12 @@ class IntegrationTest {
 
             // Check if metadata was inserted
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE symbol = ?',
+                'SELECT * FROM securities_metadata WHERE ticker = ?',
                 ['AAPL']
             );
 
             assert.strictEqual(rows.length, 1, 'Should insert metadata');
-            assert.strictEqual(rows[0].symbol, 'AAPL');
+            assert.strictEqual(rows[0].ticker, 'AAPL');
             assert.ok(rows[0].short_name, 'Should have short_name');
             assert.strictEqual(rows[0].quote_type, 'EQUITY');
         });
@@ -107,7 +107,7 @@ class IntegrationTest {
         await this.test('Populate multiple symbols (2 symbols for CI)', async () => {
             // Create test positions for just 2 symbols to keep tests fast
             await this.connection.execute(
-                `INSERT INTO positions (account_id, symbol, quantity, type)
+                `INSERT INTO positions (account_id, ticker, quantity, type)
          VALUES (1, 'MSFT', 100, 'stock'), (1, 'GOOGL', 50, 'stock')
          ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)`
             );
@@ -118,7 +118,7 @@ class IntegrationTest {
 
             // Check if both were populated
             const [rows] = await this.connection.execute(
-                'SELECT symbol FROM securities_metadata WHERE symbol IN (?, ?)',
+                'SELECT ticker FROM securities_metadata WHERE ticker IN (?, ?)',
                 ['MSFT', 'GOOGL']
             );
 
@@ -142,7 +142,7 @@ class IntegrationTest {
             // Check if some stocks were populated
             const [rows] = await this.connection.execute(
                 `SELECT COUNT(*) as count FROM securities_metadata 
-         WHERE symbol IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA')`
+         WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA')`
             );
 
             assert.ok(rows[0].count >= 1, 'Should populate at least one stock');
@@ -152,7 +152,7 @@ class IntegrationTest {
     async testDataQuality() {
         await this.test('Verify data quality for AAPL', async () => {
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE symbol = ?',
+                'SELECT * FROM securities_metadata WHERE ticker = ?',
                 ['AAPL']
             );
 

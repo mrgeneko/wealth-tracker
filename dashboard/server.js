@@ -320,7 +320,7 @@ async function initializeSymbolRegistry() {
         console.log('[Symbol Registry] Full sync results:', JSON.stringify(stats, null, 2));
         
         // Verify data was inserted
-        const [checkResult] = await pool.query('SELECT COUNT(*) as count FROM symbol_registry');
+        const [checkResult] = await pool.query('SELECT COUNT(*) as count FROM ticker_registry');
         console.log('[Symbol Registry] Verification - records in database:', checkResult[0].count);
     } catch (err) {
         console.error('[Symbol Registry] Sync error:', err.message);
@@ -965,7 +965,7 @@ app.post('/api/import', async (req, res) => {
             // Insert positions
             for (const position of positions) {
                 await pool.execute(
-                    'INSERT INTO positions (account_id, symbol, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO positions (account_id, ticker, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         position.account_id,
                         position.ticker,
@@ -1074,7 +1074,7 @@ app.post('/api/positions', async (req, res) => {
     const { account_id, symbol, type, quantity, currency } = req.body;
     try {
         const [result] = await pool.execute(
-            'INSERT INTO positions (account_id, symbol, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
             [account_id, symbol, type, quantity, currency || 'USD']
         );
         assetsCache = null;
@@ -1089,7 +1089,7 @@ app.put('/api/positions/:id', async (req, res) => {
     const { symbol, type, quantity, currency } = req.body;
     try {
         await pool.execute(
-            'UPDATE positions SET symbol=?, type=?, quantity=?, currency=? WHERE id=?',
+            'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
             [symbol, type, quantity, currency || 'USD', req.params.id]
         );
         assetsCache = null;
