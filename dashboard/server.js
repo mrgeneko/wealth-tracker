@@ -11,8 +11,8 @@ const basicAuth = require('express-basic-auth');
 const { loadAllTickers } = require('./ticker_registry');
 
 // Phase 9.2: WebSocket Real-time Metrics
-const MetricsWebSocketServer = require('../services/websocket-server');
-const ScraperMetricsCollector = require('../services/scraper-metrics-collector');
+const MetricsWebSocketServer = require('./services/websocket-server');
+const ScraperMetricsCollector = require('./services/scraper-metrics-collector');
 
 const app = express();
 
@@ -167,15 +167,15 @@ const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'test';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'testdb';
 
 // Mount Metadata API
-const metadataRouter = require('../api/metadata');
+const metadataRouter = require('./api/metadata');
 app.use('/api/metadata', metadataRouter);
 
 // Mount Autocomplete API (will be initialized after pool is created)
-const { router: autocompleteRouter } = require('../api/autocomplete');
+const { router: autocompleteRouter } = require('./api/autocomplete');
 app.use('/api/autocomplete', autocompleteRouter);
 
 // Mount Cleanup API (will be initialized after pool is created)
-const { router: cleanupRouter } = require('../api/cleanup');
+const { router: cleanupRouter } = require('./api/cleanup');
 app.use('/api/cleanup', cleanupRouter);
 
 // Phase 9.3: Analytics Dashboard Route
@@ -293,27 +293,27 @@ try {
 }
 
 // Initialize the autocomplete API with the pool
-const { initializePool } = require('../api/autocomplete');
+const { initializePool } = require('./api/autocomplete');
 initializePool(pool);
 
 // Initialize the cleanup API with the pool
-const { initializePool: initializeCleanupPool } = require('../api/cleanup');
+const { initializePool: initializeCleanupPool } = require('./api/cleanup');
 initializeCleanupPool(pool);
 
 // Initialize the statistics API with the pool
-const { router: statisticsRouter, initializePool: initializeStatisticsPool } = require('../api/statistics');
+const { router: statisticsRouter, initializePool: initializeStatisticsPool } = require('./api/statistics');
 app.use('/api/statistics', statisticsRouter);
 initializeStatisticsPool(pool);
 
 // Initialize the metrics API with the pool
-const { router: metricsRouter, initializePool: initializeMetricsPool } = require('../api/metrics');
+const { router: metricsRouter, initializePool: initializeMetricsPool } = require('./api/metrics');
 app.use('/api/metrics', metricsRouter);
 initializeMetricsPool(pool);
 
 // Initialize symbol registry sync service to load CSV data on startup
 async function initializeSymbolRegistry() {
     try {
-        const { SymbolRegistrySyncService, SymbolRegistryService } = require('../services/symbol-registry');
+        const { SymbolRegistrySyncService, SymbolRegistryService } = require('./services/symbol-registry');
         const symbolService = new SymbolRegistryService(pool);
         const syncService = new SymbolRegistrySyncService(pool, symbolService);
         
@@ -700,6 +700,170 @@ app.get('/api/tickers', (req, res) => {
     } catch (err) {
         console.error('Error loading tickers:', err);
         res.status(500).json({ error: 'Failed to load tickers' });
+    }
+});
+
+// Helper: Detect if a symbol is a bond by looking it up in the treasury file
+// Returns true if the symbol exists in the treasury registry (exchange === 'TREASURY')
+function isBondSymbol(symbol) {
+    if (!symbol) return false;
+    const clean = symbol.trim().toUpperCase();
+    
+    // Look up in ticker registry which loads from us-treasury-auctions.csv
+    const allTickers = loadAllTickers();
+    const ticker = allTickers.find(t => t.symbol === clean);
+    
+    // If found and exchange is TREASURY, it's a bond
+    if (ticker && ticker.exchange === 'TREASURY') {
+        return true;
+    }
+    
+    return false;
+}
+
+// Helper: Trigger bond scrape by touching the marker file
+// This forces the scrape daemon to run bond_positions on its next cycle
+function triggerBondScrape() {
+    // Use same path as scrape_daemon.js: /usr/src/app/logs/last.bond_positions.txt
+    const markerPath = process.env.BOND_MARKER_PATH || '/usr/src/app/logs/last.bond_positions.txt';
+    try {
+        // Write timestamp 0 to force the daemon to think the task hasn't run
+        fs.writeFileSync(markerPath, '0\nTriggered by dashboard\n');
+        console.log(`[FetchPrice] Touched bond marker file: ${markerPath}`);
+        return true;
+    } catch (err) {
+        console.error(`[FetchPrice] Failed to touch bond marker file: ${err.message}`);
+        return false;
+    }
+}
+
+// API to fetch current price for a symbol and inject into price cache
+// Used when adding a new symbol to ensure immediate price display
+// Also publishes to Kafka so the price persists to MySQL via the consumer
+app.post('/api/fetch-price', async (req, res) => {
+    const { symbol, type } = req.body;
+
+    if (!symbol || !symbol.trim()) {
+        return res.status(400).json({ error: 'Symbol is required' });
+    }
+
+    const cleanSymbol = symbol.trim().toUpperCase();
+    
+    // Detect if this is a bond (by type parameter or treasury registry lookup)
+    const isBond = type === 'bond' || isBondSymbol(cleanSymbol);
+    
+    if (isBond) {
+        // For bonds, trigger the scrape daemon to fetch prices on its next cycle
+        // This avoids duplicating the Webull scraping code
+        console.log(`[FetchPrice] Detected bond ${cleanSymbol}, triggering scrape daemon...`);
+        const triggered = triggerBondScrape();
+        
+        return res.json({
+            symbol: cleanSymbol,
+            isBond: true,
+            triggered: triggered,
+            message: triggered 
+                ? 'Bond price will be fetched by scrape daemon on next cycle'
+                : 'Failed to trigger scrape daemon, check logs',
+            note: 'Bond prices are scraped asynchronously via Webull'
+        });
+    }
+    
+    // Stock/ETF: Use Yahoo Finance
+    try {
+        // Load yahoo-finance2 v3 (requires instantiation)
+        const YahooFinanceClass = require('yahoo-finance2').default || require('yahoo-finance2');
+        const yahooFinance = new YahooFinanceClass({
+            suppressNotices: ['yahooSurvey', 'rippieTip']
+        });
+        
+        console.log(`[FetchPrice] Fetching current price for ${cleanSymbol}...`);
+        const quote = await yahooFinance.quote(cleanSymbol);
+
+        if (!quote || !quote.regularMarketPrice) {
+            return res.status(404).json({
+                error: 'No price data returned',
+                symbol: cleanSymbol
+            });
+        }
+
+        const price = quote.regularMarketPrice;
+        const previousClose = quote.regularMarketPreviousClose || null;
+        const now = new Date().toISOString();
+
+        // Update the in-memory price cache for immediate display
+        priceCache[cleanSymbol] = {
+            price: price,
+            previous_close_price: previousClose,
+            prev_close_source: 'yahoo',
+            prev_close_time: now,
+            currency: quote.currency || 'USD',
+            time: now,
+            source: 'yahoo'
+        };
+
+        // Broadcast to all connected clients for immediate UI update
+        io.emit('price_update', priceCache);
+
+        console.log(`[FetchPrice] Updated price cache for ${cleanSymbol}: $${price}`);
+
+        // Publish to Kafka so the consumer persists to MySQL
+        let kafkaPublished = false;
+        try {
+            const { Kafka } = require('kafkajs');
+            const kafka = new Kafka({
+                clientId: 'dashboard-fetch-price',
+                brokers: (process.env.KAFKA_BROKERS || 'kafka:9092').split(',')
+            });
+            const producer = kafka.producer();
+            await producer.connect();
+            
+            // Format message to match what the Kafka consumer expects
+            // Consumer uses data.get('key') for the ticker
+            const kafkaMessage = {
+                key: cleanSymbol,                    // Required by consumer
+                symbol: cleanSymbol,
+                normalized_key: cleanSymbol,
+                regular_price: price,
+                previous_close_price: previousClose,
+                currency: quote.currency || 'USD',
+                time: now,
+                source: 'yahoo',
+                scraper: 'dashboard-fetch'
+            };
+            
+            await producer.send({
+                topic: process.env.KAFKA_TOPIC || 'price_data',
+                messages: [{
+                    key: cleanSymbol,
+                    value: JSON.stringify(kafkaMessage)
+                }]
+            });
+            
+            await producer.disconnect();
+            kafkaPublished = true;
+            console.log(`[FetchPrice] Published ${cleanSymbol} to Kafka for persistence`);
+        } catch (kafkaErr) {
+            console.error(`[FetchPrice] Kafka publish failed for ${cleanSymbol}:`, kafkaErr.message);
+            // Don't fail the request - price is already in cache for immediate display
+        }
+
+        res.json({
+            symbol: cleanSymbol,
+            price: price,
+            previousClose: previousClose,
+            currency: quote.currency || 'USD',
+            timestamp: now,
+            cached: true,
+            persisted: kafkaPublished
+        });
+
+    } catch (error) {
+        console.error(`[FetchPrice] Error fetching price for ${cleanSymbol}:`, error.message);
+        res.status(500).json({
+            error: error.message,
+            symbol: cleanSymbol
+        });
     }
 });
 

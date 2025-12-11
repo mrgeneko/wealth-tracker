@@ -20,6 +20,7 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
       - ./data:/usr/src/app/data
+      - ./config:/usr/src/app/config
     ports:
       - "5901:5901"
       - "3002:3002"
