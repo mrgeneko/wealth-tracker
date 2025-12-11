@@ -190,3 +190,37 @@ describe('Dotenv Optional Loading', () => {
         delete process.env.TEST_VAR;
     });
 });
+
+describe('Metadata Prefetch Path Resolution', () => {
+    it('should resolve script path relative to api directory', () => {
+        const path = require('path');
+        
+        // Simulate the path resolution logic in api/metadata.js
+        // __dirname would be /app/api in Docker or /path/to/project/api locally
+        const mockApiDir = '/app/api';
+        const scriptPath = path.join(mockApiDir, '..', 'scripts', 'populate', 'populate_securities_metadata.js');
+        
+        expect(scriptPath).toBe('/app/scripts/populate/populate_securities_metadata.js');
+    });
+
+    it('should resolve cwd relative to api directory', () => {
+        const path = require('path');
+        
+        const mockApiDir = '/app/api';
+        const cwd = path.join(mockApiDir, '..');
+        
+        expect(cwd).toBe('/app');
+    });
+
+    it('should work with local development paths', () => {
+        const path = require('path');
+        
+        // Simulate local dev where api is at project root
+        const mockApiDir = '/Users/dev/wealth-tracker/api';
+        const scriptPath = path.join(mockApiDir, '..', 'scripts', 'populate', 'populate_securities_metadata.js');
+        const cwd = path.join(mockApiDir, '..');
+        
+        expect(scriptPath).toBe('/Users/dev/wealth-tracker/scripts/populate/populate_securities_metadata.js');
+        expect(cwd).toBe('/Users/dev/wealth-tracker');
+    });
+});

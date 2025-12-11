@@ -11,8 +11,8 @@ const basicAuth = require('express-basic-auth');
 const { loadAllTickers } = require('./ticker_registry');
 
 // Phase 9.2: WebSocket Real-time Metrics
-const MetricsWebSocketServer = require('../services/websocket-server');
-const ScraperMetricsCollector = require('../services/scraper-metrics-collector');
+const MetricsWebSocketServer = require('./services/websocket-server');
+const ScraperMetricsCollector = require('./services/scraper-metrics-collector');
 
 const app = express();
 
@@ -167,15 +167,15 @@ const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'test';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'testdb';
 
 // Mount Metadata API
-const metadataRouter = require('../api/metadata');
+const metadataRouter = require('./api/metadata');
 app.use('/api/metadata', metadataRouter);
 
 // Mount Autocomplete API (will be initialized after pool is created)
-const { router: autocompleteRouter } = require('../api/autocomplete');
+const { router: autocompleteRouter } = require('./api/autocomplete');
 app.use('/api/autocomplete', autocompleteRouter);
 
 // Mount Cleanup API (will be initialized after pool is created)
-const { router: cleanupRouter } = require('../api/cleanup');
+const { router: cleanupRouter } = require('./api/cleanup');
 app.use('/api/cleanup', cleanupRouter);
 
 // Phase 9.3: Analytics Dashboard Route
@@ -293,27 +293,27 @@ try {
 }
 
 // Initialize the autocomplete API with the pool
-const { initializePool } = require('../api/autocomplete');
+const { initializePool } = require('./api/autocomplete');
 initializePool(pool);
 
 // Initialize the cleanup API with the pool
-const { initializePool: initializeCleanupPool } = require('../api/cleanup');
+const { initializePool: initializeCleanupPool } = require('./api/cleanup');
 initializeCleanupPool(pool);
 
 // Initialize the statistics API with the pool
-const { router: statisticsRouter, initializePool: initializeStatisticsPool } = require('../api/statistics');
+const { router: statisticsRouter, initializePool: initializeStatisticsPool } = require('./api/statistics');
 app.use('/api/statistics', statisticsRouter);
 initializeStatisticsPool(pool);
 
 // Initialize the metrics API with the pool
-const { router: metricsRouter, initializePool: initializeMetricsPool } = require('../api/metrics');
+const { router: metricsRouter, initializePool: initializeMetricsPool } = require('./api/metrics');
 app.use('/api/metrics', metricsRouter);
 initializeMetricsPool(pool);
 
 // Initialize symbol registry sync service to load CSV data on startup
 async function initializeSymbolRegistry() {
     try {
-        const { SymbolRegistrySyncService, SymbolRegistryService } = require('../services/symbol-registry');
+        const { SymbolRegistrySyncService, SymbolRegistryService } = require('./services/symbol-registry');
         const symbolService = new SymbolRegistryService(pool);
         const syncService = new SymbolRegistrySyncService(pool, symbolService);
         
