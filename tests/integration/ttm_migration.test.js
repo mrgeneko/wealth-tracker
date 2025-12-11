@@ -6,6 +6,8 @@ require('dotenv').config();
 const assert = require('assert');
 const mysql = require('mysql2/promise');
 const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const TEST_DB_CONFIG = {
   host: process.env.MYSQL_HOST || 'localhost',
@@ -14,6 +16,42 @@ const TEST_DB_CONFIG = {
   password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DATABASE
 };
+
+async function initializeSchema(conn) {
+  // Read and execute init scripts
+  const baseSchemaPath = path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql');
+  const symbolRegistryPath = path.join(__dirname, '../..', 'scripts/init-db/001-symbol-registry.sql');
+
+  if (fs.existsSync(baseSchemaPath)) {
+    const baseSchema = fs.readFileSync(baseSchemaPath, 'utf8');
+    // Split by semicolon and execute each statement
+    const statements = baseSchema.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        // Ignore table already exists errors
+        if (err.code !== 'ER_TABLE_EXISTS_ERROR') {
+          console.warn('Warning executing schema statement:', err.message);
+        }
+      }
+    }
+  }
+
+  if (fs.existsSync(symbolRegistryPath)) {
+    const symbolRegistry = fs.readFileSync(symbolRegistryPath, 'utf8');
+    const statements = symbolRegistry.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        if (err.code !== 'ER_TABLE_EXISTS_ERROR') {
+          console.warn('Warning executing schema statement:', err.message);
+        }
+      }
+    }
+  }
+}
 
 async function runScript(cmd, args = []) {
   return new Promise((resolve, reject) => {
@@ -33,6 +71,14 @@ async function isoDateDaysAgo(days) {
 
 async function main() {
   const conn = await mysql.createConnection(TEST_DB_CONFIG);
+  
+  try {
+    // Initialize schema
+    await initializeSchema(conn);
+  } catch (err) {
+    console.error('Failed to initialize schema:', err);
+  }
+
   const sym = 'TTMTEST';
 
   // Ensure clean slate
