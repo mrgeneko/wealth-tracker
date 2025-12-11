@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ttm_eps_adjusted.test" tests="1" failures="0" time="0.262">
-  <testcase classname="integration" name="ttm_eps_adjusted.test.js" time="0.262">
+<testsuite name="ttm_eps_adjusted.test" tests="1" failures="0" time="0.240">
+  <testcase classname="integration" name="ttm_eps_adjusted.test.js" time="0.240">
     
     <system-out><![CDATA[
 [TEST] Running backfill_adjusted_eps.js --symbol=TTM_EPS_ADJ --apply
 [APPLY] Backfill adjusted_eps
 Found 4 earnings rows to process
-Updated id=263 adjusted_eps=0.500000
-Updated id=264 adjusted_eps=0.550000
-Updated id=265 adjusted_eps=0.600000
-Updated id=266 adjusted_eps=0.600000
+Updated id=73 adjusted_eps=0.500000
+Updated id=74 adjusted_eps=0.550000
+Updated id=75 adjusted_eps=0.600000
+Updated id=76 adjusted_eps=0.600000
 Backfill adjusted EPS complete.
 
 [TEST] Running recompute_ttm.js --symbol=TTM_EPS_ADJ --apply
@@ -19,7 +19,7 @@ TTM recompute complete.
 
 [TEST] Completed successfully
 ]]></system-out>
-    <system-err><![CDATA[(node:60188) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+    <system-err><![CDATA[(node:97985) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ]]></system-err>
   </testcase>
