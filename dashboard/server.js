@@ -46,11 +46,10 @@ let metricsWebSocketServer;
 let metricsCollector;
 
 try {
+    // Pool will be created below and passed to the collector
     metricsWebSocketServer = new MetricsWebSocketServer(server);
-    metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer);
-    
-    // Make metricsCollector available globally for scrapers
-    global.metricsCollector = metricsCollector;
+    // Pool will be assigned after creation
+    metricsCollector = null; // Will be initialized after pool creation
     
     console.log('[Phase 9.2] WebSocket metrics system initialized');
 } catch (err) {
@@ -251,6 +250,24 @@ async function fetchInitialPrices() {
     console.error('Failed to fetch initial prices after multiple attempts. Continuing with empty cache.');
 }
 
+// Run database migrations on startup
+async function runDatabaseMigrations() {
+    try {
+        console.log('\n🔄 Running database migrations...');
+        const { runAllMigrations } = require('../scripts/run-migrations');
+        const success = await runAllMigrations();
+        
+        if (!success) {
+            console.warn('⚠️  Some migrations failed, but continuing startup');
+        } else {
+            console.log('✅ All migrations completed successfully');
+        }
+    } catch (err) {
+        console.error('❌ Failed to run migrations:', err.message);
+        console.warn('⚠️  Continuing startup without migrations. Database schema may be incomplete.');
+    }
+}
+
 const pool = mysql.createPool({
     host: process.env.MYSQL_HOST,
     port: process.env.MYSQL_PORT,
@@ -261,6 +278,19 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+// Now that pool is created, initialize the metrics collector
+try {
+    if (metricsWebSocketServer) {
+        metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer, pool);
+        // Make metricsCollector available globally for scrapers
+        global.metricsCollector = metricsCollector;
+        console.log('[Phase 9.2] Metrics collector initialized with database pool');
+    }
+} catch (err) {
+    console.error('[Phase 9.2] Failed to initialize metrics collector:', err.message);
+    console.warn('[Phase 9.2] Continuing without metrics persistence.');
+}
 
 // Initialize the autocomplete API with the pool
 const { initializePool } = require('../api/autocomplete');
@@ -986,6 +1016,7 @@ if (isMainModule || !isTestEnv) {
     // Self-execute async start wrapper
     (async () => {
         try {
+            await runDatabaseMigrations();
             await ensureSchema();
             await initializeSymbolRegistry();
             server.listen(PORT, async () => {
