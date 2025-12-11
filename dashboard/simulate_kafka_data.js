@@ -10,7 +10,7 @@ const kafka = new Kafka({
 
 const producer = kafka.producer();
 
-// Tickers from your assets_liabilities.json
+// Sample tickers for price simulation (configurable test data)
 const TICKERS = [
     'QQQ', 'SCHG', 'VTI', 'BKLC', '91282CGA3', '91282CGE5'
 ];
