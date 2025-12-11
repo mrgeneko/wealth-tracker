@@ -57,7 +57,6 @@ services:
       TREASURY_HISTORICAL_FILE: /app/config/Auctions_Query_19791115_20251215.csv
     volumes:
       - ./logs:/usr/src/app/logs
-      - ./config/assets_liabilities.json:/assets_liabilities.json:ro
       - ./config:/app/config:ro
     ports:
       - "3001:3001"
