@@ -13,6 +13,16 @@ This is the **Docker-recommended approach** for initializing databases in contai
 
 ## Files
 
+- **000-base-schema.sql** - Creates core Wealth Tracker tables (REQUIRED - must run first)
+  - `accounts` - Investment and bank accounts
+  - `positions` - Holdings (stocks, bonds, cash) within accounts
+  - `fixed_assets` - Real estate and vehicles
+  - `latest_prices` - Current and historical pricing data
+  - `securities_metadata` - Security metadata (names, sectors, metrics)
+  - `securities_dividends` - Dividend information
+  - `securities_earnings` - Earnings information
+  - `security_splits` - Stock split information
+
 - **001-symbol-registry.sql** - Creates symbol registry tables for autocomplete and metadata tracking
   - `symbol_registry` - Main symbol registry with permanent failure tracking
   - `symbol_registry_metrics` - Coverage and refresh metrics

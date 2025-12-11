@@ -86,9 +86,33 @@ For detailed Phase 9 information, see:
 This repository contains Node.js scraper code that runs a persistent daemon to collect price and watchlist data from multiple sources (Yahoo Finance, Google Finance, Robinhood, StockEvents, and more) using Puppeteer/Chrome, publishes messages to Kafka, and provides a real-time web dashboard for portfolio tracking. The system supports comprehensive data management with import/export capabilities and persistent settings.
 This README focuses on running the project in Docker, the long-running scraper daemon, and operational instructions (start/stop/logs/heartbeat). For additional operational notes see `DAEMON.md`.
 ---
+## Fresh Container Setup
+
+**⚠️ Important:** Before running a fresh container, validate your setup:
+
+```bash
+# Validate all dependencies and configurations
+./scripts/validate-fresh-container.sh
+```
+
+This script checks for:
+- ✅ `.env` file with required credentials
+- ✅ Required data files (CSV files, assets_liabilities.json)
+- ✅ Port availability (3001, 3306, 9092, 2181)
+- ✅ Docker and Docker Compose installation
+- ✅ Existing containers/volumes
+
+If validation fails, fix the errors before proceeding. See [FRESH_CONTAINER_ISSUES.md](FRESH_CONTAINER_ISSUES.md) for detailed troubleshooting.
+
 ## Quick Start (Docker Compose)
 The easiest way to run the full stack locally (Kafka, Zookeeper, MySQL, scrapers, etc.) is with Docker Compose.
-1. Build and start services:
+
+1. **Validate setup** (fresh install only):
+```bash
+./scripts/validate-fresh-container.sh
+```
+
+2. Build and start services:
 ```bash
 # build the scrapers image and start the scrapers service only
 docker compose build scrapers
