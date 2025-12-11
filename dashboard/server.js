@@ -712,7 +712,7 @@ function isBondSymbol(symbol) {
     const tickerObj = allTickers.find(t => t.ticker === clean);
     
     // If found and exchange is TREASURY, it's a bond
-    if (ticker && ticker.exchange === 'TREASURY') {
+    if (tickerObj && tickerObj.exchange === 'TREASURY') {
         return true;
     }
     

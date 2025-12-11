@@ -14,6 +14,7 @@
       "listen_timeout": 8000,
       "env": {
         "NODE_ENV": "production",
+        "SERVICE_BASE_PATH": "/app/services",
         "METADATA_WORKER_DEBUG": "true",
         "METADATA_WORKER_CHECK_INTERVAL_MS": "60000",
         "METADATA_WORKER_MAX_PER_RUN": "500", 
