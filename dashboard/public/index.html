@@ -1176,8 +1176,8 @@
             if (lastAssetsData && lastAssetsData.accounts) {
                 const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
                 if (acc) {
-                    acc.holdings.stocks.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
-                    acc.holdings.bonds.forEach(pos => { if (pos.symbol.toUpperCase() === symbol) symbolExists = true; });
+                    acc.holdings.stocks.forEach(pos => { if ((pos.ticker || '').toUpperCase() === symbol) symbolExists = true; });
+                    acc.holdings.bonds.forEach(pos => { if ((pos.ticker || '').toUpperCase() === symbol) symbolExists = true; });
                 }
             }
             if (symbolExists) {
@@ -1214,7 +1214,7 @@
                     console.warn('Metadata prefetch failed:', e);
                 }
 
-                await fetch('/api/positions', {
+                const response = await fetch('/api/positions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1225,10 +1225,15 @@
                         currency
                     })
                 });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to add position');
+                }
                 closeModal('addSymbolModal');
                 fetchAssets();
             } catch (err) {
-                document.getElementById('addSymbolError').innerText = 'Error adding symbol.';
+                console.error('Error adding symbol:', err);
+                document.getElementById('addSymbolError').innerText = err.message || 'Error adding symbol.';
                 document.getElementById('addSymbolError').style.display = 'block';
             }
         };
@@ -1329,11 +1334,11 @@
             lastAssetsData.accounts.forEach(acc => {
                 if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
                     netWorth += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
                     // Bonds use price/100
                     netWorth += p.quantity * (price / 100.0);
                 });
@@ -1350,8 +1355,8 @@
             // Collect all unique symbols
             const allSymbols = new Set();
             accounts.forEach(acc => {
-                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.symbol));
-                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.symbol));
+                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.ticker));
+                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.ticker));
             });
 
             let grandTotalValueChange = 0;
@@ -1423,10 +1428,10 @@
                 let symTotalValueChange = 0;
 
                 accounts.forEach(acc => {
-                    let pos = acc.holdings.stocks.find(p => p.symbol === sym);
+                    let pos = acc.holdings.stocks.find(p => p.ticker === sym);
                     let isBond = false;
                     if (!pos) {
-                        pos = acc.holdings.bonds.find(p => p.symbol === sym);
+                        pos = acc.holdings.bonds.find(p => p.ticker === sym);
                         if (pos) isBond = true;
                     }
 
@@ -1571,12 +1576,12 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const priceData = getPriceDataForSymbol(p.symbol);
+                    const priceData = getPriceDataForSymbol(p.ticker);
                     let price = priceData?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const priceData = getPriceDataForSymbol(p.symbol);
+                    const priceData = getPriceDataForSymbol(p.ticker);
                     let price = priceData?.price || 0;
                     // Bonds use price/100
                     accTotal += p.quantity * (price / 100.0);
@@ -1674,8 +1679,8 @@
             // Collect all unique symbols
             const allSymbols = new Set();
             accounts.forEach(acc => {
-                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.symbol));
-                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.symbol));
+                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.ticker));
+                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.ticker));
             });
             const sortedSymbols = Array.from(allSymbols).sort();
 
@@ -1781,7 +1786,7 @@
 
                 // Find metadata from position (if any account has valid metadata)
                 for (const acc of accounts) {
-                    const stockPos = acc.holdings.stocks.find(p => p.symbol === sym);
+                    const stockPos = acc.holdings.stocks.find(p => p.ticker === sym);
                     if (stockPos) {
                         if (stockPos.short_name) metaName = stockPos.short_name;
                         if (stockPos.sector) metaSector = stockPos.sector;
@@ -1836,10 +1841,10 @@
 
                 accounts.forEach(acc => {
                     // Find position in stocks or bonds
-                    let pos = acc.holdings.stocks.find(p => p.symbol === sym);
+                    let pos = acc.holdings.stocks.find(p => p.ticker === sym);
                     let isBond = false;
                     if (!pos) {
-                        pos = acc.holdings.bonds.find(p => p.symbol === sym);
+                        pos = acc.holdings.bonds.find(p => p.ticker === sym);
                         if (pos) isBond = true;
                     }
 
@@ -1856,7 +1861,7 @@
                         symTotalValueChange += pos.quantity * calcChange;
                         symTotalShares += pos.quantity;
                         const posType = isBond ? 'bond' : 'stock';
-                        const posData = { id: pos.id, account_id: acc.id, symbol: pos.symbol, type: posType, quantity: pos.quantity };
+                        const posData = { id: pos.id, account_id: acc.id, symbol: pos.ticker, type: posType, quantity: pos.quantity };
                         const posJson = escapeHtml(JSON.stringify(posData));
 
                         // Check for value changes and apply flash animations
@@ -2059,11 +2064,11 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
                 acc.holdings.stocks.forEach(p => {
-                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = getPriceDataForSymbol(p.symbol)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
                     accTotal += p.quantity * (price / 100.0);
                 });
                 grandTotal += accTotal;
@@ -2395,11 +2400,11 @@
 
             document.getElementById('posAccountId').value = pos.account_id;
             document.getElementById('posQuantity').value = pos.quantity;
-            document.getElementById('posSymbol').value = pos.symbol;
+            document.getElementById('posSymbol').value = pos.symbol || pos.ticker;
             document.getElementById('posType').value = pos.type;
 
             // Output-only fields
-            document.getElementById('posSymbolDisplay').textContent = pos.symbol;
+            document.getElementById('posSymbolDisplay').textContent = pos.symbol || pos.ticker;
             document.getElementById('posTypeDisplay').textContent = (pos.type || '').charAt(0).toUpperCase() + (pos.type || '').slice(1);
             // Use account_name if present, otherwise look up
             let accountName = pos.account_name || '';
