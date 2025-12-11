@@ -90,25 +90,25 @@ class MetadataAPITest {
     async testMetadataInsertion() {
         await this.test('Insert test metadata', async () => {
             await this.connection.execute(
-                `INSERT INTO securities_metadata (symbol, quote_type, short_name, currency)
+                `INSERT INTO securities_metadata (ticker, quote_type, short_name, currency)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE short_name = VALUES(short_name)`,
                 ['TEST', 'EQUITY', 'Test Company', 'USD']
             );
 
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE symbol = ?',
+                'SELECT * FROM securities_metadata WHERE ticker = ?',
                 ['TEST']
             );
             assert.strictEqual(rows.length, 1, 'Should insert one row');
-            assert.strictEqual(rows[0].symbol, 'TEST');
+            assert.strictEqual(rows[0].ticker, 'TEST');
             assert.strictEqual(rows[0].quote_type, 'EQUITY');
         });
 
         await this.test('Unique constraint on symbol', async () => {
             try {
                 await this.connection.execute(
-                    `INSERT INTO securities_metadata (symbol, quote_type) VALUES (?, ?)`,
+                    `INSERT INTO securities_metadata (ticker, quote_type) VALUES (?, ?)`,
                     ['TEST', 'ETF']
                 );
                 throw new Error('Should have thrown duplicate key error');
@@ -123,7 +123,7 @@ class MetadataAPITest {
         await this.test('Earnings foreign key to metadata', async () => {
             // Should succeed with valid symbol
             await this.connection.execute(
-                `INSERT INTO securities_earnings (symbol, earnings_date)
+                `INSERT INTO securities_earnings (ticker, earnings_date)
          VALUES (?, NOW())
          ON DUPLICATE KEY UPDATE earnings_date = VALUES(earnings_date)`,
                 ['TEST']
@@ -132,7 +132,7 @@ class MetadataAPITest {
             // Should fail with invalid symbol
             try {
                 await this.connection.execute(
-                    `INSERT INTO securities_earnings (symbol, earnings_date)
+                    `INSERT INTO securities_earnings (ticker, earnings_date)
            VALUES (?, NOW())`,
                     ['NONEXISTENT']
                 );
@@ -146,27 +146,27 @@ class MetadataAPITest {
         await this.test('Cascade delete on metadata removal', async () => {
             // Insert test data
             await this.connection.execute(
-                `INSERT INTO securities_metadata (symbol, quote_type) 
+                `INSERT INTO securities_metadata (ticker, quote_type) 
          VALUES (?, ?)
          ON DUPLICATE KEY UPDATE quote_type = VALUES(quote_type)`,
                 ['TESTDEL', 'EQUITY']
             );
 
             await this.connection.execute(
-                `INSERT INTO securities_earnings (symbol, earnings_date)
+                `INSERT INTO securities_earnings (ticker, earnings_date)
          VALUES (?, NOW())`,
                 ['TESTDEL']
             );
 
             // Delete metadata
             await this.connection.execute(
-                'DELETE FROM securities_metadata WHERE symbol = ?',
+                'DELETE FROM securities_metadata WHERE ticker = ?',
                 ['TESTDEL']
             );
 
             // Check earnings was cascaded
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_earnings WHERE symbol = ?',
+                'SELECT * FROM securities_earnings WHERE ticker = ?',
                 ['TESTDEL']
             );
             assert.strictEqual(rows.length, 0, 'Should cascade delete');
@@ -195,12 +195,12 @@ class MetadataAPITest {
         await this.test('Portfolio query with metadata join', async () => {
             const [rows] = await this.connection.execute(`
         SELECT 
-          p.symbol,
+          p.ticker,
           p.quantity,
-          COALESCE(sm.long_name, p.symbol) as display_name,
+          COALESCE(sm.long_name, p.ticker) as display_name,
           sm.quote_type
         FROM positions p
-        LEFT JOIN securities_metadata sm ON p.metadata_symbol = sm.symbol
+        LEFT JOIN securities_metadata sm ON p.metadata_symbol = sm.ticker
         LIMIT 10
       `);
             assert.ok(Array.isArray(rows), 'Should return array');
@@ -208,9 +208,9 @@ class MetadataAPITest {
 
         await this.test('Autocomplete search query', async () => {
             const [rows] = await this.connection.execute(`
-        SELECT symbol, short_name, quote_type
+        SELECT ticker, short_name, quote_type
         FROM securities_metadata
-        WHERE symbol LIKE ? OR short_name LIKE ?
+        WHERE ticker LIKE ? OR short_name LIKE ?
         LIMIT 20
       `, ['A%', '%Apple%']);
             assert.ok(Array.isArray(rows), 'Should return array');
@@ -221,14 +221,14 @@ class MetadataAPITest {
     async testDataIntegrity() {
         await this.test('NULL handling in optional fields', async () => {
             await this.connection.execute(
-                `INSERT INTO securities_metadata (symbol, quote_type)
+                `INSERT INTO securities_metadata (ticker, quote_type)
          VALUES (?, ?)
          ON DUPLICATE KEY UPDATE quote_type = VALUES(quote_type)`,
                 ['NULLTEST', 'EQUITY']
             );
 
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE symbol = ?',
+                'SELECT * FROM securities_metadata WHERE ticker = ?',
                 ['NULLTEST']
             );
             assert.strictEqual(rows[0].dividend_yield, null, 'Should allow NULL');
@@ -239,12 +239,12 @@ class MetadataAPITest {
             await this.connection.execute(
                 `UPDATE securities_metadata 
          SET dividend_yield = ?, trailing_pe = ?
-         WHERE symbol = ?`,
+         WHERE ticker = ?`,
                 [3.1415, 25.5678, 'NULLTEST']
             );
 
             const [rows] = await this.connection.execute(
-                'SELECT dividend_yield, trailing_pe FROM securities_metadata WHERE symbol = ?',
+                'SELECT dividend_yield, trailing_pe FROM securities_metadata WHERE ticker = ?',
                 ['NULLTEST']
             );
             assert.strictEqual(rows[0].dividend_yield, '3.1415');
@@ -254,7 +254,7 @@ class MetadataAPITest {
 
     // Cleanup test data
     async cleanup() {
-        await this.connection.execute(`DELETE FROM securities_metadata WHERE symbol IN ('TEST', 'NULLTEST')`);
+        await this.connection.execute(`DELETE FROM securities_metadata WHERE ticker IN ('TEST', 'NULLTEST')`);
     }
 
     async run() {
