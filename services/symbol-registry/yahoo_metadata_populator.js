@@ -49,7 +49,7 @@ class YahooMetadataPopulator {
   }
 
   /**
-   * Get symbols that don't have Yahoo metadata yet
+   * Get symbols that don't have Yahoo metadata yet (excluding permanently failed)
    */
   async getSymbolsNeedingMetadata(limit = 100) {
     const conn = await this.dbPool.getConnection();
@@ -58,6 +58,7 @@ class YahooMetadataPopulator {
         SELECT id, symbol, name, exchange, security_type, has_yahoo_metadata
         FROM symbol_registry
         WHERE has_yahoo_metadata = 0
+        AND permanently_failed = 0
         AND security_type IN ('EQUITY', 'ETF')
         ORDER BY sort_rank ASC
         LIMIT ?
@@ -72,6 +73,7 @@ class YahooMetadataPopulator {
 
   /**
    * Fetch metadata from Yahoo Finance with retry logic
+   * Stops retrying immediately on permanent failures (delisted, invalid ticker, etc)
    */
   async fetchYahooMetadata(ticker, attempt = 1) {
     try {
@@ -80,9 +82,21 @@ class YahooMetadataPopulator {
         ticker,
         metadata,
         success: true,
-        error: null
+        error: null,
+        isPermanentFailure: false
       };
     } catch (err) {
+      // Check if this is a permanent failure - don't retry
+      if (err.isPermanentFailure === true) {
+        return {
+          ticker,
+          metadata: null,
+          success: false,
+          error: err.message,
+          isPermanentFailure: true
+        };
+      }
+      
       if (attempt < this.constructor.CONFIG.RETRY_ATTEMPTS) {
         // Exponential backoff: wait longer between retries
         const delayMs = this.constructor.CONFIG.RETRY_DELAY_MS * attempt;
@@ -94,7 +108,8 @@ class YahooMetadataPopulator {
         ticker,
         metadata: null,
         success: false,
-        error: err.message
+        error: err.message,
+        isPermanentFailure: false
       };
     }
   }
@@ -184,6 +199,24 @@ class YahooMetadataPopulator {
   }
 
   /**
+   * Mark a ticker as permanently failed (delisted, acquired, invalid, etc)
+   * Persists the failure to the database to avoid retrying on next worker run
+   */
+  async markPermanentlyFailed(conn, symbolId, ticker, reason) {
+    const sql = `
+      UPDATE symbol_registry
+      SET permanently_failed = 1,
+          permanent_failure_reason = ?,
+          permanent_failure_at = NOW(),
+          updated_at = NOW()
+      WHERE id = ?
+    `;
+    
+    await conn.query(sql, [reason, symbolId]);
+    debug(`Marked ${ticker} as permanently failed: ${reason}`);
+  }
+
+  /**
    * Process a batch of symbols
    */
   async processBatch(symbols) {
@@ -242,7 +275,19 @@ class YahooMetadataPopulator {
             this.stats.successfully_updated++;
             debug(`✓ Successfully processed ${symbol.symbol}`);
           } else {
-            debug(`✗ Failed to get metadata for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
+            // Check if this was a permanent failure
+            if (result.isPermanentFailure) {
+              console.log(`[YahooPopulator] ✗ PERMANENT FAILURE for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
+              debug(`Permanent failure for ${symbol.symbol} (will not retry): ${result.error}`);
+              // Mark as permanently failed in database so we don't retry on next run
+              try {
+                await this.markPermanentlyFailed(conn, symbol.id, symbol.symbol, result.error);
+              } catch (markErr) {
+                debug(`Warning: Failed to mark ${symbol.symbol} as permanently failed: ${markErr.message}`);
+              }
+            } else {
+              debug(`✗ Failed to get metadata for ${symbol.symbol} (transient error, will retry): ${result.error || 'no metadata returned'}`);
+            }
             batchStats.failed++;
             this.stats.failed++;
           }

@@ -12,11 +12,10 @@
  * - Nightly aggregation into summary tables
  */
 
-const pool = require('../db');
-
 class ScraperMetricsCollector {
-  constructor(wsServer, options = {}) {
+  constructor(wsServer, pool, options = {}) {
     this.wsServer = wsServer;
+    this.pool = pool;
     this.options = {
       batchSize: options.batchSize || 100,
       flushInterval: options.flushInterval || 5000, // 5 seconds
