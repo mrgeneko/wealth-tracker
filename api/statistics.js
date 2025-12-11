@@ -37,8 +37,8 @@ router.get('/', async (req, res) => {
         
         // Get overall statistics
         const typeFilter = req.query.type ? req.query.type.split(',').map(t => t.trim().toUpperCase()) : null;
-        let totalQuery = 'SELECT COUNT(*) as count FROM symbol_registry';
-        let withMetadataQuery = 'SELECT COUNT(*) as count FROM symbol_registry WHERE has_yahoo_metadata = 1';
+        let totalQuery = 'SELECT COUNT(*) as count FROM ticker_registry';
+        let withMetadataQuery = 'SELECT COUNT(*) as count FROM ticker_registry WHERE has_yahoo_metadata = 1';
         let params = [];
 
         if (typeFilter && typeFilter.length > 0) {
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
         // Get queue metrics (symbols needing metadata)
         const [queueResult] = await connection.execute(`
             SELECT COUNT(*) as queue_size
-            FROM symbol_registry 
+            FROM ticker_registry 
             WHERE has_yahoo_metadata = 0 
             AND security_type IN ('EQUITY', 'ETF', 'MUTUAL_FUND')
         `);
@@ -133,7 +133,7 @@ router.get('/by-type', async (req, res) => {
                 COUNT(*) as total,
                 SUM(CASE WHEN sr.has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
                 SUM(CASE WHEN sr.has_yahoo_metadata = 0 THEN 1 ELSE 0 END) as without_metadata
-            FROM symbol_registry sr
+            FROM ticker_registry sr
             WHERE sr.security_type IS NOT NULL
             GROUP BY sr.security_type
             ORDER BY sr.security_type ASC
@@ -190,7 +190,7 @@ router.get('/type/:type', async (req, res) => {
         
         // Validate security type exists
         const [typeCheck] = await connection.execute(
-            'SELECT DISTINCT security_type FROM symbol_registry WHERE security_type = ? LIMIT 1',
+            'SELECT DISTINCT security_type FROM ticker_registry WHERE security_type = ? LIMIT 1',
             [securityType]
         );
 
@@ -205,7 +205,7 @@ router.get('/type/:type', async (req, res) => {
                 COUNT(*) as total,
                 SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
                 SUM(CASE WHEN has_yahoo_metadata = 0 THEN 1 ELSE 0 END) as without_metadata
-            FROM symbol_registry
+            FROM ticker_registry
             WHERE security_type = ?
             GROUP BY security_type
         `, [securityType]);
@@ -258,7 +258,7 @@ router.post('/refresh-type', async (req, res) => {
 
         // Reset metadata flag for all symbols of this type
         const [result] = await connection.execute(
-            `UPDATE symbol_registry 
+            `UPDATE ticker_registry 
              SET has_yahoo_metadata = 0 
              WHERE security_type = ?`,
             [securityType]
@@ -306,10 +306,10 @@ router.post('/reset-type', async (req, res) => {
 
         // Archive existing metadata
         await connection.execute(`
-            INSERT INTO symbol_registry_metadata_archive 
+            INSERT INTO ticker_registry_metadata_archive 
             SELECT * FROM securities_metadata 
             WHERE ticker IN (
-                SELECT symbol FROM symbol_registry WHERE security_type = ?
+                SELECT ticker FROM ticker_registry WHERE security_type = ?
             )
         `, [securityType]);
 
@@ -317,13 +317,13 @@ router.post('/reset-type', async (req, res) => {
         await connection.execute(`
             DELETE FROM securities_metadata 
             WHERE ticker IN (
-                SELECT symbol FROM symbol_registry WHERE security_type = ?
+                SELECT ticker FROM ticker_registry WHERE security_type = ?
             )
         `, [securityType]);
 
         // Reset flag
         await connection.execute(
-            `UPDATE symbol_registry 
+            `UPDATE ticker_registry 
              SET has_yahoo_metadata = 0 
              WHERE security_type = ?`,
             [securityType]
@@ -366,7 +366,7 @@ router.get('/available-types', async (req, res) => {
         connection = await statisticsPool.getConnection();
         
         const [results] = await connection.execute(
-            'SELECT DISTINCT security_type FROM symbol_registry WHERE security_type IS NOT NULL ORDER BY security_type ASC'
+            'SELECT DISTINCT security_type FROM ticker_registry WHERE security_type IS NOT NULL ORDER BY security_type ASC'
         );
 
         const types = results.map(r => r.security_type);

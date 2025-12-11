@@ -55,8 +55,8 @@ class YahooMetadataPopulator {
     const conn = await this.dbPool.getConnection();
     try {
       const sql = `
-        SELECT id, symbol, name, exchange, security_type, has_yahoo_metadata
-        FROM symbol_registry
+        SELECT id, ticker, name, exchange, security_type, has_yahoo_metadata
+        FROM ticker_registry
         WHERE has_yahoo_metadata = 0
         AND permanently_failed = 0
         AND security_type IN ('EQUITY', 'ETF')
@@ -147,7 +147,7 @@ class YahooMetadataPopulator {
    */
   async updateSymbolMetadata(conn, symbolId, metadata) {
     const sql = `
-      UPDATE symbol_registry
+      UPDATE ticker_registry
       SET has_yahoo_metadata = 1,
           sort_rank = ?,
           updated_at = NOW()
@@ -204,7 +204,7 @@ class YahooMetadataPopulator {
    */
   async markPermanentlyFailed(conn, symbolId, ticker, reason) {
     const sql = `
-      UPDATE symbol_registry
+      UPDATE ticker_registry
       SET permanently_failed = 1,
           permanent_failure_reason = ?,
           permanent_failure_at = NOW(),
@@ -231,21 +231,21 @@ class YahooMetadataPopulator {
     try {
       for (const symbol of symbols) {
         try {
-          debug(`[${batchStats.processed + 1}/${symbols.length}] Processing ${symbol.symbol} (id: ${symbol.id}, type: ${symbol.security_type})`);
+          debug(`[${batchStats.processed + 1}/${symbols.length}] Processing ${symbol.ticker} (id: ${symbol.id}, type: ${symbol.security_type})`);
           
           // Fetch metadata from Yahoo
-          const result = await this.fetchYahooMetadata(symbol.symbol);
+          const result = await this.fetchYahooMetadata(symbol.ticker);
 
-          debug(`Fetch result for ${symbol.symbol}: success=${result.success}, hasMetadata=${!!result.metadata}`);
+          debug(`Fetch result for ${symbol.ticker}: success=${result.success}, hasMetadata=${!!result.metadata}`);
           
           if (result.success && result.metadata) {
             // Extract and store metadata
             const extracted = this.extractMetadata(result.metadata);
-            debug(`Extracted metadata for ${symbol.symbol}:`, extracted ? `name=${extracted.name}, marketCap=${extracted.market_cap}` : 'null');
+            debug(`Extracted metadata for ${symbol.ticker}:`, extracted ? `name=${extracted.name}, marketCap=${extracted.market_cap}` : 'null');
 
             // Update symbol with Yahoo metadata flag
             const rankSql = `
-              UPDATE symbol_registry
+              UPDATE ticker_registry
               SET has_yahoo_metadata = 1,
                   sort_rank = ?,
                   updated_at = NOW()
@@ -257,36 +257,36 @@ class YahooMetadataPopulator {
               true, // has Yahoo metadata
               extracted?.market_cap
             );
-            debug(`Calculated new rank for ${symbol.symbol}: ${newRank}`);
+            debug(`Calculated new rank for ${symbol.ticker}: ${newRank}`);
 
             await conn.query(rankSql, [newRank, symbol.id]);
-            debug(`Updated symbol_registry for ${symbol.symbol} (id: ${symbol.id})`);
+            debug(`Updated ticker_registry for ${symbol.ticker} (id: ${symbol.id})`);
 
             // Store extended metrics (non-critical - don't fail the whole symbol if this fails)
             try {
-              await this.storeExtendedMetadata(conn, symbol.id, symbol.symbol, result.metadata);
-              debug(`Stored extended metadata for ${symbol.symbol}`);
+              await this.storeExtendedMetadata(conn, symbol.id, symbol.ticker, result.metadata);
+              debug(`Stored extended metadata for ${symbol.ticker}`);
             } catch (extErr) {
-              // Log but don't fail - the symbol_registry update already succeeded
-              debug(`Warning: Failed to store extended metrics for ${symbol.symbol}: ${extErr.message}`);
+              // Log but don't fail - the ticker_registry update already succeeded
+              debug(`Warning: Failed to store extended metrics for ${symbol.ticker}: ${extErr.message}`);
             }
 
             batchStats.successful++;
             this.stats.successfully_updated++;
-            debug(`✓ Successfully processed ${symbol.symbol}`);
+            debug(`✓ Successfully processed ${symbol.ticker}`);
           } else {
             // Check if this was a permanent failure
             if (result.isPermanentFailure) {
-              console.log(`[YahooPopulator] ✗ PERMANENT FAILURE for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
-              debug(`Permanent failure for ${symbol.symbol} (will not retry): ${result.error}`);
+              console.log(`[YahooPopulator] ✗ PERMANENT FAILURE for ${symbol.ticker}: ${result.error || 'no metadata returned'}`);
+              debug(`Permanent failure for ${symbol.ticker} (will not retry): ${result.error}`);
               // Mark as permanently failed in database so we don't retry on next run
               try {
-                await this.markPermanentlyFailed(conn, symbol.id, symbol.symbol, result.error);
+                await this.markPermanentlyFailed(conn, symbol.id, symbol.ticker, result.error);
               } catch (markErr) {
-                debug(`Warning: Failed to mark ${symbol.symbol} as permanently failed: ${markErr.message}`);
+                debug(`Warning: Failed to mark ${symbol.ticker} as permanently failed: ${markErr.message}`);
               }
             } else {
-              debug(`✗ Failed to get metadata for ${symbol.symbol} (transient error, will retry): ${result.error || 'no metadata returned'}`);
+              debug(`✗ Failed to get metadata for ${symbol.ticker} (transient error, will retry): ${result.error || 'no metadata returned'}`);
             }
             batchStats.failed++;
             this.stats.failed++;
@@ -300,8 +300,8 @@ class YahooMetadataPopulator {
             await this.sleep(this.constructor.CONFIG.DELAY_MS);
           }
         } catch (err) {
-          console.error(`[YahooPopulator] Error processing ${symbol.symbol}:`, err.message);
-          debug(`Error stack for ${symbol.symbol}:`, err.stack);
+          console.error(`[YahooPopulator] Error processing ${symbol.ticker}:`, err.message);
+          debug(`Error stack for ${symbol.ticker}:`, err.stack);
           batchStats.failed++;
           this.stats.failed++;
           batchStats.processed++;
@@ -428,7 +428,7 @@ class YahooMetadataPopulator {
     try {
       const sql = `
         SELECT COUNT(*) as count
-        FROM symbol_registry
+        FROM ticker_registry
         WHERE has_yahoo_metadata = 0
         AND security_type IN ('EQUITY', 'ETF')
       `;
@@ -450,7 +450,7 @@ class YahooMetadataPopulator {
         SELECT 
           COUNT(*) as total,
           SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata
-        FROM symbol_registry
+        FROM ticker_registry
         WHERE security_type IN ('EQUITY', 'ETF')
       `;
 
@@ -473,7 +473,7 @@ class YahooMetadataPopulator {
     try {
       // Find symbol
       const selectSql = `
-        SELECT id, security_type FROM symbol_registry WHERE symbol = ? LIMIT 1
+        SELECT id, security_type FROM ticker_registry WHERE ticker = ? LIMIT 1
       `;
 
       const results = await conn.query(selectSql, [ticker]);
@@ -491,7 +491,7 @@ class YahooMetadataPopulator {
         const extracted = this.extractMetadata(result.metadata);
 
         const updateSql = `
-          UPDATE symbol_registry
+          UPDATE ticker_registry
           SET has_yahoo_metadata = 1,
               sort_rank = ?,
               updated_at = NOW()
@@ -510,7 +510,7 @@ class YahooMetadataPopulator {
         try {
           await this.storeExtendedMetadata(conn, symbol.id, ticker, result.metadata);
         } catch (extErr) {
-          // Log but don't fail - the symbol_registry update already succeeded
+          // Log but don't fail - the ticker_registry update already succeeded
           console.warn(`Warning: Failed to store extended metrics for ${ticker}: ${extErr.message}`);
         }
 
@@ -530,7 +530,7 @@ class YahooMetadataPopulator {
     const conn = await this.dbPool.getConnection();
     try {
       const sql = `
-        UPDATE symbol_registry
+        UPDATE ticker_registry
         SET has_yahoo_metadata = 0,
             sort_rank = ?
         WHERE security_type = ?

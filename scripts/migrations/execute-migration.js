@@ -130,12 +130,12 @@ async function createBackup(connection) {
   `);
   console.log('    ✓ positions_backup_pre_ticker_migration created');
 
-  console.log('  - Creating backup of symbol_registry table...');
+  console.log('  - Creating backup of ticker_registry table...');
   await connection.query(`
-    CREATE TABLE symbol_registry_backup_pre_ticker_migration AS
-    SELECT * FROM symbol_registry
+    CREATE TABLE ticker_registry_backup_pre_ticker_migration AS
+    SELECT * FROM ticker_registry
   `);
-  console.log('    ✓ symbol_registry_backup_pre_ticker_migration created');
+  console.log('    ✓ ticker_registry_backup_pre_ticker_migration created');
 }
 
 async function executeMigration(connection) {
@@ -147,13 +147,13 @@ async function executeMigration(connection) {
   `);
   console.log('    ✓ ticker column added to positions');
 
-  console.log('  - Adding ticker column to symbol_registry...');
+  console.log('  - Adding ticker column to ticker_registry...');
   await connection.query(`
-    ALTER TABLE symbol_registry
+    ALTER TABLE ticker_registry
     ADD COLUMN ticker VARCHAR(20) NULL UNIQUE AFTER symbol,
     ADD INDEX idx_ticker (ticker)
   `);
-  console.log('    ✓ ticker column added to symbol_registry');
+  console.log('    ✓ ticker column added to ticker_registry');
 
   console.log('  - Copying symbol data to ticker for positions...');
   const [result1] = await connection.query(`
@@ -163,13 +163,13 @@ async function executeMigration(connection) {
   `);
   console.log(`    ✓ ${result1.affectedRows} rows updated in positions`);
 
-  console.log('  - Copying symbol data to ticker for symbol_registry...');
+  console.log('  - Copying symbol data to ticker for ticker_registry...');
   const [result2] = await connection.query(`
-    UPDATE symbol_registry
+    UPDATE ticker_registry
     SET ticker = symbol
     WHERE symbol IS NOT NULL AND symbol != ''
   `);
-  console.log(`    ✓ ${result2.affectedRows} rows updated in symbol_registry`);
+  console.log(`    ✓ ${result2.affectedRows} rows updated in ticker_registry`);
 
   console.log('  - Creating performance indexes...');
   await connection.query(`
@@ -190,7 +190,7 @@ async function validatePostMigration(connection) {
 
   console.log('  - Verifying data was copied...');
   const [[{ symbolCount }]] = await connection.query(`
-    SELECT COUNT(*) as symbolCount FROM positions WHERE symbol IS NOT NULL
+    SELECT COUNT(*) as symbolCount FROM positions WHERE ticker IS NOT NULL
   `);
   const [[{ tickerCount }]] = await connection.query(`
     SELECT COUNT(*) as tickerCount FROM positions WHERE ticker IS NOT NULL
@@ -233,15 +233,15 @@ async function performRollback(connection) {
     await connection.query('ALTER TABLE positions DROP COLUMN ticker');
     console.log('  ✓ Dropped ticker from positions');
 
-    await connection.query('ALTER TABLE symbol_registry DROP COLUMN ticker');
-    console.log('  ✓ Dropped ticker from symbol_registry');
+    await connection.query('ALTER TABLE ticker_registry DROP COLUMN ticker');
+    console.log('  ✓ Dropped ticker from ticker_registry');
 
     console.log('\nStep 2: Cleaning up backup tables...');
     await connection.query('DROP TABLE IF EXISTS positions_backup_pre_ticker_migration');
     console.log('  ✓ Removed positions backup');
 
-    await connection.query('DROP TABLE IF EXISTS symbol_registry_backup_pre_ticker_migration');
-    console.log('  ✓ Removed symbol_registry backup');
+    await connection.query('DROP TABLE IF EXISTS ticker_registry_backup_pre_ticker_migration');
+    console.log('  ✓ Removed ticker_registry backup');
 
     console.log('\n✅ Rollback completed successfully');
     console.log('Your database is back to the pre-migration state.\n');

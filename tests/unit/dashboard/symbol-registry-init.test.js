@@ -145,7 +145,7 @@ describe('Symbol Registry Initialization', () => {
             });
 
             // Simulate verification step
-            const result = await mockPool.query('SELECT COUNT(*) as count FROM symbol_registry');
+            const result = await mockPool.query('SELECT COUNT(*) as count FROM ticker_registry');
             const checkResult = result[0];
             
             expect(checkResult[0].count).toBe(12548);
@@ -154,7 +154,7 @@ describe('Symbol Registry Initialization', () => {
         it('should warn if zero records after sync', async () => {
             mockPool.query.mockResolvedValue([[{ count: 0 }]]);
 
-            const [checkResult] = await mockPool.query('SELECT COUNT(*) as count FROM symbol_registry');
+            const [checkResult] = await mockPool.query('SELECT COUNT(*) as count FROM ticker_registry');
             
             expect(checkResult[0].count).toBe(0);
             // In actual code, this triggers a warning log

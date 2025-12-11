@@ -2,7 +2,7 @@
  * Symbol Registry Sync Service
  * 
  * Loads and syncs symbol data from all source CSV files (NASDAQ, NYSE, OTHER, TREASURY)
- * into the symbol_registry table. Handles deduplication, source priority, and rank
+ * into the ticker_registry table. Handles deduplication, source priority, and rank
  * calculation during the sync process.
  */
 
@@ -374,9 +374,9 @@ class SymbolRegistrySyncService {
    */
   async getExistingSymbol(conn, ticker, exchange, securityType) {
     const sql = `
-      SELECT id, symbol, exchange, security_type, source, has_yahoo_metadata
-      FROM symbol_registry
-      WHERE symbol = ? AND exchange = ? AND security_type = ?
+      SELECT id, ticker, exchange, security_type, source, has_yahoo_metadata
+      FROM ticker_registry
+      WHERE ticker = ? AND exchange = ? AND security_type = ?
       LIMIT 1
     `;
 
@@ -389,7 +389,7 @@ class SymbolRegistrySyncService {
    */
   async insertSymbol(conn, symbolData) {
     const sql = `
-      INSERT INTO symbol_registry (
+      INSERT INTO ticker_registry (
         symbol, name, exchange, security_type, source, has_yahoo_metadata, 
         usd_trading_volume, sort_rank, issue_date, maturity_date, security_term, 
         underlying_symbol, strike_price, option_type, expiration_date
@@ -426,7 +426,7 @@ class SymbolRegistrySyncService {
    */
   async updateSymbol(conn, symbolId, symbolData) {
     const sql = `
-      UPDATE symbol_registry
+      UPDATE ticker_registry
       SET name = ?, exchange = ?, security_type = ?, source = ?,
           usd_trading_volume = ?, sort_rank = ?, updated_at = NOW()
       WHERE id = ?
@@ -499,7 +499,7 @@ class SymbolRegistrySyncService {
   async getRegistryCount() {
     const conn = await this.dbPool.getConnection();
     try {
-      const sql = 'SELECT COUNT(*) as count FROM symbol_registry';
+      const sql = 'SELECT COUNT(*) as count FROM ticker_registry';
       const results = await conn.query(sql);
       return results[0][0].count;
     } finally {
@@ -513,7 +513,7 @@ class SymbolRegistrySyncService {
   async getCountBySource(source) {
     const conn = await this.dbPool.getConnection();
     try {
-      const sql = 'SELECT COUNT(*) as count FROM symbol_registry WHERE source = ?';
+      const sql = 'SELECT COUNT(*) as count FROM ticker_registry WHERE source = ?';
       const results = await conn.query(sql, [source]);
       return results[0][0].count;
     } finally {
@@ -527,7 +527,7 @@ class SymbolRegistrySyncService {
   async getCountBySecurityType(securityType) {
     const conn = await this.dbPool.getConnection();
     try {
-      const sql = 'SELECT COUNT(*) as count FROM symbol_registry WHERE security_type = ?';
+      const sql = 'SELECT COUNT(*) as count FROM ticker_registry WHERE security_type = ?';
       const results = await conn.query(sql, [securityType]);
       return results[0][0].count;
     } finally {
@@ -541,13 +541,13 @@ class SymbolRegistrySyncService {
   async getRegistrySummary() {
     const conn = await this.dbPool.getConnection();
     try {
-      const countSql = 'SELECT COUNT(*) as count FROM symbol_registry';
+      const countSql = 'SELECT COUNT(*) as count FROM ticker_registry';
       const countResults = await conn.query(countSql);
       const totalCount = countResults[0][0].count;
 
       const sourcesSql = `
         SELECT source, COUNT(*) as count
-        FROM symbol_registry
+        FROM ticker_registry
         GROUP BY source
         ORDER BY count DESC
       `;
@@ -556,7 +556,7 @@ class SymbolRegistrySyncService {
 
       const typesSql = `
         SELECT security_type, COUNT(*) as count
-        FROM symbol_registry
+        FROM ticker_registry
         GROUP BY security_type
         ORDER BY count DESC
       `;

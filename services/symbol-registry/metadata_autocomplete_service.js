@@ -29,14 +29,14 @@ class MetadataAutocompleteService {
     }
 
     /**
-     * Search and rank symbols with metadata enrichment
-     * Returns symbols sorted by relevance and financial metrics
+     * Search and rank tickers with metadata enrichment
+     * Returns tickers sorted by relevance and financial metrics
      * 
-     * @param {string} query - Search query (symbol, name, or partial match)
+     * @param {string} query - Search query (ticker, name, or partial match)
      * @param {object} options - Optional filters
-     * @returns {Promise<Array>} Array of enriched symbol results
+     * @returns {Promise<Array>} Array of enriched ticker results
      */
-    async searchSymbols(query, options = {}) {
+    async searchTickers(query, options = {}) {
         const searchQuery = query.toUpperCase().trim();
         
         if (searchQuery.length < this.config.MIN_QUERY_LENGTH) {
@@ -60,7 +60,7 @@ class MetadataAutocompleteService {
 
             return searchResults;
         } catch (error) {
-            console.error(`Error searching symbols: ${error.message}`);
+            console.error(`Error searching tickers: ${error.message}`);
             throw error;
         } finally {
             if (connection) {
@@ -83,21 +83,21 @@ class MetadataAutocompleteService {
         // Simple query without metadata join for now to avoid collation issues
         const sql = `
             SELECT 
-                sr.symbol,
+                sr.ticker,
                 sr.name,
                 sr.security_type,
                 sr.exchange,
                 sr.source
-            FROM symbol_registry sr
-            WHERE sr.symbol LIKE ? OR sr.name LIKE ?
+            FROM ticker_registry sr
+            WHERE sr.ticker LIKE ? OR sr.name LIKE ?
             ORDER BY 
                 CASE 
-                    WHEN sr.symbol = ? THEN 1
-                    WHEN sr.symbol LIKE ? THEN 2
+                    WHEN sr.ticker = ? THEN 1
+                    WHEN sr.ticker LIKE ? THEN 2
                     WHEN sr.name LIKE ? THEN 3
                     ELSE 4
                 END,
-                sr.symbol ASC
+                sr.ticker ASC
             LIMIT ${limitNum}
         `;
 
@@ -121,7 +121,7 @@ class MetadataAutocompleteService {
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN metadata_fetched = 1 THEN 1 ELSE 0 END) as with_metadata
-            FROM symbol_registry
+            FROM ticker_registry
         `);
 
         if (stats.length === 0) {
@@ -141,10 +141,10 @@ class MetadataAutocompleteService {
      */
     _formatResult(row, stats = null) {
         const base = {
-            symbol: row.symbol,
-            name: row.name || row.symbol,
+            ticker: row.ticker,
+            name: row.name || row.ticker,
             type: row.security_type || 'UNKNOWN',
-            exchange: row.exchange || this._getExchange(row.symbol),
+            exchange: row.exchange || this._getExchange(row.ticker),
             verified: true
         };
 
@@ -184,45 +184,45 @@ class MetadataAutocompleteService {
     }
 
     /**
-     * Get detailed metadata for a single symbol
+     * Get detailed metadata for a single ticker
      * Used for "Add Position" modal
      */
-    async getSymbolDetails(symbol) {
-        const normalizedSymbol = symbol.toUpperCase();
+    async getTickerDetails(ticker) {
+        const normalizedTicker = ticker.toUpperCase();
         
         let connection;
         try {
             connection = await this.pool.getConnection();
 
-            // Get symbol registry data
+            // Get ticker registry data
             const [registry] = await connection.execute(`
                 SELECT *
-                FROM symbol_registry
-                WHERE symbol = ?
-            `, [normalizedSymbol]);
+                FROM ticker_registry 
+                WHERE ticker = ?
+            `, [normalizedTicker]);
 
             if (registry.length === 0) {
                 return null;
             }
 
-            const symbolData = registry[0];
+            const tickerData = registry[0];
 
             // Get metadata if available
             const [metadata] = await connection.execute(`
                 SELECT *
                 FROM securities_metadata
-                WHERE symbol = ?
-            `, [normalizedSymbol]);
+                WHERE ticker = ?
+            `, [normalizedTicker]);
 
             return {
-                symbol: symbolData.symbol,
-                name: symbolData.name,
-                type: symbolData.security_type,
+                ticker: tickerData.ticker,
+                name: tickerData.name,
+                type: tickerData.security_type,
                 verified: true,
                 metadata: metadata.length > 0 ? metadata[0] : null
             };
         } catch (error) {
-            console.error(`Error getting symbol details: ${error.message}`);
+            console.error(`Error getting ticker details: ${error.message}`);
             throw error;
         } finally {
             if (connection) {
@@ -232,13 +232,13 @@ class MetadataAutocompleteService {
     }
 
     /**
-     * Get symbols needing metadata for population
+     * Get tickers needing metadata for population
      * Used by YahooMetadataPopulator
      * 
      * @param {number} limit - Max results to return
-     * @returns {Promise<Array>} Array of symbols
+     * @returns {Promise<Array>} Array of tickers
      */
-    async getSymbolsNeedingMetadata(limit = 100) {
+    async getTickersNeedingMetadata(limit = 100) {
         let connection;
         try {
             connection = await this.pool.getConnection();
@@ -247,16 +247,16 @@ class MetadataAutocompleteService {
             const numLimit = Math.max(1, Math.min(parseInt(limit, 10) || 100, 1000));
 
             const [results] = await connection.query(`
-                SELECT symbol
-                FROM symbol_registry
+                SELECT ticker
+                FROM ticker_registry
                 WHERE has_yahoo_metadata = 0
-                ORDER BY symbol ASC
+                ORDER BY ticker ASC
                 LIMIT ${numLimit}
             `);
 
-            return results.map(row => row.symbol);
+            return results.map(row => row.ticker);
         } catch (error) {
-            console.error(`Error getting symbols needing metadata: ${error.message}`);
+            console.error(`Error getting tickers needing metadata: ${error.message}`);
             throw error;
         } finally {
             if (connection) {
@@ -266,22 +266,22 @@ class MetadataAutocompleteService {
     }
 
     /**
-     * Mark symbol as having metadata
+     * Mark ticker as having metadata
      * Called after YahooMetadataPopulator successfully fetches metadata
      */
-    async markMetadataFetched(symbol) {
-        const normalizedSymbol = symbol.toUpperCase();
+    async markMetadataFetched(ticker) {
+        const normalizedTicker = ticker.toUpperCase();
         
         let connection;
         try {
             connection = await this.pool.getConnection();
 
             await connection.execute(`
-                UPDATE symbol_registry
+                UPDATE ticker_registry
                 SET has_yahoo_metadata = 1,
                     updated_at = NOW()
-                WHERE symbol = ?
-            `, [normalizedSymbol]);
+                WHERE ticker = ?
+            `, [normalizedTicker]);
 
             return true;
         } catch (error) {
@@ -312,7 +312,7 @@ class MetadataAutocompleteService {
                     COUNT(*) as total_symbols,
                     SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
                     MAX(updated_at) as last_update
-                FROM symbol_registry
+                FROM ticker_registry
             `);
             console.log('[getStatistics] Summary query complete:', registry[0]);
 
@@ -323,7 +323,7 @@ class MetadataAutocompleteService {
                     security_type,
                     COUNT(*) as count,
                     SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata
-                FROM symbol_registry
+                FROM ticker_registry
                 GROUP BY security_type
                 ORDER BY count DESC
             `);
@@ -337,7 +337,7 @@ class MetadataAutocompleteService {
             // Get queue metrics (symbols needing metadata)
             const [queueResult] = await connection.execute(`
                 SELECT COUNT(*) as queue_size
-                FROM symbol_registry 
+                FROM ticker_registry 
                 WHERE has_yahoo_metadata = 0 
                 AND security_type IN ('EQUITY', 'ETF', 'MUTUAL_FUND')
             `);
@@ -398,11 +398,11 @@ class MetadataAutocompleteService {
     }
 
     /**
-     * Force refresh metadata for a symbol
+     * Force refresh metadata for a ticker
      * Used by admin API
      */
-    async refreshSymbolMetadata(symbol) {
-        const normalizedSymbol = symbol.toUpperCase();
+    async refreshTickerMetadata(ticker) {
+        const normalizedTicker = ticker.toUpperCase();
         
         let connection;
         try {
@@ -410,19 +410,19 @@ class MetadataAutocompleteService {
 
             // Reset has_yahoo_metadata flag to trigger re-fetch
             await connection.execute(`
-                UPDATE symbol_registry
+                UPDATE ticker_registry
                 SET has_yahoo_metadata = 0,
                     updated_at = NOW()
-                WHERE symbol = ?
-            `, [normalizedSymbol]);
+                WHERE ticker = ?
+            `, [normalizedTicker]);
 
             // Also clear old metadata
             await connection.execute(`
                 DELETE FROM securities_metadata
-                WHERE symbol = ?
-            `, [normalizedSymbol]);
+                WHERE ticker = ?
+            `, [normalizedTicker]);
 
-            return { symbol: normalizedSymbol, status: 'reset' };
+            return { ticker: normalizedTicker, status: 'reset' };
         } catch (error) {
             console.error(`Error refreshing metadata: ${error.message}`);
             throw error;

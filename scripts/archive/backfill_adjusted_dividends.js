@@ -17,7 +17,7 @@ async function computeFactor(connection, symbol, exDate) {
   const [rows] = await connection.execute(
     `SELECT EXP(SUM(LN(split_ratio))) AS factor
      FROM security_splits
-     WHERE symbol = ? AND split_date > ? AND split_date <= CURDATE()`,
+     WHERE ticker = ? AND split_date > ? AND split_date <= CURDATE()`,
     [symbol, exDate]
   );
   const f = rows && rows[0] && rows[0].factor ? parseFloat(rows[0].factor) : null;
@@ -48,12 +48,12 @@ async function main() {
     let where = `WHERE (adjusted_dividend_amount IS NULL OR adjusted_dividend_amount = 0)`;
     const params = [];
     if (symbol) {
-      where += ` AND symbol = ?`;
+      where += ` AND ticker = ?`;
       params.push(symbol);
     }
 
     // Select candidate rows
-    let qry = `SELECT id, symbol, ex_dividend_date, dividend_amount FROM securities_dividends ${where} ORDER BY symbol, ex_dividend_date ASC`;
+    let qry = `SELECT id, ticker, ex_dividend_date, dividend_amount FROM securities_dividends ${where} ORDER BY ticker, ex_dividend_date ASC`;
     if (limit) qry += ` LIMIT ${limit}`;
 
     const [rows] = await connection.execute(qry, params);
@@ -63,10 +63,10 @@ async function main() {
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
       for (const r of batch) {
-        const factor = await computeFactor(connection, r.symbol, r.ex_dividend_date);
+        const factor = await computeFactor(connection, r.ticker, r.ex_dividend_date);
         const adjusted = parseFloat(r.dividend_amount) * factor;
         if (dryRun) {
-          console.log(`[DRY] id=${r.id} ${r.symbol} ${r.ex_dividend_date} amount=${r.dividend_amount} factor=${factor.toFixed(6)} adjusted=${adjusted.toFixed(6)}`);
+          console.log(`[DRY] id=${r.id} ${r.ticker} ${r.ex_dividend_date} amount=${r.dividend_amount} factor=${factor.toFixed(6)} adjusted=${adjusted.toFixed(6)}`);
         } else {
           await connection.execute(`UPDATE securities_dividends SET adjusted_dividend_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [adjusted, r.id]);
           console.log(`Updated id=${r.id} adjusted=${adjusted.toFixed(6)}`);

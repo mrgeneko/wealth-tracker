@@ -36,7 +36,7 @@ beforeAll(async () => {
     // Check if required tables exist
     const [tables] = await connection.query(`
       SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'symbol_registry')
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'ticker_registry')
     `);
     
     if (tables.length === 0) {
@@ -140,7 +140,7 @@ describe('Performance Validation', () => {
     
     const startTime = Date.now();
     
-    // Simple query to test performance - avoid JOIN if symbol_registry might not have ticker
+    // Simple query to test performance - avoid JOIN if ticker_registry might not have ticker
     const [results] = await connection.query(`
       SELECT id, ticker
       FROM positions 

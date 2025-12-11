@@ -37,7 +37,7 @@ beforeAll(async () => {
     // Check if required tables exist
     const [tables] = await connection.query(`
       SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'symbol_registry')
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'ticker_registry')
     `);
     
     if (tables.length === 0) {
@@ -69,7 +69,7 @@ describe('Post-Migration Validation', () => {
       console.warn(`⏭️  Test skipped (${skipReason})`);
       return;
     }
-    const tables = ['positions', 'symbol_registry'];
+    const tables = ['positions', 'ticker_registry'];
     
     for (const table of tables) {
       const [columns] = await connection.query(`
@@ -151,7 +151,7 @@ describe('Post-Migration Validation', () => {
     const [constraints] = await connection.query(`
       SELECT CONSTRAINT_NAME, CONSTRAINT_TYPE
       FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'symbol_registry'
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ticker_registry'
     `);
     
     expect(constraints).toBeDefined();
@@ -165,7 +165,7 @@ describe('Post-Migration Validation', () => {
     // Check if ticker column exists
     const [tickerCol] = await connection.query(`
       SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'symbol_registry' AND COLUMN_NAME = 'ticker'
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ticker_registry' AND COLUMN_NAME = 'ticker'
     `);
     if (tickerCol.length === 0) {
       console.warn('⏭️  Test skipped (ticker column not yet added)');
@@ -174,7 +174,7 @@ describe('Post-Migration Validation', () => {
     
     const [results] = await connection.query(`
       SELECT ticker, COUNT(*) as count
-      FROM symbol_registry 
+      FROM ticker_registry 
       GROUP BY ticker 
       LIMIT 10
     `);

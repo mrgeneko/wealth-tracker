@@ -48,24 +48,24 @@ async function fetchMetadataForSymbol(symbol) {
 }
 
 /**
- * GET /api/metadata/lookup/:symbol
+ * GET /api/metadata/lookup/:ticker
  * Quick lookup - returns metadata if exists, triggers fetch if not
- * Used for: Autocomplete, symbol validation, "Add Position" modal
+ * Used for: Autocomplete, ticker validation, "Add Position" modal
  */
-router.get('/lookup/:symbol', async (req, res) => {
-    const symbol = req.params.symbol.toUpperCase();
+router.get('/lookup/:ticker', async (req, res) => {
+    const ticker = req.params.ticker.toUpperCase();
     const connection = await getDbConnection();
 
     try {
         // Check if metadata exists
         const [rows] = await connection.execute(
             `SELECT 
-        symbol, quote_type, type_display, short_name, long_name,
+        ticker, quote_type, type_display, short_name, long_name,
             exchange, currency, market_cap, dividend_yield, trailing_pe,
             ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE symbol = ?`,
-            [symbol]
+       WHERE ticker = ?`,
+            [ticker]
         );
 
         if (rows.length > 0) {
@@ -79,13 +79,13 @@ router.get('/lookup/:symbol', async (req, res) => {
             res.json({
                 exists: false,
                 message: 'Fetching metadata...',
-                symbol: symbol
+                ticker: ticker
             });
 
             // Fetch asynchronously (don't wait)
-            fetchMetadataForSymbol(symbol).then(result => {
+            fetchMetadataForTicker(ticker).then(result => {
                 if (result.success) {
-                    console.log(`✓ Background fetch completed for ${symbol}`);
+                    console.log(`✓ Background fetch completed for ${ticker}`);
                 }
             });
         }
@@ -114,7 +114,7 @@ router.post('/prefetch', async (req, res) => {
     try {
         // Check if already exists
         const [existing] = await connection.execute(
-            'SELECT symbol FROM securities_metadata WHERE symbol = ?',
+            'SELECT ticker FROM securities_metadata WHERE ticker = ?',
             [normalizedSymbol]
         );
 
@@ -122,11 +122,11 @@ router.post('/prefetch', async (req, res) => {
             // Already have it
             const [metadata] = await connection.execute(
                 `SELECT 
-          symbol, quote_type, type_display, short_name, long_name,
+          ticker, quote_type, type_display, short_name, long_name,
               exchange, currency, region, market_cap, dividend_yield,
               ttm_dividend_amount, ttm_eps
          FROM securities_metadata 
-         WHERE symbol = ?`,
+         WHERE ticker = ?`,
                 [normalizedSymbol]
             );
 
@@ -150,11 +150,11 @@ router.post('/prefetch', async (req, res) => {
         // Retrieve the newly inserted metadata
         const [metadata] = await connection.execute(
             `SELECT 
-        symbol, quote_type, type_display, short_name, long_name,
+        ticker, quote_type, type_display, short_name, long_name,
         exchange, currency, region, market_cap, dividend_yield,
         ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE symbol = ?`,
+       WHERE ticker = ?`,
             [normalizedSymbol]
         );
 
@@ -173,7 +173,7 @@ router.post('/prefetch', async (req, res) => {
 /**
  * GET /api/metadata/autocomplete?q=AAPL
  * Autocomplete search for symbols
- * Searches symbol_registry (populated from exchange CSV files)
+ * Searches ticker_registry (populated from exchange CSV files)
  */
 router.get('/autocomplete', async (req, res) => {
     const query = (req.query.q || '').toUpperCase();
@@ -185,27 +185,27 @@ router.get('/autocomplete', async (req, res) => {
     const connection = await getDbConnection();
 
     try {
-        // Search symbol_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
+        // Search ticker_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
         const [rows] = await connection.execute(
             `SELECT 
-                symbol, name, security_type, exchange
-            FROM symbol_registry 
-            WHERE symbol LIKE ? OR name LIKE ?
+                ticker, name, security_type, exchange
+            FROM ticker_registry 
+            WHERE ticker LIKE ? OR name LIKE ?
             ORDER BY 
                 CASE 
-                    WHEN symbol = ? THEN 1
-                    WHEN symbol LIKE ? THEN 2
+                    WHEN ticker = ? THEN 1
+                    WHEN ticker LIKE ? THEN 2
                     WHEN name LIKE ? THEN 3
                     ELSE 4
                 END,
-                symbol
+                ticker
             LIMIT 20`,
             [`${query}%`, `%${query}%`, query, `${query}%`, `%${query}%`]
         );
 
         const results = rows.map(row => ({
-            symbol: row.symbol,
-            name: row.name || row.symbol,
+            symbol: row.ticker,
+            name: row.name || row.ticker,
             type: row.security_type,
             exchange: row.exchange,
             source: 'registry'
@@ -242,7 +242,7 @@ router.post('/batch-prefetch', async (req, res) => {
 
             // Check if exists
             const [existing] = await connection.execute(
-                'SELECT symbol FROM securities_metadata WHERE symbol = ?',
+                'SELECT ticker FROM securities_metadata WHERE ticker = ?',
                 [normalizedSymbol]
             );
 
@@ -303,15 +303,15 @@ router.get('/check-missing', async (req, res) => {
 
     try {
         const [rows] = await connection.execute(`
-      SELECT DISTINCT p.symbol
+      SELECT DISTINCT p.ticker
       FROM positions p
-      LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol
-      WHERE p.symbol IS NOT NULL 
-        AND p.symbol != 'CASH'
-        AND sm.symbol IS NULL
+      LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker
+      WHERE p.ticker IS NOT NULL 
+        AND p.ticker != 'CASH'
+        AND sm.ticker IS NULL
     `);
 
-        const missingSymbols = rows.map(r => r.symbol);
+        const missingTickers = rows.map(r => r.ticker);
 
         res.json({
             count: missingSymbols.length,

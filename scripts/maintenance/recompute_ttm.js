@@ -18,7 +18,7 @@ async function computeTtmForSymbol(connection, symbol, dryRun) {
   const [drows] = await connection.execute(
     `SELECT SUM(COALESCE(adjusted_dividend_amount, dividend_amount)) AS sum_divs
      FROM securities_dividends
-    WHERE symbol = ? AND ex_dividend_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+    WHERE ticker = ? AND ex_dividend_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
       AND status IN ('confirmed','paid')
       AND (dividend_type = 'CASH' OR dividend_type IS NULL)
     `, [symbol]
@@ -31,7 +31,7 @@ async function computeTtmForSymbol(connection, symbol, dryRun) {
     `SELECT SUM(val) AS sum_eps FROM (
        SELECT COALESCE(adjusted_eps, eps_actual) AS val
        FROM securities_earnings
-       WHERE symbol = ? AND (adjusted_eps IS NOT NULL OR eps_actual IS NOT NULL)
+       WHERE ticker = ? AND (adjusted_eps IS NOT NULL OR eps_actual IS NOT NULL)
        ORDER BY earnings_date DESC
        LIMIT 4
      ) _sub`, [symbol]
@@ -41,7 +41,7 @@ async function computeTtmForSymbol(connection, symbol, dryRun) {
   if (dryRun) {
     console.log(`[DRY] ${symbol}: ttm_dividend_amount=${sumDivs} ttm_eps=${sumEps}`);
   } else {
-    await connection.execute(`UPDATE securities_metadata SET ttm_dividend_amount = ?, ttm_eps = ?, ttm_last_calculated_at = NOW() WHERE symbol = ?`, [sumDivs, sumEps, symbol]);
+    await connection.execute(`UPDATE securities_metadata SET ttm_dividend_amount = ?, ttm_eps = ?, ttm_last_calculated_at = NOW() WHERE ticker = ?`, [sumDivs, sumEps, symbol]);
     console.log(`Updated ${symbol}: ttm_dividend_amount=${sumDivs} ttm_eps=${sumEps}`);
   }
   return { symbol, sumDivs, sumEps };
@@ -66,12 +66,12 @@ async function main() {
       await computeTtmForSymbol(connection, symbol, dryRun);
     } else {
       // gather symbols to process
-      let qry = `SELECT symbol FROM securities_metadata ORDER BY symbol`;
+      let qry = `SELECT ticker FROM securities_metadata ORDER BY ticker`;
       if (limit) qry += ` LIMIT ${limit}`;
       const [rows] = await connection.execute(qry);
       console.log(`Processing ${rows.length} symbols (limit=${limit || 'none'})`);
       for (const r of rows) {
-        await computeTtmForSymbol(connection, r.symbol, dryRun);
+        await computeTtmForSymbol(connection, r.ticker, dryRun);
       }
     }
 

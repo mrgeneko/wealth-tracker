@@ -14,7 +14,7 @@ async function main() {
             database: process.env.MYSQL_DATABASE
         });
 
-        const [rows] = await connection.execute('SELECT * FROM securities_metadata WHERE symbol = ?', ['VTI']);
+        const [rows] = await connection.execute('SELECT * FROM securities_metadata WHERE ticker = ?', ['VTI']);
 
         console.log('VTI Data:', JSON.stringify(rows, null, 2));
         fs.writeFileSync(path.join(__dirname, '../vti_db_dump.json'), JSON.stringify(rows, null, 2));

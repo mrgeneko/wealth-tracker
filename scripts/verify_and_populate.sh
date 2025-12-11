@@ -22,11 +22,11 @@ echo ""
 
 # Check positions
 echo "Sample positions:"
-docker exec wealth-tracker-mysql mysql -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} -e "SELECT DISTINCT symbol FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH' LIMIT 10;" 2>&1 | grep -v "Warning"
+docker exec wealth-tracker-mysql mysql -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} -e "SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH' LIMIT 10;" 2>&1 | grep -v "Warning"
 echo ""
 
 # Count positions
-POSITION_COUNT=$(docker exec wealth-tracker-mysql mysql -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} -e "SELECT COUNT(DISTINCT symbol) FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH';" 2>&1 | grep -v "Warning" | tail -1)
+POSITION_COUNT=$(docker exec wealth-tracker-mysql mysql -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} -e "SELECT COUNT(DISTINCT ticker) FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH';" 2>&1 | grep -v "Warning" | tail -1)
 echo "Unique symbols in positions: $POSITION_COUNT"
 echo ""
 
