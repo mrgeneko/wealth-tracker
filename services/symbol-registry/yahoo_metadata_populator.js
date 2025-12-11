@@ -473,7 +473,7 @@ class YahooMetadataPopulator {
     try {
       // Find symbol
       const selectSql = `
-        SELECT id, security_type FROM ticker_registry WHERE symbol = ? LIMIT 1
+        SELECT id, security_type FROM ticker_registry WHERE ticker = ? LIMIT 1
       `;
 
       const results = await conn.query(selectSql, [ticker]);

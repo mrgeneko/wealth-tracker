@@ -374,9 +374,9 @@ class SymbolRegistrySyncService {
    */
   async getExistingSymbol(conn, ticker, exchange, securityType) {
     const sql = `
-      SELECT id, symbol, exchange, security_type, source, has_yahoo_metadata
+      SELECT id, ticker, exchange, security_type, source, has_yahoo_metadata
       FROM ticker_registry
-      WHERE symbol = ? AND exchange = ? AND security_type = ?
+      WHERE ticker = ? AND exchange = ? AND security_type = ?
       LIMIT 1
     `;
 
