@@ -2,7 +2,7 @@
  * Unit Tests for SymbolRegistryService
  */
 
-const SymbolRegistryService = require('../../../../services/symbol-registry/ticker_registry_service');
+const SymbolRegistryService = require('../../../../services/symbol-registry/symbol_registry_service');
 
 describe('SymbolRegistryService', () => {
   let service;
