@@ -703,6 +703,115 @@ app.get('/api/tickers', (req, res) => {
     }
 });
 
+// API to fetch current price for a symbol and inject into price cache
+// Used when adding a new symbol to ensure immediate price display
+// Also publishes to Kafka so the price persists to MySQL via the consumer
+app.post('/api/fetch-price', async (req, res) => {
+    const { symbol } = req.body;
+
+    if (!symbol || !symbol.trim()) {
+        return res.status(400).json({ error: 'Symbol is required' });
+    }
+
+    const cleanSymbol = symbol.trim().toUpperCase();
+    
+    try {
+        // Load yahoo-finance2 v3 (requires instantiation)
+        const YahooFinanceClass = require('yahoo-finance2').default || require('yahoo-finance2');
+        const yahooFinance = new YahooFinanceClass({
+            suppressNotices: ['yahooSurvey', 'rippieTip']
+        });
+        
+        console.log(`[FetchPrice] Fetching current price for ${cleanSymbol}...`);
+        const quote = await yahooFinance.quote(cleanSymbol);
+
+        if (!quote || !quote.regularMarketPrice) {
+            return res.status(404).json({
+                error: 'No price data returned',
+                symbol: cleanSymbol
+            });
+        }
+
+        const price = quote.regularMarketPrice;
+        const previousClose = quote.regularMarketPreviousClose || null;
+        const now = new Date().toISOString();
+
+        // Update the in-memory price cache for immediate display
+        priceCache[cleanSymbol] = {
+            price: price,
+            previous_close_price: previousClose,
+            prev_close_source: 'yahoo',
+            prev_close_time: now,
+            currency: quote.currency || 'USD',
+            time: now,
+            source: 'yahoo'
+        };
+
+        // Broadcast to all connected clients for immediate UI update
+        io.emit('price_update', priceCache);
+
+        console.log(`[FetchPrice] Updated price cache for ${cleanSymbol}: $${price}`);
+
+        // Publish to Kafka so the consumer persists to MySQL
+        let kafkaPublished = false;
+        try {
+            const { Kafka } = require('kafkajs');
+            const kafka = new Kafka({
+                clientId: 'dashboard-fetch-price',
+                brokers: (process.env.KAFKA_BROKERS || 'kafka:9092').split(',')
+            });
+            const producer = kafka.producer();
+            await producer.connect();
+            
+            // Format message to match what the Kafka consumer expects
+            // Consumer uses data.get('key') for the ticker
+            const kafkaMessage = {
+                key: cleanSymbol,                    // Required by consumer
+                symbol: cleanSymbol,
+                normalized_key: cleanSymbol,
+                regular_price: price,
+                previous_close_price: previousClose,
+                currency: quote.currency || 'USD',
+                time: now,
+                source: 'yahoo',
+                scraper: 'dashboard-fetch'
+            };
+            
+            await producer.send({
+                topic: process.env.KAFKA_TOPIC || 'price_data',
+                messages: [{
+                    key: cleanSymbol,
+                    value: JSON.stringify(kafkaMessage)
+                }]
+            });
+            
+            await producer.disconnect();
+            kafkaPublished = true;
+            console.log(`[FetchPrice] Published ${cleanSymbol} to Kafka for persistence`);
+        } catch (kafkaErr) {
+            console.error(`[FetchPrice] Kafka publish failed for ${cleanSymbol}:`, kafkaErr.message);
+            // Don't fail the request - price is already in cache for immediate display
+        }
+
+        res.json({
+            symbol: cleanSymbol,
+            price: price,
+            previousClose: previousClose,
+            currency: quote.currency || 'USD',
+            timestamp: now,
+            cached: true,
+            persisted: kafkaPublished
+        });
+
+    } catch (error) {
+        console.error(`[FetchPrice] Error fetching price for ${cleanSymbol}:`, error.message);
+        res.status(500).json({
+            error: error.message,
+            symbol: cleanSymbol
+        });
+    }
+});
+
 app.get('/api/logs', async (req, res) => {
     try {
         if (!fs.existsSync(LOGS_DIR)) {

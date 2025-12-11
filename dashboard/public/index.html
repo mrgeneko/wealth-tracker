@@ -1192,6 +1192,16 @@
                     const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
                     if (acc && acc.currency) currency = acc.currency;
                 }
+                // Fetch current price and publish to Kafka for persistence
+                try {
+                    await fetch('/api/fetch-price', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol })
+                    });
+                } catch (e) {
+                    console.warn('Price fetch failed:', e);
+                }
                 // Prefetch metadata for the new symbol
                 try {
                     await fetch('/api/metadata/prefetch', {
@@ -3222,8 +3232,26 @@
                 document.getElementById('newSymbolType').value = typeValue;
                 
                 displayEl.style.display = 'block';
-                statusEl.textContent = '✅ Symbol found! Metadata loaded.';
-                statusEl.style.display = 'block';
+                statusEl.textContent = '⏳ Fetching current price...';
+                
+                // Fetch current price from Yahoo and update cache
+                try {
+                    const priceResponse = await fetch('/api/fetch-price', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol: symbol })
+                    });
+                    
+                    if (priceResponse.ok) {
+                        const priceData = await priceResponse.json();
+                        statusEl.textContent = `✅ Found! Current price: $${priceData.price.toFixed(2)}`;
+                    } else {
+                        statusEl.textContent = '✅ Symbol found! (Price unavailable)';
+                    }
+                } catch (priceError) {
+                    console.warn('Price fetch failed:', priceError);
+                    statusEl.textContent = '✅ Symbol found! (Price fetch failed)';
+                }
                 
             } catch (error) {
                 console.error('Error looking up symbol:', error);
