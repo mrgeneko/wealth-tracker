@@ -1,5 +1,32 @@
 // Jest Configuration
-// Separates unit tests from integration tests for CI efficiency
+// Supports unit tests, integration tests, and ticker standardization tests
+
+const isIntegration = process.env.TEST_TYPE === 'integration';
+const isMigration = process.env.TEST_TYPE === 'migration';
+const isAll = process.env.TEST_TYPE === 'all';
+
+let testMatch = [
+  '**/tests/unit/**/*.test.js',
+  '**/tests/unit/**/*.unit.test.js',
+  '!**/tests/integration/**',
+  '!**/tests/unit/**/deprecated/**'
+];
+
+if (isIntegration) {
+  testMatch = [
+    '**/tests/integration/**/*.test.js',
+    '!**/tests/integration/migration/**'
+  ];
+} else if (isMigration) {
+  testMatch = [
+    '**/tests/integration/migration/**/*.test.js'
+  ];
+} else if (isAll) {
+  testMatch = [
+    '**/tests/**/*.test.js',
+    '!**/tests/**/**/deprecated/**'
+  ];
+}
 
 module.exports = {
   // Test environment
@@ -10,6 +37,8 @@ module.exports = {
     'scrapers/**/*.js',
     'api/**/*.js',
     'scripts/**/*.js',
+    'dashboard/**/*.js',
+    'services/**/*.js',
     '!scrapers/logs/**',
     '!scrapers/scrape_daemon.js', // Daemon requires special testing
     '!scripts/archive/**', // Don't test archived migration scripts
@@ -17,16 +46,12 @@ module.exports = {
     '!**/node_modules/**',
     '!**/temp_*.js',
     '!**/tmp_*.js',
-    '!**/test_*.js'
+    '!**/test_*.js',
+    '!**/deprecated/**'
   ],
   
-  // Test match patterns
-  testMatch: [
-    '**/tests/unit/**/*.test.js',
-    '**/tests/unit/**/*.unit.test.js',
-    '!**/tests/integration/**',
-    '!**/tests/unit/**/deprecated/**'
-  ],
+  // Test match patterns - dynamically set based on TEST_TYPE
+  testMatch: testMatch,
   
   // Coverage thresholds (start conservative, increase over time)
   coverageThreshold: {
