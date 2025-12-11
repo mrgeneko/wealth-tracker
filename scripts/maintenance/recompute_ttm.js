@@ -41,7 +41,7 @@ async function computeTtmForSymbol(connection, symbol, dryRun) {
   if (dryRun) {
     console.log(`[DRY] ${symbol}: ttm_dividend_amount=${sumDivs} ttm_eps=${sumEps}`);
   } else {
-    await connection.execute(`UPDATE securities_metadata SET ttm_dividend_amount = ?, ttm_eps = ?, ttm_last_calculated_at = NOW() WHERE symbol = ?`, [sumDivs, sumEps, symbol]);
+    await connection.execute(`UPDATE securities_metadata SET ttm_dividend_amount = ?, ttm_eps = ?, ttm_last_calculated_at = NOW() WHERE ticker = ?`, [sumDivs, sumEps, symbol]);
     console.log(`Updated ${symbol}: ttm_dividend_amount=${sumDivs} ttm_eps=${sumEps}`);
   }
   return { symbol, sumDivs, sumEps };

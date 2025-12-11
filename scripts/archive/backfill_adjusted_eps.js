@@ -60,10 +60,10 @@ async function main() {
       const batch = rows.slice(i, i + batchSize);
       for (const r of batch) {
         if (r.eps_actual === null) {
-          if (dryRun) console.log(`[DRY] id=${r.id} ${r.symbol} ${r.earnings_date} eps_actual=NULL -> skip`);
+          if (dryRun) console.log(`[DRY] id=${r.id} ${r.ticker} ${r.earnings_date} eps_actual=NULL -> skip`);
           continue;
         }
-        const factor = await computeFactorForEarnings(connection, r.symbol, r.earnings_date);
+        const factor = await computeFactorForEarnings(connection, r.ticker, r.earnings_date);
         const adjusted = parseFloat(r.eps_actual) * factor;
         if (dryRun) {
           console.log(`[DRY] id=${r.id} ${r.ticker} ${r.earnings_date} eps=${r.eps_actual} factor=${factor.toFixed(6)} adjusted=${adjusted.toFixed(6)}`);

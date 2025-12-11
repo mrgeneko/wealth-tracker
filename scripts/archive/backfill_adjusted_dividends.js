@@ -63,7 +63,7 @@ async function main() {
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
       for (const r of batch) {
-        const factor = await computeFactor(connection, r.symbol, r.ex_dividend_date);
+        const factor = await computeFactor(connection, r.ticker, r.ex_dividend_date);
         const adjusted = parseFloat(r.dividend_amount) * factor;
         if (dryRun) {
           console.log(`[DRY] id=${r.id} ${r.ticker} ${r.ex_dividend_date} amount=${r.dividend_amount} factor=${factor.toFixed(6)} adjusted=${adjusted.toFixed(6)}`);
