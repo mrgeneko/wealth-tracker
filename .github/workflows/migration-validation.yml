@@ -24,10 +24,11 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wealth_tracker_test
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h localhost"
           --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+          --health-timeout=10s
+          --health-retries=5
+          --health-start-period=30s
         ports:
           - 3306:3306
 
@@ -45,10 +46,19 @@ jobs:
 
       - name: Wait for MySQL
         run: |
-          until mysqladmin ping -h"localhost" -P"3306" -u"root" -p"root" --silent; do
-            echo 'waiting for mysql...'
+          COUNTER=0
+          MAX_ATTEMPTS=60
+          until mysqladmin ping -h localhost -u root -proot --silent 2>/dev/null || [ $COUNTER -eq $MAX_ATTEMPTS ]; do
+            COUNTER=$((COUNTER + 1))
+            echo "Waiting for MySQL ($COUNTER/$MAX_ATTEMPTS)..."
             sleep 1
           done
+          
+          if [ $COUNTER -eq $MAX_ATTEMPTS ]; then
+            echo "MySQL failed to start after $MAX_ATTEMPTS attempts"
+            exit 1
+          fi
+          echo "MySQL is ready"
 
       - name: Initialize test database
         run: |
