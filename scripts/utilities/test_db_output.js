@@ -16,7 +16,7 @@ async function main() {
         });
         console.log('Connected!');
 
-        const [rows] = await connection.execute('SELECT symbol, short_name, exchange FROM securities_metadata WHERE symbol = ?', ['VTI']);
+        const [rows] = await connection.execute('SELECT ticker, short_name, exchange FROM securities_metadata WHERE ticker = ?', ['VTI']);
         console.log('Query Result:', JSON.stringify(rows, null, 2));
 
         await connection.end();

@@ -188,12 +188,12 @@ POSITION_COUNT=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tra
 log "  Positions in database: $POSITION_COUNT"
 
 if [ "$POSITION_COUNT" -gt 0 ]; then
-  UNIQUE_SYMBOLS=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(DISTINCT symbol) FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH';" 2>> "$ERROR_LOG" | tail -1)
+  UNIQUE_SYMBOLS=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(DISTINCT ticker) FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH';" 2>> "$ERROR_LOG" | tail -1)
   log "  Unique symbols: $UNIQUE_SYMBOLS"
   
   # Show sample symbols
   log "  Sample symbols:"
-  docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT DISTINCT symbol FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH' LIMIT 5;" 2>> "$ERROR_LOG" | tail -n +2 | while read symbol; do
+  docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH' LIMIT 5;" 2>> "$ERROR_LOG" | tail -n +2 | while read symbol; do
     log "    - $symbol"
   done
 else
