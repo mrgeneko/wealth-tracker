@@ -93,7 +93,7 @@ const serviceBasePath = process.env.NODE_ENV === 'development'
 debug('Loading services from:', serviceBasePath);
 
 const YahooMetadataPopulator = require(path.join(serviceBasePath, 'symbol-registry/yahoo_metadata_populator.js'));
-const SymbolRegistryService = require(path.join(serviceBasePath, 'symbol-registry/ticker_registry_service.js'));
+const SymbolRegistryService = require(path.join(serviceBasePath, 'symbol-registry/symbol_registry_service.js'));
 
 // Try to load yahoo-finance2 for the Yahoo client (v3 API)
 let yahooFinance = null;

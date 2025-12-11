@@ -5,7 +5,7 @@
  * into the symbol registry with proper deduplication and source priority handling.
  */
 
-const SymbolRegistrySyncService = require('../../../../services/symbol-registry/ticker_registry_sync');
+const SymbolRegistrySyncService = require('../../../../services/symbol-registry/symbol_registry_sync');
 const TreasuryDataHandler = require('../../../../services/symbol-registry/treasury_data_handler');
 
 // Mock fs module
