@@ -360,7 +360,7 @@ async function fetchAssetsFromDB() {
                    sm.ttm_dividend_amount, sm.ttm_eps,
                    sm.quote_type, sm.exchange as meta_exchange
             FROM positions p
-            LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol COLLATE utf8mb4_unicode_ci
+            LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker COLLATE utf8mb4_unicode_ci
         `);
 
         const [fixedAssets] = await pool.query('SELECT * FROM fixed_assets ORDER BY display_order');
@@ -409,7 +409,7 @@ async function fetchAssetsFromDB() {
                 // Common position object
                 const positionData = {
                     id: pos.id,
-                    symbol: pos.symbol,
+                    ticker: pos.ticker,
                     quantity: parseFloat(pos.quantity),
                     cost_basis: pos.cost_basis ? parseFloat(pos.cost_basis) : 0,
                     // Metadata fields (from JOIN)
@@ -479,8 +479,8 @@ if (process.env.NODE_ENV !== 'test') {
 // Supports extended hours pricing (pre-market, after-hours)
 function updatePriceCache(item) {
     // Determine a normalized key for this incoming item.
-    // Priority: item.normalized_key -> item.key -> encodeURIComponent(item.symbol)
-    const normalizedKey = item.normalized_key || item.key || (item.symbol ? encodeURIComponent(String(item.symbol)) : null);
+    // Priority: item.normalized_key -> item.key -> encodeURIComponent(item.ticker)
+    const normalizedKey = item.normalized_key || item.key || (item.ticker ? encodeURIComponent(String(item.ticker)) : null);
     if (!normalizedKey) return false;
 
     // Determine the best price to use
@@ -624,7 +624,7 @@ function updatePriceCache(item) {
         currency: 'USD',
         time: item.capture_time || new Date().toISOString(),
         // Keep both the original symbol and the normalized key for consumers
-        symbol: item.symbol || null,
+        ticker: item.ticker || null,
         normalized_key: normalizedKey,
         source: item.source ? `${item.source} (${priceSource})` : priceSource
     };
@@ -654,7 +654,7 @@ async function startKafkaConsumer() {
                 try {
                     const value = message.value.toString();
                     const data = JSON.parse(value);
-                    const displayKey = data.normalized_key || data.key || (data.symbol ? encodeURIComponent(String(data.symbol)) : '<no-key>');
+                    const displayKey = data.normalized_key || data.key || (data.ticker ? encodeURIComponent(String(data.ticker)) : '<no-key>');
                     console.log(`Received update for ${displayKey}`);
 
                     if (updatePriceCache(data)) {
@@ -709,7 +709,7 @@ function isBondSymbol(symbol) {
     
     // Look up in ticker registry which loads from us-treasury-auctions.csv
     const allTickers = loadAllTickers();
-    const ticker = allTickers.find(t => t.symbol === clean);
+    const tickerObj = allTickers.find(t => t.ticker === clean);
     
     // If found and exchange is TREASURY, it's a bond
     if (ticker && ticker.exchange === 'TREASURY') {
@@ -968,7 +968,7 @@ app.post('/api/import', async (req, res) => {
                     'INSERT INTO positions (account_id, symbol, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         position.account_id,
-                        position.symbol,
+                        position.ticker,
                         position.quantity,
                         position.type,
                         position.exchange || null,

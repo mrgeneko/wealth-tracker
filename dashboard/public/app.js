@@ -53,7 +53,7 @@ function renderPositions(accounts) {
 function addPositionRow(tbody, pos, acc, type) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td>${pos.symbol}</td>
+        <td>${pos.ticker}</td>
         <td>${pos.type || type}</td>
         <td>${pos.quantity}</td>
         <td>${formatNumber(pos.cost_basis || 0)}</td>
@@ -135,7 +135,7 @@ window.openPositionModal = function(mode, data) {
         document.getElementById('positionModalLabel').innerText = 'Edit Position';
         document.getElementById('position-id').value = data.id;
         document.getElementById('position-account').value = data.account_id;
-        document.getElementById('position-symbol').value = data.symbol;
+        document.getElementById('position-ticker').value = data.ticker;
         document.getElementById('position-type').value = data.type;
         document.getElementById('position-shares').value = data.quantity;
         document.getElementById('position-cost').value = data.cost_basis || 0;
