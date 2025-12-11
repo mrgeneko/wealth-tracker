@@ -703,11 +703,45 @@ app.get('/api/tickers', (req, res) => {
     }
 });
 
+// Helper: Detect if a symbol is a bond by looking it up in the treasury file
+// Returns true if the symbol exists in the treasury registry (exchange === 'TREASURY')
+function isBondSymbol(symbol) {
+    if (!symbol) return false;
+    const clean = symbol.trim().toUpperCase();
+    
+    // Look up in ticker registry which loads from us-treasury-auctions.csv
+    const allTickers = loadAllTickers();
+    const ticker = allTickers.find(t => t.symbol === clean);
+    
+    // If found and exchange is TREASURY, it's a bond
+    if (ticker && ticker.exchange === 'TREASURY') {
+        return true;
+    }
+    
+    return false;
+}
+
+// Helper: Trigger bond scrape by touching the marker file
+// This forces the scrape daemon to run bond_positions on its next cycle
+function triggerBondScrape() {
+    // Use same path as scrape_daemon.js: /usr/src/app/logs/last.bond_positions.txt
+    const markerPath = process.env.BOND_MARKER_PATH || '/usr/src/app/logs/last.bond_positions.txt';
+    try {
+        // Write timestamp 0 to force the daemon to think the task hasn't run
+        fs.writeFileSync(markerPath, '0\nTriggered by dashboard\n');
+        console.log(`[FetchPrice] Touched bond marker file: ${markerPath}`);
+        return true;
+    } catch (err) {
+        console.error(`[FetchPrice] Failed to touch bond marker file: ${err.message}`);
+        return false;
+    }
+}
+
 // API to fetch current price for a symbol and inject into price cache
 // Used when adding a new symbol to ensure immediate price display
 // Also publishes to Kafka so the price persists to MySQL via the consumer
 app.post('/api/fetch-price', async (req, res) => {
-    const { symbol } = req.body;
+    const { symbol, type } = req.body;
 
     if (!symbol || !symbol.trim()) {
         return res.status(400).json({ error: 'Symbol is required' });
@@ -715,6 +749,27 @@ app.post('/api/fetch-price', async (req, res) => {
 
     const cleanSymbol = symbol.trim().toUpperCase();
     
+    // Detect if this is a bond (by type parameter or treasury registry lookup)
+    const isBond = type === 'bond' || isBondSymbol(cleanSymbol);
+    
+    if (isBond) {
+        // For bonds, trigger the scrape daemon to fetch prices on its next cycle
+        // This avoids duplicating the Webull scraping code
+        console.log(`[FetchPrice] Detected bond ${cleanSymbol}, triggering scrape daemon...`);
+        const triggered = triggerBondScrape();
+        
+        return res.json({
+            symbol: cleanSymbol,
+            isBond: true,
+            triggered: triggered,
+            message: triggered 
+                ? 'Bond price will be fetched by scrape daemon on next cycle'
+                : 'Failed to trigger scrape daemon, check logs',
+            note: 'Bond prices are scraped asynchronously via Webull'
+        });
+    }
+    
+    // Stock/ETF: Use Yahoo Finance
     try {
         // Load yahoo-finance2 v3 (requires instantiation)
         const YahooFinanceClass = require('yahoo-finance2').default || require('yahoo-finance2');

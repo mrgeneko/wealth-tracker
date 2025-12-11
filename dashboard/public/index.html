@@ -1193,11 +1193,12 @@
                     if (acc && acc.currency) currency = acc.currency;
                 }
                 // Fetch current price and publish to Kafka for persistence
+                // Pass type so bonds route to Webull instead of Yahoo
                 try {
                     await fetch('/api/fetch-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ symbol })
+                        body: JSON.stringify({ symbol, type })
                     });
                 } catch (e) {
                     console.warn('Price fetch failed:', e);
@@ -3226,25 +3227,32 @@
                 document.getElementById('symbolMetadataExchange').textContent = data.exchange || '—';
                 document.getElementById('symbolMetadataVerified').textContent = data.verified ? '✅ Yes' : '⚠️ Unverified';
                 
-                // Update form with metadata
-                const typeMap = { 'STOCK': 'stock', 'ETF': 'etf', 'BOND': 'bond', 'CRYPTO': 'crypto' };
+                // Update form with metadata - map all bond-like types to 'bond'
+                const typeMap = { 'STOCK': 'stock', 'ETF': 'etf', 'BOND': 'bond', 'TREASURY': 'bond', 'CRYPTO': 'crypto' };
                 const typeValue = typeMap[data.type] || 'stock';
                 document.getElementById('newSymbolType').value = typeValue;
                 
                 displayEl.style.display = 'block';
                 statusEl.textContent = '⏳ Fetching current price...';
                 
-                // Fetch current price from Yahoo and update cache
+                // Fetch current price - pass type so bonds trigger scrape daemon
                 try {
                     const priceResponse = await fetch('/api/fetch-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ symbol: symbol })
+                        body: JSON.stringify({ symbol: symbol, type: typeValue })
                     });
                     
                     if (priceResponse.ok) {
                         const priceData = await priceResponse.json();
-                        statusEl.textContent = `✅ Found! Current price: $${priceData.price.toFixed(2)}`;
+                        if (priceData.isBond) {
+                            // Bond prices are fetched asynchronously by scrape daemon
+                            statusEl.textContent = priceData.triggered 
+                                ? '✅ Bond added! Price will update shortly via scraper.'
+                                : '⚠️ Bond added, but scraper trigger failed.';
+                        } else {
+                            statusEl.textContent = `✅ Found! Current price: $${priceData.price.toFixed(2)}`;
+                        }
                     } else {
                         statusEl.textContent = '✅ Symbol found! (Price unavailable)';
                     }
