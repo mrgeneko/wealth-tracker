@@ -58,8 +58,6 @@ try {
 }
 
 const PORT = process.env.PORT || 3001;
-// Path to assets file - adjust relative to where you run the script
-const ASSETS_FILE = path.join(__dirname, '../assets_liabilities.json');
 
 // Basic Auth Configuration
 const AUTH_USER = process.env.BASIC_AUTH_USER || 'admin';

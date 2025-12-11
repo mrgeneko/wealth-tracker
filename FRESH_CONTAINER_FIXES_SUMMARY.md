@@ -27,7 +27,6 @@
 **Issue:** `.env` file doesn't exist by default
 **Files Needed:**
 - `.env` - Database and auth credentials
-- `config/assets_liabilities.json` - Account and position data
 - `config/nasdaq-listed.csv` - NASDAQ symbols
 - `config/nyse-listed.csv` - NYSE symbols
 - `config/other-listed.csv` - Other exchange symbols
@@ -144,9 +143,9 @@ Dashboard Container
   ↓
 Kafka Container → Ready
   ↓
-Data loads from assets_liabilities.json
+Dashboard initializes with empty database
   ↓
-Dashboard shows accounts ✓
+User can add accounts and positions via web UI ✓
 User sees no errors ✓
 ```
 
@@ -191,7 +190,6 @@ User sees no errors ✓
 ✓ MYSQL_DATABASE set
 ✓ MYSQL_USER set
 ✓ BASIC_AUTH_USER set
-✓ config/assets_liabilities.json exists
 ✓ config/nasdaq-listed.csv exists
 ✓ config/nyse-listed.csv exists
 ✓ config/other-listed.csv exists
