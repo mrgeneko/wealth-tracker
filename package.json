@@ -28,9 +28,10 @@
     "test:e2e:ticker": "jest tests/integration/ticker-standardization-e2e.test.js --testTimeout=120000 --passWithNoTests",
     "test:all": "TEST_TYPE=all jest --testTimeout=120000",
     "test:coverage:comprehensive": "jest --coverage --testTimeout=120000",
-    "migrate:execute": "node scripts/migrations/execute-migration.js",
-    "migrate:execute:dry-run": "node scripts/migrations/execute-migration.js --dry-run",
-    "migrate:rollback": "node scripts/migrations/execute-migration.js --rollback"
+    "migrate:execute": "node scripts/migrations/execute-migration-ticker.js",
+    "migrate:execute:verify-only": "node scripts/migrations/execute-migration-ticker.js --verify-only",
+    "migrate:rollback": "node scripts/migrations/execute-migration-ticker.js --rollback",
+    "migrate:backfill": "node scripts/backfill_ticker_terminology.js"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",

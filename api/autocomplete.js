@@ -116,13 +116,13 @@ router.get('/search', requirePool, async (req, res) => {
  *     }
  *   }
  */
-router.get('/details/:symbol', requirePool, async (req, res) => {
-    const symbol = (req.params.symbol || '').toUpperCase().trim();
+router.get('/details/:ticker', requirePool, async (req, res) => {
+    const ticker = (req.params.ticker || '').toUpperCase().trim();
 
-    if (!symbol) {
+    if (!ticker) {
         return res.status(400).json({
             error: 'Invalid request',
-            message: 'Symbol parameter is required'
+            message: 'Ticker parameter is required'
         });
     }
 
@@ -245,19 +245,19 @@ router.get('/pending', requirePool, async (req, res) => {
  *     timestamp: ISO8601
  *   }
  */
-router.post('/refresh/:symbol', requirePool, async (req, res) => {
-    const symbol = (req.params.symbol || '').toUpperCase().trim();
+router.post('/refresh/:ticker', requirePool, async (req, res) => {
+    const ticker = (req.params.ticker || '').toUpperCase().trim();
 
-    if (!symbol) {
+    if (!ticker) {
         return res.status(400).json({
             error: 'Invalid request',
-            message: 'Symbol parameter is required'
+            message: 'Ticker parameter is required'
         });
     }
 
     try {
         const service = new MetadataAutocompleteService(connectionPool);
-        await service.refreshSymbolMetadata(symbol);
+        await service.refreshTickerMetadata(ticker);
 
         res.json({
             symbol,

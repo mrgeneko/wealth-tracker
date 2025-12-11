@@ -1,53 +1,125 @@
-/**
- * Database Migration Script: Symbol to Ticker Standardization
- * File: scripts/migrations/012_rename_symbol_to_ticker.sql
- * 
- * This migration:
- * 1. Adds 'ticker' column to affected tables
- * 2. Copies data from 'symbol' to 'ticker'
- * 3. Creates indexes on 'ticker' column
- * 4. Maintains backward compatibility
- * 5. Allows rollback by preserving 'symbol' column
- * 
- * Duration: ~30 seconds (depending on data volume)
- * Reversible: Yes (can restore from backup if needed)
- */
+-- Migration 012: Rename 'symbol' to 'ticker' for terminology standardization
+-- 
+-- This migration standardizes ticker terminology across the database.
+-- Changes:
+--   - positions.symbol -> positions.ticker
+--   - securities_metadata.symbol -> securities_metadata.ticker
+--   - symbol_registry.symbol -> symbol_registry.ticker
+--   - securities_dividends.symbol -> securities_dividends.ticker
+--   - Updates foreign key constraints
+--   - Updates indexes and unique constraints
+--
+-- Rollback: Run 013_rollback_symbol_to_ticker.sql
 
--- Step 1: Add ticker column to positions table
-ALTER TABLE positions
-ADD COLUMN ticker VARCHAR(20) NULL
-AFTER symbol,
-ADD INDEX idx_ticker (ticker);
+SET FOREIGN_KEY_CHECKS=0;
 
--- Step 2: Add ticker column to symbol_registry table
-ALTER TABLE symbol_registry
-ADD COLUMN ticker VARCHAR(20) NULL UNIQUE
-AFTER symbol,
-ADD INDEX idx_ticker (ticker);
+-- ============================================================================
+-- PHASE 1: Add ticker columns alongside existing symbol columns
+-- ============================================================================
 
--- Step 3: Add ticker column to securities_metadata table (if exists)
-ALTER TABLE securities_metadata
-ADD COLUMN ticker VARCHAR(20) NULL
-AFTER symbol,
-ADD INDEX idx_ticker (ticker);
+ALTER TABLE positions 
+ADD COLUMN ticker VARCHAR(50) DEFAULT NULL AFTER symbol,
+ADD KEY idx_positions_ticker (ticker);
 
--- Step 4: Copy symbol data to ticker column for positions
-UPDATE positions
-SET ticker = symbol
-WHERE symbol IS NOT NULL AND symbol != '';
+ALTER TABLE securities_metadata 
+ADD COLUMN ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL AFTER symbol,
+ADD UNIQUE KEY ticker (ticker);
 
--- Step 5: Copy symbol data to ticker column for symbol_registry
-UPDATE symbol_registry
-SET ticker = symbol
-WHERE symbol IS NOT NULL AND symbol != '';
+ALTER TABLE symbol_registry 
+ADD COLUMN ticker VARCHAR(50) DEFAULT NULL AFTER symbol,
+ADD UNIQUE KEY ticker_unique (ticker),
+ADD KEY idx_ticker (ticker);
 
--- Step 6: Copy symbol data to ticker column for securities_metadata
-UPDATE securities_metadata
-SET ticker = symbol
-WHERE symbol IS NOT NULL AND symbol != '';
+ALTER TABLE securities_dividends 
+ADD COLUMN ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL AFTER symbol,
+ADD KEY idx_ticker (ticker);
 
--- Step 7: Verify data integrity
--- This will be checked in tests, but here's the SQL:
+-- ============================================================================
+-- PHASE 2: Copy data from symbol to ticker columns
+-- ============================================================================
+
+UPDATE positions SET ticker = symbol WHERE ticker IS NULL AND symbol IS NOT NULL;
+UPDATE securities_metadata SET ticker = symbol WHERE ticker IS NULL AND symbol IS NOT NULL;
+UPDATE symbol_registry SET ticker = symbol WHERE ticker IS NULL AND symbol IS NOT NULL;
+UPDATE securities_dividends SET ticker = symbol WHERE ticker IS NULL AND symbol IS NOT NULL;
+
+-- ============================================================================
+-- PHASE 3: Update foreign key in symbol_registry (underlying_symbol)
+-- ============================================================================
+
+-- Drop old foreign key constraint
+ALTER TABLE symbol_registry 
+DROP FOREIGN KEY fk_underlying_symbol;
+
+-- Add new foreign key referencing ticker instead of symbol
+ALTER TABLE symbol_registry 
+ADD CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_symbol) REFERENCES symbol_registry (ticker) ON DELETE SET NULL;
+
+-- ============================================================================
+-- PHASE 4: Drop old symbol columns and constraints
+-- ============================================================================
+
+-- Drop unique constraint on symbol in securities_metadata
+ALTER TABLE securities_metadata 
+DROP KEY symbol;
+
+-- Drop unique constraint on symbol in symbol_registry
+ALTER TABLE symbol_registry 
+DROP KEY symbol;
+
+-- Drop unique constraint on symbol in securities_dividends
+ALTER TABLE securities_dividends 
+DROP KEY unique_dividend;
+
+-- Drop index on symbol in securities_metadata
+ALTER TABLE securities_metadata 
+DROP KEY idx_symbol;
+
+-- Drop index on symbol in symbol_registry
+ALTER TABLE symbol_registry 
+DROP KEY idx_symbol;
+
+-- Drop index on symbol in securities_dividends
+ALTER TABLE securities_dividends 
+DROP KEY idx_symbol;
+
+-- Drop symbol column from positions (no constraint, just column)
+ALTER TABLE positions 
+DROP COLUMN symbol;
+
+-- Drop symbol column from securities_metadata
+ALTER TABLE securities_metadata 
+DROP COLUMN symbol;
+
+-- Drop symbol column from symbol_registry
+ALTER TABLE symbol_registry 
+DROP COLUMN symbol;
+
+-- Drop symbol column from securities_dividends
+ALTER TABLE securities_dividends 
+DROP COLUMN symbol;
+
+-- ============================================================================
+-- PHASE 5: Recreate unique and index constraints on ticker columns
+-- ============================================================================
+
+ALTER TABLE securities_metadata 
+ADD UNIQUE KEY ticker_unique (ticker),
+ADD KEY idx_ticker (ticker);
+
+ALTER TABLE symbol_registry 
+ADD UNIQUE KEY ticker_unique (ticker),
+ADD KEY idx_ticker (ticker);
+
+ALTER TABLE securities_dividends 
+ADD UNIQUE KEY unique_dividend (ticker, ex_dividend_date, dividend_amount),
+ADD KEY idx_ticker (ticker);
+
+-- ============================================================================
+-- PHASE 6: Re-enable foreign key checks
+-- ============================================================================
+
+SET FOREIGN_KEY_CHECKS=1;
 -- SELECT COUNT(*) FROM positions WHERE symbol != ticker;
 -- SELECT COUNT(*) FROM symbol_registry WHERE symbol != ticker;
 -- SELECT COUNT(*) FROM securities_metadata WHERE symbol != ticker;

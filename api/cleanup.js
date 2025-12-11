@@ -49,12 +49,12 @@ router.post('/cleanup', async (req, res) => {
         try {
             connection = await pool.getConnection();
 
-            // Get symbols that are safe to delete (no holdings)
+            // Get tickers that are safe to delete (no holdings)
             let whereClause = `
                 WHERE sr.has_yahoo_metadata = 0
                 AND sr.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)
-                AND sr.symbol NOT IN (
-                    SELECT DISTINCT symbol FROM positions WHERE quantity > 0
+                AND sr.ticker NOT IN (
+                    SELECT DISTINCT ticker FROM positions WHERE quantity > 0
                 )
             `;
             const params = [daysSinceUpdate];
@@ -287,13 +287,13 @@ router.get('/status', async (req, res) => {
                 FROM symbol_registry
             `);
 
-            // Get symbols safe to delete (no holdings, no metadata)
+            // Get tickers safe to delete (no holdings, no metadata)
             const [deletable] = await connection.execute(`
                 SELECT COUNT(*) as safe_to_delete
                 FROM symbol_registry sr
                 WHERE sr.has_yahoo_metadata = 0
-                AND sr.symbol NOT IN (
-                    SELECT DISTINCT symbol FROM positions WHERE quantity > 0
+                AND sr.ticker NOT IN (
+                    SELECT DISTINCT ticker FROM positions WHERE quantity > 0
                 )
             `);
 
