@@ -18,6 +18,31 @@ const TEST_DB_CONFIG = {
 };
 
 async function initializeSchema(conn) {
+  // Drop existing tables to ensure fresh schema with ticker column
+  const tablesToDrop = [
+    'securities_metadata',
+    'securities_dividends', 
+    'securities_earnings',
+    'security_splits',
+    'latest_prices',
+    'positions',
+    'accounts'
+  ];
+  
+  try {
+    await conn.execute('SET FOREIGN_KEY_CHECKS = 0');
+    for (const table of tablesToDrop) {
+      try {
+        await conn.execute(`DROP TABLE IF EXISTS ${table}`);
+      } catch (err) {
+        // Ignore errors
+      }
+    }
+    await conn.execute('SET FOREIGN_KEY_CHECKS = 1');
+  } catch (err) {
+    console.warn('Warning dropping tables:', err.message);
+  }
+  
   // Read and execute init scripts
   const baseSchemaPath = path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql');
   const symbolRegistryPath = path.join(__dirname, '../..', 'scripts/init-db/001-symbol-registry.sql');
@@ -30,10 +55,7 @@ async function initializeSchema(conn) {
       try {
         await conn.query(statement);
       } catch (err) {
-        // Ignore table already exists errors
-        if (err.code !== 'ER_TABLE_EXISTS_ERROR') {
-          console.warn('Warning executing schema statement:', err.message);
-        }
+        console.warn('Warning executing schema statement:', err.message);
       }
     }
   }
@@ -45,9 +67,7 @@ async function initializeSchema(conn) {
       try {
         await conn.query(statement);
       } catch (err) {
-        if (err.code !== 'ER_TABLE_EXISTS_ERROR') {
-          console.warn('Warning executing schema statement:', err.message);
-        }
+        console.warn('Warning executing schema statement:', err.message);
       }
     }
   }
