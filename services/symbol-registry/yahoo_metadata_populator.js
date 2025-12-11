@@ -231,17 +231,17 @@ class YahooMetadataPopulator {
     try {
       for (const symbol of symbols) {
         try {
-          debug(`[${batchStats.processed + 1}/${symbols.length}] Processing ${symbol.symbol} (id: ${symbol.id}, type: ${symbol.security_type})`);
+          debug(`[${batchStats.processed + 1}/${symbols.length}] Processing ${symbol.ticker} (id: ${symbol.id}, type: ${symbol.security_type})`);
           
           // Fetch metadata from Yahoo
-          const result = await this.fetchYahooMetadata(symbol.symbol);
+          const result = await this.fetchYahooMetadata(symbol.ticker);
 
-          debug(`Fetch result for ${symbol.symbol}: success=${result.success}, hasMetadata=${!!result.metadata}`);
+          debug(`Fetch result for ${symbol.ticker}: success=${result.success}, hasMetadata=${!!result.metadata}`);
           
           if (result.success && result.metadata) {
             // Extract and store metadata
             const extracted = this.extractMetadata(result.metadata);
-            debug(`Extracted metadata for ${symbol.symbol}:`, extracted ? `name=${extracted.name}, marketCap=${extracted.market_cap}` : 'null');
+            debug(`Extracted metadata for ${symbol.ticker}:`, extracted ? `name=${extracted.name}, marketCap=${extracted.market_cap}` : 'null');
 
             // Update symbol with Yahoo metadata flag
             const rankSql = `
@@ -257,36 +257,36 @@ class YahooMetadataPopulator {
               true, // has Yahoo metadata
               extracted?.market_cap
             );
-            debug(`Calculated new rank for ${symbol.symbol}: ${newRank}`);
+            debug(`Calculated new rank for ${symbol.ticker}: ${newRank}`);
 
             await conn.query(rankSql, [newRank, symbol.id]);
-            debug(`Updated ticker_registry for ${symbol.symbol} (id: ${symbol.id})`);
+            debug(`Updated ticker_registry for ${symbol.ticker} (id: ${symbol.id})`);
 
             // Store extended metrics (non-critical - don't fail the whole symbol if this fails)
             try {
-              await this.storeExtendedMetadata(conn, symbol.id, symbol.symbol, result.metadata);
-              debug(`Stored extended metadata for ${symbol.symbol}`);
+              await this.storeExtendedMetadata(conn, symbol.id, symbol.ticker, result.metadata);
+              debug(`Stored extended metadata for ${symbol.ticker}`);
             } catch (extErr) {
               // Log but don't fail - the ticker_registry update already succeeded
-              debug(`Warning: Failed to store extended metrics for ${symbol.symbol}: ${extErr.message}`);
+              debug(`Warning: Failed to store extended metrics for ${symbol.ticker}: ${extErr.message}`);
             }
 
             batchStats.successful++;
             this.stats.successfully_updated++;
-            debug(`✓ Successfully processed ${symbol.symbol}`);
+            debug(`✓ Successfully processed ${symbol.ticker}`);
           } else {
             // Check if this was a permanent failure
             if (result.isPermanentFailure) {
-              console.log(`[YahooPopulator] ✗ PERMANENT FAILURE for ${symbol.symbol}: ${result.error || 'no metadata returned'}`);
-              debug(`Permanent failure for ${symbol.symbol} (will not retry): ${result.error}`);
+              console.log(`[YahooPopulator] ✗ PERMANENT FAILURE for ${symbol.ticker}: ${result.error || 'no metadata returned'}`);
+              debug(`Permanent failure for ${symbol.ticker} (will not retry): ${result.error}`);
               // Mark as permanently failed in database so we don't retry on next run
               try {
-                await this.markPermanentlyFailed(conn, symbol.id, symbol.symbol, result.error);
+                await this.markPermanentlyFailed(conn, symbol.id, symbol.ticker, result.error);
               } catch (markErr) {
-                debug(`Warning: Failed to mark ${symbol.symbol} as permanently failed: ${markErr.message}`);
+                debug(`Warning: Failed to mark ${symbol.ticker} as permanently failed: ${markErr.message}`);
               }
             } else {
-              debug(`✗ Failed to get metadata for ${symbol.symbol} (transient error, will retry): ${result.error || 'no metadata returned'}`);
+              debug(`✗ Failed to get metadata for ${symbol.ticker} (transient error, will retry): ${result.error || 'no metadata returned'}`);
             }
             batchStats.failed++;
             this.stats.failed++;
@@ -300,8 +300,8 @@ class YahooMetadataPopulator {
             await this.sleep(this.constructor.CONFIG.DELAY_MS);
           }
         } catch (err) {
-          console.error(`[YahooPopulator] Error processing ${symbol.symbol}:`, err.message);
-          debug(`Error stack for ${symbol.symbol}:`, err.stack);
+          console.error(`[YahooPopulator] Error processing ${symbol.ticker}:`, err.message);
+          debug(`Error stack for ${symbol.ticker}:`, err.stack);
           batchStats.failed++;
           this.stats.failed++;
           batchStats.processed++;
