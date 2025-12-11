@@ -363,7 +363,7 @@ describe('SymbolRegistrySyncService', () => {
 
       expect(result).toEqual(existingSymbol);
       expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, symbol'),
+        expect.stringContaining('SELECT id, ticker'),
         ['AAPL', 'NASDAQ', 'EQUITY']
       );
     });
