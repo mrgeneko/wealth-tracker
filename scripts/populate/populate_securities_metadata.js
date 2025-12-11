@@ -2,7 +2,8 @@
 // Fetch and populate security metadata from Yahoo Finance into MySQL
 // Usage: node scripts/populate/populate_securities_metadata.js [--symbol AAPL] [--all]
 
-require('dotenv').config();
+// dotenv is optional - in Docker containers, env vars are already set
+try { require('dotenv').config(); } catch (e) { /* dotenv not available, using existing env vars */ }
 const mysql = require('mysql2/promise');
 
 // Helper to load yahoo-finance2 (ESM-only package, must use dynamic import)
