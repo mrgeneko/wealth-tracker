@@ -11,6 +11,11 @@ on:
       - 'services/**'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 concurrency:
   group: ticker-standardization-${{ github.ref }}
   cancel-in-progress: true
@@ -118,18 +123,23 @@ jobs:
           cat DEPLOYMENT_READY.md
 
       - name: Comment with deployment readiness
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('DEPLOYMENT_READY.md', 'utf8');
             
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: report
-            });
+            if (context.issue && context.issue.number) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: report
+              });
+            } else {
+              console.log('Skipping PR comment - not in PR context');
+            }
 
       - name: Create success badge
         if: success()
