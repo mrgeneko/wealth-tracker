@@ -2,33 +2,7 @@
 
 ## Critical Issues
 
-### 1. ⚠️ Missing `assets_liabilities.json` File
-**Severity:** HIGH - Dashboard loads but no data appears
-
-**Problem:**
-- File is mounted as read-only: `./config/assets_liabilities.json:/assets_liabilities.json:ro`
-- If file doesn't exist, volume mount fails silently or container starts without data
-- Dashboard tries to load accounts but DB is empty
-- User sees "No accounts data available" warning
-
-**Current Protection:**
-- File is gitignored (exists in working directory but not in repo)
-- No validation on container startup
-
-**Recommendation:**
-```bash
-# Ensure file exists before docker compose up
-if [ ! -f config/assets_liabilities.json ]; then
-  echo "ERROR: config/assets_liabilities.json not found"
-  exit 1
-fi
-```
-
-**Status:** ⚠️ NEEDS DOCUMENTATION - Add startup validation
-
----
-
-### 2. ⚠️ Missing CSV Files for Symbol Registry
+### 1. ⚠️ Missing CSV Files for Symbol Registry
 **Severity:** MEDIUM - Symbol registry initialization fails
 
 **Files Required:**
@@ -223,7 +197,6 @@ permission denied while trying to connect to Docker daemon
 
 | Issue | Severity | Status | Action |
 |-------|----------|--------|--------|
-| Missing assets_liabilities.json | HIGH | ⚠️ Needs docs | Add validation script |
 | Missing CSV files | MEDIUM | ⚠️ Needs handling | Better error messages |
 | DB connection race | MEDIUM | ✅ Protected | Has retry logic |
 | Missing .env | HIGH | ⚠️ Needs check | Add startup validation |
@@ -258,7 +231,6 @@ fi
 
 # Check required files
 REQUIRED_FILES=(
-    "config/assets_liabilities.json"
     "config/nasdaq-listed.csv"
     "config/nyse-listed.csv"
     "config/other-listed.csv"
@@ -306,7 +278,6 @@ depends_on:
 
 - [ ] `.env` file exists with correct values
 - [ ] All required CSV files in `config/` directory
-- [ ] `config/assets_liabilities.json` exists
 - [ ] Ports 3001, 3306, 9092, 2181 are free
 - [ ] File permissions allow Docker volume mounts
 - [ ] Run: `docker compose down -v && docker compose up`
