@@ -75,7 +75,7 @@ router.get('/search', requirePool, async (req, res) => {
             includeMetadata: metadata === 'true' || metadata === '1'
         };
 
-        const results = await service.searchSymbols(q, options);
+        const results = await service.searchTickers(q, options);
 
         res.json({
             query: q.trim(),
@@ -128,13 +128,13 @@ router.get('/details/:ticker', requirePool, async (req, res) => {
 
     try {
         const service = new MetadataAutocompleteService(connectionPool);
-        const details = await service.getSymbolDetails(symbol);
+        const details = await service.getTickerDetails(ticker);
 
         if (!details) {
             return res.status(404).json({
                 error: 'Not found',
-                message: `Symbol "${symbol}" not found in registry`,
-                symbol
+                message: `Ticker "${ticker}" not found in registry`,
+                ticker
             });
         }
 
@@ -144,7 +144,7 @@ router.get('/details/:ticker', requirePool, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Symbol details error:', error);
+        console.error('Ticker details error:', error);
         res.status(500).json({
             error: 'Lookup failed',
             message: error.message
@@ -214,7 +214,7 @@ router.get('/pending', requirePool, async (req, res) => {
     try {
         const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
         const service = new MetadataAutocompleteService(connectionPool);
-        const pending = await service.getSymbolsNeedingMetadata(limit);
+        const pending = await service.getTickersNeedingMetadata(limit);
 
         res.json({
             pending,
@@ -223,9 +223,9 @@ router.get('/pending', requirePool, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Pending symbols error:', error);
+        console.error('Pending tickers error:', error);
         res.status(500).json({
-            error: 'Failed to retrieve pending symbols',
+            error: 'Failed to retrieve pending tickers',
             message: error.message
         });
     }
@@ -260,9 +260,9 @@ router.post('/refresh/:ticker', requirePool, async (req, res) => {
         await service.refreshTickerMetadata(ticker);
 
         res.json({
-            symbol,
+            ticker,
             action: 'refresh_initiated',
-            message: 'Metadata refresh flag reset. Symbol will be repopulated on next cycle.',
+            message: 'Metadata refresh flag reset. Ticker will be repopulated on next cycle.',
             timestamp: new Date().toISOString()
         });
 
@@ -310,7 +310,7 @@ router.post('/bulk-refresh', requirePool, async (req, res) => {
         let refreshedCount = 0;
         for (const symbol of normalizedSymbols) {
             try {
-                await service.refreshSymbolMetadata(symbol);
+                await service.refreshTickerMetadata(symbol);
                 refreshedCount++;
             } catch (err) {
                 console.error(`Failed to refresh ${symbol}:`, err.message);
