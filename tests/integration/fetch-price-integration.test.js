@@ -57,6 +57,76 @@ describe('Fetch Price Integration Tests', () => {
             // Yahoo may return 404 or 500 depending on error type
             expect([404, 500]).toContain(res.status);
         });
+
+        it.skipIf(SKIP_INTEGRATION)('should detect bond via treasury registry and trigger async scraping', async () => {
+            // Test with a known treasury symbol from the registry
+            const res = await request(BASE_URL)
+                .post('/api/fetch-price')
+                .auth(AUTH_USER, AUTH_PASS)
+                .send({ symbol: '912810EX2', type: 'bond' }) // 30-Year Treasury Bond
+                .timeout(10000);
+
+            // Bonds return 200 with async message, not immediate price
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({
+                symbol: '912810EX2',
+                message: expect.stringContaining('will be fetched by scrape daemon')
+            });
+            // Bonds should indicate triggered = true
+            expect(res.body.triggered).toBe(true);
+        });
+
+        it.skipIf(SKIP_INTEGRATION)('should detect treasury bill (4-week)', async () => {
+            const res = await request(BASE_URL)
+                .post('/api/fetch-price')
+                .auth(AUTH_USER, AUTH_PASS)
+                .send({ symbol: '912797SE8', type: 'bond' }) // 4-Week Treasury Bill
+                .timeout(10000);
+
+            expect(res.status).toBe(200);
+            expect(res.body.triggered).toBe(true);
+            expect(res.body.message).toBeDefined();
+        });
+
+        it.skipIf(SKIP_INTEGRATION)('should detect treasury note (7-year)', async () => {
+            const res = await request(BASE_URL)
+                .post('/api/fetch-price')
+                .auth(AUTH_USER, AUTH_PASS)
+                .send({ symbol: '91282CPM7', type: 'bond' }) // 7-Year Treasury Note
+                .timeout(10000);
+
+            expect(res.status).toBe(200);
+            expect(res.body.triggered).toBe(true);
+        });
+    });
+
+    describe('Bond Treasury Registry Detection', () => {
+        it.skipIf(SKIP_INTEGRATION)('should accept bond without explicit type if registry detects treasury', async () => {
+            // Even without type='bond', treasury symbols should be detected
+            const res = await request(BASE_URL)
+                .post('/api/fetch-price')
+                .auth(AUTH_USER, AUTH_PASS)
+                .send({ symbol: '912810EX2' }) // No type specified
+                .timeout(10000);
+
+            expect(res.status).toBe(200);
+            expect(res.body.triggered).toBe(true);
+        });
+
+        it.skipIf(SKIP_INTEGRATION)('should reject non-treasury symbols even if type=bond is specified', async () => {
+            // Stocks should NOT be treated as bonds, even if user explicitly says type=bond
+            const res = await request(BASE_URL)
+                .post('/api/fetch-price')
+                .auth(AUTH_USER, AUTH_PASS)
+                .send({ symbol: 'AAPL', type: 'bond' }) // Type doesn't matter, AAPL is a stock
+                .timeout(10000);
+
+            // Should fetch via Yahoo Finance, not trigger daemon
+            expect(res.status).toBe(200);
+            // Should have regular stock price response
+            expect(res.body.price).toBeGreaterThan(0);
+            expect(res.body.triggered).not.toBe(true);
+        });
     });
 });
 

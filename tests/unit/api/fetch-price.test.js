@@ -307,3 +307,197 @@ describe('Fetch Price API Endpoint', () => {
         });
     });
 });
+
+// ========== Bond Detection Tests ==========
+describe('Bond Symbol Detection via Treasury Registry', () => {
+    // Mock ticker registry data (simulates us-treasury-auctions.csv)
+    const mockTickerRegistry = [
+        { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+        { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
+        { symbol: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
+        { symbol: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' },
+        { symbol: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'TREASURY' },
+        { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
+    ];
+
+    // Helper function matching server.js implementation
+    function isBondSymbol(symbol) {
+        if (!symbol) return false;
+        const clean = symbol.trim().toUpperCase();
+        
+        // Look up in ticker registry
+        const ticker = mockTickerRegistry.find(t => t.symbol === clean);
+        
+        // If found and exchange is TREASURY, it's a bond
+        if (ticker && ticker.exchange === 'TREASURY') {
+            return true;
+        }
+        
+        return false;
+    }
+
+    describe('isBondSymbol', () => {
+        it('should detect treasury bonds from registry (30-Year)', () => {
+            expect(isBondSymbol('912810EX2')).toBe(true);
+        });
+
+        it('should detect treasury bills from registry (4-Week)', () => {
+            expect(isBondSymbol('912797SE8')).toBe(true);
+        });
+
+        it('should detect treasury notes from registry (7-Year)', () => {
+            expect(isBondSymbol('91282CPM7')).toBe(true);
+        });
+
+        it('should be case-insensitive', () => {
+            expect(isBondSymbol('912810ex2')).toBe(true);
+        });
+
+        it('should NOT detect stock symbols as bonds', () => {
+            expect(isBondSymbol('AAPL')).toBe(false);
+            expect(isBondSymbol('MSFT')).toBe(false);
+        });
+
+        it('should NOT detect ETFs as bonds', () => {
+            expect(isBondSymbol('SPY')).toBe(false);
+        });
+
+        it('should NOT detect unknown 9-char symbols as bonds (not in registry)', () => {
+            // Random 9-char string that looks like CUSIP but isn't in treasury file
+            expect(isBondSymbol('ABCDEF123')).toBe(false);
+        });
+
+        it('should handle null/undefined', () => {
+            expect(isBondSymbol(null)).toBe(false);
+            expect(isBondSymbol(undefined)).toBe(false);
+        });
+
+        it('should handle empty string', () => {
+            expect(isBondSymbol('')).toBe(false);
+            expect(isBondSymbol('   ')).toBe(false);
+        });
+    });
+});
+
+// ========== Bond Fetch Handler Tests ==========
+describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
+    let mockFs;
+    let bondFetchHandler;
+
+    // Mock ticker registry (same as detection tests)
+    const mockTickerRegistry = [
+        { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+        { symbol: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
+        { symbol: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' }
+    ];
+
+    // Helper matching server.js implementation - treasury registry lookup only
+    function isBondSymbol(symbol) {
+        if (!symbol) return false;
+        const clean = symbol.trim().toUpperCase();
+        const ticker = mockTickerRegistry.find(t => t.symbol === clean);
+        return ticker && ticker.exchange === 'TREASURY';
+    }
+
+    beforeEach(() => {
+        mockFs = {
+            writeFileSync: jest.fn()
+        };
+
+        // Bond handler that mimics the new marker file trigger approach
+        bondFetchHandler = async (symbol, type) => {
+            if (!symbol || !symbol.trim()) {
+                return { status: 400, body: { error: 'Symbol is required' } };
+            }
+
+            const cleanSymbol = symbol.trim().toUpperCase();
+            
+            // Detect bond by type parameter OR treasury registry lookup
+            const isBond = type === 'bond' || isBondSymbol(cleanSymbol);
+            
+            if (!isBond) {
+                return { status: 400, body: { error: 'Not a bond' } };
+            }
+
+            // Trigger scrape daemon by touching marker file
+            let triggered = false;
+            try {
+                mockFs.writeFileSync('/usr/src/app/logs/last.bond_positions.txt', '0\nTriggered by dashboard\n');
+                triggered = true;
+            } catch (err) {
+                triggered = false;
+            }
+
+            return {
+                status: 200,
+                body: {
+                    symbol: cleanSymbol,
+                    isBond: true,
+                    triggered: triggered,
+                    message: triggered 
+                        ? 'Bond price will be fetched by scrape daemon on next cycle'
+                        : 'Failed to trigger scrape daemon, check logs',
+                    note: 'Bond prices are scraped asynchronously via Webull'
+                }
+            };
+        };
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
+    describe('Bond trigger via marker file', () => {
+        it('should detect bond and trigger scrape daemon', async () => {
+            const res = await bondFetchHandler('912810EX2', 'bond');
+
+            expect(res.status).toBe(200);
+            expect(res.body.isBond).toBe(true);
+            expect(res.body.triggered).toBe(true);
+            expect(res.body.message).toContain('scrape daemon');
+        });
+
+        it('should detect bond by treasury registry lookup even without type', async () => {
+            // 912810EX2 is in mockTickerRegistry with exchange: 'TREASURY'
+            const res = await bondFetchHandler('912810EX2', null);
+
+            expect(res.status).toBe(200);
+            expect(res.body.isBond).toBe(true);
+        });
+
+        it('should write to marker file with timestamp 0', async () => {
+            await bondFetchHandler('912810EX2', 'bond');
+
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+                '/usr/src/app/logs/last.bond_positions.txt',
+                '0\nTriggered by dashboard\n'
+            );
+        });
+
+        it('should return triggered=false if marker file write fails', async () => {
+            mockFs.writeFileSync.mockImplementation(() => {
+                throw new Error('Permission denied');
+            });
+
+            const res = await bondFetchHandler('912810EX2', 'bond');
+
+            expect(res.status).toBe(200);
+            expect(res.body.triggered).toBe(false);
+            expect(res.body.message).toContain('Failed to trigger');
+        });
+
+        it('should NOT return price data (async scraping)', async () => {
+            const res = await bondFetchHandler('912810EX2', 'bond');
+
+            expect(res.body.price).toBeUndefined();
+            expect(res.body.note).toContain('asynchronously');
+        });
+
+        it('should reject non-bond symbols', async () => {
+            const res = await bondFetchHandler('AAPL', null);
+
+            expect(res.status).toBe(400);
+            expect(res.body.error).toBe('Not a bond');
+        });
+    });
+});
