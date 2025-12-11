@@ -84,7 +84,7 @@ When a fresh container is created:
    - `002-phase9-metrics.sql` → Creates metrics tables
 2. All 16 tables are created automatically
 3. Dashboard connects and works without errors
-4. Data loads from `assets_liabilities.json`
+4. Database starts empty; users add data via web UI
 
 ## Verification Completed
 

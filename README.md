@@ -97,7 +97,7 @@ This README focuses on running the project in Docker, the long-running scraper d
 
 This script checks for:
 - ✅ `.env` file with required credentials
-- ✅ Required data files (CSV files, assets_liabilities.json)
+- ✅ Required data files (CSV symbol files)
 - ✅ Port availability (3001, 3306, 9092, 2181)
 - ✅ Docker and Docker Compose installation
 - ✅ Existing containers/volumes
@@ -222,12 +222,8 @@ The dashboard now reads asset data (accounts, positions, real estate, vehicles) 
 
 - **Primary Source**: MySQL database (`wealth-tracker-mysql` container).
 - **Management**: 
-    - **API**: Use the dashboard API endpoints (`/api/accounts`, `/api/positions`, etc.) to manage data.
-    - **Re-Sync (Reset)**: To reset the database and re-import data from `config/assets_liabilities.json`, run the migration script:
-      ```bash
-      npm run migrate
-      ```
-      *Warning: This will DELETE all existing data in the `accounts`, `positions`, and `fixed_assets` tables and re-populate them from the JSON file.*
+    - **Add/Edit/Delete**: Use the dashboard web interface to manage accounts and positions in real-time.
+    - **API**: Use the dashboard API endpoints (`/api/accounts`, `/api/positions`, etc.) for programmatic access.
 
 ### 4. Dashboard HTTPS Configuration
 The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `dashboard/certs/`. If found, it starts an HTTPS server; otherwise, it falls back to HTTP.
