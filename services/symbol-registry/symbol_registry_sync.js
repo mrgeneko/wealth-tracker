@@ -186,7 +186,7 @@ class SymbolRegistrySyncService {
    */
   symbolToRegistryFormat(symbolData) {
     return {
-      symbol: symbolData.ticker,  // 'ticker' from CSV is mapped to 'symbol' in DB
+      symbol: symbolData.ticker,  // 'ticker' from CSV is mapped to 'ticker' in DB
       name: symbolData.name,
       exchange: symbolData.exchange,
       security_type: symbolData.security_type,
@@ -390,7 +390,7 @@ class SymbolRegistrySyncService {
   async insertSymbol(conn, symbolData) {
     const sql = `
       INSERT INTO ticker_registry (
-        symbol, name, exchange, security_type, source, has_yahoo_metadata, 
+        ticker, name, exchange, security_type, source, has_yahoo_metadata, 
         usd_trading_volume, sort_rank, issue_date, maturity_date, security_term, 
         underlying_symbol, strike_price, option_type, expiration_date
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
