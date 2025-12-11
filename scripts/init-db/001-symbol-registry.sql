@@ -6,34 +6,27 @@
 -- Creates the symbol registry system for autocomplete and metadata tracking
 
 CREATE TABLE IF NOT EXISTS symbol_registry (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  symbol VARCHAR(50) NOT NULL UNIQUE,
-  name VARCHAR(500),
-  exchange VARCHAR(50),
-  security_type ENUM('EQUITY', 'ETF', 'BOND', 'TREASURY', 'MUTUAL_FUND', 'OPTION', 'CRYPTO', 'FX', 'FUTURES', 'INDEX', 'OTHER') DEFAULT 'EQUITY',
-  source ENUM('NASDAQ_FILE', 'NYSE_FILE', 'OTHER_FILE', 'TREASURY_FILE', 'TREASURY_HISTORICAL', 'YAHOO', 'USER_ADDED') NOT NULL,
-  has_yahoo_metadata BOOLEAN DEFAULT FALSE,
-  permanently_failed BOOLEAN DEFAULT FALSE,
-  permanent_failure_reason VARCHAR(255) NULL,
-  permanent_failure_at TIMESTAMP NULL,
-  usd_trading_volume DECIMAL(20, 2) NULL,
+  id INT NOT NULL AUTO_INCREMENT,
+  symbol VARCHAR(50) NOT NULL,
+  name VARCHAR(500) DEFAULT NULL,
+  exchange VARCHAR(50) DEFAULT NULL,
+  security_type ENUM('EQUITY','ETF','BOND','TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') DEFAULT 'EQUITY',
+  source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_FILE','TREASURY_FILE','TREASURY_HISTORICAL','YAHOO','USER_ADDED') NOT NULL,
+  has_yahoo_metadata TINYINT(1) DEFAULT 0,
+  permanently_failed TINYINT(1) DEFAULT 0,
+  permanent_failure_reason VARCHAR(255) DEFAULT NULL,
+  permanent_failure_at TIMESTAMP NULL DEFAULT NULL,
+  usd_trading_volume DECIMAL(20,2) DEFAULT NULL,
   sort_rank INT DEFAULT 1000,
-  
-  -- Treasury-specific fields
-  issue_date DATE NULL,
-  maturity_date DATE NULL,
-  security_term VARCHAR(50) NULL,
-  
-  -- Option-specific fields
-  underlying_symbol VARCHAR(50) NULL,
-  strike_price DECIMAL(18, 4) NULL,
-  option_type ENUM('CALL', 'PUT') NULL,
-  expiration_date DATE NULL,
-  
-  -- Timestamps
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
+  issue_date DATE DEFAULT NULL,
+  maturity_date DATE DEFAULT NULL,
+  security_term VARCHAR(50) DEFAULT NULL,
+  underlying_symbol VARCHAR(50) DEFAULT NULL,
+  strike_price DECIMAL(18,4) DEFAULT NULL,
+  option_type ENUM('CALL','PUT') DEFAULT NULL,
+  expiration_date DATE DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY symbol (symbol),
   KEY idx_symbol (symbol),
@@ -44,28 +37,38 @@ CREATE TABLE IF NOT EXISTS symbol_registry (
   KEY idx_underlying_symbol (underlying_symbol),
   KEY idx_permanently_failed (permanently_failed),
   CONSTRAINT fk_underlying_symbol FOREIGN KEY (underlying_symbol) REFERENCES symbol_registry (symbol) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS symbol_registry_metrics (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  total_symbols INT DEFAULT 0,
-  nasdaq_symbols INT DEFAULT 0,
-  nyse_symbols INT DEFAULT 0,
-  other_symbols INT DEFAULT 0,
-  symbols_with_metadata INT DEFAULT 0,
-  symbols_without_metadata INT DEFAULT 0,
-  symbols_permanently_failed INT DEFAULT 0,
-  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  id INT NOT NULL AUTO_INCREMENT,
+  metric_date DATE NOT NULL,
+  source VARCHAR(50) NOT NULL,
+  total_symbols INT NOT NULL,
+  symbols_with_yahoo_metadata INT NOT NULL,
+  symbols_without_yahoo_metadata INT NOT NULL,
+  last_file_refresh_at TIMESTAMP NULL DEFAULT NULL,
+  file_download_duration_ms INT DEFAULT NULL,
+  avg_yahoo_fetch_duration_ms INT DEFAULT NULL,
+  errors_count INT DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY unique_date_source (metric_date,source),
+  KEY idx_metric_date (metric_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS file_refresh_status (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  file_type ENUM('NASDAQ', 'NYSE', 'OTHER', 'TREASURY_AUCTIONS', 'TREASURY_HISTORICAL') NOT NULL UNIQUE,
-  last_refreshed TIMESTAMP NULL,
+  id INT NOT NULL AUTO_INCREMENT,
+  file_type ENUM('NASDAQ','NYSE','OTHER','TREASURY') NOT NULL,
+  last_refresh_at TIMESTAMP NULL DEFAULT NULL,
+  last_refresh_duration_ms INT DEFAULT NULL,
+  last_refresh_status ENUM('SUCCESS','FAILED','IN_PROGRESS') DEFAULT 'SUCCESS',
+  last_error_message TEXT,
+  symbols_added INT DEFAULT 0,
   symbols_updated INT DEFAULT 0,
-  next_refresh_due_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_file_type (file_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  next_refresh_due_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY file_type (file_type),
+  KEY idx_file_type (file_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
