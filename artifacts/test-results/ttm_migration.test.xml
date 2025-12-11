@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ttm_migration.test" tests="1" failures="0" time="0.250">
-  <testcase classname="integration" name="ttm_migration.test.js" time="0.250">
+<testsuite name="ttm_migration.test" tests="1" failures="0" time="0.234">
+  <testcase classname="integration" name="ttm_migration.test.js" time="0.234">
     
     <system-out><![CDATA[
 [TEST] Running backfill_adjusted_dividends.js --symbol=TTMTEST --apply
 [APPLY] Backfill adjusted_dividend_amount
 Found 3 dividend rows to process
-Updated id=664 adjusted=2.500000
-Updated id=662 adjusted=1.000000
-Updated id=663 adjusted=0.500000
+Updated id=615 adjusted=2.500000
+Updated id=613 adjusted=1.000000
+Updated id=614 adjusted=0.500000
 Backfill complete.
 
 [TEST] Running recompute_ttm.js --symbol=TTMTEST --apply
@@ -18,14 +18,14 @@ TTM recompute complete.
 [TEST] metadata values: {
   ttm_dividend_amount: &apos;1.5000&apos;,
   ttm_eps: &apos;2.9000&apos;,
-  ttm_last_calculated_at: 2025-12-09T05:25:44.000Z
+  ttm_last_calculated_at: 2025-12-11T21:06:10.000Z
 }
 
 [TEST] TTM values are correct. Cleaning up test data.
 
 [TEST] Completed successfully
 ]]></system-out>
-    <system-err><![CDATA[(node:60198) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+    <system-err><![CDATA[(node:98000) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ]]></system-err>
   </testcase>

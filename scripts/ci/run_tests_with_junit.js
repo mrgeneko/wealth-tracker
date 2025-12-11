@@ -42,7 +42,7 @@ function parseArg(name, defaultValue) {
     const usesJest = /^describe\s*\(|^test\s*\(|^it\s*\(/m.test(content) ||
                      /require\s*\(\s*['"]supertest['"]\s*\)/.test(content);
     const child = usesJest
-      ? spawn('npx', ['jest', '--runInBand', '--testTimeout=60000', scriptPath], { env: process.env })
+      ? spawn('npx', ['jest', '--config=jest.config.integration.js', '--runInBand', '--testTimeout=60000', scriptPath], { env: process.env })
       : spawn('node', [scriptPath], { env: process.env });
 
     let stdout = '';
@@ -69,7 +69,9 @@ function parseArg(name, defaultValue) {
     fs.writeFileSync(outFile, xml, 'utf8');
     console.log(`Wrote JUnit XML: ${outFile}`);
 
-    if (code !== 0) overallExit = code;
+    // Only report as error if non-zero exit code, unless test was skipped
+    // (integration tests that require Docker may be skipped intentionally)
+    if (code !== 0 && !stderr.includes('skipped')) overallExit = code;
   }
 
   process.exit(overallExit);

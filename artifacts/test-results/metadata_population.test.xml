@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="metadata_population.test" tests="1" failures="0" time="0.065">
-  <testcase classname="integration" name="metadata_population.test.js" time="0.065">
+<testsuite name="metadata_population.test" tests="1" failures="0" time="0.046">
+  <testcase classname="integration" name="metadata_population.test.js" time="0.046">
     
     <system-out><![CDATA[============================================================
 METADATA POPULATION INTEGRATION TESTS
