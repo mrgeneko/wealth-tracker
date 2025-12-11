@@ -29,11 +29,11 @@ describe('Autocomplete API Endpoints', () => {
 
         // Create fresh mock service
         mockService = {
-            searchSymbols: jest.fn(),
-            getSymbolDetails: jest.fn(),
+            searchTickers: jest.fn(),
+            getTickerDetails: jest.fn(),
             getStatistics: jest.fn(),
-            getSymbolsNeedingMetadata: jest.fn(),
-            refreshSymbolMetadata: jest.fn(),
+            getTickersNeedingMetadata: jest.fn(),
+            refreshTickerMetadata: jest.fn(),
             markMetadataFetched: jest.fn()
         };
 
@@ -52,10 +52,10 @@ describe('Autocomplete API Endpoints', () => {
     // ========== SEARCH ENDPOINT ==========
 
     describe('GET /search', () => {
-        it('should search for symbols successfully', async () => {
-            mockService.searchSymbols.mockResolvedValue([
+        it('should search for tickers successfully', async () => {
+            mockService.searchTickers.mockResolvedValue([
                 {
-                    symbol: 'AAPL',
+                    ticker: 'AAPL',
                     name: 'Apple Inc.',
                     type: 'STOCK',
                     verified: true,
@@ -93,37 +93,37 @@ describe('Autocomplete API Endpoints', () => {
         });
 
         it('should respect limit parameter', async () => {
-            mockService.searchSymbols.mockResolvedValue([]);
+            mockService.searchTickers.mockResolvedValue([]);
 
             await request(app)
                 .get('/api/autocomplete/search')
                 .query({ q: 'A', limit: 50 });
 
-            expect(mockService.searchSymbols).toHaveBeenCalledWith('A', expect.objectContaining({ limit: 50 }));
+            expect(mockService.searchTickers).toHaveBeenCalledWith('A', expect.objectContaining({ limit: 50 }));
         });
 
         it('should cap limit at 100', async () => {
-            mockService.searchSymbols.mockResolvedValue([]);
+            mockService.searchTickers.mockResolvedValue([]);
 
             await request(app)
                 .get('/api/autocomplete/search')
                 .query({ q: 'A', limit: 1000 });
 
-            expect(mockService.searchSymbols).toHaveBeenCalledWith('A', expect.objectContaining({ limit: 100 }));
+            expect(mockService.searchTickers).toHaveBeenCalledWith('A', expect.objectContaining({ limit: 100 }));
         });
 
         it('should include metadata when requested', async () => {
-            mockService.searchSymbols.mockResolvedValue([]);
+            mockService.searchTickers.mockResolvedValue([]);
 
             await request(app)
                 .get('/api/autocomplete/search')
                 .query({ q: 'A', metadata: 'true' });
 
-            expect(mockService.searchSymbols).toHaveBeenCalledWith('A', expect.objectContaining({ includeMetadata: true }));
+            expect(mockService.searchTickers).toHaveBeenCalledWith('A', expect.objectContaining({ includeMetadata: true }));
         });
 
         it('should handle search errors', async () => {
-            mockService.searchSymbols.mockRejectedValue(new Error('Database error'));
+            mockService.searchTickers.mockRejectedValue(new Error('Database error'));
 
             const res = await request(app)
                 .get('/api/autocomplete/search')
@@ -136,10 +136,10 @@ describe('Autocomplete API Endpoints', () => {
 
     // ========== DETAILS ENDPOINT ==========
 
-    describe('GET /details/:symbol', () => {
-        it('should return symbol details', async () => {
-            mockService.getSymbolDetails.mockResolvedValue({
-                symbol: 'AAPL',
+    describe('GET /details/:ticker', () => {
+        it('should return ticker details', async () => {
+            mockService.getTickerDetails.mockResolvedValue({
+                ticker: 'AAPL',
                 name: 'Apple Inc.',
                 type: 'STOCK',
                 exchange: 'NASDAQ',
@@ -158,22 +158,22 @@ describe('Autocomplete API Endpoints', () => {
                 .get('/api/autocomplete/details/AAPL');
 
             expect(res.status).toBe(200);
-            expect(res.body.symbol).toBe('AAPL');
+            expect(res.body.ticker).toBe('AAPL');
             expect(res.body.name).toBe('Apple Inc.');
             expect(res.body.timestamp).toBeDefined();
         });
 
-        it('should normalize symbol to uppercase', async () => {
-            mockService.getSymbolDetails.mockResolvedValue({ symbol: 'AAPL' });
+        it('should normalize ticker to uppercase', async () => {
+            mockService.getTickerDetails.mockResolvedValue({ ticker: 'AAPL' });
 
             await request(app)
                 .get('/api/autocomplete/details/aapl');
 
-            expect(mockService.getSymbolDetails).toHaveBeenCalledWith('AAPL');
+            expect(mockService.getTickerDetails).toHaveBeenCalledWith('AAPL');
         });
 
-        it('should return 404 for unknown symbol', async () => {
-            mockService.getSymbolDetails.mockResolvedValue(null);
+        it('should return 404 for unknown ticker', async () => {
+            mockService.getTickerDetails.mockResolvedValue(null);
 
             const res = await request(app)
                 .get('/api/autocomplete/details/UNKNOWN');
@@ -184,7 +184,7 @@ describe('Autocomplete API Endpoints', () => {
         });
 
         it('should handle retrieval errors', async () => {
-            mockService.getSymbolDetails.mockRejectedValue(new Error('Database error'));
+            mockService.getTickerDetails.mockRejectedValue(new Error('Database error'));
 
             const res = await request(app)
                 .get('/api/autocomplete/details/AAPL');
@@ -241,8 +241,8 @@ describe('Autocomplete API Endpoints', () => {
     // ========== PENDING ENDPOINT ==========
 
     describe('GET /pending', () => {
-        it('should return pending symbols', async () => {
-            mockService.getSymbolsNeedingMetadata.mockResolvedValue(['SYMBOL1', 'SYMBOL2', 'SYMBOL3']);
+        it('should return pending tickers', async () => {
+            mockService.getTickersNeedingMetadata.mockResolvedValue(['TICKER1', 'TICKER2', 'TICKER3']);
 
             const res = await request(app)
                 .get('/api/autocomplete/pending');
@@ -254,71 +254,71 @@ describe('Autocomplete API Endpoints', () => {
         });
 
         it('should respect limit parameter', async () => {
-            mockService.getSymbolsNeedingMetadata.mockResolvedValue([]);
+            mockService.getTickersNeedingMetadata.mockResolvedValue([]);
 
             await request(app)
                 .get('/api/autocomplete/pending')
                 .query({ limit: 500 });
 
-            expect(mockService.getSymbolsNeedingMetadata).toHaveBeenCalledWith(500);
+            expect(mockService.getTickersNeedingMetadata).toHaveBeenCalledWith(500);
         });
 
         it('should cap limit at 1000', async () => {
-            mockService.getSymbolsNeedingMetadata.mockResolvedValue([]);
+            mockService.getTickersNeedingMetadata.mockResolvedValue([]);
 
             await request(app)
                 .get('/api/autocomplete/pending')
                 .query({ limit: 5000 });
 
-            expect(mockService.getSymbolsNeedingMetadata).toHaveBeenCalledWith(1000);
+            expect(mockService.getTickersNeedingMetadata).toHaveBeenCalledWith(1000);
         });
 
         it('should handle pending retrieval errors', async () => {
-            mockService.getSymbolsNeedingMetadata.mockRejectedValue(new Error('Database error'));
+            mockService.getTickersNeedingMetadata.mockRejectedValue(new Error('Database error'));
 
             const res = await request(app)
                 .get('/api/autocomplete/pending');
 
             expect(res.status).toBe(500);
-            expect(res.body.error).toBe('Failed to retrieve pending symbols');
+            expect(res.body.error).toBe('Failed to retrieve pending tickers');
         });
     });
 
     // ========== REFRESH ENDPOINT ==========
 
-    describe('POST /refresh/:symbol', () => {
-        it('should refresh symbol metadata', async () => {
-            mockService.refreshSymbolMetadata.mockResolvedValue();
+    describe('POST /refresh/:ticker', () => {
+        it('should refresh ticker metadata', async () => {
+            mockService.refreshTickerMetadata.mockResolvedValue();
 
             const res = await request(app)
                 .post('/api/autocomplete/refresh/AAPL');
 
             expect(res.status).toBe(200);
-            expect(res.body.symbol).toBe('AAPL');
+            expect(res.body.ticker).toBe('AAPL');
             expect(res.body.action).toBe('refresh_initiated');
-            expect(mockService.refreshSymbolMetadata).toHaveBeenCalledWith('AAPL');
+            expect(mockService.refreshTickerMetadata).toHaveBeenCalledWith('AAPL');
         });
 
-        it('should normalize symbol to uppercase', async () => {
-            mockService.refreshSymbolMetadata.mockResolvedValue();
+        it('should normalize ticker to uppercase', async () => {
+            mockService.refreshTickerMetadata.mockResolvedValue();
 
             await request(app)
                 .post('/api/autocomplete/refresh/aapl');
 
-            expect(mockService.refreshSymbolMetadata).toHaveBeenCalledWith('AAPL');
+            expect(mockService.refreshTickerMetadata).toHaveBeenCalledWith('AAPL');
         });
 
-        it('should trim whitespace from symbol', async () => {
-            mockService.refreshSymbolMetadata.mockResolvedValue();
+        it('should trim whitespace from ticker', async () => {
+            mockService.refreshTickerMetadata.mockResolvedValue();
 
             await request(app)
                 .post('/api/autocomplete/refresh/%20AAPL%20');
 
-            expect(mockService.refreshSymbolMetadata).toHaveBeenCalledWith('AAPL');
+            expect(mockService.refreshTickerMetadata).toHaveBeenCalledWith('AAPL');
         });
 
         it('should handle refresh errors', async () => {
-            mockService.refreshSymbolMetadata.mockRejectedValue(new Error('Update failed'));
+            mockService.refreshTickerMetadata.mockRejectedValue(new Error('Update failed'));
 
             const res = await request(app)
                 .post('/api/autocomplete/refresh/AAPL');
@@ -332,7 +332,7 @@ describe('Autocomplete API Endpoints', () => {
 
     describe('POST /bulk-refresh', () => {
         it('should refresh multiple symbols', async () => {
-            mockService.refreshSymbolMetadata.mockResolvedValue();
+            mockService.refreshTickerMetadata.mockResolvedValue();
 
             const res = await request(app)
                 .post('/api/autocomplete/bulk-refresh')
@@ -342,22 +342,22 @@ describe('Autocomplete API Endpoints', () => {
             expect(res.body.action).toBe('bulk_refresh_initiated');
             expect(res.body.symbols_refreshed).toBe(3);
             expect(res.body.total_requested).toBe(3);
-            expect(mockService.refreshSymbolMetadata).toHaveBeenCalledTimes(3);
+            expect(mockService.refreshTickerMetadata).toHaveBeenCalledTimes(3);
         });
 
         it('should normalize symbols to uppercase', async () => {
-            mockService.refreshSymbolMetadata.mockResolvedValue();
+            mockService.refreshTickerMetadata.mockResolvedValue();
 
             await request(app)
                 .post('/api/autocomplete/bulk-refresh')
                 .send({ symbols: ['aapl', 'googl'] });
 
-            expect(mockService.refreshSymbolMetadata).toHaveBeenNthCalledWith(1, 'AAPL');
-            expect(mockService.refreshSymbolMetadata).toHaveBeenNthCalledWith(2, 'GOOGL');
+            expect(mockService.refreshTickerMetadata).toHaveBeenNthCalledWith(1, 'AAPL');
+            expect(mockService.refreshTickerMetadata).toHaveBeenNthCalledWith(2, 'GOOGL');
         });
 
         it('should handle partial failures gracefully', async () => {
-            mockService.refreshSymbolMetadata
+            mockService.refreshTickerMetadata
                 .mockResolvedValueOnce()
                 .mockRejectedValueOnce(new Error('Error'))
                 .mockResolvedValueOnce();
@@ -435,7 +435,7 @@ describe('Autocomplete API Endpoints', () => {
 
     describe('Error Handling', () => {
         it('should handle connection errors', async () => {
-            mockService.searchSymbols.mockRejectedValue(new Error('Connection timeout'));
+            mockService.searchTickers.mockRejectedValue(new Error('Connection timeout'));
 
             const res = await request(app)
                 .get('/api/autocomplete/search')
@@ -447,7 +447,7 @@ describe('Autocomplete API Endpoints', () => {
         });
 
         it('should include timestamp on all successful responses', async () => {
-            mockService.searchSymbols.mockResolvedValue([]);
+            mockService.searchTickers.mockResolvedValue([]);
 
             const res = await request(app)
                 .get('/api/autocomplete/search')

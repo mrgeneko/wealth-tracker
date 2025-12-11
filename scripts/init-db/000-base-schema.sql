@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE TABLE IF NOT EXISTS positions (
   id INT NOT NULL AUTO_INCREMENT,
   account_id INT NOT NULL,
-  symbol VARCHAR(50) DEFAULT NULL,
+  ticker VARCHAR(50) DEFAULT NULL,
   description VARCHAR(255) DEFAULT NULL,
   quantity DECIMAL(20,8) DEFAULT NULL,
   type ENUM('stock','etf','bond','cash','crypto','other') NOT NULL,
@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS positions (
   normalized_key VARCHAR(128) DEFAULT NULL,
   PRIMARY KEY (id),
   KEY account_id (account_id),
+  KEY idx_positions_ticker (ticker),
   KEY idx_positions_normalized_key (normalized_key),
   CONSTRAINT positions_ibfk_1 FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -77,7 +78,7 @@ CREATE TABLE IF NOT EXISTS latest_prices (
 -- Create securities_metadata table
 CREATE TABLE IF NOT EXISTS securities_metadata (
   id INT NOT NULL AUTO_INCREMENT,
-  symbol VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   quote_type VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   type_display VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   short_name VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -115,8 +116,8 @@ CREATE TABLE IF NOT EXISTS securities_metadata (
   ttm_eps DECIMAL(12,4) DEFAULT NULL,
   ttm_last_calculated_at DATETIME DEFAULT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY symbol (symbol),
-  KEY idx_symbol (symbol),
+  UNIQUE KEY ticker (ticker),
+  KEY idx_ticker (ticker),
   KEY idx_quote_type (quote_type),
   KEY idx_exchange (exchange),
   KEY idx_currency (currency)
@@ -125,7 +126,7 @@ CREATE TABLE IF NOT EXISTS securities_metadata (
 -- Create securities_dividends table
 CREATE TABLE IF NOT EXISTS securities_dividends (
   id INT NOT NULL AUTO_INCREMENT,
-  symbol VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   ex_dividend_date DATE NOT NULL,
   payment_date DATE DEFAULT NULL,
   record_date DATE DEFAULT NULL,
@@ -143,18 +144,18 @@ CREATE TABLE IF NOT EXISTS securities_dividends (
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   adjusted_dividend_amount DECIMAL(12,6) DEFAULT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY unique_dividend (symbol,ex_dividend_date,dividend_amount),
-  KEY idx_symbol (symbol),
+  UNIQUE KEY unique_dividend (ticker,ex_dividend_date,dividend_amount),
+  KEY idx_ticker (ticker),
   KEY idx_ex_date (ex_dividend_date),
   KEY idx_payment_date (payment_date),
-  KEY idx_div_symbol_date_status (symbol,ex_dividend_date,status),
-  CONSTRAINT securities_dividends_ibfk_1 FOREIGN KEY (symbol) REFERENCES securities_metadata (symbol) ON DELETE CASCADE
+  KEY idx_div_ticker_date_status (ticker,ex_dividend_date,status),
+  CONSTRAINT securities_dividends_ibfk_1 FOREIGN KEY (ticker) REFERENCES securities_metadata (ticker) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create securities_dividends_backup table
 CREATE TABLE IF NOT EXISTS securities_dividends_backup (
   id INT NOT NULL AUTO_INCREMENT,
-  symbol VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   ex_dividend_date DATE NOT NULL,
   payment_date DATE DEFAULT NULL,
   record_date DATE DEFAULT NULL,
@@ -172,8 +173,8 @@ CREATE TABLE IF NOT EXISTS securities_dividends_backup (
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   adjusted_dividend_amount DECIMAL(12,6) DEFAULT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY unique_dividend (symbol,ex_dividend_date,dividend_amount),
-  KEY idx_symbol (symbol),
+  UNIQUE KEY unique_dividend (ticker,ex_dividend_date,dividend_amount),
+  KEY idx_ticker (ticker),
   KEY idx_ex_date (ex_dividend_date),
   KEY idx_payment_date (payment_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -181,7 +182,7 @@ CREATE TABLE IF NOT EXISTS securities_dividends_backup (
 -- Create securities_earnings table
 CREATE TABLE IF NOT EXISTS securities_earnings (
   id INT NOT NULL AUTO_INCREMENT,
-  symbol VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   earnings_date DATETIME NOT NULL,
   earnings_date_end DATETIME DEFAULT NULL,
   is_estimate TINYINT(1) DEFAULT 1,
@@ -199,17 +200,17 @@ CREATE TABLE IF NOT EXISTS securities_earnings (
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   adjusted_eps DECIMAL(12,6) DEFAULT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY unique_earnings (symbol,earnings_date,fiscal_quarter,fiscal_year),
-  KEY idx_symbol (symbol),
+  UNIQUE KEY unique_earnings (ticker,earnings_date,fiscal_quarter,fiscal_year),
+  KEY idx_ticker (ticker),
   KEY idx_earnings_date (earnings_date),
-  KEY idx_earn_symbol_date_eps (symbol,earnings_date,eps_actual),
-  CONSTRAINT securities_earnings_ibfk_1 FOREIGN KEY (symbol) REFERENCES securities_metadata (symbol) ON DELETE CASCADE
+  KEY idx_earn_ticker_date_eps (ticker,earnings_date,eps_actual),
+  CONSTRAINT securities_earnings_ibfk_1 FOREIGN KEY (ticker) REFERENCES securities_metadata (ticker) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create securities_earnings_backup table
 CREATE TABLE IF NOT EXISTS securities_earnings_backup (
   id INT NOT NULL AUTO_INCREMENT,
-  symbol VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   earnings_date DATETIME NOT NULL,
   earnings_date_end DATETIME DEFAULT NULL,
   is_estimate TINYINT(1) DEFAULT 1,
@@ -226,18 +227,18 @@ CREATE TABLE IF NOT EXISTS securities_earnings_backup (
   source_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY unique_earnings (symbol,earnings_date,fiscal_quarter,fiscal_year),
-  KEY idx_symbol (symbol),
+  UNIQUE KEY unique_earnings (ticker,earnings_date,fiscal_quarter,fiscal_year),
+  KEY idx_ticker (ticker),
   KEY idx_earnings_date (earnings_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create security_splits table
 CREATE TABLE IF NOT EXISTS security_splits (
   id INT NOT NULL AUTO_INCREMENT,
-  symbol VARCHAR(50) NOT NULL,
+  ticker VARCHAR(50) NOT NULL,
   split_date DATE NOT NULL,
   split_ratio DECIMAL(16,8) NOT NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_splits_symbol_date (symbol,split_date)
+  KEY idx_splits_ticker_date (ticker,split_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
