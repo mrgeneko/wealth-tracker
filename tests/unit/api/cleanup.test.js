@@ -221,7 +221,7 @@ describe('Cleanup API Endpoints', () => {
 
             const calls = mockConnection.execute.mock.calls;
             const createTableCall = calls[0];
-            expect(createTableCall[0]).toContain('CREATE TABLE IF NOT EXISTS symbol_registry_metadata_archive');
+            expect(createTableCall[0]).toContain('CREATE TABLE IF NOT EXISTS ticker_registry_metadata_archive');
         });
     });
 

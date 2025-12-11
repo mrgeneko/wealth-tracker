@@ -123,7 +123,7 @@ async function fetchStockPositions() {
 	try {
 		const pool = getMysqlPool();
 		const [rows] = await pool.query(
-			"SELECT DISTINCT symbol, type FROM positions WHERE type IN ('stock', 'etf') AND symbol IS NOT NULL AND symbol != ''"
+			"SELECT DISTINCT ticker, type FROM positions WHERE type IN ('stock', 'etf') AND ticker IS NOT NULL AND ticker != ''"
 		);
 		return rows.map(r => ({ symbol: r.symbol, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
 	} catch (e) {
@@ -136,7 +136,7 @@ async function fetchBondPositions() {
 	try {
 		const pool = getMysqlPool();
 		const [rows] = await pool.query(
-			"SELECT DISTINCT symbol, type FROM positions WHERE type = 'bond' AND symbol IS NOT NULL AND symbol != ''"
+			"SELECT DISTINCT ticker, type FROM positions WHERE type = 'bond' AND ticker IS NOT NULL AND ticker != ''"
 		);
 		return rows.map(r => ({ symbol: r.symbol, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
 	} catch (e) {

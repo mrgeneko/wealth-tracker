@@ -1,7 +1,7 @@
 /**
  * Symbol Registry Service
  * 
- * Core service managing the symbol_registry table, file refresh operations,
+ * Core service managing the ticker_registry table, file refresh operations,
  * Yahoo metadata population, and autocomplete functionality.
  */
 
@@ -116,7 +116,7 @@ class SymbolRegistryService {
 
       // Check if symbol exists
       const [existing] = await conn.query(
-        'SELECT source FROM symbol_registry WHERE symbol = ?',
+        'SELECT source FROM ticker_registry WHERE symbol = ?',
         [symbol]
       );
 
@@ -126,7 +126,7 @@ class SymbolRegistryService {
         if (this.shouldUpdateSource(oldSource, source)) {
           // New source is more authoritative - update it
           await conn.query(
-            `UPDATE symbol_registry 
+            `UPDATE ticker_registry 
              SET name = ?, exchange = ?, security_type = ?, source = ?, 
                  has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?,
                  issue_date = ?, maturity_date = ?, security_term = ?,
@@ -141,7 +141,7 @@ class SymbolRegistryService {
           // Old source is more authoritative - just update metadata if present
           if (has_yahoo_metadata || usd_trading_volume) {
             await conn.query(
-              `UPDATE symbol_registry 
+              `UPDATE ticker_registry 
                SET has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?, updated_at = CURRENT_TIMESTAMP
                WHERE symbol = ?`,
               [has_yahoo_metadata, usd_trading_volume, sortRank, symbol]
@@ -151,7 +151,7 @@ class SymbolRegistryService {
       } else {
         // New symbol - insert it
         await conn.query(
-          `INSERT INTO symbol_registry 
+          `INSERT INTO ticker_registry 
            (symbol, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sort_rank,
             issue_date, maturity_date, security_term, underlying_symbol, strike_price, option_type, expiration_date)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -185,7 +185,7 @@ class SymbolRegistryService {
           sm.trailing_pe,
           sm.ttm_dividend_amount,
           sm.ttm_eps
-         FROM symbol_registry sr
+         FROM ticker_registry sr
          LEFT JOIN securities_metadata sm ON sr.symbol = sm.symbol
          WHERE sr.symbol = ?`,
         [symbol]
@@ -220,7 +220,7 @@ class SymbolRegistryService {
           sr.security_term,
           sm.dividend_yield,
           sm.trailing_pe
-         FROM symbol_registry sr
+         FROM ticker_registry sr
          LEFT JOIN securities_metadata sm ON sr.symbol = sm.symbol
          WHERE 
           sr.symbol LIKE ? 
@@ -250,7 +250,7 @@ class SymbolRegistryService {
     metricDate = metricDate || new Date().toISOString().split('T')[0];
     const conn = await this.dbPool.getConnection();
     try {
-      let query = 'SELECT * FROM symbol_registry_metrics WHERE metric_date = ?';
+      let query = 'SELECT * FROM ticker_registry_metrics WHERE metric_date = ?';
       const params = [metricDate];
 
       if (source) {

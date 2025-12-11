@@ -49,9 +49,9 @@ router.get('/summary', requirePool, async (req, res) => {
                 file_download_duration_ms,
                 avg_yahoo_fetch_duration_ms,
                 errors_count
-            FROM symbol_registry_metrics
+            FROM ticker_registry_metrics
             WHERE (source, metric_date) IN (
-                SELECT source, MAX(metric_date) FROM symbol_registry_metrics GROUP BY source
+                SELECT source, MAX(metric_date) FROM ticker_registry_metrics GROUP BY source
             )
             ORDER BY source
         `);
@@ -77,13 +77,13 @@ router.get('/summary', requirePool, async (req, res) => {
                 COUNT(*) as total_symbols,
                 SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
                 COUNT(DISTINCT security_type) as type_count
-            FROM symbol_registry
+            FROM ticker_registry
         `);
 
         // Get recent error count (last 24 hours)
         const [recentErrors] = await connection.execute(`
             SELECT COALESCE(SUM(errors_count), 0) as error_count
-            FROM symbol_registry_metrics
+            FROM ticker_registry_metrics
             WHERE metric_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
         `);
 
@@ -137,7 +137,7 @@ router.get('/history', requirePool, async (req, res) => {
                 file_download_duration_ms,
                 avg_yahoo_fetch_duration_ms,
                 errors_count
-            FROM symbol_registry_metrics
+            FROM ticker_registry_metrics
             WHERE metric_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
         `;
         const params = [days];
@@ -266,7 +266,7 @@ router.post('/record', requirePool, async (req, res) => {
         connection = await connectionPool.getConnection();
 
         await connection.execute(`
-            INSERT INTO symbol_registry_metrics (
+            INSERT INTO ticker_registry_metrics (
                 metric_date,
                 source,
                 total_symbols,
@@ -429,7 +429,7 @@ router.get('/success-rate', requirePool, async (req, res) => {
             SELECT 
                 metric_date,
                 SUM(errors_count) as total_errors
-            FROM symbol_registry_metrics
+            FROM ticker_registry_metrics
             WHERE metric_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
             GROUP BY metric_date
             ORDER BY metric_date

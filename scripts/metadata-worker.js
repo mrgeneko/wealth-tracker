@@ -3,7 +3,7 @@
 /**
  * PM2 Metadata Worker
  * 
- * Continuously processes queued symbols from symbol_registry table.
+ * Continuously processes queued symbols from ticker_registry table.
  * Replaces cron jobs and populate_securities_metadata.js scripts.
  * 
  * Usage:
@@ -93,7 +93,7 @@ const serviceBasePath = process.env.NODE_ENV === 'development'
 debug('Loading services from:', serviceBasePath);
 
 const YahooMetadataPopulator = require(path.join(serviceBasePath, 'symbol-registry/yahoo_metadata_populator.js'));
-const SymbolRegistryService = require(path.join(serviceBasePath, 'symbol-registry/symbol_registry_service.js'));
+const SymbolRegistryService = require(path.join(serviceBasePath, 'symbol-registry/ticker_registry_service.js'));
 
 // Try to load yahoo-finance2 for the Yahoo client (v3 API)
 let yahooFinance = null;
@@ -310,7 +310,7 @@ class MetadataWorker {
         try {
             const [rows] = await connection.execute(`
                 SELECT COUNT(*) as count
-                FROM symbol_registry 
+                FROM ticker_registry 
                 WHERE has_yahoo_metadata = 0
                 AND security_type IN ('EQUITY', 'ETF', 'MUTUAL_FUND')
             `);

@@ -312,15 +312,15 @@ async function upsertEarning(connection, symbol, earningsDate, epsActual, epsEst
 
 async function computeAndWriteTTM(connection, symbol) {
   // TTM dividends: sum of dividend_amount where ex_dividend_date within last 12 months (365 days)
-  const [drows] = await connection.execute(`SELECT SUM(dividend_amount) AS sum_divs FROM securities_dividends WHERE symbol = ? AND ex_dividend_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) AND status IN ('confirmed','paid')`, [symbol]);
+  const [drows] = await connection.execute(`SELECT SUM(dividend_amount) AS sum_divs FROM securities_dividends WHERE ticker = ? AND ex_dividend_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) AND status IN ('confirmed','paid')`, [symbol]);
   const sumDivs = (drows && drows[0] && drows[0].sum_divs) ? parseFloat(drows[0].sum_divs) : null;
 
   // TTM EPS: sum of eps_actual for last 12 months
-  const [erows] = await connection.execute(`SELECT SUM(eps_actual) AS sum_eps FROM securities_earnings WHERE symbol = ? AND earnings_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) AND eps_actual IS NOT NULL`, [symbol]);
+  const [erows] = await connection.execute(`SELECT SUM(eps_actual) AS sum_eps FROM securities_earnings WHERE ticker = ? AND earnings_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) AND eps_actual IS NOT NULL`, [symbol]);
   const sumEps = (erows && erows[0] && erows[0].sum_eps) ? parseFloat(erows[0].sum_eps) : null;
 
   // Update securities_metadata
-  const updSql = `UPDATE securities_metadata SET ttm_dividend_amount = ?, ttm_eps = ? WHERE symbol = ?`;
+  // Update securities_metadata\n  const updSql = `UPDATE securities_metadata SET ttm_dividend_amount = ?, ttm_eps = ? WHERE ticker = ?`;
   try {
     await connection.execute(updSql, [sumDivs, sumEps, symbol]);
     console.log(`  ✓ Wrote TTM for ${symbol}: dividends=${sumDivs} eps=${sumEps}`);
@@ -439,11 +439,11 @@ async function processSymbol(connection, symbol) {
 
 async function getUniqueSymbols(connection, sourceAll=false, allMetadata=false) {
   if (sourceAll) {
-    const [rows] = await connection.execute(`SELECT DISTINCT symbol FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH'`);
+    const [rows] = await connection.execute(`SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH'`);
     return rows.map(r => r.symbol);
   }
   if (allMetadata) {
-    const [rows] = await connection.execute(`SELECT DISTINCT symbol FROM securities_metadata WHERE symbol IS NOT NULL AND symbol != ''`);
+    const [rows] = await connection.execute(`SELECT DISTINCT ticker FROM securities_metadata WHERE ticker IS NOT NULL AND ticker != ''`);
     return rows.map(r => r.symbol);
   }
   return [];

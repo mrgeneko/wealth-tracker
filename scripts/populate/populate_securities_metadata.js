@@ -421,14 +421,14 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
 
 async function getUniqueSymbols(connection) {
     const [rows] = await connection.execute(`
-    SELECT DISTINCT symbol FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH'
+    SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH'
   `);
     return rows.map(r => r.symbol);
 }
 
 async function getAllMetadataSymbols(connection) {
         const [rows] = await connection.execute(`
-        SELECT DISTINCT symbol FROM securities_metadata WHERE symbol IS NOT NULL AND symbol != ''
+        SELECT DISTINCT ticker FROM securities_metadata WHERE ticker IS NOT NULL AND ticker != ''
     `);
         return rows.map(r => r.symbol);
 }

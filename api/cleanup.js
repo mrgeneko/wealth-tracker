@@ -67,7 +67,7 @@ router.post('/cleanup', async (req, res) => {
             // Get count of symbols to delete
             const [countResults] = await connection.execute(`
                 SELECT COUNT(*) as count, sr.security_type, COUNT(*) as type_count
-                FROM symbol_registry sr
+                FROM ticker_registry sr
                 ${whereClause}
                 GROUP BY sr.security_type
             `, params);
@@ -78,7 +78,7 @@ router.post('/cleanup', async (req, res) => {
             let deletedCount = 0;
             if (totalCount > 0) {
                 const [deleteResult] = await connection.execute(`
-                    DELETE FROM symbol_registry
+                    DELETE FROM ticker_registry
                     ${whereClause}
                 `, params);
 
@@ -138,7 +138,7 @@ router.post('/reset-metadata', async (req, res) => {
             connection = await pool.getConnection();
 
             let query = `
-                UPDATE symbol_registry
+                UPDATE ticker_registry
                 SET has_yahoo_metadata = 0, updated_at = NOW()
             `;
             const params = [];
@@ -200,7 +200,7 @@ router.post('/archive-old-metadata', async (req, res) => {
 
             // Create archive table if not exists
             await connection.execute(`
-                CREATE TABLE IF NOT EXISTS symbol_registry_metadata_archive (
+                CREATE TABLE IF NOT EXISTS ticker_registry_metadata_archive (
                     symbol VARCHAR(50),
                     quote_type VARCHAR(50),
                     market_cap VARCHAR(50),
@@ -220,7 +220,7 @@ router.post('/archive-old-metadata', async (req, res) => {
 
             // Move old metadata to archive
             const [moveResult] = await connection.execute(`
-                INSERT INTO symbol_registry_metadata_archive 
+                INSERT INTO ticker_registry_metadata_archive 
                 SELECT *, NOW() as archived_at, updated_at as original_update_time
                 FROM securities_metadata
                 WHERE updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)
@@ -284,13 +284,13 @@ router.get('/status', async (req, res) => {
                     COUNT(*) as total_symbols,
                     SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata,
                     SUM(CASE WHEN has_yahoo_metadata = 0 THEN 1 ELSE 0 END) as without_metadata
-                FROM symbol_registry
+                FROM ticker_registry
             `);
 
             // Get tickers safe to delete (no holdings, no metadata)
             const [deletable] = await connection.execute(`
                 SELECT COUNT(*) as safe_to_delete
-                FROM symbol_registry sr
+                FROM ticker_registry sr
                 WHERE sr.has_yahoo_metadata = 0
                 AND sr.ticker NOT IN (
                     SELECT DISTINCT ticker FROM positions WHERE quantity > 0
@@ -303,7 +303,7 @@ router.get('/status', async (req, res) => {
                     security_type,
                     COUNT(*) as total,
                     SUM(CASE WHEN has_yahoo_metadata = 1 THEN 1 ELSE 0 END) as with_metadata
-                FROM symbol_registry
+                FROM ticker_registry
                 GROUP BY security_type
                 ORDER BY total DESC
             `);

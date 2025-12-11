@@ -36,7 +36,7 @@ beforeAll(async () => {
     // Check if required tables exist
     const [tables] = await connection.query(`
       SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'symbol_registry')
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('positions', 'ticker_registry')
     `);
     
     if (tables.length === 0) {
@@ -80,7 +80,7 @@ describe('Pre-Migration Validation', () => {
     expect(columns[0].DATA_TYPE).toBe('varchar');
   });
 
-  it('should have symbol_registry table with symbol column', async () => {
+  it('should have ticker_registry table with symbol column', async () => {
     if (skipTests) {
       console.warn(`⏭️  Test skipped (${skipReason})`);
       return;
@@ -88,7 +88,7 @@ describe('Pre-Migration Validation', () => {
     const [columns] = await connection.query(`
       SELECT COLUMN_NAME, DATA_TYPE 
       FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'symbol_registry' AND COLUMN_NAME = 'symbol'
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ticker_registry' AND COLUMN_NAME = 'symbol'
     `);
     expect(columns.length).toBeGreaterThan(0);
   });

@@ -114,7 +114,7 @@ router.post('/prefetch', async (req, res) => {
     try {
         // Check if already exists
         const [existing] = await connection.execute(
-            'SELECT symbol FROM securities_metadata WHERE symbol = ?',
+            'SELECT ticker FROM securities_metadata WHERE ticker = ?',
             [normalizedSymbol]
         );
 
@@ -122,11 +122,11 @@ router.post('/prefetch', async (req, res) => {
             // Already have it
             const [metadata] = await connection.execute(
                 `SELECT 
-          symbol, quote_type, type_display, short_name, long_name,
+          ticker, quote_type, type_display, short_name, long_name,
               exchange, currency, region, market_cap, dividend_yield,
               ttm_dividend_amount, ttm_eps
          FROM securities_metadata 
-         WHERE symbol = ?`,
+         WHERE ticker = ?`,
                 [normalizedSymbol]
             );
 
@@ -150,11 +150,11 @@ router.post('/prefetch', async (req, res) => {
         // Retrieve the newly inserted metadata
         const [metadata] = await connection.execute(
             `SELECT 
-        symbol, quote_type, type_display, short_name, long_name,
+        ticker, quote_type, type_display, short_name, long_name,
         exchange, currency, region, market_cap, dividend_yield,
         ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE symbol = ?`,
+       WHERE ticker = ?`,
             [normalizedSymbol]
         );
 
@@ -173,7 +173,7 @@ router.post('/prefetch', async (req, res) => {
 /**
  * GET /api/metadata/autocomplete?q=AAPL
  * Autocomplete search for symbols
- * Searches symbol_registry (populated from exchange CSV files)
+ * Searches ticker_registry (populated from exchange CSV files)
  */
 router.get('/autocomplete', async (req, res) => {
     const query = (req.query.q || '').toUpperCase();
@@ -185,26 +185,26 @@ router.get('/autocomplete', async (req, res) => {
     const connection = await getDbConnection();
 
     try {
-        // Search symbol_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
+        // Search ticker_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
         const [rows] = await connection.execute(
             `SELECT 
-                symbol, name, security_type, exchange
-            FROM symbol_registry 
-            WHERE symbol LIKE ? OR name LIKE ?
+                ticker, name, security_type, exchange
+            FROM ticker_registry 
+            WHERE ticker LIKE ? OR name LIKE ?
             ORDER BY 
                 CASE 
-                    WHEN symbol = ? THEN 1
-                    WHEN symbol LIKE ? THEN 2
+                    WHEN ticker = ? THEN 1
+                    WHEN ticker LIKE ? THEN 2
                     WHEN name LIKE ? THEN 3
                     ELSE 4
                 END,
-                symbol
+                ticker
             LIMIT 20`,
             [`${query}%`, `%${query}%`, query, `${query}%`, `%${query}%`]
         );
 
         const results = rows.map(row => ({
-            symbol: raw.ticker,
+            symbol: row.ticker,
             name: row.name || row.ticker,
             type: row.security_type,
             exchange: row.exchange,
@@ -242,7 +242,7 @@ router.post('/batch-prefetch', async (req, res) => {
 
             // Check if exists
             const [existing] = await connection.execute(
-                'SELECT symbol FROM securities_metadata WHERE symbol = ?',
+                'SELECT ticker FROM securities_metadata WHERE ticker = ?',
                 [normalizedSymbol]
             );
 

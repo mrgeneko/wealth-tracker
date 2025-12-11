@@ -3,10 +3,9 @@
 -- This script is automatically executed by Docker MySQL on container initialization
 -- (first time only, placed in /docker-entrypoint-initdb.d/)
 --
--- Creates the symbol registry system for autocomplete and metadata tracking
--- Note: Table is named symbol_registry for historical reasons but uses 'ticker' column
+-- Creates the ticker registry system for autocomplete and metadata tracking
 
-CREATE TABLE IF NOT EXISTS symbol_registry (
+CREATE TABLE IF NOT EXISTS ticker_registry (
   id INT NOT NULL AUTO_INCREMENT,
   ticker VARCHAR(50) NOT NULL,
   name VARCHAR(500) DEFAULT NULL,
@@ -37,10 +36,10 @@ CREATE TABLE IF NOT EXISTS symbol_registry (
   KEY idx_expiration_date (expiration_date),
   KEY idx_underlying_ticker (underlying_ticker),
   KEY idx_permanently_failed (permanently_failed),
-  CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker) REFERENCES symbol_registry (ticker) ON DELETE SET NULL
+  CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker) REFERENCES ticker_registry (ticker) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS symbol_registry_metrics (
+CREATE TABLE IF NOT EXISTS ticker_registry_metrics (
   id INT NOT NULL AUTO_INCREMENT,
   metric_date DATE NOT NULL,
   source VARCHAR(50) NOT NULL,
