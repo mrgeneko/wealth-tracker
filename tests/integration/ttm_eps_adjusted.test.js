@@ -36,12 +36,12 @@ async function main() {
   const sym = 'TTM_EPS_ADJ';
 
   // cleanup
-  await conn.execute('DELETE FROM securities_earnings WHERE symbol = ?', [sym]).catch(() => {});
-  await conn.execute('DELETE FROM securities_dividends WHERE symbol = ?', [sym]).catch(() => {});
-  await conn.execute('DELETE FROM security_splits WHERE symbol = ?', [sym]).catch(() => {});
-  await conn.execute('DELETE FROM securities_metadata WHERE symbol = ?', [sym]).catch(() => {});
+  await conn.execute('DELETE FROM securities_earnings WHERE ticker = ?', [sym]).catch(() => {});
+  await conn.execute('DELETE FROM securities_dividends WHERE ticker = ?', [sym]).catch(() => {});
+  await conn.execute('DELETE FROM security_splits WHERE ticker = ?', [sym]).catch(() => {});
+  await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [sym]).catch(() => {});
 
-  await conn.execute(`INSERT INTO securities_metadata (symbol, quote_type, short_name, currency) VALUES (?, 'EQUITY', 'EPS Adjust Test', 'USD')`, [sym]);
+  await conn.execute(`INSERT INTO securities_metadata (ticker, quote_type, short_name, currency) VALUES (?, 'EQUITY', 'EPS Adjust Test', 'USD')`, [sym]);
 
   // insert three earnings before split and one after split
   // For clarity: pre-split eps 1.0, 1.1, 1.2; then split (2-for-1) -> factor 0.5 -> post-split eps 0.6
@@ -52,11 +52,11 @@ async function main() {
 
   // Insert a split that occurred 75 days ago (so it will affect earnings older than 75 days)
   const splitDate = await isoDateDaysAgo(75); // split 75 days ago
-  await conn.execute(`INSERT INTO security_splits (symbol, split_date, split_ratio) VALUES (?, ?, ?)`, [sym, splitDate, 0.5]);
+  await conn.execute(`INSERT INTO security_splits (ticker, split_date, split_ratio) VALUES (?, ?, ?)`, [sym, splitDate, 0.5]);
 
   for (let i = 0; i < dates.length; i++) {
     const d = await isoDateDaysAgo(dates[i]);
-    await conn.execute(`INSERT INTO securities_earnings (symbol, earnings_date, is_estimate, eps_actual, fiscal_quarter, fiscal_year, data_source) VALUES (?, ?, FALSE, ?, 'Q', 2025, 'test')`, [sym, d + ' 00:00:00', eps_vals[i]]);
+    await conn.execute(`INSERT INTO securities_earnings (ticker, earnings_date, is_estimate, eps_actual, fiscal_quarter, fiscal_year, data_source) VALUES (?, ?, FALSE, ?, 'Q', 2025, 'test')`, [sym, d + ' 00:00:00', eps_vals[i]]);
   }
 
   // Backfill adjusted EPS
@@ -73,7 +73,7 @@ async function main() {
   // adjusted: 1.0*0.5=0.5, 1.1*0.5=0.55, 1.2*0.5=0.6, 0.6*1=0.6 (post-split unchanged)
   // TTM uses the LAST 4 reported eps -> sum adjusted values = 0.5 + 0.55 + 0.6 + 0.6 = 2.25
 
-  const [rows] = await conn.execute('SELECT ttm_eps, ttm_last_calculated_at FROM securities_metadata WHERE symbol = ?', [sym]);
+  const [rows] = await conn.execute('SELECT ttm_eps, ttm_last_calculated_at FROM securities_metadata WHERE ticker = ?', [sym]);
   assert.strictEqual(rows.length, 1, 'metadata row should exist');
   const ttmEps = parseFloat(rows[0].ttm_eps);
 
@@ -82,10 +82,10 @@ async function main() {
   console.log('[OK] Adjusted EPS TTM validated for', sym, 'value=', ttmEps);
 
   // cleanup
-  await conn.execute('DELETE FROM securities_earnings WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_dividends WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM security_splits WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_metadata WHERE symbol = ?', [sym]);
+  await conn.execute('DELETE FROM securities_earnings WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_dividends WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM security_splits WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [sym]);
 
   await conn.end();
   console.log('\n[TEST] Completed successfully');

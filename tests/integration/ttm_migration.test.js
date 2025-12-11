@@ -36,18 +36,18 @@ async function main() {
   const sym = 'TTMTEST';
 
   // Ensure clean slate
-  await conn.execute('DELETE FROM securities_earnings WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_dividends WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_dividends_backup WHERE symbol = ?', [sym]).catch(() => {});
-  await conn.execute('DELETE FROM security_splits WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_metadata WHERE symbol = ?', [sym]);
+  await conn.execute('DELETE FROM securities_earnings WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_dividends WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_dividends_backup WHERE ticker = ?', [sym]).catch(() => {});
+  await conn.execute('DELETE FROM security_splits WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [sym]);
 
   // Insert metadata row
-  await conn.execute(`INSERT INTO securities_metadata (symbol, quote_type, short_name, currency) VALUES (?, 'EQUITY', 'TTM Test Corp', 'USD')`, [sym]);
+  await conn.execute(`INSERT INTO securities_metadata (ticker, quote_type, short_name, currency) VALUES (?, 'EQUITY', 'TTM Test Corp', 'USD')`, [sym]);
 
   // Create a split that happened 90 days ago (2-for-1 => factor 0.5)
   const splitDate = await isoDateDaysAgo(90);
-  await conn.execute(`INSERT INTO security_splits (symbol, split_date, split_ratio) VALUES (?, ?, ?)`, [sym, splitDate, 0.5]);
+  await conn.execute(`INSERT INTO security_splits (ticker, split_date, split_ratio) VALUES (?, ?, ?)`, [sym, splitDate, 0.5]);
 
   // Insert dividend rows - one 300 days ago (outside TTM), one 200 days ago (inside), one 60 days ago (inside)
   const exOld = await isoDateDaysAgo(400); // outside 12 months (>365 days)
@@ -55,11 +55,11 @@ async function main() {
   const exRecent = await isoDateDaysAgo(60); // inside
 
   // Pre-split dividend had amount 2.00 on exMid; split later makes factor 0.5 -> adjusted 1.00
-  await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exMid, 2.0]);
+  await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exMid, 2.0]);
   // Another dividend amount should be counted as-is
-  await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exRecent, 0.5]);
+  await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exRecent, 0.5]);
   // Old dividend outside window
-  await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exOld, 5.0]);
+  await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exOld, 5.0]);
 
   // Insert four quarterly earnings (eps_actual)
   const epsDates = [30, 120, 210, 300]; // days ago (desc order example)
@@ -67,7 +67,7 @@ async function main() {
 
   for (let i = 0; i < epsDates.length; i++) {
     const d = await isoDateDaysAgo(epsDates[i]);
-    await conn.execute(`INSERT INTO securities_earnings (symbol, earnings_date, is_estimate, eps_actual, fiscal_quarter, fiscal_year, data_source) VALUES (?, ?, FALSE, ?, 'Q${i+1}', 2025, 'test')`, [sym, d + ' 00:00:00', epsVals[i]]);
+    await conn.execute(`INSERT INTO securities_earnings (ticker, earnings_date, is_estimate, eps_actual, fiscal_quarter, fiscal_year, data_source) VALUES (?, ?, FALSE, ?, 'Q${i+1}', 2025, 'test')`, [sym, d + ' 00:00:00', epsVals[i]]);
   }
 
   // Run backfill to compute adjusted_dividend_amount
@@ -79,7 +79,7 @@ async function main() {
   await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTMTEST', '--apply']);
 
   // Verify results
-  const [metaRows] = await conn.execute('SELECT ttm_dividend_amount, ttm_eps, ttm_last_calculated_at FROM securities_metadata WHERE symbol = ?', [sym]);
+  const [metaRows] = await conn.execute('SELECT ttm_dividend_amount, ttm_eps, ttm_last_calculated_at FROM securities_metadata WHERE ticker = ?', [sym]);
   assert.strictEqual(metaRows.length, 1, 'metadata row must exist');
   const ttmDiv = parseFloat(metaRows[0].ttm_dividend_amount);
   const ttmEps = parseFloat(metaRows[0].ttm_eps);
@@ -95,11 +95,11 @@ async function main() {
   console.log('\n[TEST] TTM values are correct. Cleaning up test data.');
 
   // Cleanup
-  await conn.execute('DELETE FROM securities_earnings WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_dividends WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_dividends_backup WHERE symbol = ?', [sym]).catch(() => {});
-  await conn.execute('DELETE FROM security_splits WHERE symbol = ?', [sym]);
-  await conn.execute('DELETE FROM securities_metadata WHERE symbol = ?', [sym]);
+  await conn.execute('DELETE FROM securities_earnings WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_dividends WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_dividends_backup WHERE ticker = ?', [sym]).catch(() => {});
+  await conn.execute('DELETE FROM security_splits WHERE ticker = ?', [sym]);
+  await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [sym]);
 
   await conn.end();
   console.log('\n[TEST] Completed successfully');

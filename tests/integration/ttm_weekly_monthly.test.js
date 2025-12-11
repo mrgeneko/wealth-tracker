@@ -33,21 +33,21 @@ async function isoDateDaysAgo(days) {
 
 async function setupSymbol(conn, symbol) {
   // Cleanup any existing test data
-  await conn.execute('DELETE FROM securities_earnings WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM securities_dividends WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM securities_dividends_backup WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM security_splits WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM securities_metadata WHERE symbol = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_earnings WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_dividends WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_dividends_backup WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM security_splits WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [symbol]).catch(() => {});
 
-  await conn.execute(`INSERT INTO securities_metadata (symbol, quote_type, short_name, currency) VALUES (?, 'ETF', ?, 'USD')`, [symbol, 'Integration Test Sym']);
+  await conn.execute(`INSERT INTO securities_metadata (ticker, quote_type, short_name, currency) VALUES (?, 'ETF', ?, 'USD')`, [symbol, 'Integration Test Sym']);
 }
 
 async function cleanupSymbol(conn, symbol) {
-  await conn.execute('DELETE FROM securities_earnings WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM securities_dividends WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM securities_dividends_backup WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM security_splits WHERE symbol = ?', [symbol]).catch(() => {});
-  await conn.execute('DELETE FROM securities_metadata WHERE symbol = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_earnings WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_dividends WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_dividends_backup WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM security_splits WHERE ticker = ?', [symbol]).catch(() => {});
+  await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [symbol]).catch(() => {});
 }
 
 async function testWeeklyDividends(conn) {
@@ -61,14 +61,14 @@ async function testWeeklyDividends(conn) {
   for (let i = 0; i < payments; i++) {
     const daysAgo = i * 7; // 0,7,14 ... up to ~357 days
     const exd = await isoDateDaysAgo(daysAgo);
-    await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
+    await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
   }
 
   // Run recompute for symbol
   await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTM_WEEKLY', '--apply']);
 
   // verify TTM dividend amount equals sum of payments within 12 months
-  const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE symbol = ?', [sym]);
+  const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE ticker = ?', [sym]);
   assert.strictEqual(rows.length, 1, 'metadata row should exist');
   const ttm = parseFloat(rows[0].ttm_dividend_amount);
   const expected = payments * perPayment;
@@ -92,11 +92,11 @@ async function testMonthlyDividends(conn) {
   for (let i = 0; i < months; i++) {
     const daysAgo = i * 30; // approximate month spacing
     const exd = await isoDateDaysAgo(daysAgo);
-    await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
+    await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
   }
 
   // also add a special non-cash dividend that should be ignored if policy excludes non-cash
-  await conn.execute(`INSERT INTO securities_dividends (symbol, ex_dividend_date, dividend_amount, dividend_type, status, data_source) VALUES (?, ?, ?, 'STOCK', 'paid', 'test')`, [sym, await isoDateDaysAgo(15), 5.0]);
+  await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, dividend_type, status, data_source) VALUES (?, ?, ?, 'STOCK', 'paid', 'test')`, [sym, await isoDateDaysAgo(15), 5.0]);
 
   // Backfill adjusted_dividend_amount (no splits present, so same as raw)
   await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
@@ -105,7 +105,7 @@ async function testMonthlyDividends(conn) {
   await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=' + sym, '--apply']);
 
   // Check stored TTM dividend amount
-  const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE symbol = ?', [sym]);
+  const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE ticker = ?', [sym]);
   assert.strictEqual(rows.length, 1, 'metadata row should exist');
   const ttm = parseFloat(rows[0].ttm_dividend_amount);
   const expected = months * perPayment; // stock dividend should not be included by default computation (dividend_type='STOCK')
