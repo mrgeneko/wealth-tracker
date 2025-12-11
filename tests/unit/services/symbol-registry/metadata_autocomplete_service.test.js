@@ -64,19 +64,19 @@ describe('MetadataAutocompleteService', () => {
     });
 
     // ============================================================================
-    // Symbol Search Tests
+    // Ticker Search Tests
     // ============================================================================
-    describe('searchSymbols', () => {
+    describe('searchTickers', () => {
         test('should return empty array for empty query', async () => {
-            const results = await service.searchSymbols('');
+            const results = await service.searchTickers('');
             expect(results).toEqual([]);
             expect(mockPool.getConnection).not.toHaveBeenCalled();
         });
 
-        test('should search symbols without metadata', async () => {
+        test('should search tickers without metadata', async () => {
             const mockResults = [
                 {
-                    symbol: 'AAPL',
+                    ticker: 'AAPL',
                     name: 'Apple Inc.',
                     security_type: 'STOCK'
                 }
@@ -84,18 +84,18 @@ describe('MetadataAutocompleteService', () => {
 
             mockConnection.execute.mockResolvedValueOnce([mockResults]);
             
-            const results = await service.searchSymbols('AAPL', { includeMetadata: false });
+            const results = await service.searchTickers('AAPL', { includeMetadata: false });
             
             expect(results).toHaveLength(1);
-            expect(results[0].symbol).toBe('AAPL');
+            expect(results[0].ticker).toBe('AAPL');
             expect(mockPool.getConnection).toHaveBeenCalled();
             expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        test('should search symbols with metadata', async () => {
+        test('should search tickers with metadata', async () => {
             const mockResults = [
                 {
-                    symbol: 'AAPL',
+                    ticker: 'AAPL',
                     name: 'Apple Inc.',
                     security_type: 'STOCK',
                     quote_type: 'EQUITY',
@@ -114,7 +114,7 @@ describe('MetadataAutocompleteService', () => {
                 .mockResolvedValueOnce([mockResults, []])
                 .mockResolvedValueOnce([[{ total: 1000, with_metadata: 750 }], []]);
             
-            const results = await service.searchSymbols('AAPL', { includeMetadata: true });
+            const results = await service.searchTickers('AAPL', { includeMetadata: true });
             
             expect(results).toHaveLength(1);
             expect(results[0].metadata).toBeDefined();
@@ -124,7 +124,7 @@ describe('MetadataAutocompleteService', () => {
         test('should handle search errors', async () => {
             mockConnection.execute.mockRejectedValueOnce(new Error('Database error'));
             
-            await expect(service.searchSymbols('TEST')).rejects.toThrow();
+            await expect(service.searchTickers('TEST')).rejects.toThrow();
             expect(mockConnection.release).toHaveBeenCalled();
         });
     });
@@ -163,7 +163,7 @@ describe('MetadataAutocompleteService', () => {
     describe('_formatResult', () => {
         test('should format basic result without metadata', () => {
             const row = {
-                symbol: 'AAPL',
+                ticker: 'AAPL',
                 name: 'Apple Inc.',
                 security_type: 'STOCK',
                 symbol_verified: true
@@ -171,7 +171,7 @@ describe('MetadataAutocompleteService', () => {
             
             const result = service._formatResult(row);
             
-            expect(result.symbol).toBe('AAPL');
+            expect(result.ticker).toBe('AAPL');
             expect(result.name).toBe('Apple Inc.');
             expect(result.type).toBe('STOCK');
             expect(result.verified).toBe(true);
@@ -179,7 +179,7 @@ describe('MetadataAutocompleteService', () => {
 
         test('should include metadata when available', () => {
             const row = {
-                symbol: 'AAPL',
+                ticker: 'AAPL',
                 name: 'Apple Inc.',
                 security_type: 'STOCK',
                 market_cap_numeric: 2500000000000,
@@ -197,9 +197,9 @@ describe('MetadataAutocompleteService', () => {
             expect(result.metadata.pe).toBe(28.5);
         });
 
-        test('should use symbol as fallback for name', () => {
+        test('should use ticker as fallback for name', () => {
             const row = {
-                symbol: 'XYZ',
+                ticker: 'XYZ',
                 name: null,
                 security_type: 'STOCK'
             };
@@ -211,64 +211,64 @@ describe('MetadataAutocompleteService', () => {
     });
 
     // ============================================================================
-    // Symbol Details Tests
+    // Ticker Details Tests
     // ============================================================================
-    describe('getSymbolDetails', () => {
-        test('should return null for non-existent symbol', async () => {
+    describe('getTickerDetails', () => {
+        test('should return null for non-existent ticker', async () => {
             mockConnection.execute.mockResolvedValueOnce([[], []]);
             
-            const details = await service.getSymbolDetails('NOTFOUND');
+            const details = await service.getTickerDetails('NOTFOUND');
             
             expect(details).toBeNull();
             expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        test('should return symbol details without metadata', async () => {
-            const symbolData = {
-                symbol: 'AAPL',
+        test('should return ticker details without metadata', async () => {
+            const tickerData = {
+                ticker: 'AAPL',
                 name: 'Apple Inc.',
                 security_type: 'STOCK'
             };
             
             mockConnection.execute
-                .mockResolvedValueOnce([[symbolData], []])
+                .mockResolvedValueOnce([[tickerData], []])
                 .mockResolvedValueOnce([[], []]);
             
-            const details = await service.getSymbolDetails('AAPL');
+            const details = await service.getTickerDetails('AAPL');
             
-            expect(details.symbol).toBe('AAPL');
+            expect(details.ticker).toBe('AAPL');
             expect(details.name).toBe('Apple Inc.');
             expect(details.metadata).toBeNull();
         });
 
-        test('should return symbol details with metadata', async () => {
-            const symbolData = {
-                symbol: 'AAPL',
+        test('should return ticker details with metadata', async () => {
+            const tickerData = {
+                ticker: 'AAPL',
                 name: 'Apple Inc.',
                 security_type: 'STOCK'
             };
             const metadataData = {
-                symbol: 'AAPL',
+                ticker: 'AAPL',
                 market_cap: '2.5T',
                 trailing_pe: 28.5
             };
             
             mockConnection.execute
-                .mockResolvedValueOnce([[symbolData], []])
+                .mockResolvedValueOnce([[tickerData], []])
                 .mockResolvedValueOnce([[metadataData], []]);
             
-            const details = await service.getSymbolDetails('AAPL');
+            const details = await service.getTickerDetails('AAPL');
             
             expect(details.metadata).toBeDefined();
             expect(details.metadata.market_cap).toBe('2.5T');
         });
 
-        test('should normalize symbol to uppercase', async () => {
+        test('should normalize ticker to uppercase', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[], []])
                 .mockResolvedValueOnce([[], []]);
             
-            await service.getSymbolDetails('test');
+            await service.getTickerDetails('test');
             
             const callArgs = mockConnection.execute.mock.calls[0];
             expect(callArgs[1][0]).toBe('TEST');
@@ -276,30 +276,30 @@ describe('MetadataAutocompleteService', () => {
     });
 
     // ============================================================================
-    // Symbols Needing Metadata Tests
+    // Tickers Needing Metadata Tests
     // ============================================================================
-    describe('getSymbolsNeedingMetadata', () => {
-        test('should return empty array when no symbols need metadata', async () => {
+    describe('getTickersNeedingMetadata', () => {
+        test('should return empty array when no tickers need metadata', async () => {
             // mysql2/promise returns [results, fields]
             mockConnection.query.mockResolvedValueOnce([[], []]);
             
-            const results = await service.getSymbolsNeedingMetadata();
+            const results = await service.getTickersNeedingMetadata();
             
             expect(results).toEqual([]);
             expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        test('should return symbols needing metadata', async () => {
+        test('should return tickers needing metadata', async () => {
             mockConnection.query.mockResolvedValueOnce([
                 [
-                    { symbol: 'AAPL' },
-                    { symbol: 'GOOGL' },
-                    { symbol: 'MSFT' }
+                    { ticker: 'AAPL' },
+                    { ticker: 'GOOGL' },
+                    { ticker: 'MSFT' }
                 ],
                 []
             ]);
             
-            const results = await service.getSymbolsNeedingMetadata();
+            const results = await service.getTickersNeedingMetadata();
             
             expect(results).toEqual(['AAPL', 'GOOGL', 'MSFT']);
         });
@@ -307,7 +307,7 @@ describe('MetadataAutocompleteService', () => {
         test('should respect limit parameter', async () => {
             mockConnection.query.mockResolvedValueOnce([[], []]);
             
-            await service.getSymbolsNeedingMetadata(50);
+            await service.getTickersNeedingMetadata(50);
             
             // Since we now use query with embedded limit, check it was called
             expect(mockConnection.query).toHaveBeenCalled();
@@ -427,26 +427,26 @@ describe('MetadataAutocompleteService', () => {
     // ============================================================================
     // Refresh Metadata Tests
     // ============================================================================
-    describe('refreshSymbolMetadata', () => {
+    describe('refreshTickerMetadata', () => {
         test('should reset metadata fetch flag and clear old metadata', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce({})
                 .mockResolvedValueOnce({});
             
-            const result = await service.refreshSymbolMetadata('AAPL');
+            const result = await service.refreshTickerMetadata('AAPL');
             
-            expect(result.symbol).toBe('AAPL');
+            expect(result.ticker).toBe('AAPL');
             expect(result.status).toBe('reset');
             expect(mockConnection.execute).toHaveBeenCalledTimes(2);
             expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        test('should normalize symbol to uppercase', async () => {
+        test('should normalize ticker to uppercase', async () => {
             mockConnection.execute
                 .mockResolvedValueOnce({})
                 .mockResolvedValueOnce({});
             
-            await service.refreshSymbolMetadata('aapl');
+            await service.refreshTickerMetadata('aapl');
             
             const firstCall = mockConnection.execute.mock.calls[0];
             expect(firstCall[1][0]).toBe('AAPL');
@@ -519,7 +519,7 @@ describe('MetadataAutocompleteService', () => {
         test('should always close connection on success', async () => {
             mockConnection.execute.mockResolvedValueOnce([[]]);
             
-            await service.searchSymbols('TEST', { includeMetadata: false });
+            await service.searchTickers('TEST', { includeMetadata: false });
             
             expect(mockConnection.release).toHaveBeenCalled();
         });
@@ -528,7 +528,7 @@ describe('MetadataAutocompleteService', () => {
             mockConnection.execute.mockRejectedValueOnce(new Error('Error'));
             
             try {
-                await service.searchSymbols('TEST', { includeMetadata: false });
+                await service.searchTickers('TEST', { includeMetadata: false });
             } catch (e) {
                 // Expected
             }
@@ -544,7 +544,7 @@ describe('MetadataAutocompleteService', () => {
         test('should handle whitespace in query', async () => {
             mockConnection.execute.mockResolvedValueOnce([[]]);
             
-            await service.searchSymbols('  AAPL  ', { includeMetadata: false });
+            await service.searchTickers('  AAPL  ', { includeMetadata: false });
             
             const callArgs = mockConnection.execute.mock.calls[0];
             expect(callArgs[1][0]).toBe('AAPL%');
@@ -553,7 +553,7 @@ describe('MetadataAutocompleteService', () => {
         test('should handle special characters gracefully', async () => {
             mockConnection.execute.mockResolvedValueOnce([[]]);
             
-            await service.searchSymbols("test'", { includeMetadata: false });
+            await service.searchTickers("test'", { includeMetadata: false });
             
             expect(mockConnection.execute).toHaveBeenCalled();
         });
@@ -561,7 +561,7 @@ describe('MetadataAutocompleteService', () => {
         test('should handle empty database results', async () => {
             mockConnection.execute.mockResolvedValueOnce([[]]);
             
-            const results = await service.searchSymbols('NOTEXIST', { includeMetadata: false });
+            const results = await service.searchTickers('NOTEXIST', { includeMetadata: false });
             
             expect(results).toEqual([]);
         });

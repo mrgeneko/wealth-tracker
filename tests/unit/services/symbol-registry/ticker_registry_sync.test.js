@@ -363,7 +363,7 @@ describe('SymbolRegistrySyncService', () => {
 
       expect(result).toEqual(existingSymbol);
       expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, symbol'),
+        expect.stringContaining('SELECT id, ticker'),
         ['AAPL', 'NASDAQ', 'EQUITY']
       );
     });
@@ -399,7 +399,7 @@ describe('SymbolRegistrySyncService', () => {
       await syncService.insertSymbol(mockConnection, symbolData);
 
       expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO symbol_registry'),
+        expect.stringContaining('INSERT INTO ticker_registry'),
         expect.arrayContaining(['AAPL', 'Apple Inc.', 'NASDAQ', 'EQUITY', 'NASDAQ_FILE'])
       );
       expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', false, undefined);
@@ -441,7 +441,7 @@ describe('SymbolRegistrySyncService', () => {
       await syncService.updateSymbol(mockConnection, 1, symbolData);
 
       expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE symbol_registry'),
+        expect.stringContaining('UPDATE ticker_registry'),
         expect.arrayContaining(['Apple Inc.', 'NASDAQ', 'EQUITY', 'NASDAQ_FILE', null])
       );
     });
@@ -641,7 +641,7 @@ describe('SymbolRegistrySyncService', () => {
       const count = await syncService.getRegistryCount();
 
       expect(count).toBe(15000);
-      expect(mockConnection.query).toHaveBeenCalledWith('SELECT COUNT(*) as count FROM symbol_registry');
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT COUNT(*) as count FROM ticker_registry');
       expect(mockConnection.release).toHaveBeenCalled();
     });
 
@@ -664,7 +664,7 @@ describe('SymbolRegistrySyncService', () => {
 
       expect(count).toBe(5000);
       expect(mockConnection.query).toHaveBeenCalledWith(
-        'SELECT COUNT(*) as count FROM symbol_registry WHERE source = ?',
+        'SELECT COUNT(*) as count FROM ticker_registry WHERE source = ?',
         ['NASDAQ_FILE']
       );
     });
@@ -681,7 +681,7 @@ describe('SymbolRegistrySyncService', () => {
 
       expect(count).toBe(8000);
       expect(mockConnection.query).toHaveBeenCalledWith(
-        'SELECT COUNT(*) as count FROM symbol_registry WHERE security_type = ?',
+        'SELECT COUNT(*) as count FROM ticker_registry WHERE security_type = ?',
         ['EQUITY']
       );
     });

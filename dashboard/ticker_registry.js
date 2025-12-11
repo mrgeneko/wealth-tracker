@@ -48,7 +48,7 @@ function loadAllTickers() {
             records.forEach(record => {
                 if (record.Symbol) {
                     tickers.push({
-                        symbol: record.Symbol.trim().toUpperCase(),
+                        ticker: record.Symbol.trim().toUpperCase(),
                         name: record['Security Name'] || '',
                         exchange: 'NASDAQ'
                     });
@@ -66,7 +66,7 @@ function loadAllTickers() {
             records.forEach(record => {
                 if (record['ACT Symbol']) {
                     tickers.push({
-                        symbol: record['ACT Symbol'].trim().toUpperCase(),
+                        ticker: record['ACT Symbol'].trim().toUpperCase(),
                         name: record['Company Name'] || '',
                         exchange: 'NYSE'
                     });
@@ -76,7 +76,7 @@ function loadAllTickers() {
 
         // Load Other Listed symbols (NYSE MKT, NYSE ARCA, BATS, IEX, etc.)
         // Track symbols we've already seen to avoid duplicates with NYSE
-        const seenSymbols = new Set(tickers.map(t => t.symbol));
+        const seenSymbols = new Set(tickers.map(t => t.ticker));
         if (fs.existsSync(OTHER_LISTED_FILE)) {
             const content = stripBOM(fs.readFileSync(OTHER_LISTED_FILE, 'utf-8'));
             const records = parse(content, {

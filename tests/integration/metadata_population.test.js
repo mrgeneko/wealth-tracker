@@ -6,6 +6,68 @@
 const { spawn } = require('child_process');
 const mysql = require('mysql2/promise');
 const assert = require('assert');
+const path = require('path');
+const fs = require('fs');
+
+// Initialize database schema with proper tables and ticker column
+async function initializeSchema(conn) {
+  // Drop existing tables to ensure fresh schema with ticker column
+  const tablesToDrop = [
+    'securities_metadata',
+    'securities_dividends', 
+    'securities_earnings',
+    'security_splits',
+    'latest_prices',
+    'positions',
+    'accounts',
+    'ticker_registry',
+    'ticker_registry_metrics',
+    'file_refresh_status'
+  ];
+  
+  try {
+    await conn.execute('SET FOREIGN_KEY_CHECKS = 0');
+    for (const table of tablesToDrop) {
+      try {
+        await conn.execute(`DROP TABLE IF EXISTS ${table}`);
+      } catch (err) {
+        // Ignore errors
+      }
+    }
+    await conn.execute('SET FOREIGN_KEY_CHECKS = 1');
+  } catch (err) {
+    console.warn('Warning dropping tables:', err.message);
+  }
+  
+  // Read and execute init scripts
+  const baseSchemaPath = path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql');
+  const symbolRegistryPath = path.join(__dirname, '../..', 'scripts/init-db/001-symbol-registry.sql');
+
+  if (fs.existsSync(baseSchemaPath)) {
+    const baseSchema = fs.readFileSync(baseSchemaPath, 'utf8');
+    // Split by semicolon and execute each statement
+    const statements = baseSchema.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        console.warn('Warning executing schema statement:', err.message);
+      }
+    }
+  }
+
+  if (fs.existsSync(symbolRegistryPath)) {
+    const symbolRegistry = fs.readFileSync(symbolRegistryPath, 'utf8');
+    const statements = symbolRegistry.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        console.warn('Warning executing schema statement:', err.message);
+      }
+    }
+  }
+}
 
 // Check for required environment variables
 function checkRequiredEnvVars() {
@@ -57,6 +119,9 @@ class IntegrationTest {
             password: process.env.MYSQL_PASSWORD,
             database: process.env.MYSQL_DATABASE
         });
+        
+        // Initialize schema before running tests
+        await initializeSchema(this.connection);
     }
 
     async teardown() {
@@ -83,12 +148,12 @@ class IntegrationTest {
 
             // Check if metadata was inserted
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE symbol = ?',
+                'SELECT * FROM securities_metadata WHERE ticker = ?',
                 ['AAPL']
             );
 
             assert.strictEqual(rows.length, 1, 'Should insert metadata');
-            assert.strictEqual(rows[0].symbol, 'AAPL');
+            assert.strictEqual(rows[0].ticker, 'AAPL');
             assert.ok(rows[0].short_name, 'Should have short_name');
             assert.strictEqual(rows[0].quote_type, 'EQUITY');
         });
@@ -107,7 +172,7 @@ class IntegrationTest {
         await this.test('Populate multiple symbols (2 symbols for CI)', async () => {
             // Create test positions for just 2 symbols to keep tests fast
             await this.connection.execute(
-                `INSERT INTO positions (account_id, symbol, quantity, type)
+                `INSERT INTO positions (account_id, ticker, quantity, type)
          VALUES (1, 'MSFT', 100, 'stock'), (1, 'GOOGL', 50, 'stock')
          ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)`
             );
@@ -118,7 +183,7 @@ class IntegrationTest {
 
             // Check if both were populated
             const [rows] = await this.connection.execute(
-                'SELECT symbol FROM securities_metadata WHERE symbol IN (?, ?)',
+                'SELECT ticker FROM securities_metadata WHERE ticker IN (?, ?)',
                 ['MSFT', 'GOOGL']
             );
 
@@ -142,7 +207,7 @@ class IntegrationTest {
             // Check if some stocks were populated
             const [rows] = await this.connection.execute(
                 `SELECT COUNT(*) as count FROM securities_metadata 
-         WHERE symbol IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA')`
+         WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA')`
             );
 
             assert.ok(rows[0].count >= 1, 'Should populate at least one stock');
@@ -152,7 +217,7 @@ class IntegrationTest {
     async testDataQuality() {
         await this.test('Verify data quality for AAPL', async () => {
             const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE symbol = ?',
+                'SELECT * FROM securities_metadata WHERE ticker = ?',
                 ['AAPL']
             );
 

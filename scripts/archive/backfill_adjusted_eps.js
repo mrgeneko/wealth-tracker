@@ -16,7 +16,7 @@ async function computeFactorForEarnings(connection, symbol, earningsDate) {
   const [rows] = await connection.execute(
     `SELECT EXP(SUM(LN(split_ratio))) AS factor
      FROM security_splits
-     WHERE symbol = ? AND split_date > ? AND split_date <= CURDATE()`,
+     WHERE ticker = ? AND split_date > ? AND split_date <= CURDATE()`,
     [symbol, earningsDate]
   );
   const f = rows && rows[0] && rows[0].factor ? parseFloat(rows[0].factor) : null;
@@ -46,11 +46,11 @@ async function main() {
     let where = `WHERE (adjusted_eps IS NULL)`;
     const params = [];
     if (symbol) {
-      where += ` AND symbol = ?`;
+      where += ` AND ticker = ?`;
       params.push(symbol);
     }
 
-    let qry = `SELECT id, symbol, earnings_date, eps_actual FROM securities_earnings ${where} ORDER BY symbol, earnings_date ASC`;
+    let qry = `SELECT id, ticker, earnings_date, eps_actual FROM securities_earnings ${where} ORDER BY ticker, earnings_date ASC`;
     if (limit) qry += ` LIMIT ${limit}`;
 
     const [rows] = await connection.execute(qry, params);
@@ -60,13 +60,13 @@ async function main() {
       const batch = rows.slice(i, i + batchSize);
       for (const r of batch) {
         if (r.eps_actual === null) {
-          if (dryRun) console.log(`[DRY] id=${r.id} ${r.symbol} ${r.earnings_date} eps_actual=NULL -> skip`);
+          if (dryRun) console.log(`[DRY] id=${r.id} ${r.ticker} ${r.earnings_date} eps_actual=NULL -> skip`);
           continue;
         }
-        const factor = await computeFactorForEarnings(connection, r.symbol, r.earnings_date);
+        const factor = await computeFactorForEarnings(connection, r.ticker, r.earnings_date);
         const adjusted = parseFloat(r.eps_actual) * factor;
         if (dryRun) {
-          console.log(`[DRY] id=${r.id} ${r.symbol} ${r.earnings_date} eps=${r.eps_actual} factor=${factor.toFixed(6)} adjusted=${adjusted.toFixed(6)}`);
+          console.log(`[DRY] id=${r.id} ${r.ticker} ${r.earnings_date} eps=${r.eps_actual} factor=${factor.toFixed(6)} adjusted=${adjusted.toFixed(6)}`);
         } else {
           await connection.execute(`UPDATE securities_earnings SET adjusted_eps = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [adjusted, r.id]);
           console.log(`Updated id=${r.id} adjusted_eps=${adjusted.toFixed(6)}`);

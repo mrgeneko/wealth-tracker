@@ -167,7 +167,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
     const stats = data.defaultKeyStatistics || {};
 
     const metadata = {
-        symbol: symbol,
+        ticker: symbol,
         quote_type: quoteType.quoteType || price.quoteType,
         type_display: quoteType.typeDisp || price.typeDisp,
         short_name: quoteType.shortName || price.shortName,
@@ -257,7 +257,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
 
     const sql = `
     INSERT INTO securities_metadata (
-      symbol, quote_type, type_display, short_name, long_name,
+      ticker, quote_type, type_display, short_name, long_name,
       sector, industry,
       region, exchange, full_exchange_name, currency, timezone_name, timezone_short,
       market, market_state, tradeable,
@@ -302,7 +302,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
   `;
 
     const values = [
-        metadata.symbol, metadata.quote_type, metadata.type_display, metadata.short_name, metadata.long_name,
+        metadata.ticker, metadata.quote_type, metadata.type_display, metadata.short_name, metadata.long_name,
         metadata.sector, metadata.industry,
         metadata.region, metadata.exchange, metadata.full_exchange_name, metadata.currency, metadata.timezone_name, metadata.timezone_short,
         metadata.market, metadata.market_state, metadata.tradeable,
@@ -327,7 +327,7 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
     if (!earningsDate) return;
 
     const earningsData = {
-        symbol: symbol,
+        ticker: symbol,
         earnings_date: formatDateTime(earningsDate),
         earnings_date_end: formatDateTime(earnings.earningsHigh),
         is_estimate: true,
@@ -340,7 +340,7 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
 
     const sql = `
     INSERT INTO securities_earnings (
-      symbol, earnings_date, earnings_date_end, is_estimate,
+      ticker, earnings_date, earnings_date_end, is_estimate,
       eps_estimate, revenue_estimate, fiscal_quarter, fiscal_year, data_source
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
@@ -351,7 +351,7 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
   `;
 
     const values = [
-        earningsData.symbol, earningsData.earnings_date, earningsData.earnings_date_end,
+        earningsData.ticker, earningsData.earnings_date, earningsData.earnings_date_end,
         earningsData.is_estimate, earningsData.eps_estimate, earningsData.revenue_estimate,
         earningsData.fiscal_quarter, earningsData.fiscal_year, earningsData.data_source
     ].map(v => v === undefined ? null : v);  // Convert undefined to null for MySQL
@@ -374,7 +374,7 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
     // Note: Yahoo's calendarEvents typically only provides the next dividend date
     // For full dividend history, you'd need to use the historical dividends endpoint
     const dividendData = {
-        symbol: symbol,
+        ticker: symbol,
         ex_dividend_date: formatDate(dividendDate),
         payment_date: null,
         record_date: null,
@@ -395,7 +395,7 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
 
     const sql = `
     INSERT INTO securities_dividends (
-      symbol, ex_dividend_date, payment_date, record_date, declaration_date,
+      ticker, ex_dividend_date, payment_date, record_date, declaration_date,
       dividend_amount, dividend_type, currency, is_estimate, status, data_source
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
@@ -405,7 +405,7 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
   `;
 
     const values = [
-        dividendData.symbol, dividendData.ex_dividend_date, dividendData.payment_date,
+        dividendData.ticker, dividendData.ex_dividend_date, dividendData.payment_date,
         dividendData.record_date, dividendData.declaration_date, dividendData.dividend_amount,
         dividendData.dividend_type, dividendData.currency, dividendData.is_estimate,
         dividendData.status, dividendData.data_source
@@ -421,16 +421,16 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
 
 async function getUniqueSymbols(connection) {
     const [rows] = await connection.execute(`
-    SELECT DISTINCT symbol FROM positions WHERE symbol IS NOT NULL AND symbol != 'CASH'
+    SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH'
   `);
-    return rows.map(r => r.symbol);
+    return rows.map(r => r.ticker);
 }
 
 async function getAllMetadataSymbols(connection) {
         const [rows] = await connection.execute(`
-        SELECT DISTINCT symbol FROM securities_metadata WHERE symbol IS NOT NULL AND symbol != ''
+        SELECT DISTINCT ticker FROM securities_metadata WHERE ticker IS NOT NULL AND ticker != ''
     `);
-        return rows.map(r => r.symbol);
+        return rows.map(r => r.ticker);
 }
 
 async function main() {

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Migration: Create symbol_registry and related tables
+ * Migration: Create ticker_registry and related tables
  * 
  * Creates three new tables for the autocomplete enhancement:
- * 1. symbol_registry - Main registry of all symbols
- * 2. symbol_registry_metrics - Track coverage and refresh metrics
+ * 1. ticker_registry - Main registry of all tickers
+ * 2. ticker_registry_metrics - Track coverage and refresh metrics
  * 3. file_refresh_status - Track when files were last refreshed
  * 
  * Uses environment variables for database configuration:
@@ -14,7 +14,7 @@
  * - MYSQL_PASSWORD (default: empty)
  * - MYSQL_DATABASE (default: wealth_tracker)
  * 
- * Run: node scripts/migrations/011_create_symbol_registry.js
+ * Run: node scripts/migrations/011_create_ticker_registry.js
  */
 
 const mysql = require('mysql2/promise');
@@ -30,8 +30,8 @@ const dbConfig = {
 };
 
 const SQL_STATEMENTS = [
-  // Create symbol_registry table
-  `CREATE TABLE IF NOT EXISTS symbol_registry (
+  // Create ticker_registry table
+  `CREATE TABLE IF NOT EXISTS ticker_registry (
     id INT AUTO_INCREMENT PRIMARY KEY,
     symbol VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(500),
@@ -68,11 +68,11 @@ const SQL_STATEMENTS = [
     INDEX idx_expiration_date (expiration_date),
     INDEX idx_underlying_symbol (underlying_symbol),
     INDEX idx_permanently_failed (permanently_failed),
-    CONSTRAINT fk_underlying_symbol FOREIGN KEY (underlying_symbol) REFERENCES symbol_registry(symbol) ON DELETE SET NULL
+    CONSTRAINT fk_underlying_symbol FOREIGN KEY (underlying_symbol) REFERENCES ticker_registry(symbol) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-  // Create symbol_registry_metrics table
-  `CREATE TABLE IF NOT EXISTS symbol_registry_metrics (
+  // Create ticker_registry_metrics table
+  `CREATE TABLE IF NOT EXISTS ticker_registry_metrics (
     id INT AUTO_INCREMENT PRIMARY KEY,
     metric_date DATE NOT NULL,
     source VARCHAR(50) NOT NULL,
