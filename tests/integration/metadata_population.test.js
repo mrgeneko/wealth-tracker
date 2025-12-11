@@ -6,6 +6,68 @@
 const { spawn } = require('child_process');
 const mysql = require('mysql2/promise');
 const assert = require('assert');
+const path = require('path');
+const fs = require('fs');
+
+// Initialize database schema with proper tables and ticker column
+async function initializeSchema(conn) {
+  // Drop existing tables to ensure fresh schema with ticker column
+  const tablesToDrop = [
+    'securities_metadata',
+    'securities_dividends', 
+    'securities_earnings',
+    'security_splits',
+    'latest_prices',
+    'positions',
+    'accounts',
+    'ticker_registry',
+    'ticker_registry_metrics',
+    'file_refresh_status'
+  ];
+  
+  try {
+    await conn.execute('SET FOREIGN_KEY_CHECKS = 0');
+    for (const table of tablesToDrop) {
+      try {
+        await conn.execute(`DROP TABLE IF EXISTS ${table}`);
+      } catch (err) {
+        // Ignore errors
+      }
+    }
+    await conn.execute('SET FOREIGN_KEY_CHECKS = 1');
+  } catch (err) {
+    console.warn('Warning dropping tables:', err.message);
+  }
+  
+  // Read and execute init scripts
+  const baseSchemaPath = path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql');
+  const symbolRegistryPath = path.join(__dirname, '../..', 'scripts/init-db/001-symbol-registry.sql');
+
+  if (fs.existsSync(baseSchemaPath)) {
+    const baseSchema = fs.readFileSync(baseSchemaPath, 'utf8');
+    // Split by semicolon and execute each statement
+    const statements = baseSchema.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        console.warn('Warning executing schema statement:', err.message);
+      }
+    }
+  }
+
+  if (fs.existsSync(symbolRegistryPath)) {
+    const symbolRegistry = fs.readFileSync(symbolRegistryPath, 'utf8');
+    const statements = symbolRegistry.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        console.warn('Warning executing schema statement:', err.message);
+      }
+    }
+  }
+}
 
 // Check for required environment variables
 function checkRequiredEnvVars() {
@@ -57,6 +119,9 @@ class IntegrationTest {
             password: process.env.MYSQL_PASSWORD,
             database: process.env.MYSQL_DATABASE
         });
+        
+        // Initialize schema before running tests
+        await initializeSchema(this.connection);
     }
 
     async teardown() {
