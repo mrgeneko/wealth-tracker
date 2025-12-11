@@ -23,13 +23,26 @@ async function getDbConnection() {
 // Helper to fetch metadata using the populate script
 async function fetchMetadataForSymbol(symbol) {
     try {
+        const path = require('path');
+        
+        // All files are under /app in Docker (api at /app/api, scripts at /app/scripts)
+        // This also works for local dev since paths are relative to this file's parent
+        const scriptPath = path.join(__dirname, '..', 'scripts', 'populate', 'populate_securities_metadata.js');
+        const cwd = path.join(__dirname, '..');
+        
+        console.log(`[Metadata] Running script: ${scriptPath} from cwd: ${cwd}`);
+        
         const { stdout, stderr } = await execPromise(
-            `node scripts/populate/populate_securities_metadata.js --symbol ${symbol}`,
-            { cwd: __dirname + '/..' }
+            `node "${scriptPath}" --symbol ${symbol}`,
+            { cwd }
         );
+        console.log(`[Metadata] Fetched metadata for ${symbol}`);
         return { success: true, output: stdout };
     } catch (error) {
         console.error(`Failed to fetch metadata for ${symbol}:`, error.message);
+        if (error.stderr) {
+            console.error(`[Metadata] stderr:`, error.stderr);
+        }
         return { success: false, error: error.message };
     }
 }

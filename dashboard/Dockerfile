@@ -8,10 +8,10 @@ WORKDIR /app
 COPY dashboard/package*.json ./
 RUN npm install
 
-# Copy application files
+# Copy application files - all under /app for consistent paths
 COPY dashboard/ .
-COPY api/ /api/
-COPY services/ /services/
+COPY api/ /app/api/
+COPY services/ /app/services/
 COPY scripts/ /app/scripts/
 COPY ecosystem.config.json /app/
 
