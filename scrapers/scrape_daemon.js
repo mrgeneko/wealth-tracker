@@ -125,7 +125,7 @@ async function fetchStockPositions() {
 		const [rows] = await pool.query(
 			"SELECT DISTINCT ticker, type FROM positions WHERE type IN ('stock', 'etf') AND ticker IS NOT NULL AND ticker != ''"
 		);
-		return rows.map(r => ({ symbol: r.symbol, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
+		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
 	} catch (e) {
 		logDebug('Error fetching stock positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -138,7 +138,7 @@ async function fetchBondPositions() {
 		const [rows] = await pool.query(
 			"SELECT DISTINCT ticker, type FROM positions WHERE type = 'bond' AND ticker IS NOT NULL AND ticker != ''"
 		);
-		return rows.map(r => ({ symbol: r.symbol, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
+		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
 	} catch (e) {
 		logDebug('Error fetching bond positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -633,12 +633,12 @@ async function runCycle(browser, outputDir) {
 		
 		// Fetch stock/etf positions from MySQL and map to security objects with ticker_yahoo
 		const positions = await fetchStockPositions();
-		logDebug(`Found ${positions.length} stock/etf positions for Yahoo batch: ${positions.map(p => p.symbol).join(', ')}`);
+		logDebug(`Found ${positions.length} stock/etf positions for Yahoo batch: ${positions.map(p => p.ticker).join(', ')}`);
 		
 		const yahooSecurities = positions.map(p => ({
 			...p,
-			key: p.symbol,
-			ticker_yahoo: p.symbol
+			key: p.ticker,
+			ticker_yahoo: p.ticker
 		}));
 		
 		if (yahooSecurities.length) {
@@ -858,16 +858,16 @@ async function runCycle(browser, outputDir) {
 		
 		// Query MySQL for list of stock/etf positions
 		const positions = await fetchStockPositions();
-		logDebug(`Found ${positions.length} stock/etf positions in database: ${positions.map(p => p.symbol).join(', ')}`);
+		logDebug(`Found ${positions.length} stock/etf positions in database: ${positions.map(p => p.ticker).join(', ')}`);
 		
 		if (positions.length > 0) {
 			// Use round robin through constructible URLs for each position
 			for (const position of positions) {
-				const { symbol, type } = position;
+				const { ticker, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(symbol, type);
+				const constructibleUrls = getConstructibleUrls(ticker, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
-					logDebug(`No constructible URLs for ${symbol}, skipping`);
+					logDebug(`No constructible URLs for ${ticker}, skipping`);
 					continue;
 				}
 				
@@ -908,22 +908,22 @@ async function runCycle(browser, outputDir) {
 							try {
 								// Create a security object with the URL
 								const security = {
-									key: symbol,
+									key: ticker,
 									type: 'stock',
 									[sourceName]: urlInfo.url
 								};
-								logDebug(`Scraping position ${symbol} with ${sourceName}: ${urlInfo.url}`);
+								logDebug(`Scraping position ${ticker} with ${sourceName}: ${urlInfo.url}`);
 								// Phase 9: Record metrics during scraper execution
 								const data = await recordScraperMetrics(sourceName, async () => {
 									return await scraperFunc(browser, security, outputDir);
 								}, {
 									url: urlInfo.url
 								});
-								logDebug(`${sourceName} scrape result for ${symbol}: ${JSON.stringify(data)}`);
+								logDebug(`${sourceName} scrape result for ${ticker}: ${JSON.stringify(data)}`);
 								scraped = true;
 								break; // Successfully scraped, move to next symbol
 							} catch (e) {
-								logDebug(`Error scraping ${symbol} with ${sourceName}: ${e.message}`);
+								logDebug(`Error scraping ${ticker} with ${sourceName}: ${e.message}`);
 							}
 						}
 					}
@@ -951,16 +951,16 @@ async function runCycle(browser, outputDir) {
 		
 		// Query MySQL for list of bond positions
 		const bondPositions = await fetchBondPositions();
-		logDebug(`Found ${bondPositions.length} bond positions in database: ${bondPositions.map(p => p.symbol).join(', ')}`);
+		logDebug(`Found ${bondPositions.length} bond positions in database: ${bondPositions.map(p => p.ticker).join(', ')}`);
 		
 		if (bondPositions.length > 0) {
 			// Use round robin through constructible URLs for each bond position
 			for (const position of bondPositions) {
-				const { symbol, type } = position;
+				const { ticker, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(symbol, type);
+				const constructibleUrls = getConstructibleUrls(ticker, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
-					logDebug(`No constructible URLs for bond ${symbol}, skipping`);
+					logDebug(`No constructible URLs for bond ${ticker}, skipping`);
 					continue;
 				}
 				
@@ -989,22 +989,22 @@ async function runCycle(browser, outputDir) {
 							try {
 								// Create a security object with the URL
 								const security = {
-									key: symbol,
+									key: ticker,
 									type: 'bond',
 									[sourceName]: urlInfo.url
 								};
-								logDebug(`Scraping bond ${symbol} with ${sourceName}: ${urlInfo.url}`);
+								logDebug(`Scraping bond ${ticker} with ${sourceName}: ${urlInfo.url}`);
 								// Phase 9: Record metrics during scraper execution
 								const data = await recordScraperMetrics(sourceName, async () => {
 									return await scraperFunc(browser, security, outputDir);
 								}, {
 									url: urlInfo.url
 								});
-								logDebug(`${sourceName} scrape result for bond ${symbol}: ${JSON.stringify(data)}`);
+								logDebug(`${sourceName} scrape result for bond ${ticker}: ${JSON.stringify(data)}`);
 								scraped = true;
 								break; // Successfully scraped, move to next bond
 							} catch (e) {
-								logDebug(`Error scraping bond ${symbol} with ${sourceName}: ${e.message}`);
+								logDebug(`Error scraping bond ${ticker} with ${sourceName}: ${e.message}`);
 							}
 						}
 					}
