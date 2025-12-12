@@ -45,7 +45,7 @@ function requirePool(req, res, next) {
  *     query: "string",
  *     results: [
  *       {
- *         symbol: "AAPL",
+ *         ticker: "AAPL",
  *         name: "Apple Inc.",
  *         type: "STOCK",
  *         verified: true,
@@ -94,12 +94,12 @@ router.get('/search', requirePool, async (req, res) => {
 });
 
 /**
- * GET /api/autocomplete/details/:symbol
- * Get detailed information for a single symbol
+ * GET /api/autocomplete/details/:ticker
+ * Get detailed information for a single ticker
  *
  * Response:
  *   {
- *     symbol: "AAPL",
+ *     ticker: "AAPL",
  *     name: "Apple Inc.",
  *     type: "STOCK",
  *     exchange: "NASDAQ",
@@ -232,16 +232,16 @@ router.get('/pending', requirePool, async (req, res) => {
 });
 
 /**
- * POST /api/autocomplete/refresh/:symbol
- * Admin: Refresh metadata for a specific symbol
+ * POST /api/autocomplete/refresh/:ticker
+ * Admin: Refresh metadata for a specific ticker
  *
  * Authorization: Optional (can be secured with middleware)
  *
  * Response:
  *   {
- *     symbol: "AAPL",
+ *     ticker: "AAPL",
  *     action: "refresh_initiated",
- *     message: "Metadata refresh flag reset. Symbol will be repopulated on next cycle.",
+ *     message: "Metadata refresh flag reset. Ticker will be repopulated on next cycle.",
  *     timestamp: ISO8601
  *   }
  */

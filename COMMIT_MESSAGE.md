@@ -33,8 +33,8 @@ MySQL through Kafka for consistency with the existing data pipeline.
 - **API Details:**
   - Method: POST
   - Path: `/api/fetch-price`
-  - Body: `{ "symbol": "AAPL" }`
-  - Response: `{ symbol, price, previousClose, currency, timestamp, cached, persisted }`
+  - Body: `{ "ticker": "AAPL" }`
+  - Response: `{ ticker, price, previousClose, currency, timestamp, cached, persisted }`
 
 #### 3. Kafka Message Format Fix
 **File:** `dashboard/server.js`
@@ -45,7 +45,7 @@ MySQL through Kafka for consistency with the existing data pipeline.
   ```json
   {
     "key": "AAPL",
-    "symbol": "AAPL",
+    "ticker": "AAPL",
     "normalized_key": "AAPL",
     "regular_price": 150.25,
     "previous_close_price": 149.50,

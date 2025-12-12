@@ -102,20 +102,20 @@ router.get('/lookup/:ticker', async (req, res) => {
  * Used for: "Add Position" modal when user selects symbol
  */
 router.post('/prefetch', async (req, res) => {
-    const { symbol } = req.body;
+    const { ticker } = req.body;
 
-    if (!symbol) {
-        return res.status(400).json({ error: 'Symbol is required' });
+    if (!ticker) {
+        return res.status(400).json({ error: 'Ticker is required' });
     }
 
-    const normalizedSymbol = symbol.toUpperCase();
+    const normalizedTicker = ticker.toUpperCase();
     const connection = await getDbConnection();
 
     try {
         // Check if already exists
         const [existing] = await connection.execute(
             'SELECT ticker FROM securities_metadata WHERE ticker = ?',
-            [normalizedSymbol]
+            [normalizedTicker]
         );
 
         if (existing.length > 0) {
@@ -127,7 +127,7 @@ router.post('/prefetch', async (req, res) => {
               ttm_dividend_amount, ttm_eps
          FROM securities_metadata 
          WHERE ticker = ?`,
-                [normalizedSymbol]
+                [normalizedTicker]
             );
 
             return res.json({
@@ -137,13 +137,13 @@ router.post('/prefetch', async (req, res) => {
         }
 
         // Fetch it now (user waits ~1-2 seconds)
-        console.log(`Prefetching metadata for ${normalizedSymbol}...`);
-        const result = await fetchMetadataForSymbol(normalizedSymbol);
+        console.log(`Prefetching metadata for ${normalizedTicker}...`);
+        const result = await fetchMetadataForSymbol(normalizedTicker);
 
         if (!result.success) {
             return res.status(404).json({
-                error: 'Symbol not found in Yahoo Finance',
-                symbol: normalizedSymbol
+                error: 'Ticker not found in Yahoo Finance',
+                ticker: normalizedTicker
             });
         }
 
@@ -155,7 +155,7 @@ router.post('/prefetch', async (req, res) => {
         ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
        WHERE ticker = ?`,
-            [normalizedSymbol]
+            [normalizedTicker]
         );
 
         res.json({

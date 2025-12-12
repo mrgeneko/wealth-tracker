@@ -735,29 +735,29 @@ function triggerBondScrape() {
     }
 }
 
-// API to fetch current price for a symbol and inject into price cache
-// Used when adding a new symbol to ensure immediate price display
+// API to fetch current price for a ticker and inject into price cache
+// Used when adding a new ticker to ensure immediate price display
 // Also publishes to Kafka so the price persists to MySQL via the consumer
 app.post('/api/fetch-price', async (req, res) => {
-    const { symbol, type } = req.body;
+    const { ticker, type } = req.body;
 
-    if (!symbol || !symbol.trim()) {
-        return res.status(400).json({ error: 'Symbol is required' });
+    if (!ticker || !ticker.trim()) {
+        return res.status(400).json({ error: 'Ticker is required' });
     }
 
-    const cleanSymbol = symbol.trim().toUpperCase();
+    const cleanTicker = ticker.trim().toUpperCase();
     
     // Detect if this is a bond (by type parameter or treasury registry lookup)
-    const isBond = type === 'bond' || isBondTicker(cleanSymbol);
+    const isBond = type === 'bond' || isBondTicker(cleanTicker);
     
     if (isBond) {
         // For bonds, trigger the scrape daemon to fetch prices on its next cycle
         // This avoids duplicating the Webull scraping code
-        console.log(`[FetchPrice] Detected bond ${cleanSymbol}, triggering scrape daemon...`);
+        console.log(`[FetchPrice] Detected bond ${cleanTicker}, triggering scrape daemon...`);
         const triggered = triggerBondScrape();
         
         return res.json({
-            symbol: cleanSymbol,
+            ticker: cleanTicker,
             isBond: true,
             triggered: triggered,
             message: triggered 
@@ -775,13 +775,13 @@ app.post('/api/fetch-price', async (req, res) => {
             suppressNotices: ['yahooSurvey', 'rippieTip']
         });
         
-        console.log(`[FetchPrice] Fetching current price for ${cleanSymbol}...`);
-        const quote = await yahooFinance.quote(cleanSymbol);
+        console.log(`[FetchPrice] Fetching current price for ${cleanTicker}...`);
+        const quote = await yahooFinance.quote(cleanTicker);
 
         if (!quote || !quote.regularMarketPrice) {
             return res.status(404).json({
                 error: 'No price data returned',
-                symbol: cleanSymbol
+                ticker: cleanTicker
             });
         }
 
@@ -790,7 +790,7 @@ app.post('/api/fetch-price', async (req, res) => {
         const now = new Date().toISOString();
 
         // Update the in-memory price cache for immediate display
-        priceCache[cleanSymbol] = {
+        priceCache[cleanTicker] = {
             price: price,
             previous_close_price: previousClose,
             prev_close_source: 'yahoo',
@@ -803,7 +803,7 @@ app.post('/api/fetch-price', async (req, res) => {
         // Broadcast to all connected clients for immediate UI update
         io.emit('price_update', priceCache);
 
-        console.log(`[FetchPrice] Updated price cache for ${cleanSymbol}: $${price}`);
+        console.log(`[FetchPrice] Updated price cache for ${cleanTicker}: $${price}`);
 
         // Publish to Kafka so the consumer persists to MySQL
         let kafkaPublished = false;
@@ -819,9 +819,9 @@ app.post('/api/fetch-price', async (req, res) => {
             // Format message to match what the Kafka consumer expects
             // Consumer uses data.get('key') for the ticker
             const kafkaMessage = {
-                key: cleanSymbol,                    // Required by consumer
-                symbol: cleanSymbol,
-                normalized_key: cleanSymbol,
+                key: cleanTicker,                    // Required by consumer
+                ticker: cleanTicker,
+                normalized_key: cleanTicker,
                 regular_price: price,
                 previous_close_price: previousClose,
                 currency: quote.currency || 'USD',
@@ -833,21 +833,21 @@ app.post('/api/fetch-price', async (req, res) => {
             await producer.send({
                 topic: process.env.KAFKA_TOPIC || 'price_data',
                 messages: [{
-                    key: cleanSymbol,
+                    key: cleanTicker,
                     value: JSON.stringify(kafkaMessage)
                 }]
             });
             
             await producer.disconnect();
             kafkaPublished = true;
-            console.log(`[FetchPrice] Published ${cleanSymbol} to Kafka for persistence`);
+            console.log(`[FetchPrice] Published ${cleanTicker} to Kafka for persistence`);
         } catch (kafkaErr) {
-            console.error(`[FetchPrice] Kafka publish failed for ${cleanSymbol}:`, kafkaErr.message);
+            console.error(`[FetchPrice] Kafka publish failed for ${cleanTicker}:`, kafkaErr.message);
             // Don't fail the request - price is already in cache for immediate display
         }
 
         res.json({
-            symbol: cleanSymbol,
+            ticker: cleanTicker,
             price: price,
             previousClose: previousClose,
             currency: quote.currency || 'USD',
@@ -857,10 +857,10 @@ app.post('/api/fetch-price', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[FetchPrice] Error fetching price for ${cleanSymbol}:`, error.message);
+        console.error(`[FetchPrice] Error fetching price for ${cleanTicker}:`, error.message);
         res.status(500).json({
             error: error.message,
-            symbol: cleanSymbol
+            ticker: cleanTicker
         });
     }
 });

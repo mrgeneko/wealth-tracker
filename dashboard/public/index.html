@@ -1198,17 +1198,17 @@
                     await fetch('/api/fetch-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ symbol, type })
+                        body: JSON.stringify({ ticker: symbol, type })
                     });
                 } catch (e) {
                     console.warn('Price fetch failed:', e);
                 }
-                // Prefetch metadata for the new symbol
+                // Prefetch metadata for the new ticker
                 try {
                     await fetch('/api/metadata/prefetch', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ symbol })
+                        body: JSON.stringify({ ticker: symbol })
                     });
                 } catch (e) {
                     console.warn('Metadata prefetch failed:', e);
@@ -3245,7 +3245,7 @@
                     const priceResponse = await fetch('/api/fetch-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ symbol: symbol, type: typeValue })
+                        body: JSON.stringify({ ticker: symbol, type: typeValue })
                     });
                     
                     if (priceResponse.ok) {
