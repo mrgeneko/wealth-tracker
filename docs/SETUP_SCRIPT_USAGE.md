@@ -225,8 +225,8 @@ The script is **idempotent** for migrations (safe to re-run):
 ./scripts/setup_metadata_system.sh --skip-population
 
 # Then manually populate specific symbols
-node scripts/populate_securities_metadata.js --symbol AAPL
-node scripts/populate_securities_metadata.js --symbol NVDA
+node scripts/populate_securities_metadata.js --ticker AAPL
+node scripts/populate_securities_metadata.js --ticker NVDA
 ```
 
 ### Populate Popular Securities Later
