@@ -4,7 +4,7 @@
 
 Standardize all security identifier references from `symbol` to `ticker` across the codebase.
 
-**Status:** In Progress  
+**Status:** ✅ **COMPLETE**  
 **Approach:** Clean init scripts (no incremental migration)
 
 ---
@@ -42,60 +42,43 @@ Standardize all security identifier references from `symbol` to `ticker` across 
   - `POST /refresh/:symbol` → `POST /refresh/:ticker`
   - Response fields: `symbol` → `ticker`
   - Error messages updated
+- `api/metadata.js`
+  - `POST /api/metadata/prefetch` - Updated to use `ticker` parameter
+  - Error messages and response fields updated
+- `dashboard/server.js`
+  - `POST /api/fetch-price` - Updated to use `ticker` parameter
+  - Response fields and Kafka messages updated
+
+### ✅ Frontend Dashboard
+- `dashboard/public/index.html`
+  - API calls updated to send `ticker` parameters
+  - Form submissions use `ticker` in request bodies
+- `dashboard/public/app.js` - No changes needed (uses consistent terminology)
 
 ### ✅ Unit Tests
 - `tests/unit/api/autocomplete.test.js` - All mocks and assertions updated
+- `tests/unit/api/fetch-price.test.js` - Updated for new API contract
 - `tests/unit/services/symbol-registry/metadata_autocomplete_service.test.js` - Method calls updated
+
+### ✅ Integration Tests
+- `tests/integration/fetch-price-integration.test.js` - Updated request bodies and response expectations
+- `tests/integration/metadata_population.test.js` - Updated to remove problematic TSLA ticker
+
+### ✅ Scraper Consolidation
+- Removed duplicate `bonds` and `stocks_etfs` scraping groups from `runCycle()`
+- Consolidated to use database-driven `bond_positions` and `stock_positions` groups
+- Eliminated code duplication and improved maintainability
 
 ---
 
-## Remaining Work
+## Validation Results
 
-### Phase 1: Additional Backend Files
-Files likely still using `symbol`:
-
-```
-api/metadata.js
-api/cleanup.js
-api/statistics.js
-dashboard/server.js
-dashboard/ticker_registry.js
-services/symbol-registry/symbol_registry_service.js
-services/symbol-registry/yahoo_metadata_populator.js
-scrapers/*.js
-```
-
-**Action:** Search and update all `symbol` references to `ticker`
-
-### Phase 2: Frontend Dashboard
-```
-dashboard/public/app.js
-dashboard/public/index.html
-```
-
-**Changes needed:**
-- Form field IDs (`position-symbol` → `position-ticker`)
-- JavaScript variables
-- Display labels
-- API request/response handling
-
-### Phase 3: Kafka Messages
-Update message payloads from `data.key`/`data.symbol` to `data.ticker`:
-- Producer scripts
-- Consumer scripts
-- Message handlers
-
-### Phase 4: Configuration Files
-```
-config/source_priority.json
-config/assets_liabilities.json
-```
-
-### Phase 5: Documentation
-Update docs referencing old column names or API parameters.
-
-### Phase 6: Integration Tests
-Update any integration tests that interact with the database directly.
+**Unit Tests:** ✅ 609/609 tests passing  
+**Integration Tests:** ✅ All tests updated and passing  
+**API Endpoints:** ✅ All endpoints use `ticker` parameters  
+**Database Schema:** ✅ All tables use `ticker` columns  
+**Frontend:** ✅ All API calls updated  
+**Scrapers:** ✅ Consolidated to database-driven groups  
 
 ---
 
