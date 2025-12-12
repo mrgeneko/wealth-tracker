@@ -2,13 +2,13 @@
 
 ## Overview
 
-This guide explains how to integrate the security metadata API endpoints into your dashboard for real-time symbol lookup and metadata prefetching.
+This guide explains how to integrate the security metadata API endpoints into your dashboard for real-time ticker lookup and metadata prefetching.
 
 ## API Endpoints
 
-### 1. Symbol Lookup (Non-blocking)
+### 1. Ticker Lookup (Non-blocking)
 
-**Endpoint:** `GET /api/metadata/lookup/:symbol`
+**Endpoint:** `GET /api/metadata/lookup/:ticker`
 
 **Use Case:** Quick check if metadata exists, triggers background fetch if not
 
@@ -30,14 +30,14 @@ if (data.exists) {
 
 **Endpoint:** `POST /api/metadata/prefetch`
 
-**Use Case:** Fetch metadata when user selects symbol (waits 1-2 seconds)
+**Use Case:** Fetch metadata when user selects ticker (waits 1-2 seconds)
 
 **Example:**
 ```javascript
 const response = await fetch('/api/metadata/prefetch', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ symbol: 'NVDA' })
+  body: JSON.stringify({ ticker: 'NVDA' })
 });
 
 const data = await response.json();
@@ -51,7 +51,7 @@ const data = await response.json();
 
 **Endpoint:** `GET /api/metadata/autocomplete?q=AAPL`
 
-**Use Case:** Symbol search as user types
+**Use Case:** Ticker search as user types
 
 **Example:**
 ```javascript
@@ -59,8 +59,8 @@ const response = await fetch('/api/metadata/autocomplete?q=APP');
 const data = await response.json();
 
 // data.results: [
-//   { symbol: 'AAPL', name: 'Apple Inc.', type: 'EQUITY', exchange: 'NASDAQ' },
-//   { symbol: 'APPN', name: 'Appian Corporation', type: 'EQUITY', exchange: 'NASDAQ' }
+//   { ticker: 'AAPL', name: 'Apple Inc.', type: 'EQUITY', exchange: 'NASDAQ' },
+//   { ticker: 'APPN', name: 'Appian Corporation', type: 'EQUITY', exchange: 'NASDAQ' }
 // ]
 ```
 
@@ -78,13 +78,13 @@ const response = await fetch('/api/metadata/batch-prefetch', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ 
-    symbols: ['AAPL', 'NVDA', 'TSLA', 'INVALID-SYMBOL'] 
+    tickers: ['AAPL', 'NVDA', 'TSLA', 'INVALID-TICKER'] 
   })
 });
 
 const data = await response.json();
 // data.summary: { total: 4, cached: 1, fetched: 2, failed: 1 }
-// data.results: detailed status for each symbol
+// data.results: detailed status for each ticker
 ```
 
 ---
@@ -101,7 +101,7 @@ const response = await fetch('/api/metadata/check-missing');
 const data = await response.json();
 
 // data.count: 3
-// data.symbols: ['PRIVATE-CO', 'BOND-2025', '912828YK0']
+// data.tickers: ['PRIVATE-CO', 'BOND-2025', '912828YK0']
 ```
 
 ---
@@ -112,12 +112,12 @@ const data = await response.json();
 
 ```
 1. User opens "Add Position" modal
-2. User types in symbol field → autocomplete triggers
+2. User types in ticker field → autocomplete triggers
 3. User selects "NVDA" from autocomplete
 4. Frontend calls /api/metadata/prefetch (blocks 1-2s)
 5. Form auto-fills with: "NVIDIA Corporation | EQUITY | NASDAQ"
 6. User enters quantity and clicks "Add"
-7. Position inserted with metadata_symbol = 'NVDA'
+7. Position inserted with metadata_ticker = 'NVDA'
 ```
 
 **Code:**
@@ -134,12 +134,12 @@ async function handleAutocomplete(query) {
   showDropdown(data.results);
 }
 
-// Step 3-5: Symbol selected
-async function onSymbolSelected(symbol) {
+// Step 3-5: Ticker selected
+async function onTickerSelected(ticker) {
   showLoading();
   const res = await fetch('/api/metadata/prefetch', {
     method: 'POST',
-    body: JSON.stringify({ symbol })
+    body: JSON.stringify({ ticker })
   });
   const data = await res.json();
   
@@ -156,28 +156,28 @@ async function onSymbolSelected(symbol) {
 
 ```
 1. User uploads CSV with 50 positions
-2. Frontend extracts unique symbols (e.g., 30 unique)
+2. Frontend extracts unique tickers (e.g., 30 unique)
 3. Frontend calls /api/metadata/batch-prefetch
 4. API fetches missing metadata (may take 15-30 seconds)
 5. API returns summary: "25 cached, 3 fetched, 2 failed"
 6. Frontend shows summary modal
 7. Frontend inserts all 50 positions
-8. Positions with failed metadata have metadata_symbol = NULL
+8. Positions with failed metadata have metadata_ticker = NULL
 ```
 
 **Code:**
 ```javascript
 async function importPositions(csvData) {
   const positions = parseCSV(csvData);
-  const symbols = [...new Set(positions.map(p => p.symbol))];
+  const tickers = [...new Set(positions.map(p => p.ticker))];
   
   // Show progress
-  showProgress(`Checking ${symbols.length} symbols...`);
+  showProgress(`Checking ${tickers.length} tickers...`);
   
   // Batch prefetch
   const res = await fetch('/api/metadata/batch-prefetch', {
     method: 'POST',
-    body: JSON.stringify({ symbols })
+    body: JSON.stringify({ tickers })
   });
   const data = await res.json();
   
