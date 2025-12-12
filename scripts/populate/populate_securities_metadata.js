@@ -97,8 +97,8 @@ function formatDate(date) {
     return d.toISOString().slice(0, 10);
 }
 
-async function fetchSecurityMetadata(symbol) {
-    console.log(`Fetching metadata for ${symbol}...`);
+async function fetchSecurityMetadata(ticker) {
+    console.log(`Fetching metadata for ${ticker}...`);
     const yahoo = await ensureYahoo();
 
     if (!yahoo) {
@@ -115,18 +115,18 @@ async function fetchSecurityMetadata(symbol) {
             const modules = ['price', 'summaryDetail', 'summaryProfile', 'assetProfile', 'defaultKeyStatistics', 'calendarEvents'];
             // quoteSummary sometimes requires an options object in different package versions
             if (typeof yahoo.quoteSummary === 'function') {
-                result = await yahoo.quoteSummary(symbol, { modules });
+                result = await yahoo.quoteSummary(ticker, { modules });
             } else if (typeof yahoo.quote === 'function') {
                 // Fallback to older quote wrapper
-                const q = await yahoo.quote(symbol);
+                const q = await yahoo.quote(ticker);
                 result = { price: q, summaryDetail: q, quoteType: q, defaultKeyStatistics: q, calendarEvents: { earnings: q.earningsTimestamp ? { earningsDate: q.earningsTimestamp } : null, dividendDate: q.dividendDate } };
             }
         } catch (e) {
             // Some versions / environments may not support quoteSummary; fall back
-            console.warn(`quoteSummary failed for ${symbol} — falling back to quote(): ${e.message}`);
-            const q = await yahoo.quote(symbol);
+            console.warn(`quoteSummary failed for ${ticker} — falling back to quote(): ${e.message}`);
+            const q = await yahoo.quote(ticker);
             if (!q) {
-                console.error(`No data returned for ${symbol}`);
+                console.error(`No data returned for ${ticker}`);
                 return null;
             }
             result = { price: q, summaryDetail: q, quoteType: q, defaultKeyStatistics: q, calendarEvents: { earnings: q.earningsTimestamp ? { earningsDate: q.earningsTimestamp } : null, dividendDate: q.dividendDate } };
@@ -153,12 +153,12 @@ async function fetchSecurityMetadata(symbol) {
             defaultKeyStatistics
         };
     } catch (error) {
-        console.error(`Error fetching ${symbol}:`, error.message);
+        console.error(`Error fetching ${ticker}:`, error.message);
         return null;
     }
 }
 
-async function upsertSecurityMetadata(connection, symbol, data) {
+async function upsertSecurityMetadata(connection, ticker, data) {
     if (!data) return;
 
     const price = data.price || {};
@@ -167,7 +167,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
     const stats = data.defaultKeyStatistics || {};
 
     const metadata = {
-        ticker: symbol,
+        ticker: ticker,
         quote_type: quoteType.quoteType || price.quoteType,
         type_display: quoteType.typeDisp || price.typeDisp,
         short_name: quoteType.shortName || price.shortName,
@@ -225,7 +225,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
             if (parsed > 1 && parsed <= 100) {
                 const frac = parsed / 100.0;
                 if (frac > MAX_ACCEPTABLE_YIELD) {
-                    console.warn(`Suspicious dividend yield for ${symbol}: ${parsed} (converted ${frac}) > ${MAX_ACCEPTABLE_YIELD} — ignoring`);
+                    console.warn(`Suspicious dividend yield for ${ticker}: ${parsed} (converted ${frac}) > ${MAX_ACCEPTABLE_YIELD} — ignoring`);
                     return null;
                 }
                 return frac;
@@ -234,7 +234,7 @@ async function upsertSecurityMetadata(connection, symbol, data) {
             if (parsed > 100) return null;
             // If parsed is fractional already, check threshold
             if (parsed > MAX_ACCEPTABLE_YIELD) {
-                console.warn(`Suspicious dividend yield for ${symbol}: ${parsed} > ${MAX_ACCEPTABLE_YIELD} — ignoring`);
+                console.warn(`Suspicious dividend yield for ${ticker}: ${parsed} > ${MAX_ACCEPTABLE_YIELD} — ignoring`);
                 return null;
             }
             // Otherwise assume it's a fractional value already
@@ -315,10 +315,10 @@ async function upsertSecurityMetadata(connection, symbol, data) {
     ].map(v => v === undefined ? null : v);  // Convert undefined to null for MySQL
 
     await connection.execute(sql, values);
-    console.log(`✓ Upserted metadata for ${symbol}`);
+    console.log(`✓ Upserted metadata for ${ticker}`);
 }
 
-async function upsertEarningsEvents(connection, symbol, calendarEvents) {
+async function upsertEarningsEvents(connection, ticker, calendarEvents) {
     if (!calendarEvents || !calendarEvents.earnings) return;
 
     const earnings = calendarEvents.earnings;
@@ -334,12 +334,12 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
     // Ensure the date can be properly formatted before proceeding
     const formattedEarningsDate = formatDateTime(earningsDate);
     if (!formattedEarningsDate) {
-        console.log(`  ⊘ Skipping earnings for ${symbol} (invalid date format: ${earningsDate})`);
+        console.log(`  ⊘ Skipping earnings for ${ticker} (invalid date format: ${earningsDate})`);
         return;
     }
 
     const earningsData = {
-        ticker: symbol,
+        ticker: ticker,
         earnings_date: formattedEarningsDate,
         earnings_date_end: formatDateTime(earnings.earningsHigh),
         is_estimate: true,
@@ -370,9 +370,9 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
 
     try {
         await connection.execute(sql, values);
-        console.log(`  ✓ Upserted earnings event for ${symbol}`);
+        console.log(`  ✓ Upserted earnings event for ${ticker}`);
     } catch (error) {
-        console.error(`  ✗ Error upserting earnings for ${symbol}:`, error.message);
+        console.error(`  ✗ Error upserting earnings for ${ticker}:`, error.message);
     }
 }
 
@@ -470,10 +470,10 @@ async function main() {
             console.log(`Processing single ticker: ${tickerArg}`);
         } else if (allFlag) {
             symbols = await getUniqueTickers(connection);
-            console.log(`Processing ${symbols.length} symbols from positions table`);
+            console.log(`Processing ${symbols.length} tickers from positions table`);
         } else if (allMetadataFlag) {
             symbols = await getAllMetadataTickers(connection);
-            console.log(`Processing ${symbols.length} symbols from securities_metadata table`);
+            console.log(`Processing ${symbols.length} tickers from securities_metadata table`);
         } else {
             console.log('Usage:');
             console.log('  node scripts/populate/populate_securities_metadata.js --ticker AAPL');
@@ -482,20 +482,20 @@ async function main() {
         }
 
         for (let i = 0; i < symbols.length; i++) {
-            const symbol = symbols[i];
-            console.log(`\n[${i + 1}/${symbols.length}] Processing ${symbol}...`);
+            const ticker = symbols[i];
+            console.log(`\n[${i + 1}/${symbols.length}] Processing ${ticker}...`);
 
-            const data = await fetchSecurityMetadata(symbol);
+            const data = await fetchSecurityMetadata(ticker);
 
             if (data) {
-                await upsertSecurityMetadata(connection, symbol, data);
-                await upsertEarningsEvents(connection, symbol, data.calendarEvents);
-                await upsertDividendEvents(connection, symbol, data.calendarEvents);
+                await upsertSecurityMetadata(connection, ticker, data);
+                await upsertEarningsEvents(connection, ticker, data.calendarEvents);
+                await upsertDividendEvents(connection, ticker, data.calendarEvents);
             }
 
             // Rate limiting: wait between requests
             if (i < symbols.length - 1) {
-                await sleep(500); // 500ms delay between symbols
+                await sleep(500); // 500ms delay between tickers
             }
         }
 
