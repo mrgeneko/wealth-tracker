@@ -78,7 +78,7 @@ async function checkIfMetadataExists(connection, symbol) {
     return rows.length > 0 ? rows[0] : null;
 }
 
-async function fetchMetadataForSymbol(symbol) {
+async function fetchMetadataForTicker(ticker) {
     try {
         const { stdout, stderr } = await execPromise(
             `node scripts/populate/populate_securities_metadata.js --ticker ${symbol}`,
@@ -90,7 +90,7 @@ async function fetchMetadataForSymbol(symbol) {
     }
 }
 
-async function processSymbolList(connection, symbols, options = {}) {
+async function processSymbolList(connection, tickers, options = {}) {
     const {
         skipExisting = true,
         maxAge = 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
@@ -98,56 +98,56 @@ async function processSymbolList(connection, symbols, options = {}) {
     } = options;
 
     const results = {
-        total: symbols.length,
+        total: tickers.length,
         skipped: 0,
         fetched: 0,
         failed: 0,
         errors: []
     };
 
-    for (let i = 0; i < symbols.length; i++) {
-        const symbol = symbols[i];
-        const progress = `[${i + 1}/${symbols.length}]`;
+    for (let i = 0; i < tickers.length; i++) {
+        const ticker = tickers[i];
+        const progress = `[${i + 1}/${tickers.length}]`;
 
         if (onProgress) {
-            onProgress({ current: i + 1, total: symbols.length, symbol });
+            onProgress({ current: i + 1, total: tickers.length, ticker });
         }
 
         try {
             // Check if metadata exists
-            const existing = await checkIfMetadataExists(connection, symbol);
+            const existing = await checkIfMetadataExists(connection, ticker);
 
             if (existing && skipExisting) {
                 // Check if it's recent enough
                 const age = Date.now() - new Date(existing.last_updated).getTime();
                 if (age < maxAge) {
-                    console.log(`${progress} ${symbol} - Skipped (cached, ${Math.floor(age / (24 * 60 * 60 * 1000))} days old)`);
+                    console.log(`${progress} ${ticker} - Skipped (cached, ${Math.floor(age / (24 * 60 * 60 * 1000))} days old)`);
                     results.skipped++;
                     continue;
                 }
             }
 
             // Fetch metadata
-            console.log(`${progress} ${symbol} - Fetching...`);
-            const result = await fetchMetadataForSymbol(symbol);
+            console.log(`${progress} ${ticker} - Fetching...`);
+            const result = await fetchMetadataForTicker(ticker);
 
             if (result.success) {
-                console.log(`${progress} ${symbol} - ✓ Success`);
+                console.log(`${progress} ${ticker} - ✓ Success`);
                 results.fetched++;
             } else {
-                console.log(`${progress} ${symbol} - ✗ Failed: ${result.error}`);
+                console.log(`${progress} ${ticker} - ✗ Failed: ${result.error}`);
                 results.failed++;
-                results.errors.push({ symbol, error: result.error });
+                results.errors.push({ ticker, error: result.error });
             }
 
         } catch (error) {
-            console.error(`${progress} ${symbol} - ✗ Error: ${error.message}`);
+            console.error(`${progress} ${ticker} - ✗ Error: ${error.message}`);
             results.failed++;
-            results.errors.push({ symbol, error: error.message });
+            results.errors.push({ ticker, error: error.message });
         }
 
         // Throttle to avoid overwhelming the API
-        if (i < symbols.length - 1) {
+        if (i < tickers.length - 1) {
             await sleep(THROTTLE_DELAY_MS);
         }
     }

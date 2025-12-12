@@ -1,6 +1,6 @@
 // api/metadata.js
 // API endpoints for security metadata operations
-// Supports: symbol lookup, autocomplete, metadata prefetch, batch import
+// Supports: ticker lookup, autocomplete, metadata prefetch, batch import
 
 const express = require('express');
 const router = express.Router();
@@ -21,7 +21,7 @@ async function getDbConnection() {
 }
 
 // Helper to fetch metadata using the populate script
-async function fetchMetadataForSymbol(symbol) {
+async function fetchMetadataForTicker(ticker) {
     try {
         const path = require('path');
         
@@ -33,13 +33,13 @@ async function fetchMetadataForSymbol(symbol) {
         console.log(`[Metadata] Running script: ${scriptPath} from cwd: ${cwd}`);
         
         const { stdout, stderr } = await execPromise(
-            `node "${scriptPath}" --ticker ${symbol}`,
+            `node "${scriptPath}" --ticker ${ticker}`,
             { cwd }
         );
-        console.log(`[Metadata] Fetched metadata for ${symbol}`);
+        console.log(`[Metadata] Fetched metadata for ${ticker}`);
         return { success: true, output: stdout };
     } catch (error) {
-        console.error(`Failed to fetch metadata for ${symbol}:`, error.message);
+        console.error(`Failed to fetch metadata for ${ticker}:`, error.message);
         if (error.stderr) {
             console.error(`[Metadata] stderr:`, error.stderr);
         }
@@ -98,8 +98,8 @@ router.get('/lookup/:ticker', async (req, res) => {
 
 /**
  * POST /api/metadata/prefetch
- * Prefetch metadata for a symbol (blocks until complete)
- * Used for: "Add Position" modal when user selects symbol
+ * Prefetch metadata for a ticker (blocks until complete)
+ * Used for: "Add Position" modal when user selects ticker
  */
 router.post('/prefetch', async (req, res) => {
     const { ticker } = req.body;
@@ -138,7 +138,7 @@ router.post('/prefetch', async (req, res) => {
 
         // Fetch it now (user waits ~1-2 seconds)
         console.log(`Prefetching metadata for ${normalizedTicker}...`);
-        const result = await fetchMetadataForSymbol(normalizedTicker);
+        const result = await fetchMetadataForTicker(normalizedTicker);
 
         if (!result.success) {
             return res.status(404).json({
@@ -172,7 +172,7 @@ router.post('/prefetch', async (req, res) => {
 
 /**
  * GET /api/metadata/autocomplete?q=AAPL
- * Autocomplete search for symbols
+ * Autocomplete search for tickers
  * Searches ticker_registry (populated from exchange CSV files)
  */
 router.get('/autocomplete', async (req, res) => {
@@ -223,32 +223,32 @@ router.get('/autocomplete', async (req, res) => {
 
 /**
  * POST /api/metadata/batch-prefetch
- * Prefetch metadata for multiple symbols (for import feature)
- * Returns status for each symbol
+ * Prefetch metadata for multiple tickers (for import feature)
+ * Returns status for each ticker
  */
 router.post('/batch-prefetch', async (req, res) => {
-    const { symbols } = req.body;
+    const { tickers } = req.body;
 
-    if (!Array.isArray(symbols) || symbols.length === 0) {
-        return res.status(400).json({ error: 'Symbols array is required' });
+    if (!Array.isArray(tickers) || tickers.length === 0) {
+        return res.status(400).json({ error: 'Tickers array is required' });
     }
 
     const connection = await getDbConnection();
     const results = [];
 
     try {
-        for (const symbol of symbols) {
-            const normalizedSymbol = symbol.toUpperCase();
+        for (const ticker of tickers) {
+            const normalizedTicker = ticker.toUpperCase();
 
             // Check if exists
             const [existing] = await connection.execute(
                 'SELECT ticker FROM securities_metadata WHERE ticker = ?',
-                [normalizedSymbol]
+                [normalizedTicker]
             );
 
             if (existing.length > 0) {
                 results.push({
-                    symbol: normalizedSymbol,
+                    ticker: normalizedTicker,
                     status: 'cached',
                     message: 'Metadata already exists'
                 });
@@ -256,20 +256,20 @@ router.post('/batch-prefetch', async (req, res) => {
             }
 
             // Fetch it
-            console.log(`Fetching metadata for ${normalizedSymbol}...`);
-            const result = await fetchMetadataForSymbol(normalizedSymbol);
+            console.log(`Fetching metadata for ${normalizedTicker}...`);
+            const result = await fetchMetadataForTicker(normalizedTicker);
 
             if (result.success) {
                 results.push({
-                    symbol: normalizedSymbol,
+                    ticker: normalizedTicker,
                     status: 'fetched',
                     message: 'Metadata retrieved successfully'
                 });
             } else {
                 results.push({
-                    symbol: normalizedSymbol,
+                    ticker: normalizedTicker,
                     status: 'failed',
-                    message: 'Symbol not found in Yahoo Finance'
+                    message: 'Ticker not found in Yahoo Finance'
                 });
             }
 
@@ -278,7 +278,7 @@ router.post('/batch-prefetch', async (req, res) => {
         }
 
         const summary = {
-            total: symbols.length,
+            total: tickers.length,
             cached: results.filter(r => r.status === 'cached').length,
             fetched: results.filter(r => r.status === 'fetched').length,
             failed: results.filter(r => r.status === 'failed').length
