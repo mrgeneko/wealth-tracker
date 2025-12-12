@@ -33,7 +33,7 @@ async function fetchMetadataForSymbol(symbol) {
         console.log(`[Metadata] Running script: ${scriptPath} from cwd: ${cwd}`);
         
         const { stdout, stderr } = await execPromise(
-            `node "${scriptPath}" --symbol ${symbol}`,
+            `node "${scriptPath}" --ticker ${symbol}`,
             { cwd }
         );
         console.log(`[Metadata] Fetched metadata for ${symbol}`);
