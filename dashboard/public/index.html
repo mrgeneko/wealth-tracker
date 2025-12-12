@@ -589,9 +589,9 @@
                         <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Account</span>
                     </button>
                     <span style="color: white; margin: 0 16px;">&nbsp;|&nbsp;</span>
-                    <button class="icon-btn" title="Add Symbol" onclick="openAddSymbolModal()"
+                    <button class="icon-btn" title="Add Ticker" onclick="openAddSymbolModal()"
                         style="font-size: inherit; white-space: nowrap;">
-                        <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Symbol</span>
+                        <span class="plus-icon" style="font-size: inherit; white-space: nowrap;">+ Ticker</span>
                     </button>
                     <span style="color: white; margin: 0 16px;">&nbsp;|&nbsp;</span>
                     <button class="icon-btn" title="Expand Accounts" onclick="toggleAccountsCollapse()"
@@ -1007,14 +1007,14 @@
         </div>
     </div>
 
-    <!-- Add Symbol Modal -->
+    <!-- Add Ticker Modal -->
     <div id="addSymbolModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('addSymbolModal')">&times;</span>
-            <h2>Add Symbol</h2>
+            <h2>Add Ticker</h2>
             <form id="addSymbolForm">
                 <div class="form-group">
-                    <label for="newSymbol">Symbol</label>
+                    <label for="newSymbol">Ticker</label>
                     <div style="display: flex; gap: 5px;">
                         <input type="text" id="newSymbol" required maxlength="50" style="text-transform:uppercase; flex: 1;"
                             class="awesomplete" autocomplete="off" onchange="lookupSymbolMetadata()">
