@@ -39,16 +39,16 @@ describe('Fetch Price Integration Tests', () => {
     const itIfDashboard = dashboardAvailable ? it : it.skip;
 
     describe('POST /api/fetch-price', () => {
-        itIfDashboard('should fetch and return price for valid symbol', async () => {
+        itIfDashboard('should fetch and return price for valid ticker', async () => {
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: 'AAPL' })
+                .send({ ticker: 'AAPL' })
                 .timeout(10000);
 
             expect(res.status).toBe(200);
             expect(res.body).toMatchObject({
-                symbol: 'AAPL',
+                ticker: 'AAPL',
                 currency: expect.any(String),
                 cached: true
             });
@@ -60,18 +60,18 @@ describe('Fetch Price Integration Tests', () => {
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: 'MSFT' })
+                .send({ ticker: 'MSFT' })
                 .timeout(10000);
 
             expect(res.status).toBe(200);
             expect(res.body.persisted).toBe(true);
         });
 
-        itIfDashboard('should return 404 for invalid symbol', async () => {
+        itIfDashboard('should return 404 for invalid ticker', async () => {
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: 'INVALIDXYZ123' })
+                .send({ ticker: 'INVALIDXYZ123' })
                 .timeout(10000);
 
             // Yahoo may return 404 or 500 depending on error type
@@ -79,17 +79,17 @@ describe('Fetch Price Integration Tests', () => {
         });
 
         itIfDashboard('should detect bond via treasury registry and trigger async scraping', async () => {
-            // Test with a known treasury symbol from the registry
+            // Test with a known treasury ticker from the registry
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: '912810EX2', type: 'bond' }) // 30-Year Treasury Bond
+                .send({ ticker: '912810EX2', type: 'bond' }) // 30-Year Treasury Bond
                 .timeout(10000);
 
             // Bonds return 200 with async message, not immediate price
             expect(res.status).toBe(200);
             expect(res.body).toMatchObject({
-                symbol: '912810EX2',
+                ticker: '912810EX2',
                 message: expect.stringContaining('will be fetched by scrape daemon')
             });
             // Bonds should indicate triggered = true
@@ -100,7 +100,7 @@ describe('Fetch Price Integration Tests', () => {
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: '912797SE8', type: 'bond' }) // 4-Week Treasury Bill
+                .send({ ticker: '912797SE8', type: 'bond' }) // 4-Week Treasury Bill
                 .timeout(10000);
 
             expect(res.status).toBe(200);
@@ -122,23 +122,23 @@ describe('Fetch Price Integration Tests', () => {
 
     describe('Bond Treasury Registry Detection', () => {
         itIfDashboard('should accept bond without explicit type if registry detects treasury', async () => {
-            // Even without type='bond', treasury symbols should be detected
+            // Even without type='bond', treasury tickers should be detected
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: '912810EX2' }) // No type specified
+                .send({ ticker: '912810EX2' }) // No type specified
                 .timeout(10000);
 
             expect(res.status).toBe(200);
             expect(res.body.triggered).toBe(true);
         });
 
-        itIfDashboard('should reject non-treasury symbols even if type=bond is specified', async () => {
+        itIfDashboard('should reject non-treasury tickers even if type=bond is specified', async () => {
             // Stocks should NOT be treated as bonds, even if user explicitly says type=bond
             const res = await request(BASE_URL)
                 .post('/api/fetch-price')
                 .auth(AUTH_USER, AUTH_PASS)
-                .send({ symbol: 'AAPL', type: 'bond' }) // Type doesn't matter, AAPL is a stock
+                .send({ ticker: 'AAPL', type: 'bond' }) // Type doesn't matter, AAPL is a stock
                 .timeout(10000);
 
             // Should fetch via Yahoo Finance, not trigger daemon

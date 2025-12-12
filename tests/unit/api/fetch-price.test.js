@@ -28,23 +28,23 @@ describe('Fetch Price API Endpoint', () => {
         };
 
         // Create the handler that mimics the actual implementation
-        fetchPriceHandler = async (symbol) => {
-            if (!symbol || !symbol.trim()) {
-                return { status: 400, body: { error: 'Symbol is required' } };
+        fetchPriceHandler = async (ticker) => {
+            if (!ticker || !ticker.trim()) {
+                return { status: 400, body: { error: 'Ticker is required' } };
             }
 
-            const cleanSymbol = symbol.trim().toUpperCase();
+            const cleanTicker = ticker.trim().toUpperCase();
 
             try {
                 // Simulate yahoo-finance2 call
-                const quote = await mockYahooFinance.quote(cleanSymbol);
+                const quote = await mockYahooFinance.quote(cleanTicker);
 
                 if (!quote || !quote.regularMarketPrice) {
                     return {
                         status: 404,
                         body: {
                             error: 'No price data returned',
-                            symbol: cleanSymbol
+                            ticker: cleanTicker
                         }
                     };
                 }
@@ -54,7 +54,7 @@ describe('Fetch Price API Endpoint', () => {
                 const now = new Date().toISOString();
 
                 // Update the in-memory price cache
-                mockPriceCache[cleanSymbol] = {
+                mockPriceCache[cleanTicker] = {
                     price: price,
                     previous_close_price: previousClose,
                     prev_close_source: 'yahoo',
@@ -74,11 +74,11 @@ describe('Fetch Price API Endpoint', () => {
                     await mockKafkaProducer.send({
                         topic: 'price_data',
                         messages: [{
-                            key: cleanSymbol,
+                            key: cleanTicker,
                             value: JSON.stringify({
-                                key: cleanSymbol,
-                                symbol: cleanSymbol,
-                                normalized_key: cleanSymbol,
+                                key: cleanTicker,
+                                ticker: cleanTicker,
+                                normalized_key: cleanTicker,
                                 regular_price: price,
                                 previous_close_price: previousClose,
                                 currency: quote.currency || 'USD',
@@ -97,7 +97,7 @@ describe('Fetch Price API Endpoint', () => {
                 return {
                     status: 200,
                     body: {
-                        symbol: cleanSymbol,
+                        ticker: cleanTicker,
                         price: price,
                         previousClose: previousClose,
                         currency: quote.currency || 'USD',
@@ -112,7 +112,7 @@ describe('Fetch Price API Endpoint', () => {
                     status: 500,
                     body: {
                         error: error.message,
-                        symbol: cleanSymbol
+                        ticker: cleanTicker
                     }
                 };
             }
@@ -124,21 +124,21 @@ describe('Fetch Price API Endpoint', () => {
     });
 
     describe('POST /api/fetch-price', () => {
-        it('should return 400 if symbol is missing', async () => {
+        it('should return 400 if ticker is missing', async () => {
             const res = await fetchPriceHandler(null);
 
             expect(res.status).toBe(400);
-            expect(res.body.error).toBe('Symbol is required');
+            expect(res.body.error).toBe('Ticker is required');
         });
 
-        it('should return 400 if symbol is empty string', async () => {
+        it('should return 400 if ticker is empty string', async () => {
             const res = await fetchPriceHandler('   ');
 
             expect(res.status).toBe(400);
-            expect(res.body.error).toBe('Symbol is required');
+            expect(res.body.error).toBe('Ticker is required');
         });
 
-        it('should uppercase the symbol', async () => {
+        it('should uppercase the ticker', async () => {
             mockYahooFinance.quote.mockResolvedValue({
                 regularMarketPrice: 150.25,
                 regularMarketPreviousClose: 149.50,
@@ -148,7 +148,7 @@ describe('Fetch Price API Endpoint', () => {
             const res = await fetchPriceHandler('aapl');
 
             expect(res.status).toBe(200);
-            expect(res.body.symbol).toBe('AAPL');
+            expect(res.body.ticker).toBe('AAPL');
             expect(mockYahooFinance.quote).toHaveBeenCalledWith('AAPL');
         });
 
@@ -162,7 +162,7 @@ describe('Fetch Price API Endpoint', () => {
             const res = await fetchPriceHandler('NVDA');
 
             expect(res.status).toBe(200);
-            expect(res.body.symbol).toBe('NVDA');
+            expect(res.body.ticker).toBe('NVDA');
             expect(res.body.price).toBe(183.78);
             expect(res.body.previousClose).toBe(184.97);
             expect(res.body.currency).toBe('USD');
@@ -232,7 +232,7 @@ describe('Fetch Price API Endpoint', () => {
             
             // The Kafka consumer expects 'key' field in the message body
             expect(messageValue.key).toBe('TEST');
-            expect(messageValue.symbol).toBe('TEST');
+            expect(messageValue.ticker).toBe('TEST');
             expect(messageValue.normalized_key).toBe('TEST');
         });
 
@@ -263,7 +263,7 @@ describe('Fetch Price API Endpoint', () => {
 
             expect(res.status).toBe(500);
             expect(res.body.error).toBe('Yahoo API error');
-            expect(res.body.symbol).toBe('ERROR');
+            expect(res.body.ticker).toBe('ERROR');
         });
 
         it('should still return success if Kafka publish fails', async () => {
@@ -312,69 +312,69 @@ describe('Fetch Price API Endpoint', () => {
 describe('Bond Symbol Detection via Treasury Registry', () => {
     // Mock ticker registry data (simulates us-treasury-auctions.csv)
     const mockTickerRegistry = [
-        { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-        { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
-        { symbol: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
-        { symbol: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' },
-        { symbol: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'TREASURY' },
-        { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
+        { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+        { ticker: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' },
+        { ticker: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'TREASURY' },
+        { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
     ];
 
     // Helper function matching server.js implementation
-    function isBondSymbol(symbol) {
-        if (!symbol) return false;
-        const clean = symbol.trim().toUpperCase();
+    function isBondTicker(ticker) {
+        if (!ticker) return false;
+        const clean = ticker.trim().toUpperCase();
         
         // Look up in ticker registry
-        const ticker = mockTickerRegistry.find(t => t.symbol === clean);
+        const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
         
         // If found and exchange is TREASURY, it's a bond
-        if (ticker && ticker.exchange === 'TREASURY') {
+        if (tickerObj && tickerObj.exchange === 'TREASURY') {
             return true;
         }
         
         return false;
     }
 
-    describe('isBondSymbol', () => {
+    describe('isBondTicker', () => {
         it('should detect treasury bonds from registry (30-Year)', () => {
-            expect(isBondSymbol('912810EX2')).toBe(true);
+            expect(isBondTicker('912810EX2')).toBe(true);
         });
 
         it('should detect treasury bills from registry (4-Week)', () => {
-            expect(isBondSymbol('912797SE8')).toBe(true);
+            expect(isBondTicker('912797SE8')).toBe(true);
         });
 
         it('should detect treasury notes from registry (7-Year)', () => {
-            expect(isBondSymbol('91282CPM7')).toBe(true);
+            expect(isBondTicker('91282CPM7')).toBe(true);
         });
 
         it('should be case-insensitive', () => {
-            expect(isBondSymbol('912810ex2')).toBe(true);
+            expect(isBondTicker('912810ex2')).toBe(true);
         });
 
         it('should NOT detect stock symbols as bonds', () => {
-            expect(isBondSymbol('AAPL')).toBe(false);
-            expect(isBondSymbol('MSFT')).toBe(false);
+            expect(isBondTicker('AAPL')).toBe(false);
+            expect(isBondTicker('MSFT')).toBe(false);
         });
 
         it('should NOT detect ETFs as bonds', () => {
-            expect(isBondSymbol('SPY')).toBe(false);
+            expect(isBondTicker('SPY')).toBe(false);
         });
 
         it('should NOT detect unknown 9-char symbols as bonds (not in registry)', () => {
             // Random 9-char string that looks like CUSIP but isn't in treasury file
-            expect(isBondSymbol('ABCDEF123')).toBe(false);
+            expect(isBondTicker('ABCDEF123')).toBe(false);
         });
 
         it('should handle null/undefined', () => {
-            expect(isBondSymbol(null)).toBe(false);
-            expect(isBondSymbol(undefined)).toBe(false);
+            expect(isBondTicker(null)).toBe(false);
+            expect(isBondTicker(undefined)).toBe(false);
         });
 
         it('should handle empty string', () => {
-            expect(isBondSymbol('')).toBe(false);
-            expect(isBondSymbol('   ')).toBe(false);
+            expect(isBondTicker('')).toBe(false);
+            expect(isBondTicker('   ')).toBe(false);
         });
     });
 });
@@ -386,17 +386,17 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
 
     // Mock ticker registry (same as detection tests)
     const mockTickerRegistry = [
-        { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-        { symbol: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
-        { symbol: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' }
+        { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' }
     ];
 
     // Helper matching server.js implementation - treasury registry lookup only
-    function isBondSymbol(symbol) {
-        if (!symbol) return false;
-        const clean = symbol.trim().toUpperCase();
-        const ticker = mockTickerRegistry.find(t => t.symbol === clean);
-        return ticker && ticker.exchange === 'TREASURY';
+    function isBondTicker(ticker) {
+        if (!ticker) return false;
+        const clean = ticker.trim().toUpperCase();
+        const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
+        return tickerObj && tickerObj.exchange === 'TREASURY';
     }
 
     beforeEach(() => {
@@ -405,15 +405,15 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
         };
 
         // Bond handler that mimics the new marker file trigger approach
-        bondFetchHandler = async (symbol, type) => {
-            if (!symbol || !symbol.trim()) {
-                return { status: 400, body: { error: 'Symbol is required' } };
+        bondFetchHandler = async (ticker, type) => {
+            if (!ticker || !ticker.trim()) {
+                return { status: 400, body: { error: 'Ticker is required' } };
             }
 
-            const cleanSymbol = symbol.trim().toUpperCase();
+            const cleanTicker = ticker.trim().toUpperCase();
             
             // Detect bond by type parameter OR treasury registry lookup
-            const isBond = type === 'bond' || isBondSymbol(cleanSymbol);
+            const isBond = type === 'bond' || isBondTicker(cleanTicker);
             
             if (!isBond) {
                 return { status: 400, body: { error: 'Not a bond' } };
@@ -431,7 +431,7 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
             return {
                 status: 200,
                 body: {
-                    symbol: cleanSymbol,
+                    ticker: cleanTicker,
                     isBond: true,
                     triggered: triggered,
                     message: triggered 
