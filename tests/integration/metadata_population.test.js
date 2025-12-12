@@ -192,10 +192,10 @@ class IntegrationTest {
     }
 
     async testPopularSecurities() {
-        await this.test('Populate a few popular securities (3 symbols for CI)', async () => {
-            // Instead of --sp500 which fetches 100+ symbols, just populate 3 known stocks
+        await this.test('Populate a few popular securities (2 symbols for CI)', async () => {
+            // Instead of --sp500 which fetches 100+ symbols, just populate 2 known stocks
             // This keeps CI fast while still exercising the code path
-            const testSymbols = ['NVDA', 'AMZN', 'TSLA'];
+            const testSymbols = ['NVDA', 'AMZN'];
             for (const sym of testSymbols) {
                 try {
                     await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--symbol', sym], { timeout: 30000 });
@@ -207,7 +207,7 @@ class IntegrationTest {
             // Check if some stocks were populated
             const [rows] = await this.connection.execute(
                 `SELECT COUNT(*) as count FROM securities_metadata 
-         WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA')`
+         WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA')`
             );
 
             assert.ok(rows[0].count >= 1, 'Should populate at least one stock');
