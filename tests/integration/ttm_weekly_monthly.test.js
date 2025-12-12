@@ -1,34 +1,25 @@
 // tests/integration/ttm_weekly_monthly.test.js
 // Integration tests for weekly and monthly dividend schedules
-// Run with: node tests/integration/ttm_weekly_monthly.test.js
+// Run with: npm run test:integration or npm run test:all
 
 require('dotenv').config();
-const assert = require('assert');
 const mysql = require('mysql2/promise');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const TEST_DB_CONFIG = {
-  host: process.env.MYSQL_HOST || 'localhost',
-  port: parseInt(process.env.MYSQL_PORT || '3306'),
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE
-};
-
 async function initializeSchema(conn) {
   // Drop existing tables to ensure fresh schema with ticker column
   const tablesToDrop = [
     'securities_metadata',
-    'securities_dividends', 
+    'securities_dividends',
     'securities_earnings',
     'security_splits',
     'latest_prices',
     'positions',
     'accounts'
   ];
-  
+
   try {
     await conn.execute('SET FOREIGN_KEY_CHECKS = 0');
     for (const table of tablesToDrop) {
@@ -42,7 +33,7 @@ async function initializeSchema(conn) {
   } catch (err) {
     console.warn('Warning dropping tables:', err.message);
   }
-  
+
   // Read and execute init scripts
   const baseSchemaPath = path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql');
   const symbolRegistryPath = path.join(__dirname, '../..', 'scripts/init-db/001-symbol-registry.sql');
@@ -108,94 +99,95 @@ async function cleanupSymbol(conn, symbol) {
   await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [symbol]).catch(() => {});
 }
 
-async function testWeeklyDividends(conn) {
-  const sym = 'TTM_WEEKLY';
-  await setupSymbol(conn, sym);
+describe('TTM Weekly/Monthly Dividend Integration Tests', () => {
+  let connection;
 
-  // Insert ~52 weekly payments (every 7 days) within the last 12 months
-  const payments = 52;
-  const perPayment = 0.02; // per-share amount
+  beforeAll(async () => {
+    // Check for required environment variables
+    const required = ['MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'];
+    const missing = required.filter(v => !process.env[v]);
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
 
-  for (let i = 0; i < payments; i++) {
-    const daysAgo = i * 7; // 0,7,14 ... up to ~357 days
-    const exd = await isoDateDaysAgo(daysAgo);
-    await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
-  }
+    connection = await mysql.createConnection({
+      host: process.env.MYSQL_HOST || 'localhost',
+      port: parseInt(process.env.MYSQL_PORT || '3306'),
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE
+    });
 
-  // Run recompute for symbol
-  await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTM_WEEKLY', '--apply']);
-
-  // verify TTM dividend amount equals sum of payments within 12 months
-  const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE ticker = ?', [sym]);
-  assert.strictEqual(rows.length, 1, 'metadata row should exist');
-  const ttm = parseFloat(rows[0].ttm_dividend_amount);
-  const expected = payments * perPayment;
-
-  // allow tiny numeric tolerance
-  assert(Math.abs(ttm - expected) < 0.0001, `Expected TTM weekly ${expected} got ${ttm}`);
-
-  console.log(`[OK] Weekly dividend TTM validated for ${sym} expected=${expected} got=${ttm}`);
-
-  await cleanupSymbol(conn, sym);
-}
-
-async function testMonthlyDividends(conn) {
-  const sym = 'TTM_MONTHLY';
-  await setupSymbol(conn, sym);
-
-  // Insert 12 monthly payments approx every 30 days
-  const months = 12;
-  const perPayment = 0.10;
-
-  for (let i = 0; i < months; i++) {
-    const daysAgo = i * 30; // approximate month spacing
-    const exd = await isoDateDaysAgo(daysAgo);
-    await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
-  }
-
-  // also add a special non-cash dividend that should be ignored if policy excludes non-cash
-  await conn.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, dividend_type, status, data_source) VALUES (?, ?, ?, 'STOCK', 'paid', 'test')`, [sym, await isoDateDaysAgo(15), 5.0]);
-
-  // Backfill adjusted_dividend_amount (no splits present, so same as raw)
-  await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
-
-  // Recompute TTM (should include only cash payments by current recompute logic)
-  await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=' + sym, '--apply']);
-
-  // Check stored TTM dividend amount
-  const [rows] = await conn.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE ticker = ?', [sym]);
-  assert.strictEqual(rows.length, 1, 'metadata row should exist');
-  const ttm = parseFloat(rows[0].ttm_dividend_amount);
-  const expected = months * perPayment; // stock dividend should not be included by default computation (dividend_type='STOCK')
-
-  assert(Math.abs(ttm - expected) < 0.0001, `Expected TTM monthly ${expected} got ${ttm}`);
-  console.log(`[OK] Monthly dividend TTM validated for ${sym} expected=${expected} got=${ttm}`);
-
-  await cleanupSymbol(conn, sym);
-}
-
-async function main() {
-  const conn = await mysql.createConnection(TEST_DB_CONFIG);
-
-  try {
     // Initialize schema before running tests
-    console.log('Initializing schema...');
-    await initializeSchema(conn);
+    await initializeSchema(connection);
+  }, 30000);
 
-    console.log('Running weekly dividend TTM test');
-    await testWeeklyDividends(conn);
+  afterAll(async () => {
+    if (connection) {
+      await connection.end();
+    }
+  });
 
-    console.log('Running monthly dividend TTM test');
-    await testMonthlyDividends(conn);
+  test('Weekly dividend TTM calculation', async () => {
+    const sym = 'TTM_WEEKLY';
+    await setupSymbol(connection, sym);
 
-    console.log('\nAll TTM weekly/monthly tests passed');
-    await conn.end();
-    process.exit(0);
-  } catch (err) {
-    console.error('TTM weekly/monthly tests failed:', err);
-    await conn.end();
-    process.exit(1);
-  }
-}
+    // Insert ~52 weekly payments (every 7 days) within the last 12 months
+    const payments = 52;
+    const perPayment = 0.02; // per-share amount
 
-if (require.main === module) main();
+    for (let i = 0; i < payments; i++) {
+      const daysAgo = i * 7; // 0,7,14 ... up to ~357 days
+      const exd = await isoDateDaysAgo(daysAgo);
+      await connection.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
+    }
+
+    // Run recompute for symbol
+    await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTM_WEEKLY', '--apply']);
+
+    // verify TTM dividend amount equals sum of payments within 12 months
+    const [rows] = await connection.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE ticker = ?', [sym]);
+    expect(rows.length).toBe(1);
+    const ttm = parseFloat(rows[0].ttm_dividend_amount);
+    const expected = payments * perPayment;
+
+    // allow tiny numeric tolerance
+    expect(Math.abs(ttm - expected)).toBeLessThan(0.0001);
+
+    await cleanupSymbol(connection, sym);
+  }, 60000);
+
+  test('Monthly dividend TTM calculation', async () => {
+    const sym = 'TTM_MONTHLY';
+    await setupSymbol(connection, sym);
+
+    // Insert 12 monthly payments approx every 30 days
+    const months = 12;
+    const perPayment = 0.10;
+
+    for (let i = 0; i < months; i++) {
+      const daysAgo = i * 30; // approximate month spacing
+      const exd = await isoDateDaysAgo(daysAgo);
+      await connection.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, status, data_source) VALUES (?, ?, ?, 'paid', 'test')`, [sym, exd, perPayment]);
+    }
+
+    // also add a special non-cash dividend that should be ignored if policy excludes non-cash
+    await connection.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, dividend_type, status, data_source) VALUES (?, ?, ?, 'STOCK', 'paid', 'test')`, [sym, await isoDateDaysAgo(15), 5.0]);
+
+    // Backfill adjusted_dividend_amount (no splits present, so same as raw)
+    await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
+
+    // Recompute TTM (should include only cash payments by current recompute logic)
+    await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=' + sym, '--apply']);
+
+    // Check stored TTM dividend amount
+    const [rows] = await connection.execute('SELECT ttm_dividend_amount FROM securities_metadata WHERE ticker = ?', [sym]);
+    expect(rows.length).toBe(1);
+    const ttm = parseFloat(rows[0].ttm_dividend_amount);
+    const expected = months * perPayment; // stock dividend should not be included by default computation (dividend_type='STOCK')
+
+    expect(Math.abs(ttm - expected)).toBeLessThan(0.0001);
+
+    await cleanupSymbol(connection, sym);
+  }, 60000);
+});

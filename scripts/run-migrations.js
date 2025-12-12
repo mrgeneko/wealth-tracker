@@ -1,86 +1,106 @@
 #!/usr/bin/env node
 
 /**
- * Database Initialization Script
+ * Database Schema Verification Script
  * 
- * Runs all migrations to ensure the database schema is up-to-date.
+ * Verifies that all required database tables exist.
  * Called during dashboard startup before the server begins.
  * 
- * Migrations are run in order:
- * - 011_create_ticker_registry.js
+ * All table creation is handled by Docker init scripts in scripts/init-db/
+ * This script only validates that the schema is properly initialized.
  * 
  * Environment variables:
  * - MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
  */
 
-const path = require('path');
-const fs = require('fs');
+const mysql = require('mysql2/promise');
+
+const REQUIRED_TABLES = [
+  // Core tables (000-base-schema.sql)
+  'accounts',
+  'positions',
+  'fixed_assets',
+  'latest_prices',
+  'securities_metadata',
+  'securities_dividends',
+  'securities_dividends_backup',
+  'securities_earnings',
+  'security_splits',
+  
+  // Ticker registry tables (001-symbol-registry.sql)
+  'ticker_registry',
+  'ticker_registry_metrics',
+  'file_refresh_status',
+  'symbol_yahoo_metrics',
+  
+  // Metrics tables (002-phase9-metrics.sql)
+  'scraper_page_performance',
+  'scraper_daily_summary',
+  'scheduler_metrics'
+];
 
 async function runAllMigrations() {
   console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log('  🔄  DATABASE INITIALIZATION - Running Migrations');
+  console.log('  🔄  DATABASE SCHEMA VERIFICATION');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
-  const migrationsDir = path.join(__dirname, './migrations');
-  
-  // Get all migration files in order
-  const migrationFiles = fs.readdirSync(migrationsDir)
-    .filter(f => f.match(/^\d+.*\.js$/))
-    .sort();
+  const dbConfig = {
+    host: process.env.MYSQL_HOST || 'localhost',
+    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+    user: process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_PASSWORD || '',
+    database: process.env.MYSQL_DATABASE || 'wealth_tracker'
+  };
 
-  if (migrationFiles.length === 0) {
-    console.warn('⚠️  No migrations found');
-    return true;
-  }
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    console.log(`✅ Connected to ${dbConfig.database}@${dbConfig.host}:${dbConfig.port}\n`);
 
-  console.log(`Found ${migrationFiles.length} migration(s):\n`);
-  migrationFiles.forEach((f, i) => {
-    console.log(`  [${i + 1}] ${f}`);
-  });
-  console.log('');
+    // Get existing tables
+    const [rows] = await connection.execute('SHOW TABLES');
+    const existingTables = rows.map(r => Object.values(r)[0]);
 
-  let successCount = 0;
-  let failureCount = 0;
+    // Check for missing tables
+    const missingTables = REQUIRED_TABLES.filter(t => !existingTables.includes(t));
+    const presentTables = REQUIRED_TABLES.filter(t => existingTables.includes(t));
 
-  for (const migrationFile of migrationFiles) {
-    const migrationPath = path.join(migrationsDir, migrationFile);
+    console.log(`Found ${presentTables.length}/${REQUIRED_TABLES.length} required tables:\n`);
     
-    try {
-      console.log(`\n📋 Running: ${migrationFile}`);
-      console.log('─'.repeat(70));
-      
-      // Dynamically require and run the migration
-      const { runMigration } = require(migrationPath);
-      
-      if (typeof runMigration !== 'function') {
-        console.error(`❌ Migration ${migrationFile} does not export runMigration function`);
-        failureCount++;
-        continue;
-      }
+    presentTables.forEach(t => console.log(`  ✅ ${t}`));
+    
+    if (missingTables.length > 0) {
+      console.log('\n⚠️  Missing tables:');
+      missingTables.forEach(t => console.log(`  ❌ ${t}`));
+      console.log('\n  To fix: Recreate the Docker container to run init scripts');
+      console.log('  Or manually run: mysql < scripts/init-db/000-base-schema.sql');
+    }
 
-      await runMigration();
-      successCount++;
-      console.log('─'.repeat(70));
-    } catch (err) {
-      console.error(`❌ Migration ${migrationFile} failed:`, err.message);
-      failureCount++;
+    console.log('\n═══════════════════════════════════════════════════════════════');
+    if (missingTables.length === 0) {
+      console.log('  ✅ Database Schema Verification Complete - All tables present');
+    } else {
+      console.log(`  ⚠️  Database Schema Verification Complete - ${missingTables.length} tables missing`);
+    }
+    console.log('═══════════════════════════════════════════════════════════════\n');
+
+    return missingTables.length === 0;
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+    return false;
+  } finally {
+    if (connection) {
+      await connection.end();
     }
   }
-
-  console.log('\n═══════════════════════════════════════════════════════════════');
-  console.log(`  ✅ Database Initialization Complete`);
-  console.log(`  ${successCount} succeeded, ${failureCount} failed`);
-  console.log('═══════════════════════════════════════════════════════════════\n');
-
-  return failureCount === 0;
 }
 
-// Run migrations if invoked directly
+// Run verification if invoked directly
 if (require.main === module) {
   runAllMigrations()
     .then(success => process.exit(success ? 0 : 1))
     .catch(err => {
-      console.error('Fatal error during migrations:', err);
+      console.error('Fatal error during verification:', err);
       process.exit(1);
     });
 }
