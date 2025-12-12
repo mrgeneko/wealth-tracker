@@ -322,13 +322,25 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
     if (!calendarEvents || !calendarEvents.earnings) return;
 
     const earnings = calendarEvents.earnings;
-    const earningsDate = earnings.earningsDate || earnings.earningsAverage;
+    let earningsDate = earnings.earningsDate || earnings.earningsAverage;
+
+    // Handle case where earningsDate is an array (Yahoo Finance returns arrays)
+    if (Array.isArray(earningsDate) && earningsDate.length > 0) {
+        earningsDate = earningsDate[0];
+    }
 
     if (!earningsDate) return;
 
+    // Ensure the date can be properly formatted before proceeding
+    const formattedEarningsDate = formatDateTime(earningsDate);
+    if (!formattedEarningsDate) {
+        console.log(`  ⊘ Skipping earnings for ${symbol} (invalid date format: ${earningsDate})`);
+        return;
+    }
+
     const earningsData = {
         ticker: symbol,
-        earnings_date: formatDateTime(earningsDate),
+        earnings_date: formattedEarningsDate,
         earnings_date_end: formatDateTime(earnings.earningsHigh),
         is_estimate: true,
         eps_estimate: null,
