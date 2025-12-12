@@ -191,15 +191,15 @@ If you are using Docker Desktop, you can manage the application through the GUI:
   - `0 1 1 * * cd /path/to/wealth-tracker && node scripts/populate_popular_securities.js --all --force >> logs/metadata_monthly.log 2>&1` (monthly full refresh)
 
 - On-demand / manual refresh options:
-  - API: POST /api/metadata/prefetch (prefetch metadata for a single symbol and update DB immediately)
+  - API: POST /api/metadata/prefetch (prefetch metadata for a single ticker and update DB immediately)
   - CLI:
-    - `node scripts/populate_securities_metadata.js --symbol SYMBOL` (single symbol)
+    - `node scripts/populate_securities_metadata.js --ticker TICKER` (single ticker)
     - `node scripts/populate_securities_metadata.js --all` (all positions)
-    - `node scripts/populate_securities_metadata.js --all-metadata` (repopulate every symbol in `securities_metadata`)
+    - `node scripts/populate_securities_metadata.js --all-tickers` (repopulate every ticker in `securities_metadata`)
 
 - Notes & best practices:
   - Some instruments (e.g., futures, certain ETFs, or crypto pairs) may not expose a `trailingPE` value — those will be stored as `NULL` until Yahoo provides a value.
-  - Increasing the metadata refresh frequency will give more up-to-date trailing P/E values but may increase rate-limiting risk when hitting Yahoo APIs. Use on-demand prefetch for a small set of symbols if you need near-real-time refreshes.
+  - Increasing the metadata refresh frequency will give more up-to-date trailing P/E values but may increase rate-limiting risk when hitting Yahoo APIs. Use on-demand prefetch for a small set of tickers if you need near-real-time refreshes.
   - To change schedules, edit `config/metadata_cron.conf` and re-install the cron jobs (see `docs/CRON_REINSTALL.md` for details).
 
 ### 1. Environment Variables (`.env`)
