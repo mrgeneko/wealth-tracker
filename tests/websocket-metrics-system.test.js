@@ -37,13 +37,19 @@ describe('WebSocket Metrics System - Phase 9.2', () => {
 
     afterEach(async () => {
       await metricsWS.shutdown();
-      await new Promise((resolve, reject) => {
-        server.close((err) => err ? reject(err) : resolve());
+      await new Promise((resolve) => {
+        if (server.listening) {
+          server.close(() => resolve());
+        } else {
+          resolve();
+        }
       });
     });
 
     test('should initialize with default options', () => {
+      // The server doesn't need to be listening for basic property checks
       expect(metricsWS).toBeDefined();
+      expect(metricsWS.wss).toBeDefined();
       expect(metricsWS.clients).toBeInstanceOf(Map);
       expect(metricsWS.subscriptions).toBeInstanceOf(Map);
       expect(metricsWS.metricsQueue).toBeInstanceOf(Map);
@@ -59,6 +65,13 @@ describe('WebSocket Metrics System - Phase 9.2', () => {
       expect(customWS.options.batchInterval).toBe(5000);
       expect(customWS.options.maxBatchSize).toBe(500);
       expect(customWS.options.maxClients).toBe(100);
+    });
+
+    test('should provide server statistics', () => {
+      const stats = metricsWS.getStatistics();
+      expect(stats).toBeDefined();
+      expect(stats.connectedClients).toBe(0);
+      expect(stats.subscriptions).toBeDefined();
     });
 
     test('should handle client connections', (done) => {
@@ -388,7 +401,7 @@ describe('WebSocket Metrics System - Phase 9.2', () => {
     });
 
     test('should auto-flush when batch size exceeded', async () => {
-      // Record 5 metrics (batch size is 5, should not flush yet)
+      // Record 4 metrics (batch size is 5, should not flush yet)
       for (let i = 0; i < 4; i++) {
         collector.recordPageNavigation('robinhood', {
           url: `https://example.com/${i}`,
@@ -406,10 +419,7 @@ describe('WebSocket Metrics System - Phase 9.2', () => {
         success: true
       });
 
-      // Wait for flush
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // Should be flushed
+      // Auto-flush happens synchronously when batchSize is exceeded
       expect(collector.navigationMetrics.length).toBe(0);
     });
 

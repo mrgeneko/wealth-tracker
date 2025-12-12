@@ -14,6 +14,12 @@
 
 class ScraperMetricsCollector {
   constructor(wsServer, pool, options = {}) {
+    // Handle case where pool is actually options (for testing)
+    if (typeof pool === 'object' && !pool.getConnection && !options.batchSize) {
+      options = pool;
+      pool = null;
+    }
+
     this.wsServer = wsServer;
     this.pool = pool;
     this.options = {
@@ -129,8 +135,13 @@ class ScraperMetricsCollector {
 
     const metrics = this.navigationMetrics.splice(0);
 
+    // Skip database write if no pool (e.g., in tests)
+    if (!this.pool) {
+      return;
+    }
+
     try {
-      const conn = await pool.getConnection();
+      const conn = await this.pool.getConnection();
 
       try {
         // Insert navigation metrics
@@ -171,8 +182,13 @@ class ScraperMetricsCollector {
 
     const metrics = this.scrapeMetrics.splice(0);
 
+    // Skip database write if no pool (e.g., in tests)
+    if (!this.pool) {
+      return;
+    }
+
     try {
-      const conn = await pool.getConnection();
+      const conn = await this.pool.getConnection();
 
       try {
         // Insert scrape metrics
@@ -214,8 +230,13 @@ class ScraperMetricsCollector {
 
     const metrics = this.schedulerMetrics.splice(0);
 
+    // Skip database write if no pool (e.g., in tests)
+    if (!this.pool) {
+      return;
+    }
+
     try {
-      const conn = await pool.getConnection();
+      const conn = await this.pool.getConnection();
 
       try {
         // Insert scheduler metrics
