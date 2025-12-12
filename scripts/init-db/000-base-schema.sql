@@ -242,3 +242,134 @@ CREATE TABLE IF NOT EXISTS security_splits (
   PRIMARY KEY (id),
   KEY idx_splits_ticker_date (ticker,split_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Symbol Registry Tables (consolidated from 001-symbol-registry.sql)
+CREATE TABLE IF NOT EXISTS ticker_registry (
+  id INT NOT NULL AUTO_INCREMENT,
+  ticker VARCHAR(50) NOT NULL,
+  name VARCHAR(500) DEFAULT NULL,
+  exchange VARCHAR(50) DEFAULT NULL,
+  security_type ENUM('EQUITY','ETF','BOND','TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') DEFAULT 'EQUITY',
+  source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_FILE','TREASURY_FILE','TREASURY_HISTORICAL','YAHOO','USER_ADDED') NOT NULL,
+  has_yahoo_metadata TINYINT(1) DEFAULT 0,
+  permanently_failed TINYINT(1) DEFAULT 0,
+  permanent_failure_reason VARCHAR(255) DEFAULT NULL,
+  permanent_failure_at TIMESTAMP NULL DEFAULT NULL,
+  usd_trading_volume DECIMAL(20,2) DEFAULT NULL,
+  sort_rank INT DEFAULT 1000,
+  issue_date DATE DEFAULT NULL,
+  maturity_date DATE DEFAULT NULL,
+  security_term VARCHAR(50) DEFAULT NULL,
+  underlying_ticker VARCHAR(50) DEFAULT NULL,
+  strike_price DECIMAL(18,4) DEFAULT NULL,
+  option_type ENUM('CALL','PUT') DEFAULT NULL,
+  expiration_date DATE DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY ticker (ticker),
+  KEY idx_ticker (ticker),
+  KEY idx_security_type (security_type),
+  KEY idx_sort_rank (sort_rank),
+  KEY idx_maturity_date (maturity_date),
+  KEY idx_expiration_date (expiration_date),
+  KEY idx_underlying_ticker (underlying_ticker),
+  KEY idx_permanently_failed (permanently_failed),
+  CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker) REFERENCES ticker_registry (ticker) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS ticker_registry_metrics (
+  id INT NOT NULL AUTO_INCREMENT,
+  metric_date DATE NOT NULL,
+  source VARCHAR(50) NOT NULL,
+  total_tickers INT NOT NULL,
+  tickers_with_yahoo_metadata INT NOT NULL,
+  tickers_without_yahoo_metadata INT NOT NULL,
+  last_file_refresh_at TIMESTAMP NULL DEFAULT NULL,
+  file_download_duration_ms INT DEFAULT NULL,
+  avg_yahoo_fetch_duration_ms INT DEFAULT NULL,
+  errors_count INT DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY unique_date_source (metric_date,source),
+  KEY idx_metric_date (metric_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS file_refresh_status (
+  id INT NOT NULL AUTO_INCREMENT,
+  file_type ENUM('NASDAQ','NYSE','OTHER','TREASURY') NOT NULL,
+  last_refresh_at TIMESTAMP NULL DEFAULT NULL,
+  last_refresh_duration_ms INT DEFAULT NULL,
+  last_refresh_status ENUM('SUCCESS','FAILED','IN_PROGRESS') DEFAULT 'SUCCESS',
+  last_error_message TEXT,
+  tickers_added INT DEFAULT 0,
+  tickers_updated INT DEFAULT 0,
+  next_refresh_due_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY file_type (file_type),
+  KEY idx_file_type (file_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS symbol_yahoo_metrics (
+  id INT NOT NULL AUTO_INCREMENT,
+  symbol_id INT NOT NULL,
+  ticker VARCHAR(50) NOT NULL,
+  market_cap BIGINT DEFAULT NULL,
+  trailing_pe DECIMAL(10,2) DEFAULT NULL,
+  dividend_yield DECIMAL(8,4) DEFAULT NULL,
+  fifty_two_week_high DECIMAL(18,4) DEFAULT NULL,
+  fifty_two_week_low DECIMAL(18,4) DEFAULT NULL,
+  beta DECIMAL(8,4) DEFAULT NULL,
+  trailing_revenue BIGINT DEFAULT NULL,
+  trailing_eps DECIMAL(10,4) DEFAULT NULL,
+  currency VARCHAR(10) DEFAULT 'USD',
+  recorded_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_symbol_id (symbol_id),
+  KEY idx_ticker (ticker),
+  KEY idx_recorded_at (recorded_at),
+  CONSTRAINT fk_symbol_yahoo_metrics_symbol_id FOREIGN KEY (symbol_id) REFERENCES ticker_registry (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Phase 9 WebSocket Real-time Metrics Tables (consolidated from 002-phase9-metrics.sql)
+CREATE TABLE IF NOT EXISTS scraper_page_performance (
+  id INT NOT NULL AUTO_INCREMENT,
+  scraper_source VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  metric_type VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  url VARCHAR(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  navigation_duration_ms INT DEFAULT NULL,
+  scrape_duration_ms INT DEFAULT NULL,
+  items_extracted INT DEFAULT NULL,
+  success TINYINT(1) DEFAULT 1,
+  error VARCHAR(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_source_time (scraper_source,created_at DESC),
+  KEY idx_type_source (metric_type,scraper_source,created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scraper_daily_summary (
+  scraper_source VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  metric_date DATE NOT NULL,
+  metric_type VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  total_count INT DEFAULT NULL,
+  success_count INT DEFAULT NULL,
+  avg_duration_ms FLOAT DEFAULT NULL,
+  total_items_extracted INT DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (scraper_source,metric_date,metric_type),
+  KEY idx_source_date (scraper_source,metric_date DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scheduler_metrics (
+  id INT NOT NULL AUTO_INCREMENT,
+  scraper_source VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  execution_duration_ms INT DEFAULT NULL,
+  success TINYINT(1) DEFAULT 1,
+  error VARCHAR(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_source_time (scraper_source,created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

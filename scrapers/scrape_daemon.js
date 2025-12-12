@@ -125,7 +125,7 @@ async function fetchStockPositions() {
 		const [rows] = await pool.query(
 			"SELECT DISTINCT ticker, type FROM positions WHERE type IN ('stock', 'etf') AND ticker IS NOT NULL AND ticker != ''"
 		);
-		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
+		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker) }));
 	} catch (e) {
 		logDebug('Error fetching stock positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -138,7 +138,7 @@ async function fetchBondPositions() {
 		const [rows] = await pool.query(
 			"SELECT DISTINCT ticker, type FROM positions WHERE type = 'bond' AND ticker IS NOT NULL AND ticker != ''"
 		);
-		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.symbol) }));
+		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker) }));
 	} catch (e) {
 		logDebug('Error fetching bond positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -728,7 +728,7 @@ async function runCycle(browser, outputDir) {
 								});
 								logDebug(`${sourceName} scrape result for ${ticker}: ${JSON.stringify(data)}`);
 								scraped = true;
-								break; // Successfully scraped, move to next symbol
+								break; // Successfully scraped, move to next ticker
 							} catch (e) {
 								logDebug(`Error scraping ${ticker} with ${sourceName}: ${e.message}`);
 							}
@@ -739,7 +739,7 @@ async function runCycle(browser, outputDir) {
 				} while (currentIndex !== startIndex && !scraped);
 				
 				if (!scraped) {
-					logDebug(`Could not scrape ${symbol} with any available source`);
+					logDebug(`Could not scrape ${ticker} with any available source`);
 				}
 				
 				await new Promise(r => setTimeout(r, 1000));
@@ -820,7 +820,7 @@ async function runCycle(browser, outputDir) {
 				} while (currentIndex !== startIndex && !scraped);
 				
 				if (!scraped) {
-					logDebug(`Could not scrape bond ${symbol} with any available source`);
+					logDebug(`Could not scrape bond ${ticker} with any available source`);
 				}
 				
 				await new Promise(r => setTimeout(r, 1000));

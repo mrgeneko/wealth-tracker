@@ -1071,11 +1071,11 @@ app.delete('/api/accounts/:id', async (req, res) => {
 
 // Positions
 app.post('/api/positions', async (req, res) => {
-    const { account_id, symbol, type, quantity, currency } = req.body;
+    const { account_id, ticker, type, quantity, currency } = req.body;
     try {
         const [result] = await pool.execute(
             'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
-            [account_id, symbol, type, quantity, currency || 'USD']
+            [account_id, ticker, type, quantity, currency || 'USD']
         );
         assetsCache = null;
         loadAssets();
@@ -1086,11 +1086,11 @@ app.post('/api/positions', async (req, res) => {
 });
 
 app.put('/api/positions/:id', async (req, res) => {
-    const { symbol, type, quantity, currency } = req.body;
+    const { ticker, type, quantity, currency } = req.body;
     try {
         await pool.execute(
             'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
-            [symbol, type, quantity, currency || 'USD', req.params.id]
+            [ticker, type, quantity, currency || 'USD', req.params.id]
         );
         assetsCache = null;
         loadAssets();

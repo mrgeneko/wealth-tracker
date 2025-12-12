@@ -33,7 +33,7 @@ const SQL_STATEMENTS = [
   // Create ticker_registry table
   `CREATE TABLE IF NOT EXISTS ticker_registry (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    symbol VARCHAR(50) NOT NULL UNIQUE,
+    ticker VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(500),
     exchange VARCHAR(50),
     security_type ENUM('EQUITY', 'ETF', 'BOND', 'TREASURY', 'MUTUAL_FUND', 'OPTION', 'CRYPTO', 'FX', 'FUTURES', 'INDEX', 'OTHER') DEFAULT 'EQUITY',
@@ -51,7 +51,7 @@ const SQL_STATEMENTS = [
     security_term VARCHAR(50) NULL,
     
     -- Option-specific fields
-    underlying_symbol VARCHAR(50) NULL,
+    underlying_ticker VARCHAR(50) NULL,
     strike_price DECIMAL(18, 4) NULL,
     option_type ENUM('CALL', 'PUT') NULL,
     expiration_date DATE NULL,
@@ -61,14 +61,14 @@ const SQL_STATEMENTS = [
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Indexes
-    INDEX idx_symbol (symbol),
+    INDEX idx_ticker (ticker),
     INDEX idx_security_type (security_type),
     INDEX idx_sort_rank (sort_rank),
     INDEX idx_maturity_date (maturity_date),
     INDEX idx_expiration_date (expiration_date),
-    INDEX idx_underlying_symbol (underlying_symbol),
+    INDEX idx_underlying_ticker (underlying_ticker),
     INDEX idx_permanently_failed (permanently_failed),
-    CONSTRAINT fk_underlying_symbol FOREIGN KEY (underlying_symbol) REFERENCES ticker_registry(symbol) ON DELETE SET NULL
+    CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker) REFERENCES ticker_registry(ticker) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
   // Create ticker_registry_metrics table
@@ -102,6 +102,27 @@ const SQL_STATEMENTS = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_file_type (file_type)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  // Create symbol_yahoo_metrics table
+  `CREATE TABLE IF NOT EXISTS symbol_yahoo_metrics (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    symbol_id INT NOT NULL,
+    ticker VARCHAR(50) NOT NULL,
+    market_cap BIGINT DEFAULT NULL,
+    trailing_pe DECIMAL(10, 2) DEFAULT NULL,
+    dividend_yield DECIMAL(8, 4) DEFAULT NULL,
+    fifty_two_week_high DECIMAL(18, 4) DEFAULT NULL,
+    fifty_two_week_low DECIMAL(18, 4) DEFAULT NULL,
+    beta DECIMAL(8, 4) DEFAULT NULL,
+    trailing_revenue BIGINT DEFAULT NULL,
+    trailing_eps DECIMAL(10, 4) DEFAULT NULL,
+    currency VARCHAR(10) DEFAULT 'USD',
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_symbol_id (symbol_id),
+    INDEX idx_ticker (ticker),
+    INDEX idx_recorded_at (recorded_at),
+    CONSTRAINT fk_symbol_yahoo_metrics_symbol_id FOREIGN KEY (symbol_id) REFERENCES ticker_registry(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
 ];
 

@@ -1,11 +1,9 @@
 // tests/integration/metadata_population.test.js
 // Integration tests for metadata population scripts
-// Run with: node tests/integration/metadata_population.test.js
-// Requires MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE env vars
+// Run with: npm run test:integration or npm run test:all
 
 const { spawn } = require('child_process');
 const mysql = require('mysql2/promise');
-const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 
@@ -14,7 +12,7 @@ async function initializeSchema(conn) {
   // Drop existing tables to ensure fresh schema with ticker column
   const tablesToDrop = [
     'securities_metadata',
-    'securities_dividends', 
+    'securities_dividends',
     'securities_earnings',
     'security_splits',
     'latest_prices',
@@ -24,7 +22,7 @@ async function initializeSchema(conn) {
     'ticker_registry_metrics',
     'file_refresh_status'
   ];
-  
+
   try {
     await conn.execute('SET FOREIGN_KEY_CHECKS = 0');
     for (const table of tablesToDrop) {
@@ -38,7 +36,7 @@ async function initializeSchema(conn) {
   } catch (err) {
     console.warn('Warning dropping tables:', err.message);
   }
-  
+
   // Read and execute init scripts
   const baseSchemaPath = path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql');
   const symbolRegistryPath = path.join(__dirname, '../..', 'scripts/init-db/001-symbol-registry.sql');
@@ -69,210 +67,142 @@ async function initializeSchema(conn) {
   }
 }
 
-// Check for required environment variables
-function checkRequiredEnvVars() {
-    const required = ['MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'];
-    const missing = required.filter(v => !process.env[v]);
-    if (missing.length > 0) {
-        console.log('='.repeat(60));
-        console.log('METADATA POPULATION INTEGRATION TESTS');
-        console.log('='.repeat(60));
-        console.log('');
-        console.log(`SKIPPED: Missing required environment variables: ${missing.join(', ')}`);
-        console.log('Set these variables to run the tests.');
-        console.log('');
-        console.log('='.repeat(60));
-        console.log('Passed: 0 ✓ (skipped)');
-        console.log('Failed: 0 ✗');
-        console.log('='.repeat(60));
-        process.exit(0);
-    }
-}
-
 async function runCommandStream(cmd, args = [], opts = {}) {
-    return new Promise((resolve, reject) => {
-        const child = spawn(cmd, args, { env: process.env, ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
-        child.stdout.on('data', d => process.stdout.write(d));
-        child.stderr.on('data', d => process.stderr.write(d));
-        child.on('error', err => reject(err));
-        child.on('exit', code => {
-            if (code === 0) resolve();
-            else reject(new Error(`Exit code ${code}`));
-        });
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { env: process.env, ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.on('data', d => process.stdout.write(d));
+    child.stderr.on('data', d => process.stderr.write(d));
+    child.on('error', err => reject(err));
+    child.on('exit', code => {
+      if (code === 0) resolve();
+      else reject(new Error(`Exit code ${code}`));
     });
+  });
 }
 
 const TEST_SYMBOLS = ['AAPL', 'MSFT', 'INVALID_SYMBOL'];
 
-class IntegrationTest {
-    constructor() {
-        this.connection = null;
-        this.passed = 0;
-        this.failed = 0;
+describe('Metadata Population Integration Tests', () => {
+  let connection;
+
+  beforeAll(async () => {
+    // Check for required environment variables
+    const required = ['MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'];
+    const missing = required.filter(v => !process.env[v]);
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
     }
 
-    async setup() {
-        this.connection = await mysql.createConnection({
-            host: process.env.MYSQL_HOST || 'localhost',
-            port: parseInt(process.env.MYSQL_PORT || '3306'),
-            user: process.env.MYSQL_USER,
-            password: process.env.MYSQL_PASSWORD,
-            database: process.env.MYSQL_DATABASE
-        });
-        
-        // Initialize schema before running tests
-        await initializeSchema(this.connection);
+    connection = await mysql.createConnection({
+      host: process.env.MYSQL_HOST || 'localhost',
+      port: parseInt(process.env.MYSQL_PORT || '3306'),
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE
+    });
+
+    // Initialize schema before running tests
+    await initializeSchema(connection);
+  }, 30000);
+
+  afterAll(async () => {
+    if (connection) {
+      await connection.end();
     }
+  });
 
-    async teardown() {
-        if (this.connection) {
-            await this.connection.end();
-        }
-    }
+  describe('Single Symbol Tests', () => {
+    test('Populate single valid symbol (AAPL)', async () => {
+      await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'AAPL'], { timeout: 10000 });
 
-    async test(name, fn) {
-        process.stdout.write(`  ${name}... `);
-        try {
-            await fn();
-            console.log('✓ PASS');
-            this.passed++;
-        } catch (error) {
-            console.log(`✗ FAIL: ${error.message}`);
-            this.failed++;
-        }
-    }
+      // Check if metadata was inserted
+      const [rows] = await connection.execute(
+        'SELECT * FROM securities_metadata WHERE ticker = ?',
+        ['AAPL']
+      );
 
-    async testSingleSymbolPopulation() {
-        await this.test('Populate single valid symbol (AAPL)', async () => {
-            await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'AAPL'], { timeout: 10000 });
+      expect(rows.length).toBe(1);
+      expect(rows[0].ticker).toBe('AAPL');
+      expect(rows[0].short_name).toBeTruthy();
+      expect(rows[0].quote_type).toBe('EQUITY');
+    }, 15000);
 
-            // Check if metadata was inserted
-            const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE ticker = ?',
-                ['AAPL']
-            );
+    test('Handle invalid symbol gracefully', async () => {
+      // The script handles invalid symbols by logging an error but not throwing
+      // This is acceptable behavior - it doesn't crash the process
+      const result = await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'INVALID_SYMBOL_123'], { timeout: 10000 });
+      // Script completes without throwing, which is the expected behavior
+      expect(result).toBeUndefined();
+    }, 15000);
+  });
 
-            assert.strictEqual(rows.length, 1, 'Should insert metadata');
-            assert.strictEqual(rows[0].ticker, 'AAPL');
-            assert.ok(rows[0].short_name, 'Should have short_name');
-            assert.strictEqual(rows[0].quote_type, 'EQUITY');
-        });
+  describe('Batch Population Tests', () => {
+    test('Populate multiple symbols (2 symbols for CI)', async () => {
+      // Create test account first
+      await connection.execute(
+        `INSERT INTO accounts (id, name, type) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE name = VALUES(name)`,
+        [1, 'Test Account', 'individual']
+      );
 
-        await this.test('Handle invalid symbol gracefully', async () => {
-            try {
-                await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'INVALID_SYMBOL_123'], { timeout: 10000 });
-            } catch (error) {
-                // Script should exit with error but not crash
-                assert.ok(true, 'Should handle invalid symbol');
-            }
-        });
-    }
-
-    async testBatchPopulation() {
-        await this.test('Populate multiple symbols (2 symbols for CI)', async () => {
-            // Create test positions for just 2 symbols to keep tests fast
-            await this.connection.execute(
-                `INSERT INTO positions (account_id, ticker, quantity, type)
+      // Create test positions for just 2 symbols to keep tests fast
+      await connection.execute(
+        `INSERT INTO positions (account_id, ticker, quantity, type)
          VALUES (1, 'MSFT', 100, 'stock'), (1, 'GOOGL', 50, 'stock')
          ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)`
-            );
+      );
 
-            // Populate each symbol individually to avoid --all which processes everything
-            await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'MSFT'], { timeout: 30000 });
-            await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'GOOGL'], { timeout: 30000 });
+      // Populate each symbol individually to avoid --all which processes everything
+      await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'MSFT'], { timeout: 30000 });
+      await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', 'GOOGL'], { timeout: 30000 });
 
-            // Check if both were populated
-            const [rows] = await this.connection.execute(
-                'SELECT ticker FROM securities_metadata WHERE ticker IN (?, ?)',
-                ['MSFT', 'GOOGL']
-            );
+      // Check if both were populated
+      const [rows] = await connection.execute(
+        'SELECT ticker FROM securities_metadata WHERE ticker IN (?, ?)',
+        ['MSFT', 'GOOGL']
+      );
 
-            assert.ok(rows.length >= 1, 'Should populate at least one symbol');
-        });
-    }
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+    }, 60000);
+  });
 
-    async testPopularSecurities() {
-        await this.test('Populate a few popular securities (2 symbols for CI)', async () => {
-            // Instead of --sp500 which fetches 100+ symbols, just populate 2 known stocks
-            // This keeps CI fast while still exercising the code path
-            const testSymbols = ['NVDA', 'AMZN'];
-            for (const sym of testSymbols) {
-                try {
-                    await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', sym], { timeout: 30000 });
-                } catch (e) {
-                    console.warn(`  Warning: Failed to populate ${sym}: ${e.message}`);
-                }
-            }
+  describe('Popular Securities Tests', () => {
+    test('Populate a few popular securities (2 symbols for CI)', async () => {
+      // Instead of --sp500 which fetches 100+ symbols, just populate 2 known stocks
+      // This keeps CI fast while still exercising the code path
+      const testSymbols = ['NVDA', 'AMZN'];
+      for (const sym of testSymbols) {
+        try {
+          await runCommandStream('node', ['scripts/populate/populate_securities_metadata.js', '--ticker', sym], { timeout: 30000 });
+        } catch (e) {
+          console.warn(`  Warning: Failed to populate ${sym}: ${e.message}`);
+        }
+      }
 
-            // Check if some stocks were populated
-            const [rows] = await this.connection.execute(
-                `SELECT COUNT(*) as count FROM securities_metadata 
+      // Check if some stocks were populated
+      const [rows] = await connection.execute(
+        `SELECT COUNT(*) as count FROM securities_metadata
          WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA')`
-            );
+      );
 
-            assert.ok(rows[0].count >= 1, 'Should populate at least one stock');
-        });
-    }
+      expect(rows[0].count).toBeGreaterThanOrEqual(1);
+    }, 60000);
+  });
 
-    async testDataQuality() {
-        await this.test('Verify data quality for AAPL', async () => {
-            const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE ticker = ?',
-                ['AAPL']
-            );
+  describe('Data Quality Tests', () => {
+    test('Verify data quality for AAPL', async () => {
+      const [rows] = await connection.execute(
+        'SELECT * FROM securities_metadata WHERE ticker = ?',
+        ['AAPL']
+      );
 
-            if (rows.length > 0) {
-                const data = rows[0];
-                assert.ok(data.long_name, 'Should have long_name');
-                assert.ok(data.exchange, 'Should have exchange');
-                assert.ok(data.currency, 'Should have currency');
-                assert.ok(data.quote_type, 'Should have quote_type');
-            }
-        });
-    }
-
-    async run() {
-        console.log('='.repeat(60));
-        console.log('METADATA POPULATION INTEGRATION TESTS');
-        console.log('='.repeat(60));
-        console.log('');
-
-        await this.setup();
-
-        console.log('Single Symbol Tests:');
-        await this.testSingleSymbolPopulation();
-        console.log('');
-
-        console.log('Batch Population Tests:');
-        await this.testBatchPopulation();
-        console.log('');
-
-        console.log('Popular Securities Tests:');
-        await this.testPopularSecurities();
-        console.log('');
-
-        console.log('Data Quality Tests:');
-        await this.testDataQuality();
-        console.log('');
-
-        await this.teardown();
-
-        console.log('='.repeat(60));
-        console.log(`Passed: ${this.passed} ✓`);
-        console.log(`Failed: ${this.failed} ✗`);
-        console.log('='.repeat(60));
-
-        process.exit(this.failed > 0 ? 1 : 0);
-    }
-}
-
-if (require.main === module) {
-    checkRequiredEnvVars();
-    const test = new IntegrationTest();
-    test.run().catch(error => {
-        console.error('Test error:', error);
-        process.exit(1);
+      if (rows.length > 0) {
+        const data = rows[0];
+        expect(data.long_name).toBeTruthy();
+        expect(data.exchange).toBeTruthy();
+        expect(data.currency).toBeTruthy();
+        expect(data.quote_type).toBeTruthy();
+      }
     });
-}
-
-module.exports = IntegrationTest;
+  });
+});
