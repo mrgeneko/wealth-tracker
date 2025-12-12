@@ -1,6 +1,6 @@
 // populate_securities_metadata.js
 // Fetch and populate security metadata from Yahoo Finance into MySQL
-// Usage: node scripts/populate/populate_securities_metadata.js [--symbol AAPL] [--all]
+// Usage: node scripts/populate/populate_securities_metadata.js [--ticker AAPL] [--all]
 
 // dotenv is optional - in Docker containers, env vars are already set
 try { require('dotenv').config(); } catch (e) { /* dotenv not available, using existing env vars */ }
@@ -376,7 +376,7 @@ async function upsertEarningsEvents(connection, symbol, calendarEvents) {
     }
 }
 
-async function upsertDividendEvents(connection, symbol, calendarEvents) {
+async function upsertDividendEvents(connection, ticker, calendarEvents) {
     if (!calendarEvents || !calendarEvents.dividendDate) return;
 
     const dividendDate = calendarEvents.dividendDate;
@@ -386,7 +386,7 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
     // Note: Yahoo's calendarEvents typically only provides the next dividend date
     // For full dividend history, you'd need to use the historical dividends endpoint
     const dividendData = {
-        ticker: symbol,
+        ticker: ticker,
         ex_dividend_date: formatDate(dividendDate),
         payment_date: null,
         record_date: null,
@@ -401,7 +401,7 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
 
     // Skip if we don't have the dividend amount
     if (!dividendData.dividend_amount || dividendData.dividend_amount === 0) {
-        console.log(`  ⊘ Skipping dividend for ${symbol} (no amount available)`);
+        console.log(`  ⊘ Skipping dividend for ${ticker} (no amount available)`);
         return;
     }
 
@@ -425,20 +425,20 @@ async function upsertDividendEvents(connection, symbol, calendarEvents) {
 
     try {
         await connection.execute(sql, values);
-        console.log(`  ✓ Upserted dividend event for ${symbol}`);
+        console.log(`  ✓ Upserted dividend event for ${ticker}`);
     } catch (error) {
-        console.error(`  ✗ Error upserting dividend for ${symbol}:`, error.message);
+        console.error(`  ✗ Error upserting dividend for ${ticker}:`, error.message);
     }
 }
 
-async function getUniqueSymbols(connection) {
+async function getUniqueTickers(connection) {
     const [rows] = await connection.execute(`
     SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH'
   `);
     return rows.map(r => r.ticker);
 }
 
-async function getAllMetadataSymbols(connection) {
+async function getAllMetadataTickers(connection) {
         const [rows] = await connection.execute(`
         SELECT DISTINCT ticker FROM securities_metadata WHERE ticker IS NOT NULL AND ticker != ''
     `);
@@ -447,7 +447,7 @@ async function getAllMetadataSymbols(connection) {
 
 async function main() {
     const args = process.argv.slice(2);
-    const symbolArg = args.includes('--symbol') ? args[args.indexOf('--symbol') + 1] : null;
+    const tickerArg = args.includes('--ticker') ? args[args.indexOf('--ticker') + 1] : null;
     const allFlag = args.includes('--all');
     const allMetadataFlag = args.includes('--all-metadata') || args.includes('--all_metadata');
 
@@ -465,18 +465,18 @@ async function main() {
     try {
         let symbols = [];
 
-        if (symbolArg) {
-            symbols = [symbolArg];
-            console.log(`Processing single symbol: ${symbolArg}`);
+        if (tickerArg) {
+            symbols = [tickerArg];
+            console.log(`Processing single ticker: ${tickerArg}`);
         } else if (allFlag) {
-            symbols = await getUniqueSymbols(connection);
+            symbols = await getUniqueTickers(connection);
             console.log(`Processing ${symbols.length} symbols from positions table`);
         } else if (allMetadataFlag) {
-            symbols = await getAllMetadataSymbols(connection);
+            symbols = await getAllMetadataTickers(connection);
             console.log(`Processing ${symbols.length} symbols from securities_metadata table`);
         } else {
             console.log('Usage:');
-            console.log('  node scripts/populate/populate_securities_metadata.js --symbol AAPL');
+            console.log('  node scripts/populate/populate_securities_metadata.js --ticker AAPL');
             console.log('  node scripts/populate/populate_securities_metadata.js --all');
             process.exit(1);
         }

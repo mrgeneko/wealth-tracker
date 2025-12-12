@@ -257,7 +257,7 @@ async function importPositions(symbols) {
 curl http://localhost:3000/api/metadata/check-missing
 
 # Manually refresh a symbol
-node scripts/populate_securities_metadata.js --symbol AAPL
+node scripts/populate_securities_metadata.js --ticker AAPL
 ```
 
 ---
