@@ -312,69 +312,69 @@ describe('Fetch Price API Endpoint', () => {
 describe('Bond Symbol Detection via Treasury Registry', () => {
     // Mock ticker registry data (simulates us-treasury-auctions.csv)
     const mockTickerRegistry = [
-        { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-        { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
-        { symbol: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
-        { symbol: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' },
-        { symbol: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'TREASURY' },
-        { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
+        { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+        { ticker: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' },
+        { ticker: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'TREASURY' },
+        { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
     ];
 
     // Helper function matching server.js implementation
-    function isBondSymbol(symbol) {
-        if (!symbol) return false;
-        const clean = symbol.trim().toUpperCase();
+    function isBondTicker(ticker) {
+        if (!ticker) return false;
+        const clean = ticker.trim().toUpperCase();
         
         // Look up in ticker registry
-        const ticker = mockTickerRegistry.find(t => t.symbol === clean);
+        const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
         
         // If found and exchange is TREASURY, it's a bond
-        if (ticker && ticker.exchange === 'TREASURY') {
+        if (tickerObj && tickerObj.exchange === 'TREASURY') {
             return true;
         }
         
         return false;
     }
 
-    describe('isBondSymbol', () => {
+    describe('isBondTicker', () => {
         it('should detect treasury bonds from registry (30-Year)', () => {
-            expect(isBondSymbol('912810EX2')).toBe(true);
+            expect(isBondTicker('912810EX2')).toBe(true);
         });
 
         it('should detect treasury bills from registry (4-Week)', () => {
-            expect(isBondSymbol('912797SE8')).toBe(true);
+            expect(isBondTicker('912797SE8')).toBe(true);
         });
 
         it('should detect treasury notes from registry (7-Year)', () => {
-            expect(isBondSymbol('91282CPM7')).toBe(true);
+            expect(isBondTicker('91282CPM7')).toBe(true);
         });
 
         it('should be case-insensitive', () => {
-            expect(isBondSymbol('912810ex2')).toBe(true);
+            expect(isBondTicker('912810ex2')).toBe(true);
         });
 
         it('should NOT detect stock symbols as bonds', () => {
-            expect(isBondSymbol('AAPL')).toBe(false);
-            expect(isBondSymbol('MSFT')).toBe(false);
+            expect(isBondTicker('AAPL')).toBe(false);
+            expect(isBondTicker('MSFT')).toBe(false);
         });
 
         it('should NOT detect ETFs as bonds', () => {
-            expect(isBondSymbol('SPY')).toBe(false);
+            expect(isBondTicker('SPY')).toBe(false);
         });
 
         it('should NOT detect unknown 9-char symbols as bonds (not in registry)', () => {
             // Random 9-char string that looks like CUSIP but isn't in treasury file
-            expect(isBondSymbol('ABCDEF123')).toBe(false);
+            expect(isBondTicker('ABCDEF123')).toBe(false);
         });
 
         it('should handle null/undefined', () => {
-            expect(isBondSymbol(null)).toBe(false);
-            expect(isBondSymbol(undefined)).toBe(false);
+            expect(isBondTicker(null)).toBe(false);
+            expect(isBondTicker(undefined)).toBe(false);
         });
 
         it('should handle empty string', () => {
-            expect(isBondSymbol('')).toBe(false);
-            expect(isBondSymbol('   ')).toBe(false);
+            expect(isBondTicker('')).toBe(false);
+            expect(isBondTicker('   ')).toBe(false);
         });
     });
 });
@@ -386,17 +386,17 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
 
     // Mock ticker registry (same as detection tests)
     const mockTickerRegistry = [
-        { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-        { symbol: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
-        { symbol: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' }
+        { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' }
     ];
 
     // Helper matching server.js implementation - treasury registry lookup only
-    function isBondSymbol(symbol) {
-        if (!symbol) return false;
-        const clean = symbol.trim().toUpperCase();
-        const ticker = mockTickerRegistry.find(t => t.symbol === clean);
-        return ticker && ticker.exchange === 'TREASURY';
+    function isBondTicker(ticker) {
+        if (!ticker) return false;
+        const clean = ticker.trim().toUpperCase();
+        const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
+        return tickerObj && tickerObj.exchange === 'TREASURY';
     }
 
     beforeEach(() => {
@@ -413,7 +413,7 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
             const cleanSymbol = symbol.trim().toUpperCase();
             
             // Detect bond by type parameter OR treasury registry lookup
-            const isBond = type === 'bond' || isBondSymbol(cleanSymbol);
+            const isBond = type === 'bond' || isBondTicker(cleanSymbol);
             
             if (!isBond) {
                 return { status: 400, body: { error: 'Not a bond' } };

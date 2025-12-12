@@ -88,7 +88,7 @@ Tests:       582 passed, 582 total
 ## Key Test Scenarios
 
 ### Detection Logic
-1. **Registry Lookup**: isBondSymbol() checks if symbol exists in registry with exchange === 'TREASURY'
+1. **Registry Lookup**: isBondTicker() checks if ticker exists in registry with exchange === 'TREASURY'
 2. **Type Mapping**: Bonds must have type parameter passed or be detected via registry
 3. **Daemon Triggering**: For bonds, write timestamp 0 to `/usr/src/app/logs/last.bond_positions.txt`
 4. **Async Response**: Return 200 with "Price will be fetched by scrape daemon" instead of immediate price

@@ -701,11 +701,11 @@ app.get('/api/tickers', (req, res) => {
     }
 });
 
-// Helper: Detect if a symbol is a bond by looking it up in the treasury file
-// Returns true if the symbol exists in the treasury registry (exchange === 'TREASURY')
-function isBondSymbol(symbol) {
-    if (!symbol) return false;
-    const clean = symbol.trim().toUpperCase();
+// Helper: Detect if a ticker is a bond by looking it up in the treasury file
+// Returns true if the ticker exists in the treasury registry (exchange === 'TREASURY')
+function isBondTicker(ticker) {
+    if (!ticker) return false;
+    const clean = ticker.trim().toUpperCase();
     
     // Look up in ticker registry which loads from us-treasury-auctions.csv
     const allTickers = loadAllTickers();
@@ -748,7 +748,7 @@ app.post('/api/fetch-price', async (req, res) => {
     const cleanSymbol = symbol.trim().toUpperCase();
     
     // Detect if this is a bond (by type parameter or treasury registry lookup)
-    const isBond = type === 'bond' || isBondSymbol(cleanSymbol);
+    const isBond = type === 'bond' || isBondTicker(cleanSymbol);
     
     if (isBond) {
         // For bonds, trigger the scrape daemon to fetch prices on its next cycle
