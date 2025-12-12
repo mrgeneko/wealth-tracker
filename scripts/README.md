@@ -20,8 +20,8 @@ This directory contains operational, setup, maintenance, and development scripts
 
 ### `populate/` - Data Population Scripts
 - **`populate_securities_metadata.js`** - **CANONICAL**: Fetch and populate security metadata from Yahoo Finance
-  - Usage: `node scripts/populate/populate_securities_metadata.js [--symbol AAPL] [--all] [--all-metadata]`
-  - `--symbol AAPL` - Single symbol
+  - Usage: `node scripts/populate/populate_securities_metadata.js [--ticker AAPL] [--all] [--all-metadata]`
+  - `--ticker AAPL` - Single ticker
   - `--all` - All symbols from positions table (positions only)
   - `--all-metadata` - All symbols from securities_metadata table (recommended for backfill)
   - Populates: sector, industry, dividend yield, P/E ratio, TTM dividend, TTM EPS
