@@ -381,6 +381,13 @@ class MetricsWebSocketServer extends EventEmitter {
   }
 
   /**
+   * Get server statistics (alias for getStats)
+   */
+  getStatistics() {
+    return this.getStats();
+  }
+
+  /**
    * Graceful shutdown
    */
   async shutdown() {

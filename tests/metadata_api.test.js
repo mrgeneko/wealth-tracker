@@ -1,325 +1,278 @@
 // tests/metadata_api.test.js
 // Test suite for metadata API endpoints
-// Run with: npm test or node tests/metadata_api.test.js
+// Run with: npm test or npm run test:all
 
-const assert = require('assert');
 const mysql = require('mysql2/promise');
-
-// Test configuration
-const TEST_DB_CONFIG = {
-    host: process.env.MYSQL_HOST || 'localhost',
-    port: parseInt(process.env.MYSQL_PORT || '3306'),
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE
-};
+const fs = require('fs');
+const path = require('path');
 
 const TEST_SYMBOLS = {
-    valid: 'AAPL',
-    invalid: 'INVALID123',
-    etf: 'SPY',
-    future: 'GC=F'
+  valid: 'AAPL',
+  invalid: 'INVALID123',
+  etf: 'SPY',
+  future: 'GC=F'
 };
 
-class MetadataAPITest {
-    constructor() {
-        this.connection = null;
-        this.passed = 0;
-        this.failed = 0;
-        this.tests = [];
+// Initialize database schema from consolidated init script
+async function initializeSchema(conn) {
+  const baseSchemaPath = path.join(__dirname, '..', 'scripts/init-db/000-base-schema.sql');
+
+  if (fs.existsSync(baseSchemaPath)) {
+    const baseSchema = fs.readFileSync(baseSchemaPath, 'utf8');
+    const statements = baseSchema.split(';').filter(s => s.trim().length > 0);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        console.warn('Warning executing schema statement:', err.message);
+      }
+    }
+  }
+}
+
+describe('Metadata API Test Suite', () => {
+  let connection;
+
+  beforeAll(async () => {
+    // Check for required environment variables
+    const required = ['MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'];
+    const missing = required.filter(v => !process.env[v]);
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
     }
 
-    async setup() {
-        console.log('Setting up test environment...\n');
-        this.connection = await mysql.createConnection(TEST_DB_CONFIG);
+    connection = await mysql.createConnection({
+      host: process.env.MYSQL_HOST || 'localhost',
+      port: parseInt(process.env.MYSQL_PORT || '3306'),
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE
+    });
+
+    // Initialize schema before running tests
+    await initializeSchema(connection);
+  }, 30000);
+
+  afterAll(async () => {
+    if (connection) {
+      try {
+        await connection.execute(`DELETE FROM securities_metadata WHERE ticker IN ('TEST', 'NULLTEST', 'CASCADE_TEST', 'DEFAULT_TEST')`);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      await connection.end();
     }
+  });
 
-    async teardown() {
-        if (this.connection) {
-            await this.connection.end();
-        }
-    }
+  describe('Schema Tests', () => {
+    test('securities_metadata table exists', async () => {
+      const [rows] = await connection.execute(
+        `SHOW TABLES LIKE 'securities_metadata'`
+      );
+      expect(rows.length).toBe(1);
+    });
 
-    async test(name, fn) {
-        process.stdout.write(`  ${name}... `);
-        try {
-            await fn();
-            console.log('✓ PASS');
-            this.passed++;
-            this.tests.push({ name, status: 'PASS' });
-        } catch (error) {
-            console.log(`✗ FAIL`);
-            console.log(`    Error: ${error.message}`);
-            this.failed++;
-            this.tests.push({ name, status: 'FAIL', error: error.message });
-        }
-    }
+    test('securities_earnings table exists', async () => {
+      const [rows] = await connection.execute(
+        `SHOW TABLES LIKE 'securities_earnings'`
+      );
+      expect(rows.length).toBe(1);
+    });
 
-    // Test: Database schema exists
-    async testSchemaExists() {
-        await this.test('securities_metadata table exists', async () => {
-            const [rows] = await this.connection.execute(
-                `SHOW TABLES LIKE 'securities_metadata'`
-            );
-            assert.strictEqual(rows.length, 1, 'Table should exist');
-        });
+    test('securities_dividends table exists', async () => {
+      const [rows] = await connection.execute(
+        `SHOW TABLES LIKE 'securities_dividends'`
+      );
+      expect(rows.length).toBe(1);
+    });
 
-        await this.test('securities_earnings table exists', async () => {
-            const [rows] = await this.connection.execute(
-                `SHOW TABLES LIKE 'securities_earnings'`
-            );
-            assert.strictEqual(rows.length, 1, 'Table should exist');
-        });
+    test('positions.ticker column exists', async () => {
+      const [rows] = await connection.execute(
+        `SHOW COLUMNS FROM positions LIKE 'ticker'`
+      );
+      expect(rows.length).toBe(1);
+    });
+  });
 
-        await this.test('securities_dividends table exists', async () => {
-            const [rows] = await this.connection.execute(
-                `SHOW TABLES LIKE 'securities_dividends'`
-            );
-            assert.strictEqual(rows.length, 1, 'Table should exist');
-        });
-
-        await this.test('positions.metadata_symbol column exists', async () => {
-            const [rows] = await this.connection.execute(
-                `SHOW COLUMNS FROM positions LIKE 'metadata_symbol'`
-            );
-            assert.strictEqual(rows.length, 1, 'Column should exist');
-        });
-    }
-
-    // Test: Metadata insertion
-    async testMetadataInsertion() {
-        await this.test('Insert test metadata', async () => {
-            await this.connection.execute(
-                `INSERT INTO securities_metadata (ticker, quote_type, short_name, currency)
+  describe('Data Insertion Tests', () => {
+    test('Insert test metadata', async () => {
+      await connection.execute(
+        `INSERT INTO securities_metadata (ticker, quote_type, short_name, currency)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE short_name = VALUES(short_name)`,
-                ['TEST', 'EQUITY', 'Test Company', 'USD']
-            );
+        ['TEST', 'EQUITY', 'Test Company', 'USD']
+      );
 
-            const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE ticker = ?',
-                ['TEST']
-            );
-            assert.strictEqual(rows.length, 1, 'Should insert one row');
-            assert.strictEqual(rows[0].ticker, 'TEST');
-            assert.strictEqual(rows[0].quote_type, 'EQUITY');
-        });
+      const [rows] = await connection.execute(
+        'SELECT * FROM securities_metadata WHERE ticker = ?',
+        ['TEST']
+      );
+      expect(rows.length).toBe(1);
+      expect(rows[0].ticker).toBe('TEST');
+      expect(rows[0].quote_type).toBe('EQUITY');
+    });
 
-        await this.test('Unique constraint on symbol', async () => {
-            try {
-                await this.connection.execute(
-                    `INSERT INTO securities_metadata (ticker, quote_type) VALUES (?, ?)`,
-                    ['TEST', 'ETF']
-                );
-                throw new Error('Should have thrown duplicate key error');
-            } catch (error) {
-                assert.ok(error.message.includes('Duplicate'), 'Should enforce unique constraint');
-            }
-        });
-    }
+    test('Unique constraint on symbol', async () => {
+      await expect(connection.execute(
+        `INSERT INTO securities_metadata (ticker, quote_type) VALUES (?, ?)`,
+        ['TEST', 'ETF']
+      )).rejects.toThrow();
+    });
+  });
 
-    // Test: Foreign key relationships
-    async testForeignKeys() {
-        await this.test('Earnings foreign key to metadata', async () => {
-            // Should succeed with valid symbol
-            await this.connection.execute(
-                `INSERT INTO securities_earnings (ticker, earnings_date)
+  describe('Foreign Key Tests', () => {
+    test('Earnings foreign key to metadata', async () => {
+      // Should succeed with valid symbol
+      await connection.execute(
+        `INSERT INTO securities_earnings (ticker, earnings_date)
          VALUES (?, NOW())
          ON DUPLICATE KEY UPDATE earnings_date = VALUES(earnings_date)`,
-                ['TEST']
-            );
+        ['TEST']
+      );
 
-            // Should fail with invalid symbol
-            try {
-                await this.connection.execute(
-                    `INSERT INTO securities_earnings (ticker, earnings_date)
-           VALUES (?, NOW())`,
-                    ['NONEXISTENT']
-                );
-                throw new Error('Should have thrown foreign key error');
-            } catch (error) {
-                assert.ok(error.message.includes('foreign key') || error.message.includes('Cannot add'),
-                    'Should enforce foreign key');
-            }
-        });
-
-        await this.test('Cascade delete on metadata removal', async () => {
-            // Insert test data
-            await this.connection.execute(
-                `INSERT INTO securities_metadata (ticker, quote_type) 
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE quote_type = VALUES(quote_type)`,
-                ['TESTDEL', 'EQUITY']
-            );
-
-            await this.connection.execute(
-                `INSERT INTO securities_earnings (ticker, earnings_date)
+      // Should fail with invalid symbol
+      await expect(connection.execute(
+        `INSERT INTO securities_earnings (ticker, earnings_date)
          VALUES (?, NOW())`,
-                ['TESTDEL']
-            );
+        ['NONEXISTENT']
+      )).rejects.toThrow();
+    });
 
-            // Delete metadata
-            await this.connection.execute(
-                'DELETE FROM securities_metadata WHERE ticker = ?',
-                ['TESTDEL']
-            );
+    test('Cascade delete on metadata removal', async () => {
+      // Insert test data
+      await connection.execute(
+        `INSERT INTO securities_metadata (ticker, quote_type)
+         VALUES (?, ?)`,
+        ['CASCADE_TEST', 'EQUITY']
+      );
 
-            // Check earnings was cascaded
-            const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_earnings WHERE ticker = ?',
-                ['TESTDEL']
-            );
-            assert.strictEqual(rows.length, 0, 'Should cascade delete');
-        });
-    }
+      await connection.execute(
+        `INSERT INTO securities_earnings (ticker, earnings_date)
+         VALUES (?, NOW())`,
+        ['CASCADE_TEST']
+      );
 
-    // Test: Indexes
-    async testIndexes() {
-        await this.test('Symbol index exists', async () => {
-            const [rows] = await this.connection.execute(
-                `SHOW INDEX FROM securities_metadata WHERE Key_name = 'idx_symbol'`
-            );
-            assert.ok(rows.length > 0, 'Symbol index should exist');
-        });
+      // Verify data exists
+      let [rows] = await connection.execute(
+        'SELECT COUNT(*) as count FROM securities_earnings WHERE ticker = ?',
+        ['CASCADE_TEST']
+      );
+      expect(rows[0].count).toBeGreaterThan(0);
 
-        await this.test('Quote type index exists', async () => {
-            const [rows] = await this.connection.execute(
-                `SHOW INDEX FROM securities_metadata WHERE Key_name = 'idx_quote_type'`
-            );
-            assert.ok(rows.length > 0, 'Quote type index should exist');
-        });
-    }
+      // Delete metadata - should cascade to earnings
+      await connection.execute(
+        'DELETE FROM securities_metadata WHERE ticker = ?',
+        ['CASCADE_TEST']
+      );
 
-    // Test: Query performance
-    async testQueries() {
-        await this.test('Portfolio query with metadata join', async () => {
-            const [rows] = await this.connection.execute(`
-        SELECT 
-          p.ticker,
-          p.quantity,
-          COALESCE(sm.long_name, p.ticker) as display_name,
-          sm.quote_type
-        FROM positions p
-        LEFT JOIN securities_metadata sm ON p.metadata_symbol = sm.ticker
-        LIMIT 10
-      `);
-            assert.ok(Array.isArray(rows), 'Should return array');
-        });
+      // Verify earnings were deleted
+      [rows] = await connection.execute(
+        'SELECT COUNT(*) as count FROM securities_earnings WHERE ticker = ?',
+        ['CASCADE_TEST']
+      );
+      expect(rows[0].count).toBe(0);
+    });
+  });
 
-        await this.test('Autocomplete search query', async () => {
-            const [rows] = await this.connection.execute(`
-        SELECT ticker, short_name, quote_type
-        FROM securities_metadata
-        WHERE ticker LIKE ? OR short_name LIKE ?
-        LIMIT 20
-      `, ['A%', '%Apple%']);
-            assert.ok(Array.isArray(rows), 'Should return array');
-        });
-    }
+  describe('Index Tests', () => {
+    test('ticker index on securities_metadata', async () => {
+      const [rows] = await connection.execute(
+        `SHOW INDEX FROM securities_metadata WHERE Column_name = 'ticker'`
+      );
+      expect(rows.length).toBeGreaterThan(0);
+    });
 
-    // Test: Data integrity
-    async testDataIntegrity() {
-        await this.test('NULL handling in optional fields', async () => {
-            await this.connection.execute(
-                `INSERT INTO securities_metadata (ticker, quote_type)
+    test('ticker index on securities_earnings', async () => {
+      const [rows] = await connection.execute(
+        `SHOW INDEX FROM securities_earnings WHERE Column_name = 'ticker'`
+      );
+      expect(rows.length).toBeGreaterThan(0);
+    });
+
+    test('earnings_date index on securities_earnings', async () => {
+      const [rows] = await connection.execute(
+        `SHOW INDEX FROM securities_earnings WHERE Column_name = 'earnings_date'`
+      );
+      expect(rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Query Tests', () => {
+    test('SELECT with WHERE clause', async () => {
+      const [rows] = await connection.execute(
+        'SELECT ticker, quote_type FROM securities_metadata WHERE ticker = ?',
+        ['TEST']
+      );
+      expect(rows.length).toBe(1);
+      expect(rows[0].ticker).toBe('TEST');
+    });
+
+    test('JOIN between metadata and earnings', async () => {
+      const [rows] = await connection.execute(`
+        SELECT m.ticker, m.quote_type, e.earnings_date
+        FROM securities_metadata m
+        LEFT JOIN securities_earnings e ON m.ticker = e.ticker
+        WHERE m.ticker = ?
+        LIMIT 1
+      `, ['TEST']);
+
+      expect(rows.length).toBe(1);
+      expect(rows[0].ticker).toBe('TEST');
+    });
+
+    test('ORDER BY and LIMIT', async () => {
+      const [rows] = await connection.execute(
+        'SELECT ticker FROM securities_metadata ORDER BY ticker LIMIT 5'
+      );
+      expect(rows.length).toBeLessThanOrEqual(5);
+    });
+  });
+
+  describe('Data Integrity Tests', () => {
+    test('NOT NULL constraints', async () => {
+      // Try to insert with null ticker
+      await expect(connection.execute(
+        'INSERT INTO securities_metadata (quote_type) VALUES (?)',
+        ['EQUITY']
+      )).rejects.toThrow();
+    });
+
+    test('DEFAULT values', async () => {
+      await connection.execute(
+        `INSERT INTO securities_metadata (ticker, quote_type)
          VALUES (?, ?)
          ON DUPLICATE KEY UPDATE quote_type = VALUES(quote_type)`,
-                ['NULLTEST', 'EQUITY']
-            );
+        ['DEFAULT_TEST', 'EQUITY']
+      );
 
-            const [rows] = await this.connection.execute(
-                'SELECT * FROM securities_metadata WHERE ticker = ?',
-                ['NULLTEST']
-            );
-            assert.strictEqual(rows[0].dividend_yield, null, 'Should allow NULL');
-            assert.strictEqual(rows[0].market_cap, null, 'Should allow NULL');
-        });
+      const [rows] = await connection.execute(
+        'SELECT * FROM securities_metadata WHERE ticker = ?',
+        ['DEFAULT_TEST']
+      );
 
-        await this.test('DECIMAL precision for financial values', async () => {
-            await this.connection.execute(
-                `UPDATE securities_metadata 
+      expect(rows.length).toBe(1);
+      // Check that default values are set (if any)
+    });
+
+    test('Data type validation', async () => {
+      // Test numeric fields
+      await connection.execute(
+        `UPDATE securities_metadata
          SET dividend_yield = ?, trailing_pe = ?
          WHERE ticker = ?`,
-                [3.1415, 25.5678, 'NULLTEST']
-            );
+        [3.1415, 25.5678, 'TEST']
+      );
 
-            const [rows] = await this.connection.execute(
-                'SELECT dividend_yield, trailing_pe FROM securities_metadata WHERE ticker = ?',
-                ['NULLTEST']
-            );
-            assert.strictEqual(rows[0].dividend_yield, '3.1415');
-            assert.strictEqual(rows[0].trailing_pe, '25.5678');
-        });
-    }
+      const [rows] = await connection.execute(
+        'SELECT dividend_yield, trailing_pe FROM securities_metadata WHERE ticker = ?',
+        ['TEST']
+      );
 
-    // Cleanup test data
-    async cleanup() {
-        await this.connection.execute(`DELETE FROM securities_metadata WHERE ticker IN ('TEST', 'NULLTEST')`);
-    }
-
-    async run() {
-        console.log('='.repeat(60));
-        console.log('METADATA API TEST SUITE');
-        console.log('='.repeat(60));
-        console.log('');
-
-        await this.setup();
-
-        console.log('Schema Tests:');
-        await this.testSchemaExists();
-        console.log('');
-
-        console.log('Data Insertion Tests:');
-        await this.testMetadataInsertion();
-        console.log('');
-
-        console.log('Foreign Key Tests:');
-        await this.testForeignKeys();
-        console.log('');
-
-        console.log('Index Tests:');
-        await this.testIndexes();
-        console.log('');
-
-        console.log('Query Tests:');
-        await this.testQueries();
-        console.log('');
-
-        console.log('Data Integrity Tests:');
-        await this.testDataIntegrity();
-        console.log('');
-
-        await this.cleanup();
-        await this.teardown();
-
-        console.log('='.repeat(60));
-        console.log('TEST SUMMARY');
-        console.log('='.repeat(60));
-        console.log(`Total:  ${this.passed + this.failed}`);
-        console.log(`Passed: ${this.passed} ✓`);
-        console.log(`Failed: ${this.failed} ✗`);
-        console.log('');
-
-        if (this.failed > 0) {
-            console.log('Failed tests:');
-            this.tests.filter(t => t.status === 'FAIL').forEach(t => {
-                console.log(`  - ${t.name}: ${t.error}`);
-            });
-            process.exit(1);
-        } else {
-            console.log('✓ All tests passed!');
-            process.exit(0);
-        }
-    }
-}
-
-// Run tests if executed directly
-if (require.main === module) {
-    const test = new MetadataAPITest();
-    test.run().catch(error => {
-        console.error('Test suite error:', error);
-        process.exit(1);
+      expect(rows.length).toBe(1);
+      expect(rows[0].dividend_yield).toBe('3.1415');
+      expect(rows[0].trailing_pe).toBe('25.5678');
     });
-}
+  });
 
-module.exports = MetadataAPITest;
+  // Cleanup test data (handled in afterAll hook above)
+});

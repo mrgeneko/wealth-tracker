@@ -23,28 +23,22 @@ This is the **Docker-recommended approach** for initializing databases in contai
   - `securities_earnings` - Earnings information
   - `security_splits` - Stock split information
 
-- **001-symbol-registry.sql** - Creates symbol registry tables for autocomplete and metadata tracking
-  - `symbol_registry` - Main symbol registry with permanent failure tracking
-  - `symbol_registry_metrics` - Coverage and refresh metrics
+- **001-symbol-registry.sql** - Creates ticker registry tables for autocomplete and metadata tracking
+  - `ticker_registry` - Main ticker registry with permanent failure tracking
+  - `ticker_registry_metrics` - Coverage and refresh metrics
   - `file_refresh_status` - File refresh status tracking
+  - `symbol_yahoo_metrics` - Extended Yahoo Finance metrics storage
 
 - **002-phase9-metrics.sql** - Creates WebSocket metrics tables for real-time dashboard
   - `scraper_page_performance` - Per-request metrics from scrapers
   - `scraper_daily_summary` - Aggregated daily metrics
   - `scheduler_metrics` - Scheduler execution metrics
 
-## Relationship to Migration System
+## Single Source of Truth
 
-These files provide a **backup initialization path** for fresh containers. The primary initialization mechanism is:
+These init scripts are the **authoritative database schema**. All tables are created here and executed automatically when a fresh Docker container is initialized.
 
-**Application Level:** `scripts/run-migrations.js` (called by `dashboard/server.js` on startup)
-- Runs `scripts/migrations/011_create_symbol_registry.js`
-- Runs `scripts/migrations/012_create_phase9_metrics_tables.js`
-
-**Dual-Path Approach:**
-- Fresh containers: Get initialized by Docker init scripts (fast, automatic)
-- Existing containers: Get updated by application migrations (flexible, graceful)
-- Both paths use the same table schemas
+For existing databases that need schema updates, use manual ALTER TABLE commands or create specific update scripts as needed.
 
 ## When to Update
 
