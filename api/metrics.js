@@ -64,8 +64,8 @@ router.get('/summary', requirePool, async (req, res) => {
                 last_refresh_duration_ms,
                 last_refresh_status,
                 last_error_message,
-                symbols_added,
-                symbols_updated,
+                tickers_added,
+                tickers_updated,
                 next_refresh_due_at
             FROM file_refresh_status
             ORDER BY file_type
@@ -203,8 +203,8 @@ router.get('/refresh-status', requirePool, async (req, res) => {
                 last_refresh_duration_ms,
                 last_refresh_status,
                 last_error_message,
-                symbols_added,
-                symbols_updated,
+                tickers_added,
+                tickers_updated,
                 next_refresh_due_at,
                 updated_at
             FROM file_refresh_status
@@ -364,8 +364,8 @@ router.post('/update-file-status', requirePool, async (req, res) => {
                 last_refresh_duration_ms,
                 last_refresh_status,
                 last_error_message,
-                symbols_added,
-                symbols_updated,
+                tickers_added,
+                tickers_updated,
                 next_refresh_due_at
             ) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -373,8 +373,8 @@ router.post('/update-file-status', requirePool, async (req, res) => {
                 last_refresh_duration_ms = VALUES(last_refresh_duration_ms),
                 last_refresh_status = VALUES(last_refresh_status),
                 last_error_message = VALUES(last_error_message),
-                symbols_added = VALUES(symbols_added),
-                symbols_updated = VALUES(symbols_updated),
+                tickers_added = VALUES(tickers_added),
+                tickers_updated = VALUES(tickers_updated),
                 next_refresh_due_at = VALUES(next_refresh_due_at)
         `, [
             fileType,

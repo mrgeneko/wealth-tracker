@@ -305,7 +305,7 @@ describe('SymbolRegistrySyncService', () => {
         issue_date: null,
         maturity_date: null,
         security_term: null,
-        underlying_symbol: null,
+        underlying_ticker: null,
         strike_price: null,
         option_type: null,
         expiration_date: null

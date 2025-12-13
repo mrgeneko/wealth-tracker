@@ -292,7 +292,6 @@ class TreasuryDataHandler {
 
     return {
       ticker: cusip,  // Used by processBatch to check existence
-      symbol: cusip,  // Used by insertSymbol
       name: this.formatTreasuryName(record),
       exchange: 'OTC',
       security_type: this.extractSecurityType(record),

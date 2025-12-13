@@ -1140,17 +1140,17 @@
                     if (autocompleteTimeout) clearTimeout(autocompleteTimeout);
                     autocompleteTimeout = setTimeout(async () => {
                         try {
-                            const res = await fetch(`/api/metadata/autocomplete?q=${encodeURIComponent(query)}`);
+                            const res = await fetch(`/api/autocomplete/search?q=${encodeURIComponent(query)}`);
                             const data = await res.json();
 
                             // Update the side-channel store
                             data.results.forEach(t => {
-                                metadataStore[t.symbol] = t;
+                                metadataStore[t.ticker] = t;
                             });
 
                             const list = data.results.map(t => ({
-                                label: t.symbol,
-                                value: t.symbol
+                                label: t.ticker,
+                                value: t.ticker
                             }));
 
                             symbolAutocomplete.list = list;
@@ -2961,8 +2961,8 @@
                 const lastRefresh = status.last_refresh_at 
                     ? new Date(status.last_refresh_at).toLocaleString() 
                     : 'Never';
-                const added = status.symbols_added || 0;
-                const updated = status.symbols_updated || 0;
+                const added = status.tickers_added || 0;
+                const updated = status.tickers_updated || 0;
 
                 return `
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #444;">
