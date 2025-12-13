@@ -295,7 +295,7 @@ describe('SymbolRegistrySyncService', () => {
       const registryFormat = syncService.symbolToRegistryFormat(symbol);
 
       expect(registryFormat).toEqual({
-        symbol: 'AAPL',
+        ticker: 'AAPL',
         name: 'Apple Inc.',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',
@@ -305,7 +305,7 @@ describe('SymbolRegistrySyncService', () => {
         issue_date: null,
         maturity_date: null,
         security_term: null,
-        underlying_symbol: null,
+        underlying_ticker: null,
         strike_price: null,
         option_type: null,
         expiration_date: null
@@ -324,8 +324,8 @@ describe('SymbolRegistrySyncService', () => {
 
       const registryFormat = syncService.symbolToRegistryFormat(symbol);
 
-      // CUSIP is stored in the symbol field
-      expect(registryFormat.symbol).toBe('912797SE8');
+      // CUSIP is stored in the ticker field
+      expect(registryFormat.ticker).toBe('912797SE8');
     });
   });
 
@@ -388,7 +388,7 @@ describe('SymbolRegistrySyncService', () => {
       mockConnection.query.mockResolvedValue([{ insertId: 1 }, []]);
 
       const symbolData = {
-        symbol: 'AAPL',
+        ticker: 'AAPL',
         name: 'Apple Inc.',
         exchange: 'NASDAQ',
         security_type: 'EQUITY',

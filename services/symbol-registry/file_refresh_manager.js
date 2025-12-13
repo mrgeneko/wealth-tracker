@@ -106,14 +106,14 @@ class FileRefreshManager {
       await conn.query(
         `INSERT INTO file_refresh_status
          (file_type, last_refresh_at, last_refresh_duration_ms, last_refresh_status,
-          symbols_added, symbols_updated, next_refresh_due_at, updated_at)
+          tickers_added, tickers_updated, next_refresh_due_at, updated_at)
          VALUES (?, CURRENT_TIMESTAMP, ?, 'SUCCESS', ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? HOUR), CURRENT_TIMESTAMP)
          ON DUPLICATE KEY UPDATE
           last_refresh_at = CURRENT_TIMESTAMP,
           last_refresh_duration_ms = VALUES(last_refresh_duration_ms),
           last_refresh_status = 'SUCCESS',
-          symbols_added = VALUES(symbols_added),
-          symbols_updated = VALUES(symbols_updated),
+          tickers_added = VALUES(tickers_added),
+          tickers_updated = VALUES(tickers_updated),
           next_refresh_due_at = VALUES(next_refresh_due_at),
           last_error_message = NULL,
           updated_at = CURRENT_TIMESTAMP`,
@@ -155,8 +155,8 @@ class FileRefreshManager {
     try {
       const [results] = await conn.query(
         `SELECT file_type, last_refresh_at, last_refresh_duration_ms,
-                last_refresh_status, last_error_message, symbols_added,
-                symbols_updated, next_refresh_due_at
+                last_refresh_status, last_error_message, tickers_added,
+                tickers_updated, next_refresh_due_at
          FROM file_refresh_status
          ORDER BY file_type`
       );
@@ -175,8 +175,8 @@ class FileRefreshManager {
     try {
       const [results] = await conn.query(
         `SELECT file_type, last_refresh_at, last_refresh_duration_ms,
-                last_refresh_status, last_error_message, symbols_added,
-                symbols_updated, next_refresh_due_at
+                last_refresh_status, last_error_message, tickers_added,
+                tickers_updated, next_refresh_due_at
          FROM file_refresh_status
          WHERE file_type = ?`,
         [fileType]

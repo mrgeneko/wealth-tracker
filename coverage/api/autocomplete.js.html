@@ -830,7 +830,7 @@ function requirePool(req, res, next) {
  *     query: "string",
  *     results: [
  *       {
- *         symbol: "AAPL",
+ *         ticker: "AAPL",
  *         name: "Apple Inc.",
  *         type: "STOCK",
  *         verified: true,
@@ -860,7 +860,7 @@ router.get('/search', requirePool, async (req, res) =&gt; {
             includeMetadata: metadata === 'true' || metadata === '1'
         };
 &nbsp;
-        const results = await service.searchSymbols(q, options);
+        const results = await service.searchTickers(q, options);
 &nbsp;
         res.json({
             query: q.trim(),
@@ -879,12 +879,12 @@ router.get('/search', requirePool, async (req, res) =&gt; {
 });
 &nbsp;
 /**
- * GET /api/autocomplete/details/:symbol
- * Get detailed information for a single symbol
+ * GET /api/autocomplete/details/:ticker
+ * Get detailed information for a single ticker
  *
  * Response:
  *   {
- *     symbol: "AAPL",
+ *     ticker: "AAPL",
  *     name: "Apple Inc.",
  *     type: "STOCK",
  *     exchange: "NASDAQ",
@@ -901,25 +901,25 @@ router.get('/search', requirePool, async (req, res) =&gt; {
  *     }
  *   }
  */
-router.get('/details/:symbol', requirePool, async (req, res) =&gt; {
-    const symbol = (req.params.symbol || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.toUpperCase().trim();
+router.get('/details/:ticker', requirePool, async (req, res) =&gt; {
+    const ticker = (req.params.ticker || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.toUpperCase().trim();
 &nbsp;
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (!symbol) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!ticker) {
 <span class="cstat-no" title="statement not covered" >        return res.status(400).json({</span>
             error: 'Invalid request',
-            message: 'Symbol parameter is required'
+            message: 'Ticker parameter is required'
         });
     }
 &nbsp;
     try {
         const service = new MetadataAutocompleteService(connectionPool);
-        const details = await service.getSymbolDetails(symbol);
+        const details = await service.getTickerDetails(ticker);
 &nbsp;
         if (!details) {
             return res.status(404).json({
                 error: 'Not found',
-                message: `Symbol "${symbol}" not found in registry`,
-                symbol
+                message: `Ticker "${ticker}" not found in registry`,
+                ticker
             });
         }
 &nbsp;
@@ -929,7 +929,7 @@ router.get('/details/:symbol', requirePool, async (req, res) =&gt; {
         });
 &nbsp;
     } catch (error) {
-        console.error('Symbol details error:', error);
+        console.error('Ticker details error:', error);
         res.status(500).json({
             error: 'Lookup failed',
             message: error.message
@@ -999,7 +999,7 @@ router.get('/pending', requirePool, async (req, res) =&gt; {
     try {
         const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
         const service = new MetadataAutocompleteService(connectionPool);
-        const pending = await service.getSymbolsNeedingMetadata(limit);
+        const pending = await service.getTickersNeedingMetadata(limit);
 &nbsp;
         res.json({
             pending,
@@ -1008,46 +1008,46 @@ router.get('/pending', requirePool, async (req, res) =&gt; {
         });
 &nbsp;
     } catch (error) {
-        console.error('Pending symbols error:', error);
+        console.error('Pending tickers error:', error);
         res.status(500).json({
-            error: 'Failed to retrieve pending symbols',
+            error: 'Failed to retrieve pending tickers',
             message: error.message
         });
     }
 });
 &nbsp;
 /**
- * POST /api/autocomplete/refresh/:symbol
- * Admin: Refresh metadata for a specific symbol
+ * POST /api/autocomplete/refresh/:ticker
+ * Admin: Refresh metadata for a specific ticker
  *
  * Authorization: Optional (can be secured with middleware)
  *
  * Response:
  *   {
- *     symbol: "AAPL",
+ *     ticker: "AAPL",
  *     action: "refresh_initiated",
- *     message: "Metadata refresh flag reset. Symbol will be repopulated on next cycle.",
+ *     message: "Metadata refresh flag reset. Ticker will be repopulated on next cycle.",
  *     timestamp: ISO8601
  *   }
  */
-router.post('/refresh/:symbol', requirePool, async (req, res) =&gt; {
-    const symbol = (req.params.symbol || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.toUpperCase().trim();
+router.post('/refresh/:ticker', requirePool, async (req, res) =&gt; {
+    const ticker = (req.params.ticker || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.toUpperCase().trim();
 &nbsp;
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (!symbol) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!ticker) {
 <span class="cstat-no" title="statement not covered" >        return res.status(400).json({</span>
             error: 'Invalid request',
-            message: 'Symbol parameter is required'
+            message: 'Ticker parameter is required'
         });
     }
 &nbsp;
     try {
         const service = new MetadataAutocompleteService(connectionPool);
-        await service.refreshSymbolMetadata(symbol);
+        await service.refreshTickerMetadata(ticker);
 &nbsp;
         res.json({
-            symbol,
+            ticker,
             action: 'refresh_initiated',
-            message: 'Metadata refresh flag reset. Symbol will be repopulated on next cycle.',
+            message: 'Metadata refresh flag reset. Ticker will be repopulated on next cycle.',
             timestamp: new Date().toISOString()
         });
 &nbsp;
@@ -1095,7 +1095,7 @@ router.post('/bulk-refresh', requirePool, async (req, res) =&gt; {
         let refreshedCount = 0;
         for (const symbol of normalizedSymbols) {
             try {
-                await service.refreshSymbolMetadata(symbol);
+                await service.refreshTickerMetadata(symbol);
                 refreshedCount++;
             } catch (err) {
                 console.error(`Failed to refresh ${symbol}:`, err.message);
@@ -1150,7 +1150,7 @@ module.exports = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-11T19:29:28.382Z
+                at 2025-12-13T00:16:57.418Z
             </div>
         <script src="../prettify.js"></script>
         <script>
