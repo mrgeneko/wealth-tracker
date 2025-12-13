@@ -235,7 +235,7 @@ describe('TreasuryDataHandler', () => {
 
       const formatted = handler.treasuryToRegistryFormat(record, 'TREASURY_FILE');
       
-      expect(formatted.symbol).toBe('912810 QC 0');
+      expect(formatted.ticker).toBe('912810 QC 0');
       expect(formatted.exchange).toBe('OTC');
       expect(formatted.security_type).toBe('TREASURY');
       expect(formatted.source).toBe('TREASURY_FILE');
