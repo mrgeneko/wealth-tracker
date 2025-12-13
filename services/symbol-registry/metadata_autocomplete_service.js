@@ -46,13 +46,10 @@ class MetadataAutocompleteService {
         const limit = options.limit || this.config.MAX_RESULTS;
         const includeMetadata = options.includeMetadata !== false;
 
-        let connection;
         try {
-            connection = await this.pool.getConnection();
-
             // Build search query with ranking
             const searchResults = await this._searchWithRanking(
-                connection,
+                this.pool,
                 searchQuery,
                 limit,
                 includeMetadata
@@ -62,10 +59,6 @@ class MetadataAutocompleteService {
         } catch (error) {
             console.error(`Error searching tickers: ${error.message}`);
             throw error;
-        } finally {
-            if (connection) {
-                await connection.release();
-            }
         }
     }
 
@@ -74,13 +67,13 @@ class MetadataAutocompleteService {
      * Uses three-tier matching: exact > prefix > fuzzy
      */
     async _searchWithRanking(connection, query, limit, includeMetadata) {
-        // Ensure limit is an integer
-        const limitNum = parseInt(limit, 10) || 20;
+        // Ensure limit is an integer and within bounds
+        const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
         
-        // Escape query for LIKE patterns
+        // Escape SQL wildcards in the user input
         const escapedQuery = query.replace(/[%_]/g, '\\$&');
         
-        // Simple query without metadata join for now to avoid collation issues
+        // Use connection.query with string interpolation for LIMIT
         const sql = `
             SELECT 
                 sr.ticker,
@@ -101,12 +94,12 @@ class MetadataAutocompleteService {
             LIMIT ${limitNum}
         `;
 
-        const [results] = await connection.execute(sql, [
-            `${escapedQuery}%`,    // LIKE for WHERE (prefix)
-            `%${escapedQuery}%`,   // LIKE for WHERE (name contains)
-            query,                  // Exact match
-            `${escapedQuery}%`,    // Prefix match
-            `%${escapedQuery}%`    // Partial name match
+        const [results] = await connection.query(sql, [
+            `${escapedQuery}%`,    // WHERE ticker prefix
+            `%${escapedQuery}%`,   // WHERE name contains
+            query,                  // ORDER exact match
+            `${escapedQuery}%`,    // ORDER prefix match
+            `%${escapedQuery}%`    // ORDER name match
         ]);
 
         return results.map(row => this._formatResult(row));
