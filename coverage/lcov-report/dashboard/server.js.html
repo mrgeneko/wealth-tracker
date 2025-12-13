@@ -2775,7 +2775,7 @@ async function <span class="fstat-no" title="function not covered" >initializeSy
 <span class="cstat-no" title="statement not covered" >        console.log('[Symbol Registry] Full sync results:', JSON.stringify(stats, null, 2));</span>
         
         // Verify data was inserted
-        const [checkResult] = <span class="cstat-no" title="statement not covered" >await pool.query('SELECT COUNT(*) as count FROM symbol_registry');</span>
+        const [checkResult] = <span class="cstat-no" title="statement not covered" >await pool.query('SELECT COUNT(*) as count FROM ticker_registry');</span>
 <span class="cstat-no" title="statement not covered" >        console.log('[Symbol Registry] Verification - records in database:', checkResult[0].count);</span>
     } catch (err) {
 <span class="cstat-no" title="statement not covered" >        console.error('[Symbol Registry] Sync error:', err.message);</span>
@@ -2815,7 +2815,7 @@ async function <span class="fstat-no" title="function not covered" >fetchAssetsF
                    sm.ttm_dividend_amount, sm.ttm_eps,
                    sm.quote_type, sm.exchange as meta_exchange
             FROM positions p
-            LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol COLLATE utf8mb4_unicode_ci
+            LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker COLLATE utf8mb4_unicode_ci
         `);
 &nbsp;
         const [fixedAssets] = <span class="cstat-no" title="statement not covered" >await pool.query('SELECT * FROM fixed_assets ORDER BY display_order');</span>
@@ -2864,7 +2864,7 @@ async function <span class="fstat-no" title="function not covered" >fetchAssetsF
                 // Common position object
                 const positionData = <span class="cstat-no" title="statement not covered" >{</span>
                     id: pos.id,
-                    symbol: pos.symbol,
+                    ticker: pos.ticker,
                     quantity: parseFloat(pos.quantity),
                     cost_basis: pos.cost_basis ? parseFloat(pos.cost_basis) : 0,
                     // Metadata fields (from JOIN)
@@ -2934,8 +2934,8 @@ let assetsPollingInterval = <span class="cstat-no" title="statement not covered"
 // Supports extended hours pricing (pre-market, after-hours)
 function <span class="fstat-no" title="function not covered" >updatePriceCache(</span>item) {
     // Determine a normalized key for this incoming item.
-    // Priority: item.normalized_key -&gt; item.key -&gt; encodeURIComponent(item.symbol)
-    const normalizedKey = <span class="cstat-no" title="statement not covered" >item.normalized_key || item.key || (item.symbol ? encodeURIComponent(String(item.symbol)) : null);</span>
+    // Priority: item.normalized_key -&gt; item.key -&gt; encodeURIComponent(item.ticker)
+    const normalizedKey = <span class="cstat-no" title="statement not covered" >item.normalized_key || item.key || (item.ticker ? encodeURIComponent(String(item.ticker)) : null);</span>
 <span class="cstat-no" title="statement not covered" >    if (!normalizedKey) <span class="cstat-no" title="statement not covered" >return false;</span></span>
 &nbsp;
     // Determine the best price to use
@@ -3079,7 +3079,7 @@ function <span class="fstat-no" title="function not covered" >updatePriceCache(<
         currency: 'USD',
         time: item.capture_time || new Date().toISOString(),
         // Keep both the original symbol and the normalized key for consumers
-        symbol: item.symbol || null,
+        ticker: item.ticker || null,
         normalized_key: normalizedKey,
         source: item.source ? `${item.source} (${priceSource})` : priceSource
     };
@@ -3109,7 +3109,7 @@ async function <span class="fstat-no" title="function not covered" >startKafkaCo
 <span class="cstat-no" title="statement not covered" >                try {</span>
                     const value = <span class="cstat-no" title="statement not covered" >message.value.toString();</span>
                     const data = <span class="cstat-no" title="statement not covered" >JSON.parse(value);</span>
-                    const displayKey = <span class="cstat-no" title="statement not covered" >data.normalized_key || data.key || (data.symbol ? encodeURIComponent(String(data.symbol)) : '&lt;no-key&gt;');</span>
+                    const displayKey = <span class="cstat-no" title="statement not covered" >data.normalized_key || data.key || (data.ticker ? encodeURIComponent(String(data.ticker)) : '&lt;no-key&gt;');</span>
 <span class="cstat-no" title="statement not covered" >                    console.log(`Received update for ${displayKey}`);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >                    if (updatePriceCache(data)) {</span>
@@ -3156,18 +3156,18 @@ const LOGS_DIR = <span class="cstat-no" title="statement not covered" >'/usr/src
     }
 });
 &nbsp;
-// Helper: Detect if a symbol is a bond by looking it up in the treasury file
-// Returns true if the symbol exists in the treasury registry (exchange === 'TREASURY')
-function <span class="fstat-no" title="function not covered" >isBondSymbol(</span>symbol) {
-<span class="cstat-no" title="statement not covered" >    if (!symbol) <span class="cstat-no" title="statement not covered" >return false;</span></span>
-    const clean = <span class="cstat-no" title="statement not covered" >symbol.trim().toUpperCase();</span>
+// Helper: Detect if a ticker is a bond by looking it up in the treasury file
+// Returns true if the ticker exists in the treasury registry (exchange === 'TREASURY')
+function <span class="fstat-no" title="function not covered" >isBondTicker(</span>ticker) {
+<span class="cstat-no" title="statement not covered" >    if (!ticker) <span class="cstat-no" title="statement not covered" >return false;</span></span>
+    const clean = <span class="cstat-no" title="statement not covered" >ticker.trim().toUpperCase();</span>
     
     // Look up in ticker registry which loads from us-treasury-auctions.csv
     const allTickers = <span class="cstat-no" title="statement not covered" >loadAllTickers();</span>
-    const ticker = <span class="cstat-no" title="statement not covered" >allTickers.find(<span class="fstat-no" title="function not covered" >t </span>=&gt; <span class="cstat-no" title="statement not covered" >t.symbol === clean)</span>;</span>
+    const tickerObj = <span class="cstat-no" title="statement not covered" >allTickers.find(<span class="fstat-no" title="function not covered" >t </span>=&gt; <span class="cstat-no" title="statement not covered" >t.ticker === clean)</span>;</span>
     
     // If found and exchange is TREASURY, it's a bond
-<span class="cstat-no" title="statement not covered" >    if (ticker &amp;&amp; ticker.exchange === 'TREASURY') {</span>
+<span class="cstat-no" title="statement not covered" >    if (tickerObj &amp;&amp; tickerObj.exchange === 'TREASURY') {</span>
 <span class="cstat-no" title="statement not covered" >        return true;</span>
     }
     
@@ -3190,29 +3190,29 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
     }
 }
 &nbsp;
-// API to fetch current price for a symbol and inject into price cache
-// Used when adding a new symbol to ensure immediate price display
+// API to fetch current price for a ticker and inject into price cache
+// Used when adding a new ticker to ensure immediate price display
 // Also publishes to Kafka so the price persists to MySQL via the consumer
 <span class="cstat-no" title="statement not covered" >app.post('/api/fetch-price', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
-    const { symbol, type } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+    const { ticker, type } = <span class="cstat-no" title="statement not covered" >req.body;</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (!symbol || !symbol.trim()) {</span>
-<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ error: 'Symbol is required' });</span>
+<span class="cstat-no" title="statement not covered" >    if (!ticker || !ticker.trim()) {</span>
+<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ error: 'Ticker is required' });</span>
     }
 &nbsp;
-    const cleanSymbol = <span class="cstat-no" title="statement not covered" >symbol.trim().toUpperCase();</span>
+    const cleanTicker = <span class="cstat-no" title="statement not covered" >ticker.trim().toUpperCase();</span>
     
     // Detect if this is a bond (by type parameter or treasury registry lookup)
-    const isBond = <span class="cstat-no" title="statement not covered" >type === 'bond' || isBondSymbol(cleanSymbol);</span>
+    const isBond = <span class="cstat-no" title="statement not covered" >type === 'bond' || isBondTicker(cleanTicker);</span>
     
 <span class="cstat-no" title="statement not covered" >    if (isBond) {</span>
         // For bonds, trigger the scrape daemon to fetch prices on its next cycle
         // This avoids duplicating the Webull scraping code
-<span class="cstat-no" title="statement not covered" >        console.log(`[FetchPrice] Detected bond ${cleanSymbol}, triggering scrape daemon...`);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[FetchPrice] Detected bond ${cleanTicker}, triggering scrape daemon...`);</span>
         const triggered = <span class="cstat-no" title="statement not covered" >triggerBondScrape();</span>
         
 <span class="cstat-no" title="statement not covered" >        return res.json({</span>
-            symbol: cleanSymbol,
+            ticker: cleanTicker,
             isBond: true,
             triggered: triggered,
             message: triggered 
@@ -3230,13 +3230,13 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
             suppressNotices: ['yahooSurvey', 'rippieTip']
         });
         
-<span class="cstat-no" title="statement not covered" >        console.log(`[FetchPrice] Fetching current price for ${cleanSymbol}...`);</span>
-        const quote = <span class="cstat-no" title="statement not covered" >await yahooFinance.quote(cleanSymbol);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[FetchPrice] Fetching current price for ${cleanTicker}...`);</span>
+        const quote = <span class="cstat-no" title="statement not covered" >await yahooFinance.quote(cleanTicker);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        if (!quote || !quote.regularMarketPrice) {</span>
 <span class="cstat-no" title="statement not covered" >            return res.status(404).json({</span>
                 error: 'No price data returned',
-                symbol: cleanSymbol
+                ticker: cleanTicker
             });
         }
 &nbsp;
@@ -3245,7 +3245,7 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
         const now = <span class="cstat-no" title="statement not covered" >new Date().toISOString();</span>
 &nbsp;
         // Update the in-memory price cache for immediate display
-<span class="cstat-no" title="statement not covered" >        priceCache[cleanSymbol] = {</span>
+<span class="cstat-no" title="statement not covered" >        priceCache[cleanTicker] = {</span>
             price: price,
             previous_close_price: previousClose,
             prev_close_source: 'yahoo',
@@ -3258,7 +3258,7 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
         // Broadcast to all connected clients for immediate UI update
 <span class="cstat-no" title="statement not covered" >        io.emit('price_update', priceCache);</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >        console.log(`[FetchPrice] Updated price cache for ${cleanSymbol}: $${price}`);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[FetchPrice] Updated price cache for ${cleanTicker}: $${price}`);</span>
 &nbsp;
         // Publish to Kafka so the consumer persists to MySQL
         let kafkaPublished = <span class="cstat-no" title="statement not covered" >false;</span>
@@ -3274,9 +3274,9 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
             // Format message to match what the Kafka consumer expects
             // Consumer uses data.get('key') for the ticker
             const kafkaMessage = <span class="cstat-no" title="statement not covered" >{</span>
-                key: cleanSymbol,                    // Required by consumer
-                symbol: cleanSymbol,
-                normalized_key: cleanSymbol,
+                key: cleanTicker,                    // Required by consumer
+                ticker: cleanTicker,
+                normalized_key: cleanTicker,
                 regular_price: price,
                 previous_close_price: previousClose,
                 currency: quote.currency || 'USD',
@@ -3288,21 +3288,21 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
 <span class="cstat-no" title="statement not covered" >            await producer.send({</span>
                 topic: process.env.KAFKA_TOPIC || 'price_data',
                 messages: [{
-                    key: cleanSymbol,
+                    key: cleanTicker,
                     value: JSON.stringify(kafkaMessage)
                 }]
             });
             
 <span class="cstat-no" title="statement not covered" >            await producer.disconnect();</span>
 <span class="cstat-no" title="statement not covered" >            kafkaPublished = true;</span>
-<span class="cstat-no" title="statement not covered" >            console.log(`[FetchPrice] Published ${cleanSymbol} to Kafka for persistence`);</span>
+<span class="cstat-no" title="statement not covered" >            console.log(`[FetchPrice] Published ${cleanTicker} to Kafka for persistence`);</span>
         } catch (kafkaErr) {
-<span class="cstat-no" title="statement not covered" >            console.error(`[FetchPrice] Kafka publish failed for ${cleanSymbol}:`, kafkaErr.message);</span>
+<span class="cstat-no" title="statement not covered" >            console.error(`[FetchPrice] Kafka publish failed for ${cleanTicker}:`, kafkaErr.message);</span>
             // Don't fail the request - price is already in cache for immediate display
         }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        res.json({</span>
-            symbol: cleanSymbol,
+            ticker: cleanTicker,
             price: price,
             previousClose: previousClose,
             currency: quote.currency || 'USD',
@@ -3312,10 +3312,10 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
         });
 &nbsp;
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error(`[FetchPrice] Error fetching price for ${cleanSymbol}:`, error.message);</span>
+<span class="cstat-no" title="statement not covered" >        console.error(`[FetchPrice] Error fetching price for ${cleanTicker}:`, error.message);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({</span>
             error: error.message,
-            symbol: cleanSymbol
+            ticker: cleanTicker
         });
     }
 });
@@ -3420,10 +3420,10 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
             // Insert positions
 <span class="cstat-no" title="statement not covered" >            for (const position of positions) {</span>
 <span class="cstat-no" title="statement not covered" >                await pool.execute(</span>
-                    'INSERT INTO positions (account_id, symbol, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO positions (account_id, ticker, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         position.account_id,
-                        position.symbol,
+                        position.ticker,
                         position.quantity,
                         position.type,
                         position.exchange || null,
@@ -3526,11 +3526,11 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
 &nbsp;
 // Positions
 <span class="cstat-no" title="statement not covered" >app.post('/api/positions', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
-    const { account_id, symbol, type, quantity, currency } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+    const { account_id, ticker, type, quantity, currency } = <span class="cstat-no" title="statement not covered" >req.body;</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
         const [result] = <span class="cstat-no" title="statement not covered" >await pool.execute(</span>
-            'INSERT INTO positions (account_id, symbol, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
-            [account_id, symbol, type, quantity, currency || 'USD']
+            'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
+            [account_id, ticker, type, quantity, currency || 'USD']
         );
 <span class="cstat-no" title="statement not covered" >        assetsCache = null;</span>
 <span class="cstat-no" title="statement not covered" >        loadAssets();</span>
@@ -3541,11 +3541,11 @@ function <span class="fstat-no" title="function not covered" >triggerBondScrape(
 });
 &nbsp;
 <span class="cstat-no" title="statement not covered" >app.put('/api/positions/:id', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
-    const { symbol, type, quantity, currency } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+    const { ticker, type, quantity, currency } = <span class="cstat-no" title="statement not covered" >req.body;</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
 <span class="cstat-no" title="statement not covered" >        await pool.execute(</span>
-            'UPDATE positions SET symbol=?, type=?, quantity=?, currency=? WHERE id=?',
-            [symbol, type, quantity, currency || 'USD', req.params.id]
+            'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
+            [ticker, type, quantity, currency || 'USD', req.params.id]
         );
 <span class="cstat-no" title="statement not covered" >        assetsCache = null;</span>
 <span class="cstat-no" title="statement not covered" >        loadAssets();</span>
@@ -3655,7 +3655,7 @@ const isTestEnv = <span class="cstat-no" title="statement not covered" >process.
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-11T19:29:28.328Z
+                at 2025-12-13T00:16:57.361Z
             </div>
         <script src="../prettify.js"></script>
         <script>

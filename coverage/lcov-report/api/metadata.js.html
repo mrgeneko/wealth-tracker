@@ -721,7 +721,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// api/metadata.js
 // API endpoints for security metadata operations
-// Supports: symbol lookup, autocomplete, metadata prefetch, batch import
+// Supports: ticker lookup, autocomplete, metadata prefetch, batch import
 &nbsp;
 const express = <span class="cstat-no" title="statement not covered" >require('express');</span>
 const router = <span class="cstat-no" title="statement not covered" >express.Router();</span>
@@ -742,7 +742,7 @@ async function <span class="fstat-no" title="function not covered" >getDbConnect
 }
 &nbsp;
 // Helper to fetch metadata using the populate script
-async function <span class="fstat-no" title="function not covered" >fetchMetadataForSymbol(</span>symbol) {
+async function <span class="fstat-no" title="function not covered" >fetchMetadataForTicker(</span>ticker) {
 <span class="cstat-no" title="statement not covered" >    try {</span>
         const path = <span class="cstat-no" title="statement not covered" >require('path');</span>
         
@@ -754,13 +754,13 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 <span class="cstat-no" title="statement not covered" >        console.log(`[Metadata] Running script: ${scriptPath} from cwd: ${cwd}`);</span>
         
         const { stdout, stderr } = <span class="cstat-no" title="statement not covered" >await execPromise(</span>
-            `node "${scriptPath}" --symbol ${symbol}`,
+            `node "${scriptPath}" --ticker ${ticker}`,
             { cwd }
         );
-<span class="cstat-no" title="statement not covered" >        console.log(`[Metadata] Fetched metadata for ${symbol}`);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`[Metadata] Fetched metadata for ${ticker}`);</span>
 <span class="cstat-no" title="statement not covered" >        return { success: true, output: stdout };</span>
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error(`Failed to fetch metadata for ${symbol}:`, error.message);</span>
+<span class="cstat-no" title="statement not covered" >        console.error(`Failed to fetch metadata for ${ticker}:`, error.message);</span>
 <span class="cstat-no" title="statement not covered" >        if (error.stderr) {</span>
 <span class="cstat-no" title="statement not covered" >            console.error(`[Metadata] stderr:`, error.stderr);</span>
         }
@@ -769,24 +769,24 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 }
 &nbsp;
 /**
- * GET /api/metadata/lookup/:symbol
+ * GET /api/metadata/lookup/:ticker
  * Quick lookup - returns metadata if exists, triggers fetch if not
- * Used for: Autocomplete, symbol validation, "Add Position" modal
+ * Used for: Autocomplete, ticker validation, "Add Position" modal
  */
-<span class="cstat-no" title="statement not covered" >router.get('/lookup/:symbol', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
-    const symbol = <span class="cstat-no" title="statement not covered" >req.params.symbol.toUpperCase();</span>
+<span class="cstat-no" title="statement not covered" >router.get('/lookup/:ticker', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
+    const ticker = <span class="cstat-no" title="statement not covered" >req.params.ticker.toUpperCase();</span>
     const connection = <span class="cstat-no" title="statement not covered" >await getDbConnection();</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
         // Check if metadata exists
         const [rows] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
             `SELECT 
-        symbol, quote_type, type_display, short_name, long_name,
+        ticker, quote_type, type_display, short_name, long_name,
             exchange, currency, market_cap, dividend_yield, trailing_pe,
             ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE symbol = ?`,
-            [symbol]
+       WHERE ticker = ?`,
+            [ticker]
         );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        if (rows.length &gt; 0) {</span>
@@ -800,13 +800,13 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 <span class="cstat-no" title="statement not covered" >            res.json({</span>
                 exists: false,
                 message: 'Fetching metadata...',
-                symbol: symbol
+                ticker: ticker
             });
 &nbsp;
             // Fetch asynchronously (don't wait)
-<span class="cstat-no" title="statement not covered" >            fetchMetadataForSymbol(symbol).then(<span class="fstat-no" title="function not covered" >re</span>sult =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >            fetchMetadataForTicker(ticker).then(<span class="fstat-no" title="function not covered" >re</span>sult =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >                if (result.success) {</span>
-<span class="cstat-no" title="statement not covered" >                    console.log(`✓ Background fetch completed for ${symbol}`);</span>
+<span class="cstat-no" title="statement not covered" >                    console.log(`✓ Background fetch completed for ${ticker}`);</span>
                 }
             });
         }
@@ -819,36 +819,36 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 &nbsp;
 /**
  * POST /api/metadata/prefetch
- * Prefetch metadata for a symbol (blocks until complete)
- * Used for: "Add Position" modal when user selects symbol
+ * Prefetch metadata for a ticker (blocks until complete)
+ * Used for: "Add Position" modal when user selects ticker
  */
 <span class="cstat-no" title="statement not covered" >router.post('/prefetch', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
-    const { symbol } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+    const { ticker } = <span class="cstat-no" title="statement not covered" >req.body;</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (!symbol) {</span>
-<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ error: 'Symbol is required' });</span>
+<span class="cstat-no" title="statement not covered" >    if (!ticker) {</span>
+<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ error: 'Ticker is required' });</span>
     }
 &nbsp;
-    const normalizedSymbol = <span class="cstat-no" title="statement not covered" >symbol.toUpperCase();</span>
+    const normalizedTicker = <span class="cstat-no" title="statement not covered" >ticker.toUpperCase();</span>
     const connection = <span class="cstat-no" title="statement not covered" >await getDbConnection();</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
         // Check if already exists
         const [existing] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
-            'SELECT symbol FROM securities_metadata WHERE symbol = ?',
-            [normalizedSymbol]
+            'SELECT ticker FROM securities_metadata WHERE ticker = ?',
+            [normalizedTicker]
         );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        if (existing.length &gt; 0) {</span>
             // Already have it
             const [metadata] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
                 `SELECT 
-          symbol, quote_type, type_display, short_name, long_name,
+          ticker, quote_type, type_display, short_name, long_name,
               exchange, currency, region, market_cap, dividend_yield,
               ttm_dividend_amount, ttm_eps
          FROM securities_metadata 
-         WHERE symbol = ?`,
-                [normalizedSymbol]
+         WHERE ticker = ?`,
+                [normalizedTicker]
             );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >            return res.json({</span>
@@ -858,25 +858,25 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
         }
 &nbsp;
         // Fetch it now (user waits ~1-2 seconds)
-<span class="cstat-no" title="statement not covered" >        console.log(`Prefetching metadata for ${normalizedSymbol}...`);</span>
-        const result = <span class="cstat-no" title="statement not covered" >await fetchMetadataForSymbol(normalizedSymbol);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(`Prefetching metadata for ${normalizedTicker}...`);</span>
+        const result = <span class="cstat-no" title="statement not covered" >await fetchMetadataForTicker(normalizedTicker);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        if (!result.success) {</span>
 <span class="cstat-no" title="statement not covered" >            return res.status(404).json({</span>
-                error: 'Symbol not found in Yahoo Finance',
-                symbol: normalizedSymbol
+                error: 'Ticker not found in Yahoo Finance',
+                ticker: normalizedTicker
             });
         }
 &nbsp;
         // Retrieve the newly inserted metadata
         const [metadata] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
             `SELECT 
-        symbol, quote_type, type_display, short_name, long_name,
+        ticker, quote_type, type_display, short_name, long_name,
         exchange, currency, region, market_cap, dividend_yield,
         ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE symbol = ?`,
-            [normalizedSymbol]
+       WHERE ticker = ?`,
+            [normalizedTicker]
         );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        res.json({</span>
@@ -893,8 +893,8 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 &nbsp;
 /**
  * GET /api/metadata/autocomplete?q=AAPL
- * Autocomplete search for symbols
- * Searches symbol_registry (populated from exchange CSV files)
+ * Autocomplete search for tickers
+ * Searches ticker_registry (populated from exchange CSV files)
  */
 <span class="cstat-no" title="statement not covered" >router.get('/autocomplete', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
     const query = <span class="cstat-no" title="statement not covered" >(req.query.q || '').toUpperCase();</span>
@@ -906,27 +906,27 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
     const connection = <span class="cstat-no" title="statement not covered" >await getDbConnection();</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
-        // Search symbol_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
+        // Search ticker_registry (populated from NASDAQ/NYSE/OTHER/TREASURY CSV files)
         const [rows] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
             `SELECT 
-                symbol, name, security_type, exchange
-            FROM symbol_registry 
-            WHERE symbol LIKE ? OR name LIKE ?
+                ticker, name, security_type, exchange
+            FROM ticker_registry 
+            WHERE ticker LIKE ? OR name LIKE ?
             ORDER BY 
                 CASE 
-                    WHEN symbol = ? THEN 1
-                    WHEN symbol LIKE ? THEN 2
+                    WHEN ticker = ? THEN 1
+                    WHEN ticker LIKE ? THEN 2
                     WHEN name LIKE ? THEN 3
                     ELSE 4
                 END,
-                symbol
+                ticker
             LIMIT 20`,
             [`${query}%`, `%${query}%`, query, `${query}%`, `%${query}%`]
         );
 &nbsp;
         const results = <span class="cstat-no" title="statement not covered" >rows.map(<span class="fstat-no" title="function not covered" >ro</span>w =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
-            symbol: row.symbol,
-            name: row.name || row.symbol,
+            symbol: row.ticker,
+            name: row.name || row.ticker,
             type: row.security_type,
             exchange: row.exchange,
             source: 'registry'
@@ -944,32 +944,32 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 &nbsp;
 /**
  * POST /api/metadata/batch-prefetch
- * Prefetch metadata for multiple symbols (for import feature)
- * Returns status for each symbol
+ * Prefetch metadata for multiple tickers (for import feature)
+ * Returns status for each ticker
  */
 <span class="cstat-no" title="statement not covered" >router.post('/batch-prefetch', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {</span>
-    const { symbols } = <span class="cstat-no" title="statement not covered" >req.body;</span>
+    const { tickers } = <span class="cstat-no" title="statement not covered" >req.body;</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (!Array.isArray(symbols) || symbols.length === 0) {</span>
-<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ error: 'Symbols array is required' });</span>
+<span class="cstat-no" title="statement not covered" >    if (!Array.isArray(tickers) || tickers.length === 0) {</span>
+<span class="cstat-no" title="statement not covered" >        return res.status(400).json({ error: 'Tickers array is required' });</span>
     }
 &nbsp;
     const connection = <span class="cstat-no" title="statement not covered" >await getDbConnection();</span>
     const results = <span class="cstat-no" title="statement not covered" >[];</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
-<span class="cstat-no" title="statement not covered" >        for (const symbol of symbols) {</span>
-            const normalizedSymbol = <span class="cstat-no" title="statement not covered" >symbol.toUpperCase();</span>
+<span class="cstat-no" title="statement not covered" >        for (const ticker of tickers) {</span>
+            const normalizedTicker = <span class="cstat-no" title="statement not covered" >ticker.toUpperCase();</span>
 &nbsp;
             // Check if exists
             const [existing] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
-                'SELECT symbol FROM securities_metadata WHERE symbol = ?',
-                [normalizedSymbol]
+                'SELECT ticker FROM securities_metadata WHERE ticker = ?',
+                [normalizedTicker]
             );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >            if (existing.length &gt; 0) {</span>
 <span class="cstat-no" title="statement not covered" >                results.push({</span>
-                    symbol: normalizedSymbol,
+                    ticker: normalizedTicker,
                     status: 'cached',
                     message: 'Metadata already exists'
                 });
@@ -977,20 +977,20 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
             }
 &nbsp;
             // Fetch it
-<span class="cstat-no" title="statement not covered" >            console.log(`Fetching metadata for ${normalizedSymbol}...`);</span>
-            const result = <span class="cstat-no" title="statement not covered" >await fetchMetadataForSymbol(normalizedSymbol);</span>
+<span class="cstat-no" title="statement not covered" >            console.log(`Fetching metadata for ${normalizedTicker}...`);</span>
+            const result = <span class="cstat-no" title="statement not covered" >await fetchMetadataForTicker(normalizedTicker);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >            if (result.success) {</span>
 <span class="cstat-no" title="statement not covered" >                results.push({</span>
-                    symbol: normalizedSymbol,
+                    ticker: normalizedTicker,
                     status: 'fetched',
                     message: 'Metadata retrieved successfully'
                 });
             } else {
 <span class="cstat-no" title="statement not covered" >                results.push({</span>
-                    symbol: normalizedSymbol,
+                    ticker: normalizedTicker,
                     status: 'failed',
-                    message: 'Symbol not found in Yahoo Finance'
+                    message: 'Ticker not found in Yahoo Finance'
                 });
             }
 &nbsp;
@@ -999,7 +999,7 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
         }
 &nbsp;
         const summary = <span class="cstat-no" title="statement not covered" >{</span>
-            total: symbols.length,
+            total: tickers.length,
             cached: results.filter(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.status === 'cached')</span>.length,
             fetched: results.filter(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.status === 'fetched')</span>.length,
             failed: results.filter(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.status === 'failed')</span>.length
@@ -1024,15 +1024,15 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
         const [rows] = <span class="cstat-no" title="statement not covered" >await connection.execute(`</span>
-      SELECT DISTINCT p.symbol
+      SELECT DISTINCT p.ticker
       FROM positions p
-      LEFT JOIN securities_metadata sm ON p.symbol = sm.symbol
-      WHERE p.symbol IS NOT NULL 
-        AND p.symbol != 'CASH'
-        AND sm.symbol IS NULL
+      LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker
+      WHERE p.ticker IS NOT NULL 
+        AND p.ticker != 'CASH'
+        AND sm.ticker IS NULL
     `);
 &nbsp;
-        const missingSymbols = <span class="cstat-no" title="statement not covered" >rows.map(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.symbol)</span>;</span>
+        const missingTickers = <span class="cstat-no" title="statement not covered" >rows.map(<span class="fstat-no" title="function not covered" >r </span>=&gt; <span class="cstat-no" title="statement not covered" >r.ticker)</span>;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        res.json({</span>
             count: missingSymbols.length,
@@ -1054,7 +1054,7 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-11T19:29:28.328Z
+                at 2025-12-13T00:16:57.361Z
             </div>
         <script src="../prettify.js"></script>
         <script>

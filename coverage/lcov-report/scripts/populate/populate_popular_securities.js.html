@@ -663,16 +663,16 @@ async function <span class="fstat-no" title="function not covered" >getDbConnect
 &nbsp;
 async function <span class="fstat-no" title="function not covered" >checkIfMetadataExists(</span>connection, symbol) {
     const [rows] = <span class="cstat-no" title="statement not covered" >await connection.execute(</span>
-        'SELECT symbol, last_updated FROM securities_metadata WHERE symbol = ?',
+        'SELECT ticker, last_updated FROM securities_metadata WHERE ticker = ?',
         [symbol]
     );
 <span class="cstat-no" title="statement not covered" >    return rows.length &gt; 0 ? rows[0] : null;</span>
 }
 &nbsp;
-async function <span class="fstat-no" title="function not covered" >fetchMetadataForSymbol(</span>symbol) {
+async function <span class="fstat-no" title="function not covered" >fetchMetadataForTicker(</span>ticker) {
 <span class="cstat-no" title="statement not covered" >    try {</span>
         const { stdout, stderr } = <span class="cstat-no" title="statement not covered" >await execPromise(</span>
-            `node scripts/populate/populate_securities_metadata.js --symbol ${symbol}`,
+            `node scripts/populate/populate_securities_metadata.js --ticker ${symbol}`,
             { cwd: path.join(__dirname, '../..'), timeout: 10000 }
         );
 <span class="cstat-no" title="statement not covered" >        return { success: true, output: stdout };</span>
@@ -681,7 +681,7 @@ async function <span class="fstat-no" title="function not covered" >fetchMetadat
     }
 }
 &nbsp;
-async function <span class="fstat-no" title="function not covered" >processSymbolList(</span>connection, symbols, options = <span class="branch-0 cbranch-no" title="branch not covered" >{})</span> {
+async function <span class="fstat-no" title="function not covered" >processSymbolList(</span>connection, tickers, options = <span class="branch-0 cbranch-no" title="branch not covered" >{})</span> {
     const {
         skipExisting = <span class="branch-0 cbranch-no" title="branch not covered" >true,</span>
         maxAge = <span class="branch-0 cbranch-no" title="branch not covered" >7 * 24 * 60 * 60 * 1000,</span> // 7 days in milliseconds
@@ -689,56 +689,56 @@ async function <span class="fstat-no" title="function not covered" >processSymbo
     } = <span class="cstat-no" title="statement not covered" >options;</span>
 &nbsp;
     const results = <span class="cstat-no" title="statement not covered" >{</span>
-        total: symbols.length,
+        total: tickers.length,
         skipped: 0,
         fetched: 0,
         failed: 0,
         errors: []
     };
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; symbols.length; i++) {</span>
-        const symbol = <span class="cstat-no" title="statement not covered" >symbols[i];</span>
-        const progress = <span class="cstat-no" title="statement not covered" >`[${i + 1}/${symbols.length}]`;</span>
+<span class="cstat-no" title="statement not covered" >    for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; tickers.length; i++) {</span>
+        const ticker = <span class="cstat-no" title="statement not covered" >tickers[i];</span>
+        const progress = <span class="cstat-no" title="statement not covered" >`[${i + 1}/${tickers.length}]`;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        if (onProgress) {</span>
-<span class="cstat-no" title="statement not covered" >            onProgress({ current: i + 1, total: symbols.length, symbol });</span>
+<span class="cstat-no" title="statement not covered" >            onProgress({ current: i + 1, total: tickers.length, ticker });</span>
         }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        try {</span>
             // Check if metadata exists
-            const existing = <span class="cstat-no" title="statement not covered" >await checkIfMetadataExists(connection, symbol);</span>
+            const existing = <span class="cstat-no" title="statement not covered" >await checkIfMetadataExists(connection, ticker);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >            if (existing &amp;&amp; skipExisting) {</span>
                 // Check if it's recent enough
                 const age = <span class="cstat-no" title="statement not covered" >Date.now() - new Date(existing.last_updated).getTime();</span>
 <span class="cstat-no" title="statement not covered" >                if (age &lt; maxAge) {</span>
-<span class="cstat-no" title="statement not covered" >                    console.log(`${progress} ${symbol} - Skipped (cached, ${Math.floor(age / (24 * 60 * 60 * 1000))} days old)`);</span>
+<span class="cstat-no" title="statement not covered" >                    console.log(`${progress} ${ticker} - Skipped (cached, ${Math.floor(age / (24 * 60 * 60 * 1000))} days old)`);</span>
 <span class="cstat-no" title="statement not covered" >                    results.skipped++;</span>
 <span class="cstat-no" title="statement not covered" >                    continue;</span>
                 }
             }
 &nbsp;
             // Fetch metadata
-<span class="cstat-no" title="statement not covered" >            console.log(`${progress} ${symbol} - Fetching...`);</span>
-            const result = <span class="cstat-no" title="statement not covered" >await fetchMetadataForSymbol(symbol);</span>
+<span class="cstat-no" title="statement not covered" >            console.log(`${progress} ${ticker} - Fetching...`);</span>
+            const result = <span class="cstat-no" title="statement not covered" >await fetchMetadataForTicker(ticker);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >            if (result.success) {</span>
-<span class="cstat-no" title="statement not covered" >                console.log(`${progress} ${symbol} - ✓ Success`);</span>
+<span class="cstat-no" title="statement not covered" >                console.log(`${progress} ${ticker} - ✓ Success`);</span>
 <span class="cstat-no" title="statement not covered" >                results.fetched++;</span>
             } else {
-<span class="cstat-no" title="statement not covered" >                console.log(`${progress} ${symbol} - ✗ Failed: ${result.error}`);</span>
+<span class="cstat-no" title="statement not covered" >                console.log(`${progress} ${ticker} - ✗ Failed: ${result.error}`);</span>
 <span class="cstat-no" title="statement not covered" >                results.failed++;</span>
-<span class="cstat-no" title="statement not covered" >                results.errors.push({ symbol, error: result.error });</span>
+<span class="cstat-no" title="statement not covered" >                results.errors.push({ ticker, error: result.error });</span>
             }
 &nbsp;
         } catch (error) {
-<span class="cstat-no" title="statement not covered" >            console.error(`${progress} ${symbol} - ✗ Error: ${error.message}`);</span>
+<span class="cstat-no" title="statement not covered" >            console.error(`${progress} ${ticker} - ✗ Error: ${error.message}`);</span>
 <span class="cstat-no" title="statement not covered" >            results.failed++;</span>
-<span class="cstat-no" title="statement not covered" >            results.errors.push({ symbol, error: error.message });</span>
+<span class="cstat-no" title="statement not covered" >            results.errors.push({ ticker, error: error.message });</span>
         }
 &nbsp;
         // Throttle to avoid overwhelming the API
-<span class="cstat-no" title="statement not covered" >        if (i &lt; symbols.length - 1) {</span>
+<span class="cstat-no" title="statement not covered" >        if (i &lt; tickers.length - 1) {</span>
 <span class="cstat-no" title="statement not covered" >            await sleep(THROTTLE_DELAY_MS);</span>
         }
     }
@@ -859,7 +859,7 @@ async function <span class="fstat-no" title="function not covered" >main(</span>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-11T19:29:28.328Z
+                at 2025-12-13T00:16:57.361Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

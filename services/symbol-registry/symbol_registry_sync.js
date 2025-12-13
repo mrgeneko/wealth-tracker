@@ -186,7 +186,7 @@ class SymbolRegistrySyncService {
    */
   symbolToRegistryFormat(symbolData) {
     return {
-      symbol: symbolData.ticker,  // 'ticker' from CSV is mapped to 'ticker' in DB
+      ticker: symbolData.ticker,  // 'ticker' from CSV is mapped to 'ticker' in DB
       name: symbolData.name,
       exchange: symbolData.exchange,
       security_type: symbolData.security_type,
@@ -196,7 +196,7 @@ class SymbolRegistrySyncService {
       issue_date: null,
       maturity_date: null,
       security_term: null,
-      underlying_symbol: null,
+      underlying_ticker: null,
       strike_price: null,
       option_type: null,
       expiration_date: null
@@ -296,16 +296,16 @@ class SymbolRegistrySyncService {
           last_refresh_duration_ms,
           last_refresh_status,
           last_error_message,
-          symbols_added,
-          symbols_updated
+          tickers_added,
+          tickers_updated
         ) VALUES (?, NOW(), ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           last_refresh_at = NOW(),
           last_refresh_duration_ms = VALUES(last_refresh_duration_ms),
           last_refresh_status = VALUES(last_refresh_status),
           last_error_message = VALUES(last_error_message),
-          symbols_added = VALUES(symbols_added),
-          symbols_updated = VALUES(symbols_updated)
+          tickers_added = VALUES(tickers_added),
+          tickers_updated = VALUES(tickers_updated)
       `, [fileType, durationMs, status, errorMessage, symbolsAdded || 0, symbolsUpdated || 0]);
     } catch (err) {
       console.error('[SymbolRegistrySync] Error updating file refresh status:', err.message);
@@ -392,7 +392,7 @@ class SymbolRegistrySyncService {
       INSERT INTO ticker_registry (
         ticker, name, exchange, security_type, source, has_yahoo_metadata, 
         usd_trading_volume, sort_rank, issue_date, maturity_date, security_term, 
-        underlying_symbol, strike_price, option_type, expiration_date
+        underlying_ticker, strike_price, option_type, expiration_date
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -403,7 +403,7 @@ class SymbolRegistrySyncService {
     );
 
     await conn.query(sql, [
-      symbolData.symbol,
+      symbolData.ticker,
       symbolData.name,
       symbolData.exchange,
       symbolData.security_type,
@@ -414,7 +414,7 @@ class SymbolRegistrySyncService {
       symbolData.issue_date || null,
       symbolData.maturity_date || null,
       symbolData.security_term || null,
-      symbolData.underlying_symbol || null,
+      symbolData.underlying_ticker || null,
       symbolData.strike_price || null,
       symbolData.option_type || null,
       symbolData.expiration_date || null
