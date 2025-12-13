@@ -88,9 +88,7 @@ function debug(...args) {
 // Services are installed at /services/ in Docker, or ../services/ in local dev
 const serviceBasePath = process.env.NODE_ENV === 'development' 
     ? path.join(__dirname, '../services')
-    : '/services';
-
-debug('Loading services from:', serviceBasePath);
+    : '/app/services';
 
 const YahooMetadataPopulator = require(path.join(serviceBasePath, 'symbol-registry/yahoo_metadata_populator.js'));
 const SymbolRegistryService = require(path.join(serviceBasePath, 'symbol-registry/ticker_registry_service.js'));
