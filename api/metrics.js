@@ -42,9 +42,9 @@ router.get('/summary', requirePool, async (req, res) => {
             SELECT 
                 source,
                 metric_date,
-                total_symbols,
-                symbols_with_yahoo_metadata,
-                symbols_without_yahoo_metadata,
+                total_tickers,
+                tickers_with_yahoo_metadata,
+                tickers_without_yahoo_metadata,
                 last_file_refresh_at,
                 file_download_duration_ms,
                 avg_yahoo_fetch_duration_ms,
@@ -131,9 +131,9 @@ router.get('/history', requirePool, async (req, res) => {
             SELECT 
                 metric_date,
                 source,
-                total_symbols,
-                symbols_with_yahoo_metadata,
-                symbols_without_yahoo_metadata,
+                total_tickers,
+                tickers_with_yahoo_metadata,
+                tickers_without_yahoo_metadata,
                 file_download_duration_ms,
                 avg_yahoo_fetch_duration_ms,
                 errors_count
@@ -159,8 +159,8 @@ router.get('/history', requirePool, async (req, res) => {
                 byDate[dateKey] = { date: dateKey, sources: {} };
             }
             byDate[dateKey].sources[row.source] = {
-                totalSymbols: row.total_symbols,
-                withMetadata: row.symbols_with_yahoo_metadata,
+                totalTickers: row.total_tickers,
+                withMetadata: row.tickers_with_yahoo_metadata,
                 downloadDuration: row.file_download_duration_ms,
                 fetchDuration: row.avg_yahoo_fetch_duration_ms,
                 errors: row.errors_count
@@ -269,9 +269,9 @@ router.post('/record', requirePool, async (req, res) => {
             INSERT INTO ticker_registry_metrics (
                 metric_date,
                 source,
-                total_symbols,
-                symbols_with_yahoo_metadata,
-                symbols_without_yahoo_metadata,
+                total_tickers,
+                tickers_with_yahoo_metadata,
+                tickers_without_yahoo_metadata,
                 last_file_refresh_at,
                 file_download_duration_ms,
                 avg_yahoo_fetch_duration_ms,
@@ -280,9 +280,9 @@ router.post('/record', requirePool, async (req, res) => {
                 CURDATE(), ?, ?, ?, ?, NOW(), ?, ?, ?
             )
             ON DUPLICATE KEY UPDATE
-                total_symbols = VALUES(total_symbols),
-                symbols_with_yahoo_metadata = VALUES(symbols_with_yahoo_metadata),
-                symbols_without_yahoo_metadata = VALUES(symbols_without_yahoo_metadata),
+                total_tickers = VALUES(total_tickers),
+                tickers_with_yahoo_metadata = VALUES(tickers_with_yahoo_metadata),
+                tickers_without_yahoo_metadata = VALUES(tickers_without_yahoo_metadata),
                 last_file_refresh_at = VALUES(last_file_refresh_at),
                 file_download_duration_ms = VALUES(file_download_duration_ms),
                 avg_yahoo_fetch_duration_ms = VALUES(avg_yahoo_fetch_duration_ms),
