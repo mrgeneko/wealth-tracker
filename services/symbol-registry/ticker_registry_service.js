@@ -106,7 +106,7 @@ class SymbolRegistryService {
         issue_date = null,
         maturity_date = null,
         security_term = null,
-        underlying_symbol = null,
+        underlying_ticker = null,
         strike_price = null,
         option_type = null,
         expiration_date = null
@@ -130,11 +130,11 @@ class SymbolRegistryService {
              SET name = ?, exchange = ?, security_type = ?, source = ?, 
                  has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?,
                  issue_date = ?, maturity_date = ?, security_term = ?,
-                 underlying_symbol = ?, strike_price = ?, option_type = ?, expiration_date = ?,
+                 underlying_ticker = ?, strike_price = ?, option_type = ?, expiration_date = ?,
                  updated_at = CURRENT_TIMESTAMP
              WHERE ticker = ?`,
             [name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sortRank,
-             issue_date, maturity_date, security_term, underlying_symbol, strike_price, option_type, expiration_date,
+             issue_date, maturity_date, security_term, underlying_ticker, strike_price, option_type, expiration_date,
              symbol]
           );
         } else {
@@ -153,10 +153,10 @@ class SymbolRegistryService {
         await conn.query(
           `INSERT INTO ticker_registry 
            (ticker, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sort_rank,
-            issue_date, maturity_date, security_term, underlying_symbol, strike_price, option_type, expiration_date)
+            issue_date, maturity_date, security_term, underlying_ticker, strike_price, option_type, expiration_date)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [symbol, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sortRank,
-           issue_date, maturity_date, security_term, underlying_symbol, strike_price, option_type, expiration_date]
+           issue_date, maturity_date, security_term, underlying_ticker, strike_price, option_type, expiration_date]
         );
       }
     } finally {
@@ -274,14 +274,14 @@ class SymbolRegistryService {
       await conn.query(
         `INSERT INTO file_refresh_status 
          (file_type, last_refresh_at, last_refresh_duration_ms, last_refresh_status, 
-          symbols_added, symbols_updated, last_error_message, next_refresh_due_at, updated_at)
+          tickers_added, tickers_updated, last_error_message, next_refresh_due_at, updated_at)
          VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? HOUR), CURRENT_TIMESTAMP)
          ON DUPLICATE KEY UPDATE
           last_refresh_at = CURRENT_TIMESTAMP,
           last_refresh_duration_ms = VALUES(last_refresh_duration_ms),
           last_refresh_status = VALUES(last_refresh_status),
-          symbols_added = VALUES(symbols_added),
-          symbols_updated = VALUES(symbols_updated),
+          tickers_added = VALUES(tickers_added),
+          tickers_updated = VALUES(tickers_updated),
           last_error_message = VALUES(last_error_message),
           next_refresh_due_at = VALUES(next_refresh_due_at),
           updated_at = CURRENT_TIMESTAMP`,
