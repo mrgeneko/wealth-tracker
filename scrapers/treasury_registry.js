@@ -1,49 +1,98 @@
-const fs = require('fs');
-const path = require('path');
-const { parse } = require('csv-parse/sync');
 const { normalizedKey } = require('./scraper_utils');
 
-const CONFIG_DIR = path.join(__dirname, '../config');
-const TREASURY_FILE = path.join(CONFIG_DIR, 'us-treasury-auctions.csv');
+/**
+ * Treasury Registry
+ *
+ * Provides lookup functionality for treasury securities (bonds, bills, notes).
+ *
+ * Data source: Database (ticker_registry table)
+ *
+ * @module scrapers/treasury_registry
+ */
 
+let dbPool = null;
 let treasuryCache = null;
 
-function loadTreasuryData() {
+/**
+ * Initialize database connection
+ * @param {Object} pool - MySQL connection pool
+ */
+function initializeDbPool(pool) {
+    dbPool = pool;
+    treasuryCache = null;
+}
+
+/**
+ * Load treasury tickers/CUSIPs into cache
+ * @returns {Promise<Set<string>>} Set of treasury tickers/CUSIPs
+ */
+async function loadTreasuryCache() {
     if (treasuryCache) return treasuryCache;
-    const cache = new Set();
-    try {
-        if (fs.existsSync(TREASURY_FILE)) {
-            const content = fs.readFileSync(TREASURY_FILE);
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            // Treasury CSV header: e.g. Security Type, Cusip, etc.
-            records.forEach(record => {
-                // Use CUSIP as unique identifier if present
-                if (record.Cusip) {
-                    cache.add(record.Cusip.trim().toUpperCase());
-                }
-                // Optionally, add other identifiers (e.g. Issue Date, Security Type)
-            });
-        }
-    } catch (e) {
-        console.error('Error loading treasury data:', e.message);
+
+    if (!dbPool) {
+        throw new Error('Database pool not initialized. Call initializeDbPool() first.');
     }
-    treasuryCache = cache;
-    return cache;
+
+    const conn = await dbPool.getConnection();
+    try {
+        const [rows] = await conn.execute(
+            "SELECT ticker FROM ticker_registry WHERE security_type = 'TREASURY'"
+        );
+        treasuryCache = new Set((rows || []).map(r => String(r.ticker || '').toUpperCase()).filter(Boolean));
+        console.log(`[TreasuryRegistry] Loaded ${treasuryCache.size} treasury securities from database`);
+        return treasuryCache;
+    } finally {
+        conn.release();
+    }
 }
 
 /**
  * Determines if a ticker (CUSIP) is a US Treasury security.
  * @param {string} ticker - The CUSIP or identifier
- * @returns {boolean} - true if found in treasury listings
+ * @returns {Promise<boolean>} true if found in treasury listings
  */
-function isTreasury(ticker) {
+async function isTreasury(ticker) {
     if (!ticker) return false;
-    const normalized = ticker.trim().toUpperCase();
-    const data = loadTreasuryData();
-    return data.has(normalized);
+    const normalized = String(ticker).trim().toUpperCase();
+    const cache = await loadTreasuryCache();
+    return cache.has(normalized);
+}
+
+/**
+ * Get treasury security details
+ * @param {string} ticker - Ticker/CUSIP
+ * @returns {Promise<Object|null>} Treasury details or null
+ */
+async function getTreasuryDetails(ticker) {
+    if (!ticker) return null;
+
+    if (!dbPool) {
+        throw new Error('Database pool not initialized. Call initializeDbPool() first.');
+    }
+
+    const conn = await dbPool.getConnection();
+    try {
+        const [rows] = await conn.execute(
+            `SELECT ticker, name, issue_date, maturity_date, security_term
+       FROM ticker_registry
+       WHERE ticker = ? AND security_type = 'TREASURY'
+       LIMIT 1`,
+            [String(ticker).toUpperCase()]
+        );
+
+        if (rows && rows.length > 0) {
+            return {
+                cusip: rows[0].ticker,
+                name: rows[0].name,
+                issueDate: rows[0].issue_date,
+                maturityDate: rows[0].maturity_date,
+                securityTerm: rows[0].security_term
+            };
+        }
+        return null;
+    } finally {
+        conn.release();
+    }
 }
 
 // Utility: return a normalized identifier for a treasury ticker/CUSIP.
@@ -54,14 +103,16 @@ function normalizedIdentifier(ticker) {
     return normalizedKey(ticker);
 }
 
-function reloadTreasuryData() {
+async function reloadTreasuryData() {
     treasuryCache = null;
-    loadTreasuryData();
+    await loadTreasuryCache();
 }
 
 module.exports = {
     isTreasury,
     reloadTreasuryData,
-    loadTreasuryData
-    , normalizedIdentifier
+    loadTreasuryCache,
+    getTreasuryDetails,
+    initializeDbPool,
+    normalizedIdentifier
 };
