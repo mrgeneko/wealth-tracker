@@ -1,114 +1,122 @@
 /**
  * Unit tests for exchange_registry.js
- * Tests exchange lookup functionality
+ * Tests DB-backed exchange lookup functionality
  */
 
-const fs = require('fs');
-const path = require('path');
-const { 
-  getExchange, 
-  reloadExchangeData, 
+const {
+  getExchange,
+  reloadExchangeData,
   loadExchangeData,
-  normalizedTickerForLookup 
+  normalizedTickerForLookup,
+  initializeDbPool
 } = require('../../../scrapers/exchange_registry');
 
 describe('Exchange Registry', () => {
-  const CONFIG_DIR = path.join(__dirname, '../../../config');
-  const NASDAQ_FILE = path.join(CONFIG_DIR, 'nasdaq-listed.csv');
-  const NYSE_FILE = path.join(CONFIG_DIR, 'nyse-listed.csv');
+  let pool;
+  let connection;
+
+  const seededRows = [
+    { ticker: 'AAPL', exchange: 'NASDAQ' },
+    { ticker: 'BRK.B', exchange: 'NYSE' },
+    { ticker: 'JPM', exchange: 'NYSE' },
+    { ticker: 'VTI', exchange: 'OTHER' }
+  ];
 
   beforeEach(() => {
-    // Clear the cache before each test
+    connection = {
+      query: jest.fn().mockResolvedValue([seededRows]),
+      release: jest.fn()
+    };
+    pool = {
+      getConnection: jest.fn().mockResolvedValue(connection)
+    };
+
+    initializeDbPool(pool);
     reloadExchangeData();
   });
 
   describe('getExchange', () => {
-    test('returns NASDAQ for NASDAQ-listed stocks', () => {
-      // Assuming AAPL is in NASDAQ CSV
-      const exchange = getExchange('AAPL');
-      expect(exchange).toBeValidExchange();
-      if (exchange) {
-        expect(['NASDAQ', 'NYSE']).toContain(exchange);
-      }
-    });
-
-    test('returns NYSE for NYSE-listed stocks', () => {
-      // Assuming JPM or similar is in NYSE CSV
-      const exchange = getExchange('JPM');
+    test('returns NASDAQ for NASDAQ-listed stocks', async () => {
+      const exchange = await getExchange('AAPL');
+      expect(exchange).toBe('NASDAQ');
       expect(exchange).toBeValidExchange();
     });
 
-    test('returns null for invalid/unknown ticker', () => {
-      const exchange = getExchange('INVALID_TICKER_12345');
+    test('returns NYSE for NYSE-listed stocks', async () => {
+      const exchange = await getExchange('JPM');
+      expect(exchange).toBe('NYSE');
+      expect(exchange).toBeValidExchange();
+    });
+
+    test('returns OTHER for OTHER-listed stocks', async () => {
+      const exchange = await getExchange('VTI');
+      expect(exchange).toBe('OTHER');
+      expect(exchange).toBeValidExchange();
+    });
+
+    test('returns null for invalid/unknown ticker', async () => {
+      const exchange = await getExchange('INVALID_TICKER_12345');
       expect(exchange).toBeNull();
     });
 
-    test('handles null/undefined ticker', () => {
-      expect(getExchange(null)).toBeNull();
-      expect(getExchange(undefined)).toBeNull();
-      expect(getExchange('')).toBeNull();
+    test('handles null/undefined ticker', async () => {
+      await expect(getExchange(null)).resolves.toBeNull();
+      await expect(getExchange(undefined)).resolves.toBeNull();
+      await expect(getExchange('')).resolves.toBeNull();
     });
 
-    test('is case-insensitive', () => {
-      const upper = getExchange('AAPL');
-      const lower = getExchange('aapl');
-      const mixed = getExchange('AaPl');
+    test('is case-insensitive', async () => {
+      const upper = await getExchange('AAPL');
+      const lower = await getExchange('aapl');
+      const mixed = await getExchange('AaPl');
       expect(lower).toBe(upper);
       expect(mixed).toBe(upper);
     });
 
-    test('handles class shares with dots (BRK.B)', () => {
-      const exchange = getExchange('BRK.B');
+    test('handles class shares with dots (BRK.B)', async () => {
+      const exchange = await getExchange('BRK.B');
+      expect(exchange).toBe('NYSE');
       expect(exchange).toBeValidExchange();
     });
 
-    test('normalizes hyphens to dots for lookup', () => {
-      // Test that BRK-B is normalized to BRK.B
-      const exchangeWithDot = getExchange('BRK.B');
-      const exchangeWithDash = getExchange('BRK-B');
-      // Both should return the same result if BRK.B is in the CSV
-      if (exchangeWithDot) {
-        expect(exchangeWithDash).toBe(exchangeWithDot);
-      }
+    test('normalizes hyphens to dots for lookup', async () => {
+      const exchangeWithDot = await getExchange('BRK.B');
+      const exchangeWithDash = await getExchange('BRK-B');
+      expect(exchangeWithDash).toBe(exchangeWithDot);
     });
   });
 
   describe('loadExchangeData', () => {
-    test('returns an object with NASDAQ and NYSE sets', () => {
-      const data = loadExchangeData();
+    test('returns an object with NASDAQ/NYSE/OTHER sets', async () => {
+      const data = await loadExchangeData();
       expect(data).toHaveProperty('NASDAQ');
       expect(data).toHaveProperty('NYSE');
+      expect(data).toHaveProperty('OTHER');
       expect(data.NASDAQ).toBeInstanceOf(Set);
       expect(data.NYSE).toBeInstanceOf(Set);
+      expect(data.OTHER).toBeInstanceOf(Set);
     });
 
-    test('caches data on subsequent calls', () => {
-      const data1 = loadExchangeData();
-      const data2 = loadExchangeData();
+    test('caches data on subsequent calls', async () => {
+      const data1 = await loadExchangeData();
+      const data2 = await loadExchangeData();
       expect(data1).toBe(data2); // Same reference = cached
     });
 
-    test('loads data from CSV files if they exist', () => {
-      if (fs.existsSync(NASDAQ_FILE) || fs.existsSync(NYSE_FILE)) {
-        const data = loadExchangeData();
-        const totalSymbols = data.NASDAQ.size + data.NYSE.size;
-        expect(totalSymbols).toBeGreaterThan(0);
-      }
-    });
-
-    test('handles missing CSV files gracefully', () => {
-      // This test assumes CSV files might not exist in test env
-      // The function should not throw
-      expect(() => loadExchangeData()).not.toThrow();
+    test('queries DB only once due to caching', async () => {
+      await loadExchangeData();
+      await loadExchangeData();
+      expect(pool.getConnection).toHaveBeenCalledTimes(1);
+      expect(connection.query).toHaveBeenCalledTimes(1);
+      expect(connection.release).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('reloadExchangeData', () => {
-    test('clears cache and forces reload', () => {
-      const data1 = loadExchangeData();
+    test('clears cache and forces reload', async () => {
+      const data1 = await loadExchangeData();
       reloadExchangeData();
-      const data2 = loadExchangeData();
-      // After reload, we get fresh data (different reference)
+      const data2 = await loadExchangeData();
       expect(data1).not.toBe(data2);
     });
 
@@ -142,8 +150,8 @@ describe('Exchange Registry', () => {
   });
 
   describe('Data integrity checks', () => {
-    test('NASDAQ set contains only uppercase symbols', () => {
-      const data = loadExchangeData();
+    test('NASDAQ set contains only uppercase symbols', async () => {
+      const data = await loadExchangeData();
       if (data.NASDAQ.size > 0) {
         const symbols = Array.from(data.NASDAQ);
         symbols.forEach(symbol => {
@@ -152,8 +160,8 @@ describe('Exchange Registry', () => {
       }
     });
 
-    test('NYSE set contains only uppercase symbols', () => {
-      const data = loadExchangeData();
+    test('NYSE set contains only uppercase symbols', async () => {
+      const data = await loadExchangeData();
       if (data.NYSE.size > 0) {
         const symbols = Array.from(data.NYSE);
         symbols.forEach(symbol => {
@@ -162,8 +170,8 @@ describe('Exchange Registry', () => {
       }
     });
 
-    test('no symbol appears in both NASDAQ and NYSE', () => {
-      const data = loadExchangeData();
+    test('no symbol appears in both NASDAQ and NYSE', async () => {
+      const data = await loadExchangeData();
       const nasdaqArray = Array.from(data.NASDAQ);
       const nyseArray = Array.from(data.NYSE);
       
@@ -174,23 +182,6 @@ describe('Exchange Registry', () => {
       nyseArray.forEach(symbol => {
         expect(data.NASDAQ.has(symbol)).toBe(false);
       });
-    });
-  });
-
-  describe('Performance tests', () => {
-    test('lookup is fast (< 5ms for single symbol)', () => {
-      const start = Date.now();
-      getExchange('AAPL');
-      const duration = Date.now() - start;
-      expect(duration).toBeLessThan(5);
-    });
-
-    test('handles rapid sequential lookups efficiently', () => {
-      const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'];
-      const start = Date.now();
-      symbols.forEach(symbol => getExchange(symbol));
-      const duration = Date.now() - start;
-      expect(duration).toBeLessThan(10); // 10ms for 5 lookups
     });
   });
 });
