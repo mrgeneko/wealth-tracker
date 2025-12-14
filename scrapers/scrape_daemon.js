@@ -118,6 +118,15 @@ function getMysqlPool() {
 	}
 	return mysqlPool;
 }
+ 
+ // Phase 3: exchange registry now reads from DB; initialize it using the daemon pool.
+ try {
+ 	const { initializeDbPool } = require('./exchange_registry');
+ 	initializeDbPool(getMysqlPool());
+ } catch (e) {
+ 	// Daemon can continue even if initialization fails; lookups will error when used.
+ 	try { console.warn('Failed to init exchange registry DB pool: ' + (e && e.message ? e.message : e)); } catch (e2) {}
+ }
 
 async function fetchStockPositions() {
 	try {
@@ -540,7 +549,7 @@ async function runCycle(browser, outputDir) {
 					});
 				} else {
 					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
-				}
+				 		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker) }));
 			}
 		} else {
 			logDebug('No investing watchlists in attributes; skipping investing.com scrape');
@@ -672,7 +681,7 @@ async function runCycle(browser, outputDir) {
 			for (const position of positions) {
 				const { ticker, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(ticker, type);
+				const constructibleUrls = await getConstructibleUrls(ticker, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
 					logDebug(`No constructible URLs for ${ticker}, skipping`);
 					continue;
@@ -765,7 +774,7 @@ async function runCycle(browser, outputDir) {
 			for (const position of bondPositions) {
 				const { ticker, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(ticker, type);
+				const constructibleUrls = await getConstructibleUrls(ticker, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
 					logDebug(`No constructible URLs for bond ${ticker}, skipping`);
 					continue;

@@ -630,7 +630,7 @@ async function savePageSnapshot(page, basePath) {
  * @param {string} [type='stock'] - The position type: 'stock', 'etf', or 'bond'
  * @returns {Array<{source: string, url: string}>} Array of source/url pairs
  */
-function getConstructibleUrls(ticker, type = 'stock') {
+async function getConstructibleUrls(ticker, type = 'stock') {
     if (!ticker) return [];
     
     const normalizedType = String(type).toLowerCase();
@@ -647,7 +647,7 @@ function getConstructibleUrls(ticker, type = 'stock') {
     // Normalize ticker: ensure uppercase and use dot separator for these domains
     // e.g. BRK-B -> BRK.B
     const normalizedTicker = String(ticker).toUpperCase().replace(/-/g, '.');
-    const exchange = getExchange(ticker);
+    const exchange = await getExchange(ticker);
     
     const urls = [
         { source: 'cnbc', url: `https://www.cnbc.com/quotes/${normalizedTicker}` },

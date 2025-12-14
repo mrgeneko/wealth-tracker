@@ -35,10 +35,10 @@ expect.extend({
   },
   
   toBeValidExchange(received) {
-    const pass = ['NASDAQ', 'NYSE', null].includes(received);
+    const pass = ['NASDAQ', 'NYSE', 'OTHER', null].includes(received);
     return {
       pass,
-      message: () => `expected ${received} to be a valid exchange (NASDAQ, NYSE, or null)`
+      message: () => `expected ${received} to be a valid exchange (NASDAQ, NYSE, OTHER, or null)`
     };
   }
 });
