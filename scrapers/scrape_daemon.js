@@ -549,7 +549,7 @@ async function runCycle(browser, outputDir) {
 					});
 				} else {
 					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
-				 		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker) }));
+				}
 			}
 		} else {
 			logDebug('No investing watchlists in attributes; skipping investing.com scrape');
