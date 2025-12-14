@@ -8,7 +8,7 @@ const path = require('path');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
-const { loadAllTickers } = require('./ticker_registry');
+const { loadAllTickers, initializeDbPool: initializeTickerRegistryDbPool } = require('./ticker_registry');
 
 // Phase 9.2: WebSocket Real-time Metrics
 const MetricsWebSocketServer = require('./services/websocket-server');
@@ -276,6 +276,13 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+// Initialize dashboard ticker registry to query DB instead of CSV files
+try {
+    initializeTickerRegistryDbPool(pool);
+} catch (err) {
+    console.warn('[TickerRegistry] Failed to initialize DB pool:', err.message);
+}
 
 // Now that pool is created, initialize the metrics collector
 try {
@@ -691,9 +698,9 @@ app.get('/api/assets', async (req, res) => {
 const LOGS_DIR = '/usr/src/app/logs';
 
 // API to get all tickers for autocomplete
-app.get('/api/tickers', (req, res) => {
+app.get('/api/tickers', async (req, res) => {
     try {
-        const tickers = loadAllTickers();
+        const tickers = await loadAllTickers();
         res.json(tickers);
     } catch (err) {
         console.error('Error loading tickers:', err);
@@ -701,14 +708,13 @@ app.get('/api/tickers', (req, res) => {
     }
 });
 
-// Helper: Detect if a ticker is a bond by looking it up in the treasury file
+// Helper: Detect if a ticker is a bond by looking it up in the DB-backed registry
 // Returns true if the ticker exists in the treasury registry (exchange === 'TREASURY')
-function isBondTicker(ticker) {
+async function isBondTicker(ticker) {
     if (!ticker) return false;
     const clean = ticker.trim().toUpperCase();
-    
-    // Look up in ticker registry which loads from us-treasury-auctions.csv
-    const allTickers = loadAllTickers();
+
+    const allTickers = await loadAllTickers();
     const tickerObj = allTickers.find(t => t.ticker === clean);
     
     // If found and exchange is TREASURY, it's a bond
@@ -748,7 +754,7 @@ app.post('/api/fetch-price', async (req, res) => {
     const cleanTicker = ticker.trim().toUpperCase();
     
     // Detect if this is a bond (by type parameter or treasury registry lookup)
-    const isBond = type === 'bond' || isBondTicker(cleanTicker);
+    const isBond = type === 'bond' || await isBondTicker(cleanTicker);
     
     if (isBond) {
         // For bonds, trigger the scrape daemon to fetch prices on its next cycle
