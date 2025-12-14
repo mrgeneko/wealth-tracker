@@ -2559,27 +2559,141 @@ if (req.url.startsWith('/scrape') && req.method === 'POST') {
  * @returns {Promise<Object>} Scrape results
  */
 async function scrapeOnDemand(browser, tickers, source = 'yahoo') {
+  // NOTE: On-demand scraping is intended for *browser* sources and MUST use
+  // the PagePool from Phase 7 for parallel execution.
+  // Phase 10 later moves Yahoo to the API-scraper container.
   const results = {};
-  
-  for (const ticker of tickers) {
-    try {
-      // Use Yahoo as default source for on-demand
-      const price = await scrapeYahoo(browser, ticker);
-      results[ticker] = { success: true, price };
-    } catch (error) {
-      results[ticker] = { success: false, error: error.message };
-    }
+
+  // Choose browser scraper by source (default: google)
+  const sourceId = (source || 'google').toLowerCase();
+  const scrapeBySource = {
+    google: scrapeGoogle,
+    marketwatch: scrapeMarketWatch,
+    // yahoo: scrapeYahoo, // Phase 10 removes Yahoo from browser scraper
+  };
+  const scrapeFn = scrapeBySource[sourceId];
+  if (!scrapeFn) {
+    throw new Error(`Unsupported source for on-demand browser scrape: ${sourceId}`);
   }
-  
+
+  // Parallelize using the Phase 7 helper that acquires/releases pages.
+  // Assumes scrapeFn signature is updated to: scrapeFn(page, ticker, ...)
+  const { results: ok, errors } = await scrapeTickersParallel(
+    tickers,
+    async (page, ticker) => scrapeFn(page, ticker)
+  );
+
+  for (const [ticker, price] of Object.entries(ok)) {
+    results[ticker] = { success: true, price, source: sourceId };
+  }
+  for (const [ticker, message] of Object.entries(errors)) {
+    results[ticker] = { success: false, error: message, source: sourceId };
+  }
+
   return results;
 }
+```
+
+#### Step 8.1.1: Rate Limiting (Per Source)
+
+Rate limiting MUST be enforced **per source** (e.g., `google` rate limits do not consume `marketwatch` limits).
+
+**Scope**: rate limiting applies to `POST /scrape` only.
+
+**Counting rule**: each requested ticker counts as 1 unit against the selected source.
+
+**Recommended policy (defaults)**:
+
+```js
+// In scrapers/scrape_daemon.js (health server scope)
+const ON_DEMAND_LIMITS = {
+  google:      { maxTickersPerMinute: 60, maxConcurrent: 4 },
+  marketwatch: { maxTickersPerMinute: 30, maxConcurrent: 2 }
+};
+```
+
+**Enforcement semantics (must be deterministic):**
+
+- If `tickers.length > maxTickersPerRequest` (optional safety cap, recommended 25) → respond `400` with `{ error: 'too_many_tickers' }`.
+- If the source exceeds `maxTickersPerMinute` (by the counting rule) → respond `429`.
+- If the source has `activeRequests >= maxConcurrent` → respond `429`.
+- The server MUST NOT block/wait for rate limit; it should fail fast with `429`.
+
+**429 response contract**:
+
+```json
+{
+  "error": "rate_limited",
+  "source": "google",
+  "retryAfterMs": 12000,
+  "limits": { "maxTickersPerMinute": 60, "maxConcurrent": 4 }
+}
+```
+
+The response MUST also set `Retry-After` (seconds, rounded up).
+
+#### POST /scrape Request/Response Schema (Canonical)
+
+**Request** (`Content-Type: application/json`)
+
+```json
+{
+  "tickers": ["AAPL", "MSFT"],
+  "source": "google"
+}
+```
+
+Rules:
+- `tickers` is required and MUST be an array of strings.
+- `source` is optional; defaults to `"google"`.
+
+**Success (200)**
+
+```json
+{
+  "success": true,
+  "results": {
+    "AAPL": { "success": true, "price": "187.12", "source": "google" },
+    "MSFT": { "success": false, "error": "not found", "source": "google" }
+  }
+}
+```
+
+**Client Errors (400)**
+
+```json
+{ "error": "tickers array required" }
+```
+
+```json
+{ "error": "too_many_tickers" }
+```
+
+**Rate Limited (429)**
+
+```json
+{
+  "error": "rate_limited",
+  "source": "google",
+  "retryAfterMs": 12000,
+  "limits": { "maxTickersPerMinute": 60, "maxConcurrent": 4 }
+}
+```
+
+**Server Error (500)**
+
+```json
+{ "error": "<message>" }
 ```
 
 **Tests Required**:
 - POST /scrape with valid tickers
 - POST /scrape with invalid body
 - POST /scrape with empty tickers array
-- Rate limiting tests
+- Rate limiting tests (per source):
+  - `google` limited does not affect `marketwatch`
+  - `429` includes `Retry-After` and `retryAfterMs`
+  - counts tickers (N tickers consumes N units)
 - Concurrent request handling
 
 ---
@@ -2605,11 +2719,12 @@ async function scrapeOnDemand(browser, tickers, source = 'yahoo') {
 describe('Listing Sync E2E Tests', () => {
   describe('Full Sync Flow', () => {
     test('should download CSVs, sync to DB, and serve queries', async () => {
-      // 1. Start listing_sync_service
-      // 2. Trigger sync
-      // 3. Verify DB has data
-      // 4. Verify exchange_registry queries work
-      // 5. Verify ticker_registry queries work
+      // REQUIRED (non-negotiable) E2E steps:
+      // 1) Start dependencies (MySQL required). In CI: docker compose up -d mysql
+      // 2) Start listing_sync_service on a test port (or import the module and start in-process)
+      // 3) Trigger sync via HTTP: POST /sync/all
+      // 4) Assert HTTP: /health 200, /status shows last sync ok
+      // 5) Assert DB: ticker_registry row count > 0; exchange registry tables row count > 0
     });
   });
 
@@ -2630,12 +2745,14 @@ describe('Listing Sync E2E Tests', () => {
 
     test('should handle on-demand scrape requests', async () => {
       // Test POST /scrape endpoint
+      // - 200 response contains per-ticker success/error
+      // - respects per-source rate limiting (429) and includes Retry-After
     });
   });
 });
 ```
 
-### Step 8.2: Documentation Updates
+### Step 9.2: Documentation Updates
 
 **Files to Update/Create**:
 
@@ -2644,7 +2761,7 @@ describe('Listing Sync E2E Tests', () => {
 3. `README.md` - Update architecture section
 4. Code comments throughout all new/modified files
 
-### Step 8.3: PM2/Docker Configuration
+### Step 9.3: PM2/Docker Configuration
 
 **File**: Update `ecosystem.config.json`
 
