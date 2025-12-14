@@ -25,6 +25,10 @@ puppeteerExtra.use(StealthPlugin());
 const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 
+// Phase 7: page pool & persistent page registry
+const PagePool = require('./page_pool');
+const PersistentPageRegistry = require('./persistent_page_registry');
+
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 const { scrapeTradingViewWatchlists } = require('./scrape_tradingview_watchlists');
 const { scrapeWebullWatchlists } = require('./scrape_webull_watchlists');
@@ -178,6 +182,62 @@ function getScrapeGroupSettings(groupName, defaultMinutes = 5) {
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
+
+// Phase 7: global scraping infrastructure (page pool + persistent pages)
+let pagePool = null;
+let persistentPages = null;
+let pagePoolBrowser = null;
+
+async function shutdownScraperInfrastructure() {
+	if (pagePool) {
+		try { await pagePool.shutdown(); } catch (e) {}
+		pagePool = null;
+	}
+	if (persistentPages) {
+		try { await persistentPages.closeAll(); } catch (e) {}
+		persistentPages = null;
+	}
+	pagePoolBrowser = null;
+}
+
+async function initializeScraperInfrastructure(browser) {
+	if (!browser) return { pagePool: null, persistentPages: null };
+	if (pagePool && pagePoolBrowser === browser) return { pagePool, persistentPages };
+
+	// Re-init on browser change
+	await shutdownScraperInfrastructure();
+
+	// Page pool for stateless scrapers
+	const poolSize = parseInt(process.env.PAGE_POOL_SIZE || '4', 10);
+	const acquireTimeout = parseInt(process.env.PAGE_ACQUIRE_TIMEOUT || '30000', 10);
+	const maxOperationsPerPage = parseInt(process.env.PAGE_MAX_OPERATIONS || '100', 10);
+	const navigationTimeout = parseInt(process.env.PAGE_NAVIGATION_TIMEOUT || '30000', 10);
+
+	try {
+		pagePool = new PagePool(browser, {
+			poolSize,
+			acquireTimeout,
+			maxOperationsPerPage,
+			navigationTimeout
+		});
+		await pagePool.initialize();
+		pagePoolBrowser = browser;
+	} catch (e) {
+		// Daemon can continue without the page pool; Phase 8 will require it.
+		try { logDebug('[PagePool] Failed to initialize: ' + (e && e.message ? e.message : e)); } catch (e2) {}
+		pagePool = null;
+		pagePoolBrowser = null;
+	}
+
+	// Persistent page registry for stateful scrapers
+	try {
+		persistentPages = new PersistentPageRegistry(browser);
+	} catch (e) {
+		persistentPages = null;
+	}
+
+	return { pagePool, persistentPages };
+}
 // Health state
 let lastCycleAt = null;
 let lastCycleStatus = 'not-run';
@@ -247,6 +307,7 @@ function resetProtocolTimeoutCounter() {
 // Restart the browser
 async function restartBrowser() {
 	logDebug('Attempting browser restart...');
+	try { await shutdownScraperInfrastructure(); } catch (e) {}
 	try {
 		if (globalBrowser) {
 			try {
@@ -271,6 +332,7 @@ async function restartBrowser() {
 	// Launch new browser
 	const newBrowser = await ensureBrowser();
 	globalBrowser = newBrowser;
+	try { await initializeScraperInfrastructure(newBrowser); } catch (e) {}
 	logDebug('Browser restarted successfully');
 	return newBrowser;
 }
@@ -905,6 +967,8 @@ async function daemon() {
 	}
 	// expose browser for graceful shutdown
 	globalBrowser = browser;
+	// Phase 7: initialize page pool / persistent page registry
+	try { await initializeScraperInfrastructure(browser); } catch (e) {}
 
 	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
 	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
@@ -916,6 +980,8 @@ async function daemon() {
 		healthServer = http.createServer((req, res) => {
 			if (req.url === '/health') {
 				const compactMetrics = getMetrics ? getMetrics() : null;
+				const poolStats = pagePool ? pagePool.getStats() : null;
+				const persistentStats = persistentPages ? persistentPages.getStats() : null;
 				const payload = {
 					status: 'ok',
 					pid: process.pid,
@@ -924,7 +990,9 @@ async function daemon() {
 					last_cycle_status: lastCycleStatus,
 					last_cycle_error: lastCycleError,
 					last_cycle_duration_ms: lastCycleDurationMs,
-					metrics: compactMetrics
+					metrics: compactMetrics,
+					page_pool: poolStats,
+					persistent_pages: persistentStats
 				};
 				res.writeHead(200, { 'Content-Type': 'application/json' });
 				res.end(JSON.stringify(payload));
@@ -963,6 +1031,28 @@ async function daemon() {
 				lines.push('# TYPE scrape_last_cycle_status gauge');
 				const statusLabel = lastCycleStatus || 'unknown';
 				lines.push(`scrape_last_cycle_status{status="${statusLabel}"} 1`);
+				// Phase 7: page pool gauges
+				if (pagePool) {
+					const ps = pagePool.getStats();
+					lines.push('# HELP scrape_page_pool_current_size Current number of pages in pool');
+					lines.push('# TYPE scrape_page_pool_current_size gauge');
+					lines.push(`scrape_page_pool_current_size ${ps.currentSize || 0}`);
+					lines.push('# HELP scrape_page_pool_available_pages Available pages in pool');
+					lines.push('# TYPE scrape_page_pool_available_pages gauge');
+					lines.push(`scrape_page_pool_available_pages ${ps.availablePages || 0}`);
+					lines.push('# HELP scrape_page_pool_busy_pages Busy pages in pool');
+					lines.push('# TYPE scrape_page_pool_busy_pages gauge');
+					lines.push(`scrape_page_pool_busy_pages ${ps.busyPages || 0}`);
+					lines.push('# HELP scrape_page_pool_wait_queue_length Acquire wait queue length');
+					lines.push('# TYPE scrape_page_pool_wait_queue_length gauge');
+					lines.push(`scrape_page_pool_wait_queue_length ${ps.waitQueueLength || 0}`);
+				}
+				if (persistentPages) {
+					const st = persistentPages.getStats();
+					lines.push('# HELP scrape_persistent_pages_count Persistent pages tracked');
+					lines.push('# TYPE scrape_persistent_pages_count gauge');
+					lines.push(`scrape_persistent_pages_count ${st.count || 0}`);
+				}
 				res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
 				res.end(lines.join('\n') + '\n');
 				return;
@@ -1075,6 +1165,7 @@ async function gracefulShutdown(signal) {
 		const msg = 'Received ' + signal + ', shutting down...';
 		logDebug(msg);
 		try { require('fs').writeSync(1, `[${new Date().toISOString()}] ${msg}\n`); } catch (e) {}
+		try { await shutdownScraperInfrastructure(); } catch (e) {}
 		if (globalBrowser) {
 			await globalBrowser.close();
 			logDebug('Browser closed.');
