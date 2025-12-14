@@ -17,6 +17,11 @@ services:
       YAHOO_DELAY_MS: "5000"
       YAHOO_MAX_RETRIES: "4"
       YAHOO_BACKOFF_BASE_MS: "1000"
+      # Phase 7: Page pool configuration
+      PAGE_POOL_SIZE: "4"
+      PAGE_ACQUIRE_TIMEOUT: "30000"
+      PAGE_MAX_OPERATIONS: "100"
+      PAGE_NAVIGATION_TIMEOUT: "30000"
     volumes:
       - ./logs:/usr/src/app/logs
       - ./data:/usr/src/app/data
