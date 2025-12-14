@@ -479,49 +479,8 @@ async function runCycle(browser, outputDir) {
 //		return;
 //	}
 
-	// ======== US LISTINGS UPDATE ===========
-	const usListingsName = 'us_listings';
-	const usListingsMarker = path.join('/usr/src/app/logs', `last.${usListingsName}.txt`);
-	const attrs = loadScraperAttributes();
-	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
-	const usListingsConfig = groups[usListingsName] || {};
-	const usListingsInterval = typeof usListingsConfig.interval === 'number' ? usListingsConfig.interval : 1440;
-	const usListingsEnabled = usListingsConfig.enabled === true;
-	const usListingsSettings = getScrapeGroupSettings(usListingsName, usListingsInterval);
-	if (usListingsEnabled && shouldRunTask(usListingsSettings, usListingsMarker)) {
-		logDebug('Begin US listings update');
-		try {
-			const { execSync } = require('child_process');
-					   execSync('node /usr/src/app/scripts/update_exchange_listings.js update', { stdio: 'inherit' });
-			logDebug('US listings update script executed successfully');
-		} catch (e) {
-			logDebug('Error running US listings update script: ' + (e && e.message ? e.message : e));
-		}
-	} else {
-		logDebug('Skipping US listings update (interval not reached or not enabled)');
-	}
-
-	// ======== US TREASURY LISTINGS UPDATE ===========
-	const usTreasuryListingsName = 'us_treasury_listings';
-	const usTreasuryListingsMarker = path.join('/usr/src/app/logs', `last.${usTreasuryListingsName}.txt`);
-	const treasuryAttrs = loadScraperAttributes();
-	const treasuryGroups = treasuryAttrs && treasuryAttrs.scrape_groups ? treasuryAttrs.scrape_groups : {};
-	const usTreasuryListingsConfig = treasuryGroups[usTreasuryListingsName] || {};
-	const usTreasuryListingsInterval = typeof usTreasuryListingsConfig.interval === 'number' ? usTreasuryListingsConfig.interval : 1440;
-	const usTreasuryListingsEnabled = usTreasuryListingsConfig.enabled === true;
-	const usTreasuryListingsSettings = getScrapeGroupSettings(usTreasuryListingsName, usTreasuryListingsInterval);
-	if (usTreasuryListingsEnabled && shouldRunTask(usTreasuryListingsSettings, usTreasuryListingsMarker)) {
-		logDebug('Begin US Treasury listings update');
-		try {
-			const { execSync } = require('child_process');
-			execSync('node /usr/src/app/scripts/update_treasury_listings.js', { stdio: 'inherit' });
-			logDebug('US Treasury listings update script executed successfully');
-		} catch (e) {
-			logDebug('Error running US Treasury listings update script: ' + (e && e.message ? e.message : e));
-		}
-	} else {
-		logDebug('Skipping US Treasury listings update (interval not reached or not enabled)');
-	}
+	// Phase 6: Listing updates have been moved out of the scrape daemon.
+	// The daemon is now focused solely on price scraping.
 
 	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingWatchlistsName = 'investing_watchlists'
