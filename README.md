@@ -40,7 +40,9 @@ For detailed Phase 9 information, see:
 - **Architecture Refactor (Listing Sync + On-Demand Scrape):**
   - Listing Sync Service HTTP API: see [docs/LISTING_SYNC_SERVICE.md](docs/LISTING_SYNC_SERVICE.md)
   - Consolidated API reference (including `POST /scrape`): see [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+  - API Scraper Service (Yahoo batch, non-browser): see [docs/API_SCRAPER_SERVICE.md](docs/API_SCRAPER_SERVICE.md)
   - On-demand browser scrape endpoint (scrapers health server): `POST http://localhost:3002/scrape`
+  - API scraper health endpoint: `GET http://localhost:3020/health`
 
 - **Security Metadata System:**
   - Complete system for rich security data: Names, Sectors, Market Caps, P/E Ratios, Dividends, Earnings.

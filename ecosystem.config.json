@@ -71,6 +71,40 @@
       "error_file": "./logs/listing-sync-error.log",
       "log_file": "./logs/listing-sync-combined.log",
       "time": true
+    },
+    {
+      "name": "api-scraper",
+      "script": "services/api-scraper/api_scrape_daemon.js",
+      "cwd": "/app",
+      "instances": 1,
+      "exec_mode": "fork",
+      "restart_delay": 5000,
+      "max_restarts": 10,
+      "min_uptime": "10s",
+      "kill_timeout": 30000,
+      "wait_ready": false,
+      "listen_timeout": 8000,
+      "env": {
+        "NODE_ENV": "production",
+        "KAFKA_BROKERS": "kafka:9092",
+        "KAFKA_TOPIC": "price_data",
+        "API_SCRAPER_HEALTH_PORT": "3020",
+        "MYSQL_HOST": "mysql",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "root",
+        "MYSQL_PASSWORD": "",
+        "MYSQL_DATABASE": "wealth_tracker",
+        "CONFIG_DIR": "/app/config",
+        "DATA_DIR": "/app/data",
+        "LOG_DIR": "/app/logs"
+      },
+      "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+      "combine_logs": true,
+      "merge_logs": true,
+      "out_file": "./logs/api-scraper.log",
+      "error_file": "./logs/api-scraper-error.log",
+      "log_file": "./logs/api-scraper-combined.log",
+      "time": true
     }
   ]
 }
