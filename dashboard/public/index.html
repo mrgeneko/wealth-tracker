@@ -2491,9 +2491,12 @@
         document.getElementById('positionForm').onsubmit = async function (e) {
             e.preventDefault();
             const id = document.getElementById('posId').value;
+            const symbol = document.getElementById('posSymbol').value;
             const body = {
                 account_id: document.getElementById('posAccountId').value,
-                symbol: document.getElementById('posSymbol').value,
+                // Backend expects ticker; keep symbol for backward compatibility.
+                ticker: symbol,
+                symbol,
                 type: document.getElementById('posType').value,
                 quantity: parseFloat(document.getElementById('posQuantity').value),
                 currency: 'USD'
