@@ -65,10 +65,10 @@ function loadAttributes() {
 	}
 }
 
-function getScrapeGroupSettings(groupName, defaultMinutes) {
+function getScrapeGroupSettings(groupName, defaultIntervalSeconds) {
 	const attrs = loadAttributes();
 	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
-	let interval = defaultMinutes;
+	let interval = defaultIntervalSeconds;
 	let enabled = false;
 
 	if (groups && groups[groupName]) {
@@ -88,7 +88,7 @@ function getScrapeGroupSettings(groupName, defaultMinutes) {
 
 function shouldRunTask(settings, markerPath) {
 	if (!settings.enabled) return false;
-	const intervalMinutes = settings.interval;
+	const intervalSeconds = settings.interval;
 
 	let lastRun = 0;
 	try {
@@ -99,7 +99,7 @@ function shouldRunTask(settings, markerPath) {
 	} catch (e) {}
 
 	const now = Date.now();
-	if (now - lastRun >= intervalMinutes * 60 * 1000) {
+	if (now - lastRun >= intervalSeconds * 1000) {
 		const human = new Date(now).toLocaleString('en-US', { hour12: false });
 		try { fs.mkdirSync(path.dirname(markerPath), { recursive: true }); } catch (e) {}
 		fs.writeFileSync(markerPath, now.toString() + '\n' + human + '\n');
@@ -225,7 +225,7 @@ async function main() {
 	let stopped = false;
 	async function tick() {
 		if (stopped) return;
-		const yahooSettings = getScrapeGroupSettings('yahoo_batch', 45);
+		const yahooSettings = getScrapeGroupSettings('yahoo_batch', 2700);
 		if (shouldRunTask(yahooSettings, markerPath)) {
 			log('Begin yahoo_batch');
 			await runYahooBatch(outputDir);
@@ -234,7 +234,7 @@ async function main() {
 
 	// Run once immediately, then on interval.
 	await tick();
-	const timer = setInterval(() => { tick().catch(e => log('Tick error: ' + (e && e.message ? e.message : e))); }, 60 * 1000);
+	const timer = setInterval(() => { tick().catch(e => log('Tick error: ' + (e && e.message ? e.message : e))); }, 1000);
 
 	async function shutdown(signal) {
 		if (stopped) return;

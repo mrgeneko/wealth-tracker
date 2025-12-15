@@ -2,39 +2,39 @@
   "single_security_mode": "round_robin",
   "scrape_groups": {
     "investing_watchlists": {
-      "interval": 3,
+      "interval": 180,
       "enabled": true
     },
     "yahoo_batch": {
-      "interval": 60,
+      "interval": 3600,
       "enabled": true
     },
     "tradingview_watchlists": {
-      "interval": 45,
+      "interval": 2700,
       "enabled": false
     },
     "stocks_etfs": {
-      "interval": 90,
+      "interval": 5400,
       "enabled": true
     },
     "stock_positions": {
-      "interval": 30,
+      "interval": 1800,
       "enabled": true
     },
     "bond_positions": {
-      "interval": 30,
+      "interval": 1800,
       "enabled": true
     },
     "bonds": {
-      "interval": 240,
+      "interval": 14400,
       "enabled": true
     },
     "us_listings": {
-      "interval": 1440,
+      "interval": 86400,
       "enabled": true
     },
     "us_treasury_listings": {
-      "interval": 1440,
+      "interval": 86400,
       "enabled": true
     }
   },
@@ -49,11 +49,11 @@
     "watchlists": [
       {
         "key": "primary",
-        "interval": 2
+        "interval": 20
       },
       {
         "key": "secondary",
-        "interval": 5
+        "interval": 300
       }
     ]
   },
@@ -62,11 +62,11 @@
     "watchlists": [
       {
         "key": "My Watchlist",
-        "interval": 5
+        "interval": 300
       },
       {
         "key": "testlist 2",
-        "interval": 5
+        "interval": 300
       }
     ]
   },
@@ -75,7 +75,7 @@
     "watchlists": [
       {
         "key": "Watchlist",
-        "interval": 5
+        "interval": 300
       }
     ]
   },
