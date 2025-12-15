@@ -208,6 +208,14 @@ app.get('/api/watchlist/:provider/tickers', async (req, res) => {
     await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tickers`);
 });
 
+app.post('/api/watchlist/:provider/switch', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+    });
+});
+
 app.post('/api/watchlist/:provider/add', async (req, res) => {
     await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/add`, {
         method: 'POST',
