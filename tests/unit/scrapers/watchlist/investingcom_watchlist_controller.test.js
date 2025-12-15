@@ -13,9 +13,19 @@ describe('InvestingComWatchlistController', () => {
 
 	beforeEach(() => {
 		mockPage = {
-			waitForSelector: jest.fn().mockResolvedValue(true),
+			waitForSelector: jest.fn((selector) => {
+				// Default: assume we are already logged in (login form not present)
+				if (selector === '#loginFormUser_email') {
+					return Promise.reject(new Error('not found'));
+				}
+				return Promise.resolve(true);
+			}),
+			waitForFunction: jest.fn().mockResolvedValue(true),
 			click: jest.fn().mockResolvedValue(undefined),
 			type: jest.fn().mockResolvedValue(undefined),
+			bringToFront: jest.fn().mockResolvedValue(undefined),
+			keyboard: { press: jest.fn().mockResolvedValue(undefined) },
+			goto: jest.fn().mockResolvedValue(undefined),
 			$$: jest.fn().mockResolvedValue([]),
 			$$eval: jest.fn().mockResolvedValue([]),
 			evaluate: jest.fn().mockResolvedValue('AAPL')
@@ -39,6 +49,28 @@ describe('InvestingComWatchlistController', () => {
 		expect(mockPage.waitForSelector).toHaveBeenCalled();
 		expect(controller.isInitialized).toBe(true);
 	});
+
+		test('initialize() attempts login when login form is present', async () => {
+			process.env.INVESTING_EMAIL = 'user@example.com';
+			process.env.INVESTING_PASSWORD = 'pass';
+
+			mockPage.waitForSelector = jest.fn((selector) => {
+				if (selector === '#loginFormUser_email') {
+					return Promise.resolve(true);
+				}
+				return Promise.resolve(true);
+			});
+
+			const controller = new InvestingComWatchlistController(mockBrowser);
+			await controller.initialize('https://www.investing.com/portfolio/?portfolioID=test');
+
+			expect(mockPage.type).toHaveBeenCalledWith('#loginFormUser_email', 'user@example.com', expect.any(Object));
+			expect(mockPage.type).toHaveBeenCalledWith('#loginForm_password', 'pass', expect.any(Object));
+			expect(mockPage.keyboard.press).toHaveBeenCalledWith('Enter');
+			// The controller also tries a submit click when possible
+			expect(mockPage.click).toHaveBeenCalled();
+			expect(controller.isInitialized).toBe(true);
+		});
 
 	test('validateTicker accepts stocks and ETFs', () => {
 		const controller = new InvestingComWatchlistController(mockBrowser);

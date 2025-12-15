@@ -2593,6 +2593,41 @@
         let _watchlistProvidersCache = null;
         let _watchlistInitializedOnce = false;
 
+        function isWatchlistProviderInitialized(providerId) {
+            if (!providerId) return false;
+            const initialized = _watchlistProvidersCache && Array.isArray(_watchlistProvidersCache.initialized)
+                ? _watchlistProvidersCache.initialized
+                : [];
+            return initialized.includes(providerId);
+        }
+
+        function renderWatchlistNotInitializedState(providerId) {
+            const tabsSel = document.getElementById('watchlistTab');
+            if (tabsSel) {
+                tabsSel.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Provider not initialized';
+                tabsSel.appendChild(opt);
+            }
+
+            const tbody = document.getElementById('watchlistTickersBody');
+            if (tbody) {
+                tbody.innerHTML = '';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="2" style="text-align:center; color:#aaa;">Provider not initialized</td>`;
+                tbody.appendChild(tr);
+            }
+
+            const meta = document.getElementById('watchlistTickersMeta');
+            if (meta) meta.textContent = '';
+
+            setWatchlistStatus(
+                `Provider not initialized: ${providerId}. Configure at least one enabled watchlist URL in watchlist_instances and restart scrapers.`,
+                true
+            );
+        }
+
         function setWatchlistStatus(message, isError = false) {
             const el = document.getElementById('watchlistStatus');
             if (!el) return;
@@ -2700,6 +2735,12 @@
             if (!sel) return;
 
             sel.innerHTML = '';
+
+            if (!isWatchlistProviderInitialized(providerId)) {
+                renderWatchlistNotInitializedState(providerId);
+                return;
+            }
+
             try {
                 const data = await watchlistFetchJson(`/api/watchlist/${providerId}/tabs`);
                 const tabs = (data && Array.isArray(data.tabs)) ? data.tabs : [];
@@ -2729,6 +2770,11 @@
             const watchlist = getSelectedWatchlistTab();
             if (!providerId || !watchlist) return;
 
+            if (!isWatchlistProviderInitialized(providerId)) {
+                renderWatchlistNotInitializedState(providerId);
+                return;
+            }
+
             setWatchlistStatus(`Switching to tab: ${watchlist}...`);
             await watchlistFetchJson(`/api/watchlist/${providerId}/switch`, {
                 method: 'POST',
@@ -2740,6 +2786,11 @@
         async function loadWatchlistTickers() {
             const providerId = getSelectedWatchlistProvider();
             if (!providerId) return;
+
+            if (!isWatchlistProviderInitialized(providerId)) {
+                renderWatchlistNotInitializedState(providerId);
+                return;
+            }
 
             setWatchlistStatus('Loading tickers...');
             const data = await watchlistFetchJson(`/api/watchlist/${providerId}/tickers`);
@@ -2780,6 +2831,11 @@
             const providerId = getSelectedWatchlistProvider();
             if (!providerId) return;
 
+            if (!isWatchlistProviderInitialized(providerId)) {
+                renderWatchlistNotInitializedState(providerId);
+                return;
+            }
+
             const tickerEl = document.getElementById('watchlistAddTicker');
             const assetTypeEl = document.getElementById('watchlistAddAssetType');
             const ticker = tickerEl ? tickerEl.value.trim().toUpperCase() : '';
@@ -2807,6 +2863,11 @@
             const watchlist = getSelectedWatchlistTab();
             if (!providerId || !ticker) return;
 
+            if (!isWatchlistProviderInitialized(providerId)) {
+                renderWatchlistNotInitializedState(providerId);
+                return;
+            }
+
             showConfirmModal(
                 'Delete Ticker',
                 `Delete ${ticker} from watchlist?`,
@@ -2832,6 +2893,12 @@
 
             try {
                 renderWatchlistProviderCapabilities(providerId);
+
+                if (!isWatchlistProviderInitialized(providerId)) {
+                    renderWatchlistNotInitializedState(providerId);
+                    return;
+                }
+
                 await loadWatchlistTabs();
 
                 // Best effort: switch to the first tab so tickers reflect the tab selection.
@@ -2854,6 +2921,12 @@
                 const providerId = getSelectedWatchlistProvider();
                 if (providerId) {
                     renderWatchlistProviderCapabilities(providerId);
+
+                    if (!isWatchlistProviderInitialized(providerId)) {
+                        renderWatchlistNotInitializedState(providerId);
+                        return;
+                    }
+
                     await loadWatchlistTabs();
                     const tab = getSelectedWatchlistTab();
                     if (tab) {

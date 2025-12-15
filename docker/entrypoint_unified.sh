@@ -23,12 +23,28 @@ else
   echo "[DEBUG] dbus-daemon already running."
 fi
 
-# Start Xvfb if not already running
-if [ ! -e /tmp/.X99-lock ]; then
-  echo "[DEBUG] Starting Xvfb on :99..."
-  Xvfb :99 -screen 0 1920x1080x24 &
-else
+# Start Xvfb if not already running.
+# NOTE: A stale /tmp/.X99-lock can exist even when Xvfb is not running;
+# prefer process checks and clean up stale lock/sockets.
+if pgrep -x Xvfb > /dev/null 2>&1; then
   echo "[DEBUG] Xvfb already running."
+else
+  if [ -e /tmp/.X99-lock ]; then
+    echo "[DEBUG] Removing stale /tmp/.X99-lock..."
+    rm -f /tmp/.X99-lock
+  fi
+  if [ -S /tmp/.X11-unix/X99 ]; then
+    echo "[DEBUG] Removing stale /tmp/.X11-unix/X99 socket..."
+    rm -f /tmp/.X11-unix/X99
+  fi
+  mkdir -p /tmp/.X11-unix
+
+  echo "[DEBUG] Starting Xvfb on :99..."
+  if ! command -v Xvfb >/dev/null 2>&1; then
+    echo "[ERROR] Xvfb binary not found in container image"
+    exit 1
+  fi
+  Xvfb :99 -screen 0 1920x1080x24 &
 fi
 
 # Wait for Xvfb to be ready before starting clients (x11vnc / Chrome)
@@ -50,7 +66,9 @@ wait_for_xvfb() {
     fi
     sleep "$sleep_sec"
   done
-  echo "[ERROR] Xvfb did not become ready after $((retries*sleep_sec)) seconds"
+  local total_wait
+  total_wait=$(awk -v r="$retries" -v s="$sleep_sec" 'BEGIN { printf "%.1f", r*s }')
+  echo "[ERROR] Xvfb did not become ready after ${total_wait} seconds"
   return 1
 }
 
