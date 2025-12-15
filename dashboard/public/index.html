@@ -2079,7 +2079,9 @@
             });
 
             // Cash Row
-            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td>';
+            // IMPORTANT: This table always starts with Symbol/Name/Sector columns.
+            // Ensure CASH aligns with those columns (Name/Sector should be blank).
+            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td><td></td><td></td>';
             let totalCash = 0;
             accounts.forEach(acc => {
                 let cashVal = 0;
@@ -2104,12 +2106,15 @@
             if (accountsCollapsed) {
                 cashRowHtml += '<td style="text-align: center;">-</td>';
             }
-            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+            // Placeholder cells for: Prev Close, Price, P/E, Yield, Change, Change %, Time, Source, Value Change
+            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
 
             // Account Totals
-            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td>';
+            // IMPORTANT: Keep alignment with Symbol/Name/Sector columns.
+            // Name/Sector should be blank for TOTAL.
+            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td><td></td><td></td>';
             let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
@@ -2135,7 +2140,8 @@
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
-            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
+            // Placeholder cells for: Prev Close, Price, P/E, Yield, Change, Change %, Time, Source
+            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
             totalRowHtml += `<td id="total-row-value-change" style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
             totalRowHtml += `<td id="total-row-grand-total">${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
