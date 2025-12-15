@@ -248,3 +248,53 @@ module.exports = {
   ListingSyncService,
   DEFAULT_CONFIG
 };
+
+function envFlag(name, defaultValue) {
+  const raw = process.env[name];
+  if (raw == null) return defaultValue;
+  const v = String(raw).trim().toLowerCase();
+  if (v === '1' || v === 'true' || v === 'yes' || v === 'y' || v === 'on') return true;
+  if (v === '0' || v === 'false' || v === 'no' || v === 'n' || v === 'off') return false;
+  return defaultValue;
+}
+
+if (require.main === module) {
+  (async () => {
+    const httpPort = parseInt(process.env.HTTP_PORT || process.env.LISTING_SYNC_PORT || String(DEFAULT_CONFIG.httpPort), 10);
+    const enableHttpApi = envFlag('ENABLE_HTTP_API', envFlag('ENABLE_LISTING_SYNC_HTTP_API', true));
+    const enableAutoSync = envFlag('ENABLE_AUTO_SYNC', envFlag('ENABLE_LISTING_SYNC_AUTO_SYNC', false));
+    const syncIntervalMinutes = parseInt(process.env.SYNC_INTERVAL_MINUTES || String(DEFAULT_CONFIG.syncIntervalMinutes), 10);
+
+    const service = new ListingSyncService({
+      httpPort,
+      enableHttpApi,
+      enableAutoSync,
+      syncIntervalMinutes,
+      configDir: process.env.CONFIG_DIR
+    });
+
+    await service.initialize();
+    // eslint-disable-next-line no-console
+    console.log(`[ListingSyncService] running on :${httpPort} (httpApi=${enableHttpApi}, autoSync=${enableAutoSync})`);
+
+    let shuttingDown = false;
+    const shutdown = async (signal) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      // eslint-disable-next-line no-console
+      console.log(`[ListingSyncService] shutting down (${signal})...`);
+      try {
+        await service.shutdown();
+      } finally {
+        process.exit(0);
+      }
+    };
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+  })().catch((e) => {
+    // eslint-disable-next-line no-console
+    console.error('[ListingSyncService] failed to start:', e);
+    process.exit(1);
+  });
+}

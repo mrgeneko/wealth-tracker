@@ -37,6 +37,11 @@ For detailed Phase 9 information, see:
 
 ## Recent Feature Updates
 
+- **Architecture Refactor (Listing Sync + On-Demand Scrape):**
+  - Listing Sync Service HTTP API: see [docs/LISTING_SYNC_SERVICE.md](docs/LISTING_SYNC_SERVICE.md)
+  - Consolidated API reference (including `POST /scrape`): see [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+  - On-demand browser scrape endpoint (scrapers health server): `POST http://localhost:3002/scrape`
+
 - **Security Metadata System:**
   - Complete system for rich security data: Names, Sectors, Market Caps, P/E Ratios, Dividends, Earnings.
   - **Automated Population**: Fetches metadata from Yahoo Finance for all positions automatically.
@@ -160,6 +165,39 @@ docker compose stop scrapers
 To stop and remove all compose services:
 ```bash
 docker compose down
+```
+
+## How to Run Integration Tests (Docker MySQL)
+
+Integration tests expect a MySQL database with the schema initialized.
+
+1. Start MySQL via Docker Compose:
+
+```bash
+docker compose up -d mysql
+docker compose ps
+```
+
+2. Export DB environment variables for tests (match your `.env` / compose config):
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_NAME=${MYSQL_DATABASE:-wealth_tracker}
+export DB_USER=${MYSQL_USER:-root}
+export DB_PASSWORD=${MYSQL_PASSWORD:-$MYSQL_ROOT_PASSWORD}
+```
+
+3. Run integration tests:
+
+```bash
+npm run test:integration
+```
+
+Tip: to run a single integration test file, pass Jest args after `--`.
+
+```bash
+npm run test:integration -- --runTestsByPath tests/integration/listing_sync_e2e.test.js
 ```
 
 ## Docker Desktop Setup
