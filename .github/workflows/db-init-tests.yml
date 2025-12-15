@@ -50,15 +50,28 @@ jobs:
           docker compose up -d mysql
           echo "Waiting for MySQL to be ready..."
           
-          # Wait explicitly for MySQL to be responsive
-          until docker compose exec -T mysql mysqladmin ping -h "localhost" --silent; do
-            echo "Waiting for database connection..."
+          # Wait explicitly for MySQL to be responsive *and* auth to be initialized.
+          # mysqladmin ping can succeed during the entrypoint's temporary init server,
+          # so we require a real authenticated query as root.
+          for i in {1..60}; do
+            if docker compose exec -T mysql mysql --protocol=tcp -h 127.0.0.1 -u root -proot -e 'SELECT 1' >/dev/null 2>&1; then
+              echo "MySQL is up (root auth confirmed)."
+              break
+            fi
+            echo "Waiting for database connection/auth..."
             sleep 2
           done
-          
-          echo "MySQL is up! Importing init script..."
-          # Explicitly run the script to guarantee execution and see errors if any
-          docker compose exec -T mysql mysql -u test -ptest testdb < scripts/init-db/001-listing-sync-watchlist.sql
+
+          echo "Waiting for init SQL to create update_windows..."
+          for i in {1..60}; do
+            exists=$(docker compose exec -T mysql mysql --protocol=tcp -h 127.0.0.1 -u root -proot -N -s -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='testdb' AND table_name='update_windows';" 2>/dev/null || echo "0")
+            if [ "$exists" = "1" ]; then
+              echo "Init SQL executed (update_windows exists)."
+              break
+            fi
+            echo "Waiting for init SQL..."
+            sleep 2
+          done
 
       - name: Run DB Init Test
         run: node tests/integration/db_init_test.js
