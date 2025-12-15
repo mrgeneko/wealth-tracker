@@ -213,7 +213,8 @@ class MetadataAutocompleteService {
             let detectedType = tickerData.security_type;
 
             // Priority 1: Check if it's a bond (treasury registry)
-            if (tickerData.exchange === 'TREASURY') {
+            // Use security_type rather than exchange; treasuries trade OTC.
+            if (tickerData.security_type === 'TREASURY' || tickerData.security_type === 'BOND') {
                 detectedType = 'bond';
             }
             // Priority 2: Use Yahoo metadata asset type (handles crypto, ETF, stock)

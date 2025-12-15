@@ -314,9 +314,9 @@ describe('Bond Symbol Detection via Treasury Registry', () => {
     const mockTickerRegistry = [
         { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
         { ticker: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
-        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
-        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' },
-        { ticker: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'TREASURY' },
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'OTC', securityType: 'TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'OTC', securityType: 'TREASURY' },
+        { ticker: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'OTC', securityType: 'TREASURY' },
         { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
     ];
 
@@ -328,8 +328,8 @@ describe('Bond Symbol Detection via Treasury Registry', () => {
         // Look up in ticker registry
         const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
         
-        // If found and exchange is TREASURY, it's a bond
-        if (tickerObj && tickerObj.exchange === 'TREASURY') {
+        const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
+        if (tickerObj && (tickerObj.exchange === 'TREASURY' || securityType === 'TREASURY' || securityType === 'BOND')) {
             return true;
         }
         
@@ -387,8 +387,8 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
     // Mock ticker registry (same as detection tests)
     const mockTickerRegistry = [
         { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'TREASURY' },
-        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'TREASURY' }
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'OTC', securityType: 'TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'OTC', securityType: 'TREASURY' }
     ];
 
     // Helper matching server.js implementation - treasury registry lookup only
@@ -396,7 +396,8 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
         if (!ticker) return false;
         const clean = ticker.trim().toUpperCase();
         const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
-        return tickerObj && tickerObj.exchange === 'TREASURY';
+        const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
+        return !!(tickerObj && (tickerObj.exchange === 'TREASURY' || securityType === 'TREASURY' || securityType === 'BOND'));
     }
 
     beforeEach(() => {
