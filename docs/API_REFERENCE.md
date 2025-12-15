@@ -70,6 +70,7 @@ Routes (scrapers daemon):
 - `GET /watchlist/providers`
 - `GET /watchlist/:provider/status`
 - `GET /watchlist/:provider/tabs`
+- `POST /watchlist/:provider/switch` body: `{ "watchlist": "primary" }`
 - `GET /watchlist/:provider/tickers`
 - `POST /watchlist/:provider/add` body: `{ "ticker": "AAPL", "watchlist": "primary", "assetType": "stock" }`
 - `POST /watchlist/:provider/delete` body: `{ "ticker": "AAPL", "watchlist": "primary" }`
@@ -78,6 +79,7 @@ Routes (dashboard proxy):
 - `GET /api/watchlist/providers`
 - `GET /api/watchlist/:provider/status`
 - `GET /api/watchlist/:provider/tabs`
+- `POST /api/watchlist/:provider/switch`
 - `GET /api/watchlist/:provider/tickers`
 - `POST /api/watchlist/:provider/add`
 - `POST /api/watchlist/:provider/delete`
