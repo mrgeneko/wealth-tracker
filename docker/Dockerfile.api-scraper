@@ -1,0 +1,16 @@
+FROM node:20-slim
+
+WORKDIR /usr/src/app
+
+ENV NODE_ENV=production
+# Prevent Puppeteer from downloading Chromium during install; this container does not run browser scrapers.
+ENV PUPPETEER_SKIP_DOWNLOAD=1
+
+COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
+COPY . .
+
+EXPOSE 3020
+
+CMD ["node", "services/api-scraper/api_scrape_daemon.js"]
