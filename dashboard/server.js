@@ -1177,8 +1177,13 @@ app.post('/api/positions', async (req, res) => {
     }
     
     try {
-        // Auto-detect position type from treasury registry (don't trust frontend)
-        const detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
+        // For cash positions, preserve type='cash'. Otherwise auto-detect from treasury registry.
+        let detectedType = 'stock';
+        if (ticker.toUpperCase() === 'CASH') {
+            detectedType = 'cash';
+        } else {
+            detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
+        }
         
         const [result] = await pool.execute(
             'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
@@ -1205,8 +1210,13 @@ app.put('/api/positions/:id', async (req, res) => {
     }
     
     try {
-        // Auto-detect position type from treasury registry (don't trust frontend)
-        const detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
+        // For cash positions, preserve type='cash'. Otherwise auto-detect from treasury registry.
+        let detectedType = 'stock';
+        if (ticker.toUpperCase() === 'CASH') {
+            detectedType = 'cash';
+        } else {
+            detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
+        }
         
         await pool.execute(
             'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
