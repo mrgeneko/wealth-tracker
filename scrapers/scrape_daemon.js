@@ -1078,6 +1078,8 @@ async function daemon() {
 	// start health server so external monitors can query status and (optionally) metrics
 	try {
 		const METRICS_ENABLED = (process.env.METRICS_ENABLED || 'false').toLowerCase() === 'true';
+		// Capture the last initialization error per provider so API responses are actionable.
+		const providerInitErrors = new Map();
 		healthServer = http.createServer(async (req, res) => {
 			// Phase 8: On-demand scrape endpoint (uses PagePool + rate limiting)
 			if (req.url && req.url.startsWith('/scrape') && req.method === 'POST') {
@@ -1093,6 +1095,73 @@ async function daemon() {
 
 			// Phase 11: Watchlist management endpoints
 			try {
+				const isProviderRegistered = (providerId) => {
+					try {
+						return watchlistManager.getRegisteredProviders().includes(providerId);
+					} catch (e) {
+						return false;
+					}
+				};
+
+				const ensureProviderInitialized = async (providerId) => {
+					let controller = watchlistManager.getProvider(providerId);
+					if (controller) return controller;
+					if (!isProviderRegistered(providerId)) return null;
+					if (!browser) return null;
+
+					try {
+						if (!watchlistConfigLoader) {
+							watchlistConfigLoader = new WatchlistConfigLoader(getMysqlPool());
+						}
+						// Ensure we pick up newly inserted watchlist_instances immediately.
+						watchlistConfigLoader.cache = null;
+						watchlistConfigLoader.cacheExpiry = 0;
+						const providerCfg = await watchlistConfigLoader.getProvider(providerId);
+						const watchlists = providerCfg && Array.isArray(providerCfg.watchlists) ? providerCfg.watchlists : [];
+						const first = watchlists.find(w => w && w.enabled !== false && w.url);
+						if (!first || !first.url) return null;
+						await watchlistManager.initializeProvider(providerId, browser, first.url);
+						controller = watchlistManager.getProvider(providerId);
+						providerInitErrors.delete(providerId);
+						return controller;
+					} catch (e) {
+						const msg = e && e.message ? e.message : String(e);
+						providerInitErrors.set(providerId, msg);
+						logDebug(`[Watchlist] On-demand initialization failed for ${providerId}: ${msg}`);
+						return null;
+					}
+				};
+
+				const writeProviderNotReady = async (providerId) => {
+					const registered = isProviderRegistered(providerId);
+					if (!registered) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						return;
+					}
+
+					let hasUrl = false;
+					try {
+						if (!watchlistConfigLoader) {
+							watchlistConfigLoader = new WatchlistConfigLoader(getMysqlPool());
+						}
+						watchlistConfigLoader.cache = null;
+						watchlistConfigLoader.cacheExpiry = 0;
+						const providerCfg = await watchlistConfigLoader.getProvider(providerId);
+						const watchlists = providerCfg && Array.isArray(providerCfg.watchlists) ? providerCfg.watchlists : [];
+						hasUrl = !!watchlists.find(w => w && w.enabled !== false && w.url);
+					} catch (e) {
+						// ignore
+					}
+
+					const lastErr = providerInitErrors.get(providerId);
+					const msg = hasUrl
+						? `Provider not initialized: ${providerId}. Initialization failed (often due to login required or page layout changes).${lastErr ? ` Last error: ${lastErr}` : ''}`
+						: `Provider not initialized: ${providerId}. Configure at least one enabled watchlist URL in watchlist_instances and retry.`;
+					res.writeHead(400, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({ error: msg }));
+				};
+
 				if (req.url === '/watchlist/providers' && req.method === 'GET') {
 					res.writeHead(200, { 'Content-Type': 'application/json' });
 					res.end(JSON.stringify({
@@ -1106,10 +1175,9 @@ async function daemon() {
 				const statusMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/status$/);
 				if (statusMatch && req.method === 'GET') {
 					const providerId = statusMatch[1];
-					const controller = watchlistManager.getProvider(providerId);
+					const controller = await ensureProviderInitialized(providerId);
 					if (!controller) {
-						res.writeHead(404, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ error: `Provider not found or not initialized: ${providerId}` }));
+						await writeProviderNotReady(providerId);
 						return;
 					}
 					res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1120,10 +1188,9 @@ async function daemon() {
 				const tabsMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tabs$/);
 				if (tabsMatch && req.method === 'GET') {
 					const providerId = tabsMatch[1];
-					const controller = watchlistManager.getProvider(providerId);
+					const controller = await ensureProviderInitialized(providerId);
 					if (!controller) {
-						res.writeHead(404, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						await writeProviderNotReady(providerId);
 						return;
 					}
 					const tabs = await controller.getWatchlistTabs();
@@ -1135,10 +1202,9 @@ async function daemon() {
 				const switchMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/switch$/);
 				if (switchMatch && req.method === 'POST') {
 					const providerId = switchMatch[1];
-					const controller = watchlistManager.getProvider(providerId);
+					const controller = await ensureProviderInitialized(providerId);
 					if (!controller) {
-						res.writeHead(404, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						await writeProviderNotReady(providerId);
 						return;
 					}
 					const body = await readJsonBody(req);
@@ -1157,10 +1223,9 @@ async function daemon() {
 				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers$/);
 				if (tickersMatch && req.method === 'GET') {
 					const providerId = tickersMatch[1];
-					const controller = watchlistManager.getProvider(providerId);
+					const controller = await ensureProviderInitialized(providerId);
 					if (!controller) {
-						res.writeHead(404, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						await writeProviderNotReady(providerId);
 						return;
 					}
 					const tickers = await controller.listTickers();
@@ -1172,10 +1237,9 @@ async function daemon() {
 				const addMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/add$/);
 				if (addMatch && req.method === 'POST') {
 					const providerId = addMatch[1];
-					const controller = watchlistManager.getProvider(providerId);
+					const controller = await ensureProviderInitialized(providerId);
 					if (!controller) {
-						res.writeHead(404, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						await writeProviderNotReady(providerId);
 						return;
 					}
 					const body = await readJsonBody(req);
@@ -1194,10 +1258,9 @@ async function daemon() {
 				const deleteMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/delete$/);
 				if (deleteMatch && req.method === 'POST') {
 					const providerId = deleteMatch[1];
-					const controller = watchlistManager.getProvider(providerId);
+					const controller = await ensureProviderInitialized(providerId);
 					if (!controller) {
-						res.writeHead(404, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						await writeProviderNotReady(providerId);
 						return;
 					}
 					const body = await readJsonBody(req);
