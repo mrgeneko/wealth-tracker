@@ -59,6 +59,31 @@ Rate limited (429):
 Headers:
 - `Retry-After`: seconds (rounded up)
 
+### Watchlist management (Phase 11)
+
+Provider-based watchlist endpoints exposed by the scrapers daemon health server.
+
+- URL (docker-compose default via dashboard): `http://localhost:3000/api/watchlist/...`
+- URL (direct to scrapers daemon): `http://localhost:3002/watchlist/...`
+
+Routes (scrapers daemon):
+- `GET /watchlist/providers`
+- `GET /watchlist/:provider/status`
+- `GET /watchlist/:provider/tabs`
+- `GET /watchlist/:provider/tickers`
+- `POST /watchlist/:provider/add` body: `{ "ticker": "AAPL", "watchlist": "primary", "assetType": "stock" }`
+- `POST /watchlist/:provider/delete` body: `{ "ticker": "AAPL", "watchlist": "primary" }`
+
+Routes (dashboard proxy):
+- `GET /api/watchlist/providers`
+- `GET /api/watchlist/:provider/status`
+- `GET /api/watchlist/:provider/tabs`
+- `GET /api/watchlist/:provider/tickers`
+- `POST /api/watchlist/:provider/add`
+- `POST /api/watchlist/:provider/delete`
+
+For configuration and adding new providers, see `docs/WATCHLIST_PROVIDERS.md`.
+
 ## Listing Sync Service
 
 - URL (docker-compose default): `http://localhost:3010`
