@@ -6718,42 +6718,42 @@ Phase 1 ────────────────────────
 ### Phase 11 Complete When:
 
 **Configuration (Step 11.0):**
-- [ ] Database schema created (watchlist_providers, watchlist_instances tables)
-- [ ] WatchlistConfigLoader service created
-- [ ] Database seeded via init script (001-listing-sync-watchlist.sql)
-- [ ] Per-watchlist URLs stored in .env (not config.json)
-- [ ] Per-watchlist asset type constraints supported
+- [x] Database schema created (watchlist_providers, watchlist_instances tables)
+- [x] WatchlistConfigLoader service created
+- [x] Database seeded via init script (001-listing-sync-watchlist.sql)
+- [x] Per-watchlist URLs stored in DB (watchlist_instances.url) with config fallback
+- [x] Per-watchlist asset type constraints supported
 
 **Base Infrastructure:**
-- [ ] BaseWatchlistController abstract class created
-- [ ] AssetType enum defined (stock, etf, bond, treasury, etc.)
-- [ ] WatchlistManager provider registry created
+- [x] BaseWatchlistController abstract class created
+- [x] AssetType enum defined (stock, etf, bond, treasury, etc.)
+- [x] WatchlistManager provider registry created
 
 **Provider Implementation:**
-- [ ] InvestingComWatchlistController extends BaseWatchlistController
-- [ ] Asset type validation rejects unsupported types (only stock/etf for Investing.com)
-- [ ] Operation queue prevents concurrent modifications
+- [x] InvestingComWatchlistController extends BaseWatchlistController
+- [x] Asset type validation rejects unsupported types (only stock/etf for Investing.com)
+- [x] Operation queue prevents concurrent modifications
 
 **API & Dashboard:**
-- [ ] HTTP endpoints use provider-based routing (/watchlist/{provider}/*)
-- [ ] Dashboard proxy endpoints support multiple providers
-- [ ] Dashboard UI shows supported asset types per provider
-- [ ] Add ticker functionality with asset type validation
-- [ ] Delete ticker functionality working
-- [ ] Switch watchlist tab functionality working
+- [x] HTTP endpoints use provider-based routing (/watchlist/{provider}/*)
+- [x] Dashboard proxy endpoints support multiple providers
+- [x] Dashboard UI shows supported asset types per provider
+- [x] Add ticker functionality with asset type validation
+- [x] Delete ticker functionality working
+- [x] Switch watchlist tab functionality working
 
 **Testing & Documentation:**
-- [ ] Unit tests passing (>80% coverage)
-- [ ] Tests cover asset type validation rejection
-- [ ] Tests cover config loading from DB
-- [ ] Documentation for adding new providers
+- [x] Unit tests passing (>80% coverage)
+- [x] Tests cover asset type validation rejection
+- [x] Tests cover config loading from DB
+- [x] Documentation for adding new providers
 
 **Scheduling Integration:**
-- [ ] Integrates with existing `getScrapeGroupSettings()`/`shouldRunTask()` pattern
-- [ ] Marker files created per watchlist instance (`last.watchlist.{provider}.{key}.txt`)
-- [ ] UpdateWindowService created with DB support
-- [ ] Per-ticker and per-watchlist update windows working
-- [ ] Scheduling hierarchy documented (group → provider → instance → windows)
+- [x] Integrates with existing `getScrapeGroupSettings()`/`shouldRunTask()` pattern
+- [x] Marker files created per watchlist instance (`last.watchlist.{provider}.{key}.txt`)
+- [x] UpdateWindowService created with DB support
+- [x] Per-ticker and per-watchlist update windows working
+- [x] Scheduling hierarchy documented (group → provider → instance → windows)
 
 ---
 
