@@ -5,5 +5,7 @@ services:
       - 172.17.0.2
       - 1.1.1.1
       - 8.8.8.8
+    environment:
+      ROUTING_DEBUG: "true"
     # Optional: set restart to recreate with the override when using `docker-compose up`
     restart: unless-stopped
