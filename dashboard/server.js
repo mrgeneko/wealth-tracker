@@ -495,8 +495,11 @@ async function fetchAssetsFromDB() {
             const accPositions = positions.filter(p => p.account_id === acc.id);
 
             for (const pos of accPositions) {
+                const isCashTicker = pos.ticker && String(pos.ticker).trim().toUpperCase() === 'CASH';
+
                 // Determine display type
-                const displayType = pos.type; // Default to stored type
+                // Defensive: treat ticker CASH as cash even if stored type was incorrect.
+                const displayType = isCashTicker ? 'cash' : pos.type; // Default to stored type
 
                 // Common position object
                 const positionData = {
@@ -516,13 +519,19 @@ async function fetchAssetsFromDB() {
                     exchange: pos.exchange || pos.meta_exchange || null
                 };
 
-                if (pos.type === 'cash') {
-                    accountObj.holdings.cash = {
-                        id: pos.id,
-                        value: parseFloat(pos.quantity),
-                        currency: pos.currency
-                    };
-                } else if (pos.type === 'bond') {
+                if (displayType === 'cash') {
+                    const cashValue = parseFloat(pos.quantity);
+                    if (!accountObj.holdings.cash) {
+                        accountObj.holdings.cash = {
+                            id: pos.id,
+                            value: isNaN(cashValue) ? 0 : cashValue,
+                            currency: pos.currency
+                        };
+                    } else {
+                        // If multiple cash rows exist for an account, show them as one value in the UI.
+                        accountObj.holdings.cash.value += (isNaN(cashValue) ? 0 : cashValue);
+                    }
+                } else if (displayType === 'bond') {
                     accountObj.holdings.bonds.push(positionData);
                 } else {
                     // Stocks, ETFs, Crypto, etc.

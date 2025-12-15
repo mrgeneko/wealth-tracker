@@ -1720,10 +1720,16 @@
             }
 
             // Collect all unique symbols
+            // NOTE: CASH is rendered as a dedicated row below; exclude it from the symbol universe
+            // so it doesn't appear twice if a mis-typed CASH position exists.
             const allSymbols = new Set();
             accounts.forEach(acc => {
-                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.ticker));
-                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.ticker));
+                acc.holdings.stocks.forEach(pos => {
+                    if (pos && pos.ticker && String(pos.ticker).toUpperCase() !== 'CASH') allSymbols.add(pos.ticker);
+                });
+                acc.holdings.bonds.forEach(pos => {
+                    if (pos && pos.ticker && String(pos.ticker).toUpperCase() !== 'CASH') allSymbols.add(pos.ticker);
+                });
             });
             const sortedSymbols = Array.from(allSymbols).sort();
 
@@ -1759,6 +1765,7 @@
             // Build row data for sorting
             const rowData = [];
             sortedSymbols.forEach(sym => {
+                if (sym && String(sym).toUpperCase() === 'CASH') return;
                 let rowInfo = { symbol: sym, changePct: 0, valueChange: 0, total: 0, name: '', sector: '' };
                 let price = 0;
                 let changePct = '0%';
