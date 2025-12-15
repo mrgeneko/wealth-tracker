@@ -44,7 +44,16 @@ function parseToIso(timeStr) {
 }
 
 async function scrapeGoogle(browser, security, outputDir) {
-	let page = null;
+	return await scrapeGoogleCore({ browser, page: null, security, outputDir, closePage: true, attachCounters: true });
+}
+
+// Phase 8: on-demand scraping uses PagePool pages; do not close pooled pages.
+async function scrapeGoogleWithPage(page, security, outputDir) {
+	return await scrapeGoogleCore({ browser: null, page, security, outputDir, closePage: false, attachCounters: false });
+}
+
+async function scrapeGoogleCore({ browser, page, security, outputDir, closePage, attachCounters }) {
+	let activePage = page || null;
 	let data = {};
 	const dateTimeString = getDateTimeString();
 	try {
@@ -52,10 +61,15 @@ async function scrapeGoogle(browser, security, outputDir) {
 		const ticker = sanitizeForFilename(security.key);
 		logDebug(`Security: ${ticker}   open Google Finance: ${url}`);
 		const snapshotBase = path.join(outputDir, `${dateTimeString}.${ticker}.google`);
-		const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3 };
-		page = await createPreparedPage(browser, pageOpts);
+		const pageOpts = { url, downloadPath: outputDir, waitUntil: 'domcontentloaded', timeout: 20000, gotoRetries: 3, attachCounters };
+		if (activePage) {
+			pageOpts.existingPage = activePage;
+			activePage = await createPreparedPage(null, pageOpts);
+		} else {
+			activePage = await createPreparedPage(browser, pageOpts);
+		}
 		logDebug('Page loaded. Extracting HTML...');
-		const html = await savePageSnapshot(page, snapshotBase);
+		const html = await savePageSnapshot(activePage, snapshotBase);
 		if (html) logDebug(`Saved Google snapshot base ${snapshotBase}`);
 		
 		const $ = cheerio.load(html);
@@ -216,11 +230,11 @@ fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 2), 'utf-8');
 	} catch (err) {
 		logDebug('Error in scrapeGoogle: ' + err);
 	} finally {
-		if (page) {
-			try { await page.close(); logDebug('Closed Google Finance tab.'); } catch (e) { logDebug('Error closing tab: ' + e); }
+		if (activePage && closePage) {
+			try { await activePage.close(); logDebug('Closed Google Finance tab.'); } catch (e) { logDebug('Error closing tab: ' + e); }
 		}
 	}
 	return data;
 }
 
-module.exports = { scrapeGoogle };
+module.exports = { scrapeGoogle, scrapeGoogleWithPage };

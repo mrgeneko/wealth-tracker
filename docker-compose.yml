@@ -17,6 +17,11 @@ services:
       YAHOO_DELAY_MS: "5000"
       YAHOO_MAX_RETRIES: "4"
       YAHOO_BACKOFF_BASE_MS: "1000"
+      # Phase 7: Page pool configuration
+      PAGE_POOL_SIZE: "4"
+      PAGE_ACQUIRE_TIMEOUT: "30000"
+      PAGE_MAX_OPERATIONS: "100"
+      PAGE_NAVIGATION_TIMEOUT: "30000"
     volumes:
       - ./logs:/usr/src/app/logs
       - ./data:/usr/src/app/data
@@ -28,6 +33,36 @@ services:
       resources:
         limits:
           memory: 8g
+
+  listing-sync:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.listing-sync
+    container_name: wealth-tracker-listing-sync
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      HTTP_PORT: 3010
+      ENABLE_HTTP_API: "true"
+      ENABLE_AUTO_SYNC: "false"
+      SYNC_INTERVAL_MINUTES: "1440"
+      CONFIG_DIR: /app/config
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    ports:
+      - "3010:3010"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   dashboard:
     build:

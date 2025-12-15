@@ -1,150 +1,129 @@
 /**
- * Ticker Registry - Loads all available tickers from exchange and treasury CSV files
- * Used for autocomplete in the dashboard
+ * Ticker Registry
+ *
+ * Provides ticker data for dashboard autocomplete and lookup.
+ *
+ * Data source: Database (ticker_registry table)
+ *
+ * @module dashboard/ticker_registry
  */
-const fs = require('fs');
-const path = require('path');
-const { parse } = require('csv-parse/sync');
 
-const CONFIG_DIR = process.env.CONFIG_DIR || '/app/config';
-const NASDAQ_FILE = path.join(CONFIG_DIR, 'nasdaq-listed.csv');
-const NYSE_FILE = path.join(CONFIG_DIR, 'nyse-listed.csv');
-const OTHER_LISTED_FILE = path.join(CONFIG_DIR, 'other-listed.csv');
-const TREASURY_FILE = path.join(CONFIG_DIR, 'us-treasury-auctions.csv');
-
-// Exchange code mapping from NASDAQ symboldirdefs
-// A = NYSE MKT, N = NYSE, P = NYSE ARCA, Z = BATS, V = IEX
-const EXCHANGE_CODES = {
-    'A': 'NYSE MKT',
-    'N': 'NYSE',
-    'P': 'NYSE ARCA',
-    'Z': 'BATS',
-    'V': 'IEX'
-};
-
+let dbPool = null;
 let tickerCache = null;
 
-// Strip BOM (Byte Order Mark) from file content
-function stripBOM(content) {
-    if (content.charCodeAt(0) === 0xFEFF) {
-        return content.slice(1);
-    }
-    return content;
+/**
+ * Initialize database connection
+ * @param {Object} pool - MySQL connection pool
+ */
+function initializeDbPool(pool) {
+    dbPool = pool;
+    tickerCache = null;
 }
 
-function loadAllTickers() {
+/**
+ * Load all tickers from database
+ * @returns {Promise<Array>} Array of ticker objects
+ */
+async function loadAllTickers() {
     if (tickerCache) return tickerCache;
 
-    const tickers = [];
-
-    try {
-        // Load NASDAQ symbols
-        if (fs.existsSync(NASDAQ_FILE)) {
-            const content = stripBOM(fs.readFileSync(NASDAQ_FILE, 'utf-8'));
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            records.forEach(record => {
-                if (record.Symbol) {
-                    tickers.push({
-                        ticker: record.Symbol.trim().toUpperCase(),
-                        name: record['Security Name'] || '',
-                        exchange: 'NASDAQ'
-                    });
-                }
-            });
-        }
-
-        // Load NYSE symbols
-        if (fs.existsSync(NYSE_FILE)) {
-            const content = stripBOM(fs.readFileSync(NYSE_FILE, 'utf-8'));
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            records.forEach(record => {
-                if (record['ACT Symbol']) {
-                    tickers.push({
-                        ticker: record['ACT Symbol'].trim().toUpperCase(),
-                        name: record['Company Name'] || '',
-                        exchange: 'NYSE'
-                    });
-                }
-            });
-        }
-
-        // Load Other Listed symbols (NYSE MKT, NYSE ARCA, BATS, IEX, etc.)
-        // Track symbols we've already seen to avoid duplicates with NYSE
-        const seenSymbols = new Set(tickers.map(t => t.ticker));
-        if (fs.existsSync(OTHER_LISTED_FILE)) {
-            const content = stripBOM(fs.readFileSync(OTHER_LISTED_FILE, 'utf-8'));
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            records.forEach(record => {
-                if (record['ACT Symbol']) {
-                    const symbol = record['ACT Symbol'].trim().toUpperCase();
-                    // Skip if we already have this symbol from NYSE or NASDAQ
-                    if (seenSymbols.has(symbol)) return;
-                    seenSymbols.add(symbol);
-                    const exchangeCode = record['Exchange'] || '';
-                    const exchange = EXCHANGE_CODES[exchangeCode] || exchangeCode || 'OTHER';
-                    tickers.push({
-                        symbol: symbol,
-                        name: record['Company Name'] || '',
-                        exchange: exchange
-                    });
-                }
-            });
-        }
-
-        // Load Treasury CUSIPs
-        if (fs.existsSync(TREASURY_FILE)) {
-            const content = stripBOM(fs.readFileSync(TREASURY_FILE, 'utf-8'));
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            records.forEach(record => {
-                // Header is 'CUSIP' (uppercase)
-                const cusip = record.CUSIP || record.Cusip;
-                if (cusip) {
-                    const securityType = record['Security Type'] || '';
-                    const securityTerm = record['Security Term'] || '';
-                    const issueDate = record['Issue Date'] || '';
-                    const maturityDate = record['Maturity Date'] || '';
-                    // Build description: "Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06"
-                    const parts = [];
-                    if (securityType) parts.push(securityType);
-                    if (securityTerm) parts.push(securityTerm);
-                    const dateParts = [];
-                    if (issueDate) dateParts.push(`Issue: ${issueDate}`);
-                    if (maturityDate) dateParts.push(`Maturity: ${maturityDate}`);
-                    const name = parts.join(' ') + (dateParts.length ? ' | ' + dateParts.join(' | ') : '');
-                    tickers.push({
-                        symbol: cusip.trim().toUpperCase(),
-                        name: name.trim(),
-                        exchange: 'TREASURY'
-                    });
-                }
-            });
-        }
-    } catch (e) {
-        console.error('Error loading tickers:', e.message);
+    if (!dbPool) {
+        throw new Error('Database pool not initialized. Call initializeDbPool() first.');
     }
 
-    tickerCache = tickers;
-    return tickers;
+    const conn = await dbPool.getConnection();
+    try {
+        const [rows] = await conn.execute(`
+      SELECT
+        ticker,
+        name,
+        exchange,
+        security_type,
+        maturity_date,
+        issue_date,
+        security_term,
+        sort_rank
+      FROM ticker_registry
+      ORDER BY
+        CASE exchange
+          WHEN 'NASDAQ' THEN 1
+          WHEN 'NYSE' THEN 2
+          ELSE 3
+        END,
+        sort_rank ASC,
+        ticker ASC
+    `);
+
+        tickerCache = rows.map(row => ({
+            ticker: row.ticker,
+            symbol: row.ticker, // Alias for compatibility
+            name: row.name || '',
+            exchange: row.exchange,
+            securityType: row.security_type,
+            maturityDate: row.maturity_date,
+            issueDate: row.issue_date,
+            securityTerm: row.security_term
+        }));
+
+        console.log(`[TickerRegistry] Loaded ${tickerCache.length} tickers from database`);
+        return tickerCache;
+    } finally {
+        conn.release();
+    }
 }
 
-function reloadTickers() {
+/**
+ * Force reload of ticker data from database
+ * @returns {Promise<Array>} Array of ticker objects
+ */
+async function reloadTickers() {
     tickerCache = null;
     return loadAllTickers();
 }
 
+/**
+ * Search tickers by prefix (for autocomplete)
+ * @param {string} prefix - Ticker prefix to search
+ * @param {number} limit - Max results (default 20)
+ * @returns {Promise<Array>} Matching tickers
+ */
+async function searchTickers(prefix, limit = 20) {
+    if (!dbPool) {
+        throw new Error('Database pool not initialized. Call initializeDbPool() first.');
+    }
+
+    const conn = await dbPool.getConnection();
+    try {
+        const normalizedPrefix = (prefix || '').toString().toUpperCase();
+        const [rows] = await conn.execute(`
+      SELECT ticker, name, exchange, security_type
+      FROM ticker_registry
+      WHERE ticker LIKE ?
+      ORDER BY sort_rank ASC, ticker ASC
+      LIMIT ?
+    `, [`${normalizedPrefix}%`, limit]);
+
+        return rows;
+    } finally {
+        conn.release();
+    }
+}
+
+/**
+ * Get cache statistics
+ * @returns {Object} Cache stats
+ */
+function getCacheStats() {
+    return {
+        count: tickerCache ? tickerCache.length : 0,
+        hasDbConnection: !!dbPool
+    };
+}
+
 module.exports = {
     loadAllTickers,
-    reloadTickers
+    reloadTickers,
+    searchTickers,
+    initializeDbPool,
+    getCacheStats
 };
