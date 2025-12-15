@@ -43,7 +43,7 @@
 
         th,
         td {
-            padding: 10px;
+            padding: 4px 8px;
             border: 1px solid #333;
             text-align: right;
             color: #e0e0e0;
@@ -479,7 +479,7 @@
             box-shadow: none;
             margin-bottom: 0;
         }
-        
+
         #metadataStats td {
             border: none;
             padding: 4px 0;
@@ -672,13 +672,16 @@
                         <select id="watchlistTab"></select>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="btn" style="background-color: #555; color: white;" onclick="switchWatchlistTab()">Switch Tab</button>
-                        <button class="btn" style="background-color: #555; color: white;" onclick="loadWatchlistTickers()">Load Tickers</button>
+                        <button class="btn" style="background-color: #555; color: white;"
+                            onclick="switchWatchlistTab()">Switch Tab</button>
+                        <button class="btn" style="background-color: #555; color: white;"
+                            onclick="loadWatchlistTickers()">Load Tickers</button>
                     </div>
                 </div>
             </div>
 
-            <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+            <div
+                style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
                 <h3 style="margin-top: 0;">Add Ticker</h3>
                 <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: end;">
                     <div class="form-group" style="margin: 0;">
@@ -846,47 +849,59 @@
 
                 <div class="settings-section">
                     <h3>Symbol Registry Management</h3>
-                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Manage metadata population and refresh cycles</p>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Manage metadata population and
+                        refresh cycles</p>
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
-                        <button class="btn btn-primary" id="btnRefreshMetadata" onclick="refreshMetadata()" style="text-align: left;">
+                        <button class="btn btn-primary" id="btnRefreshMetadata" onclick="refreshMetadata()"
+                            style="text-align: left;">
                             🔄 Refresh Yahoo Metadata
                         </button>
-                        <button class="btn btn-primary" id="btnCleanupExpired" onclick="cleanupExpired()" style="text-align: left;">
+                        <button class="btn btn-primary" id="btnCleanupExpired" onclick="cleanupExpired()"
+                            style="text-align: left;">
                             🗑️ Cleanup Expired Securities
                         </button>
                     </div>
-                    
+
                     <!-- Metadata Statistics -->
-                    <div id="metadataStats" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                    <div id="metadataStats"
+                        style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
                         <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa;">Statistics (auto-updating)</p>
                         <div style="font-size: 0.85em;">
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Total</span>
                                 <span id="stat-total" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">With Data</span>
                                 <span id="stat-with" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Without Data</span>
                                 <span id="stat-without" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0; font-weight: bold;">Complete %</span>
-                                <span style="color: #fff; font-weight: bold;"><span id="stat-completion">0</span>%</span>
+                                <span style="color: #fff; font-weight: bold;"><span
+                                        id="stat-completion">0</span>%</span>
                             </div>
                             <!-- Queue Metrics -->
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444; border-top: 1px solid #555; margin-top: 8px; padding-top: 8px;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444; border-top: 1px solid #555; margin-top: 8px; padding-top: 8px;">
                                 <span style="color: #ffb74d;">Queue Size</span>
                                 <span id="stat-queue-size" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #ffb74d;">Est. Time</span>
                                 <span id="stat-queue-time" style="color: #fff; font-weight: bold;">0 min</span>
                             </div>
                             <!-- Processing Metrics -->
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444; border-top: 1px solid #555; margin-top: 8px; padding-top: 8px;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444; border-top: 1px solid #555; margin-top: 8px; padding-top: 8px;">
                                 <span style="color: #81c784;">Recent Updates</span>
                                 <span id="stat-recent-updates" style="color: #fff; font-weight: bold;">0</span>
                             </div>
@@ -897,36 +912,50 @@
                         </div>
                     </div>
                     <p id="metadataStatus" style="font-size: 0.85em; color: #aaa; margin-top: 8px;"></p>
-                    
+
                     <!-- Per-Type Statistics Filtering (Phase 8.3) -->
                     <div style="background: #3a3a3a; padding: 10px; border-radius: 4px; margin-top: 10px;">
-                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">Filter by Type</p>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;" id="typeFilterButtons"></div>
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">Filter by Type
+                        </p>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;"
+                            id="typeFilterButtons"></div>
                         <div id="typeStats" style="font-size: 0.85em; display: none;">
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid #555; border-bottom: 1px solid #444; color: #e0e0e0;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid #555; border-bottom: 1px solid #444; color: #e0e0e0;">
                                 <span id="typeStatsLabel">Type: </span>
                                 <span style="color: #aaa;"></span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Total</span>
                                 <span id="typeStat-total" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">With Data</span>
                                 <span id="typeStat-with" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Without Data</span>
                                 <span id="typeStat-without" style="color: #fff; font-weight: bold;">0</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Complete %</span>
-                                <span style="color: #fff; font-weight: bold;"><span id="typeStat-completion">0</span>%</span>
+                                <span style="color: #fff; font-weight: bold;"><span
+                                        id="typeStat-completion">0</span>%</span>
                             </div>
                             <div style="display: flex; gap: 5px; margin-top: 8px;">
-                                <button class="btn btn-primary" id="btnRefreshType" style="flex: 1; padding: 6px; font-size: 0.8em;" onclick="refreshSelectedType()">🔄 Refresh</button>
-                                <button class="btn btn-danger" id="btnResetType" style="flex: 1; padding: 6px; font-size: 0.8em;" onclick="resetSelectedType()">⚠️ Reset</button>
-                                <button class="btn" id="btnClearType" style="flex: 1; padding: 6px; font-size: 0.8em; background-color: #555; color: white;" onclick="clearTypeFilter()">✕ Clear</button>
+                                <button class="btn btn-primary" id="btnRefreshType"
+                                    style="flex: 1; padding: 6px; font-size: 0.8em;" onclick="refreshSelectedType()">🔄
+                                    Refresh</button>
+                                <button class="btn btn-danger" id="btnResetType"
+                                    style="flex: 1; padding: 6px; font-size: 0.8em;" onclick="resetSelectedType()">⚠️
+                                    Reset</button>
+                                <button class="btn" id="btnClearType"
+                                    style="flex: 1; padding: 6px; font-size: 0.8em; background-color: #555; color: white;"
+                                    onclick="clearTypeFilter()">✕ Clear</button>
                             </div>
                         </div>
                     </div>
@@ -934,7 +963,8 @@
 
                 <div class="settings-section">
                     <h3>Scheduled Metadata Refresh</h3>
-                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Automatically refresh metadata at specified intervals</p>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Automatically refresh metadata at
+                        specified intervals</p>
                     <div class="setting-item">
                         <label for="refreshSchedule">Refresh Schedule</label>
                         <select id="refreshSchedule">
@@ -946,7 +976,8 @@
                             <option value="null" selected>Never</option>
                         </select>
                     </div>
-                    <div id="scheduleStatus" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 0.85em;">
+                    <div id="scheduleStatus"
+                        style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 0.85em;">
                         <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #aaa;">
                             <span>Status</span>
                             <span id="schedule-status" style="color: #e0e0e0;">Disabled</span>
@@ -964,33 +995,42 @@
 
                 <div class="settings-section">
                     <h3>System Health & Performance</h3>
-                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Monitor sync status and system performance metrics</p>
-                    
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Monitor sync status and system
+                        performance metrics</p>
+
                     <!-- File Refresh Status -->
-                    <div id="fileRefreshStatus" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">📁 File Sync Status</p>
+                    <div id="fileRefreshStatus"
+                        style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">📁 File Sync
+                            Status</p>
                         <div id="fileStatusList" style="font-size: 0.85em;">
                             <div style="color: #888; text-align: center; padding: 10px;">Loading...</div>
                         </div>
                     </div>
 
                     <!-- Performance Metrics -->
-                    <div id="performanceMetrics" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">📊 Performance Metrics</p>
+                    <div id="performanceMetrics"
+                        style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #aaa; font-weight: bold;">📊 Performance
+                            Metrics</p>
                         <div style="font-size: 0.85em;">
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Overall Health</span>
                                 <span id="metric-health" style="font-weight: bold;">—</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Success Rate</span>
                                 <span id="metric-success-rate" style="color: #fff; font-weight: bold;">—</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Total Symbols</span>
                                 <span id="metric-total-symbols" style="color: #fff; font-weight: bold;">—</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
+                            <div
+                                style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #444;">
                                 <span style="color: #e0e0e0;">Recent Errors</span>
                                 <span id="metric-recent-errors" style="color: #fff; font-weight: bold;">—</span>
                             </div>
@@ -1067,38 +1107,46 @@
                 <div class="form-group">
                     <label for="newSymbol">Ticker</label>
                     <div style="display: flex; gap: 5px;">
-                        <input type="text" id="newSymbol" required maxlength="50" style="text-transform:uppercase; flex: 1;"
-                            class="awesomplete" autocomplete="off" onchange="lookupSymbolMetadata()">
-                        <button type="button" class="btn btn-primary" id="btnLookupSymbol" onclick="lookupSymbolMetadata()" style="padding: 8px 12px;">🔍</button>
+                        <input type="text" id="newSymbol" required maxlength="50"
+                            style="text-transform:uppercase; flex: 1;" class="awesomplete" autocomplete="off"
+                            onchange="lookupSymbolMetadata()">
+                        <button type="button" class="btn btn-primary" id="btnLookupSymbol"
+                            onclick="lookupSymbolMetadata()" style="padding: 8px 12px;">🔍</button>
                     </div>
-                    <p id="symbolLookupStatus" style="font-size: 0.85em; color: #aaa; margin-top: 5px; display: none;"></p>
+                    <p id="symbolLookupStatus" style="font-size: 0.85em; color: #aaa; margin-top: 5px; display: none;">
+                    </p>
                 </div>
-                
+
                 <!-- Symbol Metadata Display (Phase 7) -->
-                <div id="symbolMetadataDisplay" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none;">
+                <div id="symbolMetadataDisplay"
+                    style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none;">
                     <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #888;">Symbol Information</p>
                     <table style="width: 100%; font-size: 0.85em;">
                         <tbody>
                             <tr style="border-bottom: 1px solid #444;">
                                 <td style="padding: 4px 0; color: #aaa;">Name:</td>
-                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataName">—</span></td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataName">—</span>
+                                </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #444;">
                                 <td style="padding: 4px 0; color: #aaa;">Type:</td>
-                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataType">—</span></td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataType">—</span>
+                                </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #444;">
                                 <td style="padding: 4px 0; color: #aaa;">Exchange:</td>
-                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataExchange">—</span></td>
+                                <td style="text-align: right; padding: 4px 0;"><span
+                                        id="symbolMetadataExchange">—</span></td>
                             </tr>
                             <tr>
                                 <td style="padding: 4px 0; color: #aaa;">Verified:</td>
-                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataVerified">✓</span></td>
+                                <td style="text-align: right; padding: 4px 0;"><span
+                                        id="symbolMetadataVerified">✓</span></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                
+
                 <input type="hidden" id="newSymbolType">
                 <div class="form-group">
                     <label for="newSymbolAccount">Account</label>
@@ -1738,7 +1786,7 @@
             };
             let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Symbol${sortIndicator('symbol')}</th>`;
             headerHtml += `<th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('name')">Name${sortIndicator('name')}</th>`;
-            headerHtml += `<th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('sector')">Sector${sortIndicator('sector')}</th>`;
+
 
             if (accountsCollapsed) {
                 // When collapsed, show only a "Shares" column
@@ -1841,7 +1889,7 @@
                             try {
                                 const v = priceNow / Number(stockPos.ttm_eps);
                                 if (isFinite(v) && v > 0 && v < 10000) metaPE = v.toFixed(2);
-                            } catch (e) {}
+                            } catch (e) { }
                         } else if (stockPos.trailing_pe) metaPE = stockPos.trailing_pe.toFixed(2);
 
                         if (stockPos.ttm_dividend_amount && priceNow) {
@@ -1850,7 +1898,7 @@
                                 if (isFinite(yieldPct) && yieldPct >= 0 && yieldPct <= 100) {
                                     metaYield = yieldPct.toFixed(2) + '%';
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         } else if (stockPos.dividend_yield) {
                             // Stored dividend_yield may be either a fraction (0.0123) or a
                             // percent-like value (1.23 or 123). Normalize for display:
@@ -1877,8 +1925,8 @@
                 rowInfo.sector = metaSector;
 
                 let rowHtml = `<tr><td style="text-align: left; font-weight: bold;">${sym}</td>`;
-                rowHtml += `<td style="text-align: left; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(metaName)}">${metaName}</td>`;
-                rowHtml += `<td style="text-align: left">${metaSector}</td>`;
+                rowHtml += `<td style="text-align: left; max-width: 105px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(metaName)}">${metaName}</td>`;
+
 
                 let symTotalValue = 0;
                 let symTotalValueChange = 0;
@@ -2066,7 +2114,7 @@
             rowData.sort((a, b) => {
                 let aVal = a[investmentGridSort.column];
                 let bVal = b[investmentGridSort.column];
-                if (investmentGridSort.column === 'symbol' || investmentGridSort.column === 'name' || investmentGridSort.column === 'sector') {
+                if (investmentGridSort.column === 'symbol' || investmentGridSort.column === 'name') {
                     aVal = (aVal || '').toLowerCase();
                     bVal = (bVal || '').toLowerCase();
                 }
@@ -2083,7 +2131,7 @@
             // Cash Row
             // IMPORTANT: This table always starts with Symbol/Name/Sector columns.
             // Ensure CASH aligns with those columns (Name/Sector should be blank).
-            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td><td></td><td></td>';
+            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td><td></td>';
             let totalCash = 0;
             accounts.forEach(acc => {
                 let cashVal = 0;
@@ -2116,7 +2164,7 @@
             // Account Totals
             // IMPORTANT: Keep alignment with Symbol/Name/Sector columns.
             // Name/Sector should be blank for TOTAL.
-            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td><td></td><td></td>';
+            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td><td></td>';
             let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
@@ -2902,7 +2950,7 @@
                 // Best effort: switch to the first tab so tickers reflect the tab selection.
                 const firstTab = getSelectedWatchlistTab();
                 if (firstTab) {
-                    try { await switchWatchlistTab(); } catch (e) {}
+                    try { await switchWatchlistTab(); } catch (e) { }
                 }
                 await loadWatchlistTickers();
             } catch (e) {
@@ -2928,7 +2976,7 @@
                     await loadWatchlistTabs();
                     const tab = getSelectedWatchlistTab();
                     if (tab) {
-                        try { await switchWatchlistTab(); } catch (e) {}
+                        try { await switchWatchlistTab(); } catch (e) { }
                     }
                     await loadWatchlistTickers();
                 }
@@ -3146,7 +3194,7 @@
             document.getElementById('autoRefresh').checked = autoRefresh;
             document.getElementById('refreshInterval').value = refreshInterval;
             document.getElementById('theme').value = theme;
-            
+
             // Phase 7: Update metadata stats when modal opens
             updateMetadataStats();
         }
@@ -3314,7 +3362,7 @@
          */
         function updateMetricsDisplay(summaryData, successData) {
             const summary = summaryData.summary || {};
-            
+
             // Health status
             const healthEl = document.getElementById('metric-health');
             const overallHealth = summaryData.fileRefreshStatus?.every(s => s.last_refresh_status === 'SUCCESS');
@@ -3336,7 +3384,7 @@
             successRateEl.style.color = successRate >= 90 ? '#4ade80' : successRate >= 70 ? '#fbbf24' : '#ff6b6b';
 
             // Total symbols
-            document.getElementById('metric-total-symbols').textContent = 
+            document.getElementById('metric-total-symbols').textContent =
                 (summary.totalSymbols || 0).toLocaleString();
 
             // Recent errors
@@ -3346,7 +3394,7 @@
             errorsEl.style.color = recentErrors === 0 ? '#4ade80' : recentErrors < 10 ? '#fbbf24' : '#ff6b6b';
 
             // Last updated
-            document.getElementById('metric-last-updated').textContent = 
+            document.getElementById('metric-last-updated').textContent =
                 new Date(summaryData.timestamp).toLocaleString();
         }
 
@@ -3368,11 +3416,11 @@
 
             container.innerHTML = fileStatus.map(status => {
                 const icon = statusIcons[status.last_refresh_status] || '❓';
-                const duration = status.last_refresh_duration_ms 
-                    ? `${(status.last_refresh_duration_ms / 1000).toFixed(1)}s` 
+                const duration = status.last_refresh_duration_ms
+                    ? `${(status.last_refresh_duration_ms / 1000).toFixed(1)}s`
                     : '—';
-                const lastRefresh = status.last_refresh_at 
-                    ? new Date(status.last_refresh_at).toLocaleString() 
+                const lastRefresh = status.last_refresh_at
+                    ? new Date(status.last_refresh_at).toLocaleString()
                     : 'Never';
                 const added = status.tickers_added || 0;
                 const updated = status.tickers_updated || 0;
@@ -3394,7 +3442,7 @@
 
         // Load metrics when settings modal opens
         const originalOpenSettingsModal = openSettingsModal;
-        openSettingsModal = function() {
+        openSettingsModal = function () {
             originalOpenSettingsModal();
             loadPerformanceMetrics();
         };
@@ -3409,37 +3457,37 @@
                 console.log('[updateMetadataStats] Fetching statistics...');
                 const response = await fetch('/api/autocomplete/stats');
                 console.log('[updateMetadataStats] Response status:', response.status);
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
                 console.log('[updateMetadataStats] Data received:', data);
-                
+
                 const summary = data.summary || {};
-                
+
                 // Update statistics display
                 const totalElement = document.getElementById('stat-total');
                 const withElement = document.getElementById('stat-with');
                 const withoutElement = document.getElementById('stat-without');
                 const completionElement = document.getElementById('stat-completion');
-                
+
                 // Queue metrics elements
                 const queueSizeElement = document.getElementById('stat-queue-size');
                 const queueTimeElement = document.getElementById('stat-queue-time');
-                
+
                 // Processing metrics elements  
                 const recentUpdatesElement = document.getElementById('stat-recent-updates');
                 const avgTimeElement = document.getElementById('stat-avg-time');
-                
+
                 const totalValue = summary.total_symbols || 0;
                 const withValue = summary.with_metadata || 0;
                 const withoutValue = summary.without_metadata || 0;
                 const completionValue = (summary.completion_percentage || 0).toFixed(1);
-                
+
                 console.log('[updateMetadataStats] Setting values:', { totalValue, withValue, withoutValue, completionValue });
-                
+
                 if (totalElement) {
                     totalElement.textContent = totalValue;
                     console.log('[updateMetadataStats] stat-total element text set to:', totalElement.textContent);
@@ -3456,7 +3504,7 @@
                     completionElement.textContent = completionValue;
                     console.log('[updateMetadataStats] stat-completion element text set to:', completionElement.textContent);
                 }
-                
+
                 // Update queue metrics
                 const queue = data.queue || {};
                 if (queueSizeElement) {
@@ -3466,7 +3514,7 @@
                     const estMinutes = queue.estimated_completion_minutes || 0;
                     queueTimeElement.textContent = estMinutes > 0 ? `${estMinutes} min` : '0 min';
                 }
-                
+
                 // Update processing metrics
                 const processing = data.processing || {};
                 if (recentUpdatesElement) {
@@ -3476,12 +3524,12 @@
                     const avgTime = processing.avg_processing_time_seconds || 0;
                     avgTimeElement.textContent = avgTime > 0 ? `${avgTime}s` : '0s';
                 }
-                
+
                 // Update status message
                 const completion = summary.completion_percentage || 0;
                 const totalSymbols = summary.total_symbols || 0;
                 let statusMsg = '';
-                
+
                 if (totalSymbols === 0) {
                     statusMsg = 'ℹ️ No symbols in registry yet.';
                 } else if (completion >= 95) {
@@ -3498,7 +3546,7 @@
                 const statusElement = document.getElementById('metadataStatus');
                 if (statusElement) statusElement.textContent = statusMsg;
                 console.log('[updateMetadataStats] Status set to:', statusMsg);
-                
+
             } catch (error) {
                 console.error('[updateMetadataStats] Error:', error.message);
                 const statusElement = document.getElementById('metadataStatus');
@@ -3514,40 +3562,40 @@
         async function refreshMetadata() {
             const btn = document.getElementById('btnRefreshMetadata');
             const originalText = btn.textContent;
-            
+
             try {
                 btn.disabled = true;
                 btn.textContent = '⏳ Refreshing metadata...';
-                
+
                 // Call API to get pending symbols and mark them for refresh
                 const pendingResponse = await fetch('/api/autocomplete/pending?limit=100');
                 if (!pendingResponse.ok) throw new Error('Failed to get pending symbols');
-                
+
                 const pendingData = await pendingResponse.json();
                 const symbols = pendingData.pending || [];
-                
+
                 if (symbols.length === 0) {
                     alert('✅ All symbols have metadata! No refresh needed.');
                     btn.textContent = originalText;
                     btn.disabled = false;
                     return;
                 }
-                
+
                 // Bulk refresh the pending symbols
                 const refreshResponse = await fetch('/api/autocomplete/bulk-refresh', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ symbols })
                 });
-                
+
                 if (!refreshResponse.ok) throw new Error('Failed to refresh metadata');
-                
+
                 const refreshData = await refreshResponse.json();
                 alert(`✅ Queued ${refreshData.symbols_refreshed} symbols for metadata refresh!`);
-                
+
                 // Update stats immediately
                 await updateMetadataStats();
-                
+
             } catch (error) {
                 console.error('Error refreshing metadata:', error);
                 alert('❌ Error refreshing metadata: ' + error.message);
@@ -3563,36 +3611,36 @@
         async function cleanupExpired() {
             const btn = document.getElementById('btnCleanupExpired');
             const originalText = btn.textContent;
-            
+
             if (!confirm('This will remove symbols with no metadata and no holdings. Continue?')) {
                 return;
             }
-            
+
             try {
                 btn.disabled = true;
                 btn.textContent = '⏳ Cleaning up...';
-                
+
                 // Call cleanup API endpoint
                 const response = await fetch('/api/cleanup/cleanup', {
                     method: 'POST'
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.symbols_deleted > 0) {
                     alert(`✅ Cleanup complete!\n\nRemoved: ${data.symbols_deleted} symbols\n\n` +
-                          data.by_type.map(t => `${t.type}: ${t.count}`).join('\n'));
+                        data.by_type.map(t => `${t.type}: ${t.count}`).join('\n'));
                 } else {
                     alert('ℹ️ No expired symbols to clean up.');
                 }
-                
+
                 // Update statistics after cleanup
                 await updateMetadataStats();
-                
+
             } catch (error) {
                 console.error('Error during cleanup:', error);
                 alert('❌ Error during cleanup: ' + error.message);
@@ -3610,22 +3658,22 @@
             const statusEl = document.getElementById('symbolLookupStatus');
             const displayEl = document.getElementById('symbolMetadataDisplay');
             const btn = document.getElementById('btnLookupSymbol');
-            
+
             // Clear previous status
             statusEl.style.display = 'none';
             displayEl.style.display = 'none';
-            
+
             if (!symbol) {
                 return;
             }
-            
+
             try {
                 btn.disabled = true;
                 statusEl.textContent = '🔍 Checking symbol...';
                 statusEl.style.display = 'block';
-                
+
                 const response = await fetch(`/api/autocomplete/details/${symbol}`);
-                
+
                 if (!response.ok) {
                     if (response.status === 404) {
                         statusEl.textContent = '⚠️ Symbol not recognized. Will add as new stock.';
@@ -3636,9 +3684,9 @@
                     statusEl.style.display = 'block';
                     return;
                 }
-                
+
                 const data = await response.json();
-                
+
                 // Populate metadata display
                 document.getElementById('symbolMetadataName').textContent = data.name || '—';
                 // Show detected type (auto-determined by backend from treasury registry + Yahoo metadata)
@@ -3646,13 +3694,13 @@
                 document.getElementById('symbolMetadataType').textContent = detectedType.toUpperCase();
                 document.getElementById('symbolMetadataExchange').textContent = data.exchange || '—';
                 document.getElementById('symbolMetadataVerified').textContent = data.verified ? '✅ Yes' : '⚠️ Unverified';
-                
+
                 // Store detected type in hidden input (backend auto-detected)
                 document.getElementById('newSymbolType').value = detectedType.toLowerCase();
-                
+
                 displayEl.style.display = 'block';
                 statusEl.textContent = '⏳ Fetching current price...';
-                
+
                 // Fetch current price - pass type so bonds trigger scrape daemon
                 try {
                     const priceResponse = await fetch('/api/fetch-price', {
@@ -3660,12 +3708,12 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ticker: symbol, type: detectedType.toLowerCase() })
                     });
-                    
+
                     if (priceResponse.ok) {
                         const priceData = await priceResponse.json();
                         if (priceData.isBond) {
                             // Bond prices are fetched asynchronously by scrape daemon
-                            statusEl.textContent = priceData.triggered 
+                            statusEl.textContent = priceData.triggered
                                 ? '✅ Bond added! Price will update shortly via scraper.'
                                 : '⚠️ Bond added, but scraper trigger failed.';
                         } else {
@@ -3678,7 +3726,7 @@
                     console.warn('Price fetch failed:', priceError);
                     statusEl.textContent = '✅ Symbol found! (Price fetch failed)';
                 }
-                
+
             } catch (error) {
                 console.error('Error looking up symbol:', error);
                 statusEl.textContent = '❌ Error: ' + error.message;
@@ -3702,12 +3750,12 @@
             // MetadataRefreshScheduler class will be loaded from scheduler.js
             if (typeof MetadataRefreshScheduler !== 'undefined') {
                 metadataRefreshScheduler = new MetadataRefreshScheduler();
-                
+
                 // Set initial UI state
                 updateScheduleStatus();
-                
+
                 console.log('[Dashboard] Metadata refresh scheduler initialized');
-                
+
                 // Update schedule status every minute
                 setInterval(updateScheduleStatus, 60000);
             } else {
@@ -3788,7 +3836,7 @@
         function initializeStatisticsFilter() {
             if (typeof StatisticsFilter !== 'undefined') {
                 statisticsFilter = new StatisticsFilter();
-                
+
                 // Load available types and populate buttons
                 statisticsFilter.loadAvailableTypes().then(types => {
                     populateTypeFilterButtons(types);
@@ -3807,7 +3855,7 @@
             if (!container) return;
 
             container.innerHTML = '';
-            
+
             types.forEach(type => {
                 const btn = document.createElement('button');
                 btn.className = 'btn';
@@ -3817,12 +3865,12 @@
                 btn.style.color = '#e0e0e0';
                 btn.style.border = '1px solid #555';
                 btn.textContent = type;
-                
+
                 btn.onclick = () => {
                     selectTypeFilter(type);
                     btn.style.backgroundColor = '#0d6efd';
                     btn.style.color = 'white';
-                    
+
                     // Deselect other buttons
                     container.querySelectorAll('button').forEach(b => {
                         if (b !== btn) {
@@ -3832,7 +3880,7 @@
                         }
                     });
                 };
-                
+
                 container.appendChild(btn);
             });
         }
@@ -3877,7 +3925,7 @@
             statisticsFilter.save();
 
             document.getElementById('typeStats').style.display = 'none';
-            
+
             // Deselect all type buttons
             document.getElementById('typeFilterButtons').querySelectorAll('button').forEach(btn => {
                 btn.style.backgroundColor = '#3a3a3a';

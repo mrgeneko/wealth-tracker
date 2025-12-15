@@ -20,9 +20,15 @@ function parseArg(name, defaultValue) {
   fs.mkdirSync(outDir, { recursive: true });
 
   // find test files ending in .js in testsDir
-  // Skip dashboard_integration.test.js as it's a Jest test meant to run via npm test
+  // Skip certain tests that have their own dedicated workflows or require special setup:
+  // - dashboard_integration.test.js: Jest test meant to run via npm test
+  // - db_init_test.js: Requires docker-compose with init-db volume mount (see db-init-tests.yml)
+  const skipFiles = new Set([
+    'dashboard_integration.test.js',
+    'db_init_test.js'
+  ]);
   const files = fs.readdirSync(testsDir)
-    .filter(f => f.endsWith('.js') && f !== 'dashboard_integration.test.js');
+    .filter(f => f.endsWith('.js') && !skipFiles.has(f));
   if (!files.length) {
     console.error('No integration tests found in', testsDir);
     process.exit(1);

@@ -150,7 +150,12 @@ INSERT INTO watchlist_providers (provider_id, display_name, enabled, auth_method
 ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 -- Default update windows (market hours for stocks)
-INSERT INTO update_windows (provider_id, ticker, days, start_time, end_time, timezone, priority) VALUES
-(NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '09:30:00', '16:00:00', 'America/New_York', 0),
-(NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '16:00:00', '20:00:00', 'America/New_York', 0)
-ON DUPLICATE KEY UPDATE days = VALUES(days);
+-- Default update windows (market hours for stocks)
+INSERT INTO update_windows (provider_id, watchlist_key, ticker, days, start_time, end_time, timezone, priority) VALUES
+(NULL, NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '00:00:00', '04:00:00', 'America/New_York', 0),
+(NULL, NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '04:00:00', '09:30:00', 'America/New_York', 0),
+(NULL, NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '09:30:00', '16:00:00', 'America/New_York', 0),
+(NULL, NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '16:00:00', '20:00:00', 'America/New_York', 0),
+(NULL, NULL, 'default', '["mon", "tue", "wed", "thu", "fri"]', '20:00:00', '23:59:59', 'America/New_York', 0),
+('investingcom', NULL, 'BKLC', '["mon", "tue", "wed", "thu", "fri"]', '09:31:00', '16:00:00', 'America/New_York', 10)
+ON DUPLICATE KEY UPDATE days = VALUES(days), start_time = VALUES(start_time), end_time = VALUES(end_time), priority = VALUES(priority);
