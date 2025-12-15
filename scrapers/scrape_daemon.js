@@ -26,6 +26,21 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 const { OnDemandScrapeApi, DEFAULT_ON_DEMAND_LIMITS } = require('./on_demand_scrape_api');
 
+const ROUTING_DEBUG = (process.env.ROUTING_DEBUG || 'false').toLowerCase() === 'true';
+
+function routingLog(event, details) {
+	try {
+		const payload = {
+			event,
+			...details,
+			ts: new Date().toISOString()
+		};
+		logDebug('[routing] ' + JSON.stringify(payload));
+	} catch (e) {
+		// ignore
+	}
+}
+
 // Phase 11: watchlist management API
 const { watchlistManager } = require('./watchlist/watchlist_manager');
 const { WatchlistConfigLoader } = require('../services/watchlist_config_loader');
@@ -156,9 +171,14 @@ async function fetchStockPositions() {
 	try {
 		const pool = getMysqlPool();
 		const [rows] = await pool.query(
-			"SELECT DISTINCT ticker, type FROM positions WHERE type IN ('stock', 'etf') AND ticker IS NOT NULL AND ticker != ''"
+			"SELECT DISTINCT p.ticker, p.type, tr.security_type AS registry_security_type FROM positions p LEFT JOIN ticker_registry tr ON tr.ticker = p.ticker WHERE p.type IN ('stock', 'etf') AND p.ticker IS NOT NULL AND p.ticker != ''"
 		);
-		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker) }));
+		return rows.map(r => ({
+			ticker: r.ticker,
+			type: r.type,
+			registry_security_type: r.registry_security_type,
+			normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker)
+		}));
 	} catch (e) {
 		logDebug('Error fetching stock positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -169,9 +189,14 @@ async function fetchBondPositions() {
 	try {
 		const pool = getMysqlPool();
 		const [rows] = await pool.query(
-			"SELECT DISTINCT ticker, type FROM positions WHERE type = 'bond' AND ticker IS NOT NULL AND ticker != ''"
+			"SELECT DISTINCT p.ticker, p.type, tr.security_type AS registry_security_type FROM positions p LEFT JOIN ticker_registry tr ON tr.ticker = p.ticker WHERE p.type = 'bond' AND p.ticker IS NOT NULL AND p.ticker != ''"
 		);
-		return rows.map(r => ({ ticker: r.ticker, type: r.type, normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker) }));
+		return rows.map(r => ({
+			ticker: r.ticker,
+			type: r.type,
+			registry_security_type: r.registry_security_type,
+			normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker)
+		}));
 	} catch (e) {
 		logDebug('Error fetching bond positions from MySQL: ' + (e && e.message ? e.message : e));
 		return [];
@@ -813,11 +838,35 @@ async function runCycle(browser, outputDir) {
 			// Use round robin through constructible URLs for each position
 			for (const position of positions) {
 				const { ticker, type } = position;
+				const registrySecurityType = position && position.registry_security_type ? String(position.registry_security_type) : null;
+				const registrySecurityTypeUpper = registrySecurityType ? registrySecurityType.toUpperCase() : null;
+				const isRegistryBond = registrySecurityTypeUpper === 'TREASURY' || registrySecurityTypeUpper === 'BOND';
+				const effectiveType = isRegistryBond ? 'bond' : type;
+
+				if (isRegistryBond) {
+					routingLog('misclassified_bond_position_in_stock_group', {
+						group: stockPositionsName,
+						ticker,
+						position_type: type,
+						registry_security_type: registrySecurityType,
+						effective_type: effectiveType
+					});
+				}
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = await getConstructibleUrls(ticker, type);
+				const constructibleUrls = await getConstructibleUrls(ticker, effectiveType);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
 					logDebug(`No constructible URLs for ${ticker}, skipping`);
 					continue;
+				}
+				if (ROUTING_DEBUG || isRegistryBond) {
+					routingLog('candidate_sources', {
+						group: stockPositionsName,
+						ticker,
+						position_type: type,
+						registry_security_type: registrySecurityType,
+						effective_type: effectiveType,
+						sources: constructibleUrls.map(u => u.source)
+					});
 				}
 				
 				// Pick a random starting index for round robin
@@ -840,6 +889,20 @@ async function runCycle(browser, outputDir) {
 							currentIndex = (currentIndex + 1) % constructibleUrls.length;
 							continue;
 						}
+
+						// If this ticker is a registry bond/treasury, enforce bond rules even though we're in stock_positions.
+						if (effectiveType === 'bond') {
+							if (!sourceConfig || sourceConfig.has_bond_prices !== true) {
+								logDebug(`Skipping source ${sourceName} for bond ${ticker} (has_bond_prices is not explicitly true)`);
+								currentIndex = (currentIndex + 1) % constructibleUrls.length;
+								continue;
+							}
+							if (sourceName !== 'webull') {
+								logDebug(`Skipping non-webull source ${sourceName} for bond ${ticker} (bonds must use webull)`);
+								currentIndex = (currentIndex + 1) % constructibleUrls.length;
+								continue;
+							}
+						}
 						
 						// Check session validity
 						const isPre = isPreMarketSession();
@@ -853,14 +916,25 @@ async function runCycle(browser, outputDir) {
 							(isReg || !isWkday);
 						
 						// Check if source supports stock prices
-						if (sourceConfig.has_stock_prices !== false && isValidSession) {
+						if (effectiveType === 'bond' || (sourceConfig.has_stock_prices !== false && isValidSession)) {
 							try {
 								// Create a security object with the URL
 								const security = {
 									key: ticker,
-									type: 'stock',
+									type: (effectiveType === 'bond') ? 'bond' : 'stock',
 									[sourceName]: urlInfo.url
 								};
+								if (ROUTING_DEBUG || effectiveType === 'bond') {
+									routingLog('scrape_attempt', {
+										group: stockPositionsName,
+										ticker,
+										position_type: type,
+										registry_security_type: registrySecurityType,
+										effective_type: effectiveType,
+										source: sourceName,
+										url: urlInfo.url
+									});
+								}
 								logDebug(`Scraping position ${ticker} with ${sourceName}: ${urlInfo.url}`);
 								// Phase 9: Record metrics during scraper execution
 								const data = await recordScraperMetrics(sourceName, async () => {
@@ -933,28 +1007,39 @@ async function runCycle(browser, outputDir) {
 							continue;
 						}
 						
-						// Check if source supports bond prices
-						if (sourceConfig.has_bond_prices !== false) {
-							try {
-								// Create a security object with the URL
-								const security = {
-									key: ticker,
-									type: 'bond',
-									[sourceName]: urlInfo.url
-								};
-								logDebug(`Scraping bond ${ticker} with ${sourceName}: ${urlInfo.url}`);
-								// Phase 9: Record metrics during scraper execution
-								const data = await recordScraperMetrics(sourceName, async () => {
-									return await scraperFunc(browser, security, outputDir);
-								}, {
-									url: urlInfo.url
-								});
-								logDebug(`${sourceName} scrape result for bond ${ticker}: ${JSON.stringify(data)}`);
-								scraped = true;
-								break; // Successfully scraped, move to next bond
-							} catch (e) {
-								logDebug(`Error scraping bond ${ticker} with ${sourceName}: ${e.message}`);
-							}
+						// For bonds, ONLY allow sources that explicitly support bond prices (has_bond_prices === true)
+						if (sourceConfig && sourceConfig.has_bond_prices !== true) {
+							logDebug(`Skipping source ${sourceName} for bond ${ticker} (has_bond_prices is not explicitly true)`);
+							currentIndex = (currentIndex + 1) % constructibleUrls.length;
+							continue;
+						}
+						
+						// Explicit webull-only enforcement for bonds as a safety net
+						if (sourceName !== 'webull') {
+							logDebug(`Skipping non-webull source ${sourceName} for bond ${ticker} (bonds must use webull)`);
+							currentIndex = (currentIndex + 1) % constructibleUrls.length;
+							continue;
+						}
+						
+						try {
+							// Create a security object with the URL
+							const security = {
+								key: ticker,
+								type: 'bond',
+								[sourceName]: urlInfo.url
+							};
+							logDebug(`Scraping bond ${ticker} with ${sourceName}: ${urlInfo.url}`);
+							// Phase 9: Record metrics during scraper execution
+							const data = await recordScraperMetrics(sourceName, async () => {
+								return await scraperFunc(browser, security, outputDir);
+							}, {
+								url: urlInfo.url
+							});
+							logDebug(`${sourceName} scrape result for bond ${ticker}: ${JSON.stringify(data)}`);
+							scraped = true;
+							break; // Successfully scraped, move to next bond
+						} catch (e) {
+							logDebug(`Error scraping bond ${ticker} with ${sourceName}: ${e.message}`);
 						}
 					}
 					

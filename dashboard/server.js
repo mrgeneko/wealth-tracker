@@ -802,8 +802,10 @@ async function isBondTicker(ticker) {
     const allTickers = await loadAllTickers();
     const tickerObj = allTickers.find(t => t.ticker === clean);
     
-    // If found and exchange is TREASURY, it's a bond
-    if (tickerObj && tickerObj.exchange === 'TREASURY') {
+    // Treat anything in the registry with TREASURY/BOND security type as a bond.
+    // (Historically some treasury records used exchange='OTC', so exchange alone is not reliable.)
+    const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
+    if (tickerObj && (tickerObj.exchange === 'TREASURY' || securityType === 'TREASURY' || securityType === 'BOND')) {
         return true;
     }
     
