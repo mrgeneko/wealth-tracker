@@ -1,0 +1,42 @@
+name: Database Init Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/init-db/**'
+      - 'tests/integration/db_init_test.js'
+      - '.github/workflows/db-init-tests.yml'
+  pull_request:
+    paths:
+      - 'scripts/init-db/**'
+      - 'tests/integration/db_init_test.js'
+
+jobs:
+  test-db-init:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install mysql2
+
+      - name: Start MySQL with Docker Compose
+        run: |
+          docker compose up -d wealth-tracker-mysql
+          echo "Waiting for MySQL to be ready..."
+          sleep 20 # Give enough time for init scripts to run
+
+      - name: Run DB Init Test
+        run: node tests/integration/db_init_test.js
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_DATABASE: testdb
