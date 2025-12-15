@@ -1132,6 +1132,28 @@ async function daemon() {
 					return;
 				}
 
+				const switchMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/switch$/);
+				if (switchMatch && req.method === 'POST') {
+					const providerId = switchMatch[1];
+					const controller = watchlistManager.getProvider(providerId);
+					if (!controller) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						return;
+					}
+					const body = await readJsonBody(req);
+					const { watchlist } = body || {};
+					if (!watchlist) {
+						res.writeHead(400, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'watchlist required' }));
+						return;
+					}
+					const switched = await controller.switchToTab(watchlist);
+					res.writeHead(switched ? 200 : 400, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({ provider: providerId, success: !!switched, watchlist }));
+					return;
+				}
+
 				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers$/);
 				if (tickersMatch && req.method === 'GET') {
 					const providerId = tickersMatch[1];
