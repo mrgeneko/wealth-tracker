@@ -293,6 +293,8 @@ class TreasuryDataHandler {
     return {
       ticker: cusip,  // Used by processBatch to check existence
       name: this.formatTreasuryName(record),
+      // Treasuries trade OTC; we keep exchange as OTC and rely on security_type
+      // ('TREASURY'/'BOND') for type detection and routing.
       exchange: 'OTC',
       security_type: this.extractSecurityType(record),
       source: source || record._source || 'TREASURY_FILE',
