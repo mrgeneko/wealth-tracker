@@ -1720,6 +1720,8 @@
             }
 
             // Collect all unique symbols
+            // Type-driven only: do not special-case the literal ticker "CASH" here.
+            // (Cash is determined by position.type === 'cash' on the backend.)
             const allSymbols = new Set();
             accounts.forEach(acc => {
                 acc.holdings.stocks.forEach(pos => allSymbols.add(pos.ticker));
