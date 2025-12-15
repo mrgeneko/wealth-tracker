@@ -496,6 +496,7 @@ async function fetchAssetsFromDB() {
 
             for (const pos of accPositions) {
                 // Determine display type
+                // Type-driven only: cash is determined strictly by pos.type === 'cash'.
                 const displayType = pos.type; // Default to stored type
 
                 // Common position object
@@ -516,13 +517,19 @@ async function fetchAssetsFromDB() {
                     exchange: pos.exchange || pos.meta_exchange || null
                 };
 
-                if (pos.type === 'cash') {
-                    accountObj.holdings.cash = {
-                        id: pos.id,
-                        value: parseFloat(pos.quantity),
-                        currency: pos.currency
-                    };
-                } else if (pos.type === 'bond') {
+                if (displayType === 'cash') {
+                    const cashValue = parseFloat(pos.quantity);
+                    if (!accountObj.holdings.cash) {
+                        accountObj.holdings.cash = {
+                            id: pos.id,
+                            value: isNaN(cashValue) ? 0 : cashValue,
+                            currency: pos.currency
+                        };
+                    } else {
+                        // If multiple cash rows exist for an account, show them as one value in the UI.
+                        accountObj.holdings.cash.value += (isNaN(cashValue) ? 0 : cashValue);
+                    }
+                } else if (displayType === 'bond') {
                     accountObj.holdings.bonds.push(positionData);
                 } else {
                     // Stocks, ETFs, Crypto, etc.
@@ -1167,7 +1174,7 @@ app.delete('/api/accounts/:id', async (req, res) => {
 app.post('/api/positions', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { account_id, ticker, quantity, currency } = normalized;
+    const { account_id, ticker, quantity, currency, type } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1177,11 +1184,10 @@ app.post('/api/positions', async (req, res) => {
     }
     
     try {
-        // For cash positions, preserve type='cash'. Otherwise auto-detect from treasury registry.
-        let detectedType = 'stock';
-        if (ticker.toUpperCase() === 'CASH') {
-            detectedType = 'cash';
-        } else {
+        // Type-driven only: respect incoming type when provided.
+        // If type is not provided, fall back to bond auto-detection (else stock).
+        let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
+        if (!detectedType) {
             detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
         }
         
@@ -1200,7 +1206,7 @@ app.post('/api/positions', async (req, res) => {
 app.put('/api/positions/:id', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { ticker, quantity, currency } = normalized;
+    const { ticker, quantity, currency, type } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1210,11 +1216,10 @@ app.put('/api/positions/:id', async (req, res) => {
     }
     
     try {
-        // For cash positions, preserve type='cash'. Otherwise auto-detect from treasury registry.
-        let detectedType = 'stock';
-        if (ticker.toUpperCase() === 'CASH') {
-            detectedType = 'cash';
-        } else {
+        // Type-driven only: respect incoming type when provided.
+        // If type is not provided, fall back to bond auto-detection (else stock).
+        let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
+        if (!detectedType) {
             detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
         }
         
