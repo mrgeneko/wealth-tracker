@@ -17,6 +17,11 @@ services:
       PAGE_ACQUIRE_TIMEOUT: "30000"
       PAGE_MAX_OPERATIONS: "100"
       PAGE_NAVIGATION_TIMEOUT: "30000"
+
+      # Investing.com watchlist automation (optional)
+      # Set these in your local `.env` to enable automatic login.
+      INVESTING_EMAIL: ${INVESTING_EMAIL}
+      INVESTING_PASSWORD: ${INVESTING_PASSWORD}
     volumes:
       - ./logs:/usr/src/app/logs
       - ./data:/usr/src/app/data
@@ -209,7 +214,9 @@ services:
       - ./scripts/maintenance/rotate-logs.sh:/usr/local/bin/rotate-logs.sh:ro
     entrypoint: [ "sh", "/usr/local/bin/rotate-logs.sh", "/usr/src/app/logs", "7", "1", "300" ]
     healthcheck:
-      test: [ "CMD", "sh", "-c", "test -x /usr/local/bin/rotate-logs.sh || exit 1" ]
+      # The script is invoked via `sh ...` and may be mounted without the executable bit;
+      # require readability/existence rather than executability.
+      test: [ "CMD", "sh", "-c", "test -r /usr/local/bin/rotate-logs.sh || exit 1" ]
       interval: 1m
       timeout: 10s
       retries: 3
