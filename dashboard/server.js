@@ -1162,7 +1162,16 @@ app.delete('/api/accounts/:id', async (req, res) => {
 
 // Positions
 app.post('/api/positions', async (req, res) => {
-    const { account_id, ticker, type, quantity, currency } = req.body;
+    const { normalizePositionBody } = require('./position_body');
+    const normalized = normalizePositionBody(req.body);
+    const { account_id, ticker, type, quantity, currency } = normalized;
+
+    if (!ticker) {
+        return res.status(400).json({ error: 'ticker is required' });
+    }
+    if (!Number.isFinite(quantity)) {
+        return res.status(400).json({ error: 'quantity must be a valid number' });
+    }
     try {
         const [result] = await pool.execute(
             'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
@@ -1170,14 +1179,23 @@ app.post('/api/positions', async (req, res) => {
         );
         assetsCache = null;
         loadAssets();
-        res.json({ id: result.insertId, ...req.body });
+        res.json({ id: result.insertId, ...normalized });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 app.put('/api/positions/:id', async (req, res) => {
-    const { ticker, type, quantity, currency } = req.body;
+    const { normalizePositionBody } = require('./position_body');
+    const normalized = normalizePositionBody(req.body);
+    const { ticker, type, quantity, currency } = normalized;
+
+    if (!ticker) {
+        return res.status(400).json({ error: 'ticker is required' });
+    }
+    if (!Number.isFinite(quantity)) {
+        return res.status(400).json({ error: 'quantity must be a valid number' });
+    }
     try {
         await pool.execute(
             'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
