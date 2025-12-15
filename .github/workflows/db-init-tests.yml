@@ -26,9 +26,23 @@ jobs:
       - name: Install dependencies
         run: npm install mysql2
 
+      - name: Create .env file for Docker Compose
+        run: |
+          echo "MYSQL_HOST=mysql" >> .env
+          echo "MYSQL_PORT=3306" >> .env
+          echo "MYSQL_USER=test" >> .env
+          echo "MYSQL_PASSWORD=test" >> .env
+          echo "MYSQL_ROOT_PASSWORD=root" >> .env
+          echo "MYSQL_DATABASE=testdb" >> .env
+          # Add other required vars to prevent warnings/errors even if unused by this test
+          echo "INVESTING_EMAIL=dummy" >> .env
+          echo "INVESTING_PASSWORD=dummy" >> .env
+          echo "BASIC_AUTH_USER=dummy" >> .env
+          echo "BASIC_AUTH_PASSWORD=dummy" >> .env
+
       - name: Start MySQL with Docker Compose
         run: |
-          docker compose up -d wealth-tracker-mysql
+          docker compose up -d mysql
           echo "Waiting for MySQL to be ready..."
           sleep 20 # Give enough time for init scripts to run
 
