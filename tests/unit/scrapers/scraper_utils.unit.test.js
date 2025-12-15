@@ -3,6 +3,16 @@
  * Tests utility functions without requiring browser/network dependencies
  */
 
+jest.mock('../../../scrapers/exchange_registry', () => {
+  return {
+    getExchange: jest.fn(async () => 'NASDAQ'),
+    reloadExchangeData: jest.fn(),
+    loadExchangeData: jest.fn(async () => ({ NASDAQ: new Set(), NYSE: new Set(), OTHER: new Set() })),
+    normalizedTickerForLookup: jest.fn((t) => encodeURIComponent(String(t || ''))),
+    initializeDbPool: jest.fn()
+  };
+});
+
 const {
   sanitizeForFilename,
   getDateTimeString,
@@ -181,15 +191,15 @@ describe('Metrics functions', () => {
 });
 
 describe('getConstructibleUrls', () => {
-  test('returns an array', () => {
-    const urls = getConstructibleUrls('AAPL', 'stock');
+  test('returns an array', async () => {
+    const urls = await getConstructibleUrls('AAPL', 'stock');
     expect(Array.isArray(urls)).toBe(true);
   });
 
-  test('handles various symbols', () => {
-    expect(Array.isArray(getConstructibleUrls('AAPL', 'stock'))).toBe(true);
-    expect(Array.isArray(getConstructibleUrls('BRK.B', 'stock'))).toBe(true);
-    expect(Array.isArray(getConstructibleUrls('', 'stock'))).toBe(true);
+  test('handles various symbols', async () => {
+    expect(Array.isArray(await getConstructibleUrls('AAPL', 'stock'))).toBe(true);
+    expect(Array.isArray(await getConstructibleUrls('BRK.B', 'stock'))).toBe(true);
+    expect(Array.isArray(await getConstructibleUrls('', 'stock'))).toBe(true);
   });
 });
 

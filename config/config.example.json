@@ -38,6 +38,12 @@
       "enabled": true
     }
   },
+  "pagePool": {
+    "size": 4,
+    "acquireTimeout": 30000,
+    "maxOperationsPerPage": 100,
+    "navigationTimeout": 30000
+  },
   "investing_watchlists": {
     "url": "https://www.investing.com/portfolio/?portfolioID=OTpkM2QwZDE1ZW9iN2FjaA%3D%3D",
     "watchlists": [

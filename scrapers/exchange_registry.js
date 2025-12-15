@@ -1,51 +1,51 @@
-const fs = require('fs');
-const path = require('path');
-const { parse } = require('csv-parse/sync');
-
-const CONFIG_DIR = path.join(__dirname, '../config');
-const NASDAQ_FILE = path.join(CONFIG_DIR, 'nasdaq-listed.csv');
-const NYSE_FILE = path.join(CONFIG_DIR, 'nyse-listed.csv');
-
 let exchangeCache = null;
+let dbPool = null;
 
-function loadExchangeData() {
+/**
+ * Initialize the database connection pool used for exchange lookups.
+ * @param {Object} pool - mysql2/promise pool
+ */
+function initializeDbPool(pool) {
+    dbPool = pool;
+    exchangeCache = null;
+}
+
+async function loadExchangeData() {
     if (exchangeCache) return exchangeCache;
+
+    if (!dbPool) {
+        throw new Error('Database pool not initialized. Call initializeDbPool() first.');
+    }
 
     const cache = {
         NASDAQ: new Set(),
-        NYSE: new Set()
+        NYSE: new Set(),
+        OTHER: new Set()
     };
 
+    let conn;
     try {
-        if (fs.existsSync(NASDAQ_FILE)) {
-            const content = fs.readFileSync(NASDAQ_FILE);
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            // NASDAQ CSV header: Symbol,Security Name,...
-            records.forEach(record => {
-                if (record.Symbol) {
-                    cache.NASDAQ.add(record.Symbol.trim().toUpperCase());
-                }
-            });
-        }
+        conn = await dbPool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT ticker, exchange
+             FROM ticker_registry
+             WHERE exchange IN ('NASDAQ', 'NYSE', 'OTHER')
+               AND ticker IS NOT NULL`
+        );
 
-        if (fs.existsSync(NYSE_FILE)) {
-            const content = fs.readFileSync(NYSE_FILE);
-            const records = parse(content, {
-                columns: true,
-                skip_empty_lines: true
-            });
-            // NYSE CSV header: ACT Symbol,Company Name,...
-            records.forEach(record => {
-                if (record['ACT Symbol']) {
-                    cache.NYSE.add(record['ACT Symbol'].trim().toUpperCase());
-                }
-            });
+        for (const row of rows) {
+            const ticker = row && row.ticker ? String(row.ticker).trim().toUpperCase() : '';
+            const exchange = row && row.exchange ? String(row.exchange).trim().toUpperCase() : '';
+            if (!ticker || !exchange) continue;
+
+            if (exchange === 'NASDAQ') cache.NASDAQ.add(ticker);
+            else if (exchange === 'NYSE') cache.NYSE.add(ticker);
+            else if (exchange === 'OTHER') cache.OTHER.add(ticker);
         }
-    } catch (e) {
-        console.error('Error loading exchange data:', e.message);
+    } finally {
+        if (conn && typeof conn.release === 'function') {
+            conn.release();
+        }
     }
 
     exchangeCache = cache;
@@ -57,19 +57,15 @@ function loadExchangeData() {
  * @param {string} ticker - The stock ticker (e.g. 'AAPL', 'BRK.B')
  * @returns {string|null} - 'NASDAQ', 'NYSE', or null if not found
  */
-function getExchange(ticker) {
+async function getExchange(ticker) {
     if (!ticker) return null;
-    const normalizedTicker = ticker.toUpperCase().replace(/-/g, '.'); // Normalize BRK-B to BRK.B for lookup if needed, though CSVs might use different formats.
-    // The CSVs seem to use dots for classes (e.g. BRK.B).
-    // Let's try exact match first, then normalized.
-    
-    const data = loadExchangeData();
-    
-    // Check NASDAQ
-    if (data.NASDAQ.has(ticker) || data.NASDAQ.has(normalizedTicker)) return 'NASDAQ';
-    
-    // Check NYSE
-    if (data.NYSE.has(ticker) || data.NYSE.has(normalizedTicker)) return 'NYSE';
+    const normalizedTicker = String(ticker).toUpperCase().replace(/-/g, '.');
+
+    const data = await loadExchangeData();
+
+    if (data.NASDAQ.has(normalizedTicker)) return 'NASDAQ';
+    if (data.NYSE.has(normalizedTicker)) return 'NYSE';
+    if (data.OTHER.has(normalizedTicker)) return 'OTHER';
 
     return null;
 }
@@ -90,12 +86,12 @@ function normalizedTickerForLookup(ticker) {
  */
 function reloadExchangeData() {
     exchangeCache = null;
-    loadExchangeData();
 }
 
 module.exports = {
     getExchange,
     reloadExchangeData,
     loadExchangeData
-    , normalizedTickerForLookup
+    , normalizedTickerForLookup,
+    initializeDbPool
 };

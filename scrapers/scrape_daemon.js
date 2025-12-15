@@ -12,7 +12,7 @@ try {
 	console.log(`Startup files: scrape_yahoo.js@${stDF}, publish_to_kafka.js@${stPF}`);
 } catch (e) { console.warn('Startup diagnostics failed: ' + (e && e.message ? e.message : e)); }
 
-const { scrapeGoogle } = require('./scrape_google');
+const { scrapeGoogle, scrapeGoogleWithPage } = require('./scrape_google');
 const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls, normalizedKey } = require('./scraper_utils');
 const { recordScraperMetrics, getMetricsCollector } = require('./metrics-integration');
 const mysql = require('mysql2/promise');
@@ -24,6 +24,11 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
 const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
+const { OnDemandScrapeApi, DEFAULT_ON_DEMAND_LIMITS } = require('./on_demand_scrape_api');
+
+// Phase 7: page pool & persistent page registry
+const PagePool = require('./page_pool');
+const PersistentPageRegistry = require('./persistent_page_registry');
 
 const { scrapeInvestingComWatchlists } = require('./scrape_investingcom_watchlists');
 const { scrapeTradingViewWatchlists } = require('./scrape_tradingview_watchlists');
@@ -118,6 +123,15 @@ function getMysqlPool() {
 	}
 	return mysqlPool;
 }
+ 
+ // Phase 3: exchange registry now reads from DB; initialize it using the daemon pool.
+ try {
+ 	const { initializeDbPool } = require('./exchange_registry');
+ 	initializeDbPool(getMysqlPool());
+ } catch (e) {
+ 	// Daemon can continue even if initialization fails; lookups will error when used.
+ 	try { console.warn('Failed to init exchange registry DB pool: ' + (e && e.message ? e.message : e)); } catch (e2) {}
+ }
 
 async function fetchStockPositions() {
 	try {
@@ -169,6 +183,62 @@ function getScrapeGroupSettings(groupName, defaultMinutes = 5) {
 
 // Global reference to the Puppeteer browser so we can close it on shutdown
 let globalBrowser = null;
+
+// Phase 7: global scraping infrastructure (page pool + persistent pages)
+let pagePool = null;
+let persistentPages = null;
+let pagePoolBrowser = null;
+
+async function shutdownScraperInfrastructure() {
+	if (pagePool) {
+		try { await pagePool.shutdown(); } catch (e) {}
+		pagePool = null;
+	}
+	if (persistentPages) {
+		try { await persistentPages.closeAll(); } catch (e) {}
+		persistentPages = null;
+	}
+	pagePoolBrowser = null;
+}
+
+async function initializeScraperInfrastructure(browser) {
+	if (!browser) return { pagePool: null, persistentPages: null };
+	if (pagePool && pagePoolBrowser === browser) return { pagePool, persistentPages };
+
+	// Re-init on browser change
+	await shutdownScraperInfrastructure();
+
+	// Page pool for stateless scrapers
+	const poolSize = parseInt(process.env.PAGE_POOL_SIZE || '4', 10);
+	const acquireTimeout = parseInt(process.env.PAGE_ACQUIRE_TIMEOUT || '30000', 10);
+	const maxOperationsPerPage = parseInt(process.env.PAGE_MAX_OPERATIONS || '100', 10);
+	const navigationTimeout = parseInt(process.env.PAGE_NAVIGATION_TIMEOUT || '30000', 10);
+
+	try {
+		pagePool = new PagePool(browser, {
+			poolSize,
+			acquireTimeout,
+			maxOperationsPerPage,
+			navigationTimeout
+		});
+		await pagePool.initialize();
+		pagePoolBrowser = browser;
+	} catch (e) {
+		// Daemon can continue without the page pool; Phase 8 will require it.
+		try { logDebug('[PagePool] Failed to initialize: ' + (e && e.message ? e.message : e)); } catch (e2) {}
+		pagePool = null;
+		pagePoolBrowser = null;
+	}
+
+	// Persistent page registry for stateful scrapers
+	try {
+		persistentPages = new PersistentPageRegistry(browser);
+	} catch (e) {
+		persistentPages = null;
+	}
+
+	return { pagePool, persistentPages };
+}
 // Health state
 let lastCycleAt = null;
 let lastCycleStatus = 'not-run';
@@ -238,6 +308,7 @@ function resetProtocolTimeoutCounter() {
 // Restart the browser
 async function restartBrowser() {
 	logDebug('Attempting browser restart...');
+	try { await shutdownScraperInfrastructure(); } catch (e) {}
 	try {
 		if (globalBrowser) {
 			try {
@@ -262,6 +333,7 @@ async function restartBrowser() {
 	// Launch new browser
 	const newBrowser = await ensureBrowser();
 	globalBrowser = newBrowser;
+	try { await initializeScraperInfrastructure(newBrowser); } catch (e) {}
 	logDebug('Browser restarted successfully');
 	return newBrowser;
 }
@@ -269,6 +341,12 @@ async function restartBrowser() {
 // Health server
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || '3000', 10);
 let healthServer = null;
+
+// Phase 8: On-demand scrape API (stateful rate limiter lives here)
+const onDemandScrapeApi = new OnDemandScrapeApi({
+	limits: DEFAULT_ON_DEMAND_LIMITS,
+	maxTickersPerRequest: 25
+});
 
 function shouldRunTask(settings, markerPath) {
     if (!settings.enabled) return false;
@@ -470,49 +548,8 @@ async function runCycle(browser, outputDir) {
 //		return;
 //	}
 
-	// ======== US LISTINGS UPDATE ===========
-	const usListingsName = 'us_listings';
-	const usListingsMarker = path.join('/usr/src/app/logs', `last.${usListingsName}.txt`);
-	const attrs = loadScraperAttributes();
-	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
-	const usListingsConfig = groups[usListingsName] || {};
-	const usListingsInterval = typeof usListingsConfig.interval === 'number' ? usListingsConfig.interval : 1440;
-	const usListingsEnabled = usListingsConfig.enabled === true;
-	const usListingsSettings = getScrapeGroupSettings(usListingsName, usListingsInterval);
-	if (usListingsEnabled && shouldRunTask(usListingsSettings, usListingsMarker)) {
-		logDebug('Begin US listings update');
-		try {
-			const { execSync } = require('child_process');
-					   execSync('node /usr/src/app/scripts/update_exchange_listings.js update', { stdio: 'inherit' });
-			logDebug('US listings update script executed successfully');
-		} catch (e) {
-			logDebug('Error running US listings update script: ' + (e && e.message ? e.message : e));
-		}
-	} else {
-		logDebug('Skipping US listings update (interval not reached or not enabled)');
-	}
-
-	// ======== US TREASURY LISTINGS UPDATE ===========
-	const usTreasuryListingsName = 'us_treasury_listings';
-	const usTreasuryListingsMarker = path.join('/usr/src/app/logs', `last.${usTreasuryListingsName}.txt`);
-	const treasuryAttrs = loadScraperAttributes();
-	const treasuryGroups = treasuryAttrs && treasuryAttrs.scrape_groups ? treasuryAttrs.scrape_groups : {};
-	const usTreasuryListingsConfig = treasuryGroups[usTreasuryListingsName] || {};
-	const usTreasuryListingsInterval = typeof usTreasuryListingsConfig.interval === 'number' ? usTreasuryListingsConfig.interval : 1440;
-	const usTreasuryListingsEnabled = usTreasuryListingsConfig.enabled === true;
-	const usTreasuryListingsSettings = getScrapeGroupSettings(usTreasuryListingsName, usTreasuryListingsInterval);
-	if (usTreasuryListingsEnabled && shouldRunTask(usTreasuryListingsSettings, usTreasuryListingsMarker)) {
-		logDebug('Begin US Treasury listings update');
-		try {
-			const { execSync } = require('child_process');
-			execSync('node /usr/src/app/scripts/update_treasury_listings.js', { stdio: 'inherit' });
-			logDebug('US Treasury listings update script executed successfully');
-		} catch (e) {
-			logDebug('Error running US Treasury listings update script: ' + (e && e.message ? e.message : e));
-		}
-	} else {
-		logDebug('Skipping US Treasury listings update (interval not reached or not enabled)');
-	}
+	// Phase 6: Listing updates have been moved out of the scrape daemon.
+	// The daemon is now focused solely on price scraping.
 
 	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingWatchlistsName = 'investing_watchlists'
@@ -672,7 +709,7 @@ async function runCycle(browser, outputDir) {
 			for (const position of positions) {
 				const { ticker, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(ticker, type);
+				const constructibleUrls = await getConstructibleUrls(ticker, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
 					logDebug(`No constructible URLs for ${ticker}, skipping`);
 					continue;
@@ -765,7 +802,7 @@ async function runCycle(browser, outputDir) {
 			for (const position of bondPositions) {
 				const { ticker, type } = position;
 				// Get list of potential sources using getConstructibleUrls
-				const constructibleUrls = getConstructibleUrls(ticker, type);
+				const constructibleUrls = await getConstructibleUrls(ticker, type);
 				if (!constructibleUrls || constructibleUrls.length === 0) {
 					logDebug(`No constructible URLs for bond ${ticker}, skipping`);
 					continue;
@@ -937,6 +974,8 @@ async function daemon() {
 	}
 	// expose browser for graceful shutdown
 	globalBrowser = browser;
+	// Phase 7: initialize page pool / persistent page registry
+	try { await initializeScraperInfrastructure(browser); } catch (e) {}
 
 	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
 	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
@@ -946,8 +985,21 @@ async function daemon() {
 	try {
 		const METRICS_ENABLED = (process.env.METRICS_ENABLED || 'false').toLowerCase() === 'true';
 		healthServer = http.createServer((req, res) => {
+			// Phase 8: On-demand scrape endpoint (uses PagePool + rate limiting)
+			if (req.url && req.url.startsWith('/scrape') && req.method === 'POST') {
+				onDemandScrapeApi.handle(req, res, {
+					browser,
+					outputDir,
+					pagePool,
+					getConstructibleUrls,
+					scrapeGoogleWithPage
+				});
+				return;
+			}
 			if (req.url === '/health') {
 				const compactMetrics = getMetrics ? getMetrics() : null;
+				const poolStats = pagePool ? pagePool.getStats() : null;
+				const persistentStats = persistentPages ? persistentPages.getStats() : null;
 				const payload = {
 					status: 'ok',
 					pid: process.pid,
@@ -956,7 +1008,9 @@ async function daemon() {
 					last_cycle_status: lastCycleStatus,
 					last_cycle_error: lastCycleError,
 					last_cycle_duration_ms: lastCycleDurationMs,
-					metrics: compactMetrics
+					metrics: compactMetrics,
+					page_pool: poolStats,
+					persistent_pages: persistentStats
 				};
 				res.writeHead(200, { 'Content-Type': 'application/json' });
 				res.end(JSON.stringify(payload));
@@ -995,6 +1049,28 @@ async function daemon() {
 				lines.push('# TYPE scrape_last_cycle_status gauge');
 				const statusLabel = lastCycleStatus || 'unknown';
 				lines.push(`scrape_last_cycle_status{status="${statusLabel}"} 1`);
+				// Phase 7: page pool gauges
+				if (pagePool) {
+					const ps = pagePool.getStats();
+					lines.push('# HELP scrape_page_pool_current_size Current number of pages in pool');
+					lines.push('# TYPE scrape_page_pool_current_size gauge');
+					lines.push(`scrape_page_pool_current_size ${ps.currentSize || 0}`);
+					lines.push('# HELP scrape_page_pool_available_pages Available pages in pool');
+					lines.push('# TYPE scrape_page_pool_available_pages gauge');
+					lines.push(`scrape_page_pool_available_pages ${ps.availablePages || 0}`);
+					lines.push('# HELP scrape_page_pool_busy_pages Busy pages in pool');
+					lines.push('# TYPE scrape_page_pool_busy_pages gauge');
+					lines.push(`scrape_page_pool_busy_pages ${ps.busyPages || 0}`);
+					lines.push('# HELP scrape_page_pool_wait_queue_length Acquire wait queue length');
+					lines.push('# TYPE scrape_page_pool_wait_queue_length gauge');
+					lines.push(`scrape_page_pool_wait_queue_length ${ps.waitQueueLength || 0}`);
+				}
+				if (persistentPages) {
+					const st = persistentPages.getStats();
+					lines.push('# HELP scrape_persistent_pages_count Persistent pages tracked');
+					lines.push('# TYPE scrape_persistent_pages_count gauge');
+					lines.push(`scrape_persistent_pages_count ${st.count || 0}`);
+				}
 				res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
 				res.end(lines.join('\n') + '\n');
 				return;
@@ -1107,6 +1183,7 @@ async function gracefulShutdown(signal) {
 		const msg = 'Received ' + signal + ', shutting down...';
 		logDebug(msg);
 		try { require('fs').writeSync(1, `[${new Date().toISOString()}] ${msg}\n`); } catch (e) {}
+		try { await shutdownScraperInfrastructure(); } catch (e) {}
 		if (globalBrowser) {
 			await globalBrowser.close();
 			logDebug('Browser closed.');

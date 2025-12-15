@@ -496,6 +496,8 @@ async function createPreparedPage(browser, opts = {}) {
     const {
         url,
         downloadPath,
+        // If provided, configure and (optionally) navigate this existing page instead of creating a new one.
+        existingPage = null,
         userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         viewport = { width: 1280, height: 900 },
         waitUntil = 'domcontentloaded',
@@ -526,6 +528,30 @@ async function createPreparedPage(browser, opts = {}) {
             }
         }
     };
+
+    // If an existing page is provided (e.g., from PagePool), set it up in-place.
+    if (existingPage) {
+        const p = existingPage;
+        if (attachCounters) {
+            try { await attachRequestFailureCounters(p, { suppressionPatterns: opts.suppressionPatterns }); } catch (e) {
+                logDebug('attachRequestFailureCounters failed on existing page: ' + (e && e.message ? e.message : e));
+                checkProtocolTimeout(e, 'attachRequestFailureCounters');
+            }
+        }
+        try { await p.setUserAgent(userAgent); } catch (e) {
+            logDebug('setUserAgent on existing page failed: ' + (e && e.message ? e.message : e));
+            checkProtocolTimeout(e, 'setUserAgent');
+        }
+        try { await p.setViewport(viewport); } catch (e) {
+            logDebug('setViewport on existing page failed: ' + (e && e.message ? e.message : e));
+            checkProtocolTimeout(e, 'setViewport');
+        }
+        if (url) {
+            try { await gotoWithRetries(p, url, { waitUntil, timeout }, gotoRetries); } catch (e) { logDebug('gotoWithRetries on existing page failed: ' + (e && e.message ? e.message : e)); }
+        }
+        try { await setupCDPSession(p, downloadPath); } catch (e) { logDebug('setupCDPSession failed on existing page: ' + (e && e.message ? e.message : e)); }
+        return p;
+    }
 
     // If reuseIfUrlMatches provided, try to find an existing page whose URL matches
     if (reuseIfUrlMatches) {
@@ -630,7 +656,7 @@ async function savePageSnapshot(page, basePath) {
  * @param {string} [type='stock'] - The position type: 'stock', 'etf', or 'bond'
  * @returns {Array<{source: string, url: string}>} Array of source/url pairs
  */
-function getConstructibleUrls(ticker, type = 'stock') {
+async function getConstructibleUrls(ticker, type = 'stock') {
     if (!ticker) return [];
     
     const normalizedType = String(type).toLowerCase();
@@ -647,7 +673,7 @@ function getConstructibleUrls(ticker, type = 'stock') {
     // Normalize ticker: ensure uppercase and use dot separator for these domains
     // e.g. BRK-B -> BRK.B
     const normalizedTicker = String(ticker).toUpperCase().replace(/-/g, '.');
-    const exchange = getExchange(ticker);
+    const exchange = await getExchange(ticker);
     
     const urls = [
         { source: 'cnbc', url: `https://www.cnbc.com/quotes/${normalizedTicker}` },
