@@ -12,7 +12,7 @@ try {
 	console.log(`Startup files: scrape_yahoo.js@${stDF}, publish_to_kafka.js@${stPF}`);
 } catch (e) { console.warn('Startup diagnostics failed: ' + (e && e.message ? e.message : e)); }
 
-const { scrapeGoogle } = require('./scrape_google');
+const { scrapeGoogle, scrapeGoogleWithPage } = require('./scrape_google');
 const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls, normalizedKey } = require('./scraper_utils');
 const { recordScraperMetrics, getMetricsCollector } = require('./metrics-integration');
 const mysql = require('mysql2/promise');
@@ -24,6 +24,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteerExtra.use(StealthPlugin());
 const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
+const { OnDemandScrapeApi, DEFAULT_ON_DEMAND_LIMITS } = require('./on_demand_scrape_api');
 
 // Phase 7: page pool & persistent page registry
 const PagePool = require('./page_pool');
@@ -340,6 +341,12 @@ async function restartBrowser() {
 // Health server
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || '3000', 10);
 let healthServer = null;
+
+// Phase 8: On-demand scrape API (stateful rate limiter lives here)
+const onDemandScrapeApi = new OnDemandScrapeApi({
+	limits: DEFAULT_ON_DEMAND_LIMITS,
+	maxTickersPerRequest: 25
+});
 
 function shouldRunTask(settings, markerPath) {
     if (!settings.enabled) return false;
@@ -978,6 +985,17 @@ async function daemon() {
 	try {
 		const METRICS_ENABLED = (process.env.METRICS_ENABLED || 'false').toLowerCase() === 'true';
 		healthServer = http.createServer((req, res) => {
+			// Phase 8: On-demand scrape endpoint (uses PagePool + rate limiting)
+			if (req.url && req.url.startsWith('/scrape') && req.method === 'POST') {
+				onDemandScrapeApi.handle(req, res, {
+					browser,
+					outputDir,
+					pagePool,
+					getConstructibleUrls,
+					scrapeGoogleWithPage
+				});
+				return;
+			}
 			if (req.url === '/health') {
 				const compactMetrics = getMetrics ? getMetrics() : null;
 				const poolStats = pagePool ? pagePool.getStats() : null;
