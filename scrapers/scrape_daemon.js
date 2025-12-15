@@ -81,6 +81,21 @@ const ATTR_PATH = path.join(CONFIG_DIR, 'config.json');
 let _cachedAttrs = null;
 let _cachedMtime = 0;
 
+// Reduce log spam when the daemon runs frequent cycles (e.g. sub-second sleeps).
+// This keeps operational logs readable while preserving scheduling behavior.
+const _throttledLogState = new Map();
+function logDebugThrottled(key, message, minIntervalMs = 30000) {
+	try {
+		const now = Date.now();
+		const last = _throttledLogState.get(key) || 0;
+		if (now - last < minIntervalMs) return;
+		_throttledLogState.set(key, now);
+		logDebug(message);
+	} catch (e) {
+		// ignore throttling/logging errors
+	}
+}
+
 function loadScraperAttributes() {
 	try {
 		const st = fs.statSync(ATTR_PATH);
@@ -163,10 +178,11 @@ async function fetchBondPositions() {
 	}
 }
 
-function getScrapeGroupSettings(groupName, defaultMinutes = 5) {
+
+function getScrapeGroupSettings(groupName, defaultIntervalSeconds = 300) {
 	const attrs = loadScraperAttributes();
 	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
-    let interval = defaultMinutes;
+	let interval = defaultIntervalSeconds;
     // Default to false. Only set to true if explicitly enabled in config.
     let enabled = false;
 
@@ -410,7 +426,7 @@ const onDemandScrapeApi = new OnDemandScrapeApi({
 
 function shouldRunTask(settings, markerPath) {
     if (!settings.enabled) return false;
-    const intervalMinutes = settings.interval;
+	const intervalSeconds = settings.interval;
 
 	let lastRun = 0;
 	if (fs.existsSync(markerPath)) {
@@ -418,7 +434,7 @@ function shouldRunTask(settings, markerPath) {
 		lastRun = parseInt(lines[0], 10);
 	}
 	const now = Date.now();
-	if (now - lastRun >= intervalMinutes * 60 * 1000) {
+	if (now - lastRun >= intervalSeconds * 1000) {
 		const human = new Date(now).toLocaleString('en-US', { hour12: false });
 		fs.writeFileSync(markerPath, now.toString() + '\n' + human + '\n');
 		return true;
@@ -428,7 +444,7 @@ function shouldRunTask(settings, markerPath) {
 
 function isTaskDue(settings, markerPath) {
 	if (!settings.enabled) return false;
-	const intervalMinutes = settings.interval;
+	const intervalSeconds = settings.interval;
 
 	let lastRun = 0;
 	if (fs.existsSync(markerPath)) {
@@ -436,7 +452,7 @@ function isTaskDue(settings, markerPath) {
 		lastRun = parseInt(lines[0], 10);
 	}
 	const now = Date.now();
-	return (now - lastRun >= intervalMinutes * 60 * 1000);
+	return (now - lastRun >= intervalSeconds * 1000);
 }
 
 function markTaskRan(markerPath) {
@@ -632,7 +648,7 @@ async function runCycle(browser, outputDir) {
 
 	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingWatchlistsName = 'investing_watchlists';
-	const investingGroupSettings = getScrapeGroupSettings(investingWatchlistsName, 3); // minutes
+	const investingGroupSettings = getScrapeGroupSettings(investingWatchlistsName, 180); // seconds
 	const loader = watchlistConfigLoader || new WatchlistConfigLoader(getMysqlPool());
 	let investingProvider = null;
 	try {
@@ -648,15 +664,12 @@ async function runCycle(browser, outputDir) {
 
 	if (investingProvider && investingProvider.enabled && Array.isArray(investingProvider.watchlists) && investingProvider.watchlists.length > 0) {
 		for (const wl of investingProvider.watchlists.filter(w => w && w.enabled !== false)) {
-			const intervalSeconds = wl.intervalSeconds || investingProvider.defaultIntervalSeconds || (investingGroupSettings.interval * 60);
-			const perWatchlistSettings = {
-				enabled: investingGroupSettings.enabled,
-				interval: Math.max(1, Math.ceil(intervalSeconds / 60))
-			};
+			const intervalSeconds = wl.intervalSeconds || investingProvider.defaultIntervalSeconds || investingGroupSettings.interval;
+			const perWatchlistSettings = { enabled: investingGroupSettings.enabled, interval: Math.max(1, intervalSeconds) };
 
 			const markerPath = path.join('/usr/src/app/logs', `last.watchlist.investingcom.${sanitizeForFilename(wl.key)}.txt`);
 			if (!isTaskDue(perWatchlistSettings, markerPath)) {
-				logDebug(`Skipping investing.com watchlist ${wl.key} (interval not reached)`);
+				logDebugThrottled(`skip:watchlist:investingcom:${wl.key}`, `Skipping investing.com watchlist ${wl.key} (interval not reached)`);
 				continue;
 			}
 
@@ -664,7 +677,7 @@ async function runCycle(browser, outputDir) {
 			try {
 				const decision = await getUpdateWindowService().isWithinUpdateWindow('default', 'investingcom', wl.key);
 				if (!decision.allowed) {
-					logDebug(`Skipping investing.com watchlist ${wl.key} - ${decision.reason}`);
+					logDebugThrottled(`skip:watchlist:investingcom:${wl.key}:window`, `Skipping investing.com watchlist ${wl.key} - ${decision.reason}`);
 					continue;
 				}
 			} catch (e) {
@@ -687,15 +700,15 @@ async function runCycle(browser, outputDir) {
 		const attrs = getConfig(investingWatchlistsName);
 		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
 			for (const item of attrs.watchlists) {
-				const intervalMinutes = typeof item.interval === 'number' ? item.interval : investingGroupSettings.interval;
-				const perWatchlistSettings = { enabled: investingGroupSettings.enabled, interval: intervalMinutes };
+				const intervalSeconds = typeof item.interval === 'number' ? item.interval : investingGroupSettings.interval;
+				const perWatchlistSettings = { enabled: investingGroupSettings.enabled, interval: intervalSeconds };
 				const markerPath = path.join('/usr/src/app/logs', `last.watchlist.investingcom.${sanitizeForFilename(item.key)}.txt`);
 				if (!isTaskDue(perWatchlistSettings, markerPath)) {
-					logDebug(`Skipping investing.com watchlist ${item.key} (interval not reached)`);
+					logDebugThrottled(`skip:watchlist:investingcom:${item.key}`, `Skipping investing.com watchlist ${item.key} (interval not reached)`);
 					continue;
 				}
 
-				const record = { key: item.key, interval: intervalMinutes, url: attrs.url };
+				const record = { key: item.key, interval: intervalSeconds, url: attrs.url };
 				logDebug(`Begin investing.com watchlist scrape (legacy config): ${record.key} ${record.url}`);
 				if (record.url && record.url.startsWith('http')) {
 					await recordScraperMetrics('investing', async () => {
@@ -714,7 +727,7 @@ async function runCycle(browser, outputDir) {
 	// ======== WEBULL WATCHLISTS ===========
 	const webullWatchListsName = 'webull_watchlists'
 	const webullMarker = path.join('/usr/src/app/logs', `last.${webullWatchListsName}.txt`);
-	const webullSettings = getScrapeGroupSettings(webullWatchListsName, 3); // minutes
+	const webullSettings = getScrapeGroupSettings(webullWatchListsName, 180); // seconds
 	if (shouldRunTask(webullSettings, webullMarker)) {
 		logDebug('Begin webull watchlists scrape');
 		// Prefer configuration from config.json (same shape as investing_watchlists)
@@ -753,13 +766,13 @@ async function runCycle(browser, outputDir) {
 			logDebug('No webull watchlists in attributes; skipping webull watchlists scrape');
 		}
 	} else {
-		logDebug('Skipping webull watchlists scrape (interval not reached)');
+		logDebugThrottled('skip:webull_watchlists', 'Skipping webull watchlists scrape (interval not reached)');
 	}
 
 	// ======== TRADINGVIEW WATCHLISTS ===========
 	const tvWatchlistsName = 'tradingview_watchlists'
 	const tvMarker = path.join('/usr/src/app/logs', `last.${tvWatchlistsName}.txt`);
-	const tvSettings = getScrapeGroupSettings(tvWatchlistsName, 3); // minutes
+	const tvSettings = getScrapeGroupSettings(tvWatchlistsName, 180); // seconds
 	if (shouldRunTask(tvSettings, tvMarker)) {
 		logDebug('Begin tradingview watchlists scrape');
 		const attrs = getConfig(tvWatchlistsName);
@@ -782,13 +795,13 @@ async function runCycle(browser, outputDir) {
 			logDebug('No tradingview watchlists in attributes; skipping tradingview watchlists scrape');
 		}
 	} else {
-		logDebug('Skipping tradingview watchlists scrape (interval not reached)');
+		logDebugThrottled('skip:tradingview_watchlists', 'Skipping tradingview watchlists scrape (interval not reached)');
 	}
 
 	// ======== STOCK POSITIONS (from MySQL) ===========
 	const stockPositionsName = 'stock_positions';
 	const stockPositionsMarker = path.join('/usr/src/app/logs/', `last.${stockPositionsName}.txt`);
-	const stockPositionsSettings = getScrapeGroupSettings(stockPositionsName, 30); // default 30 min
+	const stockPositionsSettings = getScrapeGroupSettings(stockPositionsName, 1800); // default 30 min
 	if (shouldRunTask(stockPositionsSettings, stockPositionsMarker)) {
 		logDebug('Begin stock_positions scrape');
 		
@@ -875,13 +888,13 @@ async function runCycle(browser, outputDir) {
 			}
 		}
 	} else {
-		logDebug('Skipping stock_positions scrape (interval not reached or not enabled)');
+		logDebugThrottled('skip:stock_positions', 'Skipping stock_positions scrape (interval not reached or not enabled)');
 	}
 
 	// ======== BOND POSITIONS (from MySQL) ===========
 	const bondPositionsName = 'bond_positions';
 	const bondPositionsMarker = path.join('/usr/src/app/logs/', `last.${bondPositionsName}.txt`);
-	const bondPositionsSettings = getScrapeGroupSettings(bondPositionsName, 30); // default 30 min
+	const bondPositionsSettings = getScrapeGroupSettings(bondPositionsName, 1800); // default 30 min
 	if (shouldRunTask(bondPositionsSettings, bondPositionsMarker)) {
 		logDebug('Begin bond_positions scrape');
 		
@@ -956,7 +969,7 @@ async function runCycle(browser, outputDir) {
 			}
 		}
 	} else {
-		logDebug('Skipping bond_positions scrape (interval not reached or not enabled)');
+		logDebugThrottled('skip:bond_positions', 'Skipping bond_positions scrape (interval not reached or not enabled)');
 	}
 
 	logDebug('Cycle complete.');
@@ -1072,7 +1085,7 @@ async function daemon() {
 	try { await initializeWatchlistProviders(browser); } catch (e) {}
 
 	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
-	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
+	const HEARTBEAT_INTERVAL_SECONDS = parseInt(process.env.HEARTBEAT_INTERVAL_SECONDS || '300', 10);
 	let lastHeartbeat = 0;
 
 	// start health server so external monitors can query status and (optionally) metrics
@@ -1368,6 +1381,11 @@ async function daemon() {
 	} catch (e) {
 		logDebug('Failed to start health server: ' + e.message);
 	}
+
+	// Throttle dynamic interval logging across cycles (otherwise it spams when sleepMs is small).
+	let lastCycleIntervalLoggedMs = null;
+	let lastCycleIntervalLoggedAt = 0;
+
 	while (true) {
 		let cycleStart = null;
 		try {
@@ -1421,7 +1439,7 @@ async function daemon() {
 		// Emit heartbeat if interval elapsed
 		try {
 			const now = Date.now();
-			if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MINUTES * 60 * 1000) {
+			if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_SECONDS * 1000) {
 				const hb = `[${new Date().toISOString()}] HEARTBEAT: daemon alive\n`;
 				logDebug('HEARTBEAT: daemon alive');
 				try { require('fs').writeSync(1, hb); } catch (e) {}
@@ -1438,7 +1456,12 @@ async function daemon() {
             sleepMs = getDynamicCycleInterval(attrs);
 			// FOR TESTING 
 			sleepMs = 500;
-            logDebug(`Dynamic cycle interval: ${sleepMs/1000}s`);
+			const now = Date.now();
+			if (lastCycleIntervalLoggedMs !== sleepMs || (now - lastCycleIntervalLoggedAt) >= 60000) {
+				logDebug(`Dynamic cycle interval: ${sleepMs/1000}s`);
+				lastCycleIntervalLoggedMs = sleepMs;
+				lastCycleIntervalLoggedAt = now;
+			}
         } catch (e) {
             logDebug('Error calculating dynamic interval: ' + e);
         }
