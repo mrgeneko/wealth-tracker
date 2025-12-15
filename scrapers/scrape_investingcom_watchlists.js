@@ -108,7 +108,7 @@ function parseToIso(timeStr) {
   }
 }
 
-async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updateRules = null) {
+async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updateRules = null, updateWindowService = null) {
 	const investingUrl = watchlist.url;
 	if (!investingUrl) {
 		logDebug('WARNING: INVESTING_URL is missing or invalid');
@@ -275,11 +275,25 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
 		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
 		
-		// Filter tickers based on update_rules before publishing to Kafka
+		// Filter tickers based on DB-backed update windows (preferred) or legacy update_rules before publishing to Kafka
 		let publishCount = 0;
 		let skippedCount = 0;
 		for (const sec of dataObjects) {
-			if (isWithinUpdateWindow(sec.key, updateRules)) {
+			let allowed = true;
+			try {
+				if (updateWindowService && typeof updateWindowService.isWithinUpdateWindow === 'function') {
+					const decision = await updateWindowService.isWithinUpdateWindow(sec.key, 'investingcom', watchlist.key);
+					allowed = decision && decision.allowed !== false;
+				} else {
+					allowed = isWithinUpdateWindow(sec.key, updateRules);
+				}
+			} catch (e) {
+				// Fail open: publish if update window checks error
+				allowed = true;
+				logDebug(`Update window check failed for ${sec.key}: ${e && e.message ? e.message : e}`);
+			}
+
+			if (allowed) {
 				publishToKafka(sec, kafkaTopic, kafkaBrokers).catch(e => logDebug('Kafka publish error: ' + e));
 				publishCount++;
 			} else {
