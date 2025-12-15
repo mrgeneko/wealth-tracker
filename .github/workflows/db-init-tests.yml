@@ -42,9 +42,14 @@ jobs:
 
       - name: Start MySQL with Docker Compose
         run: |
+          # Ensure entirely clean state
+          rm -rf mysql
+          mkdir mysql
+          chmod 777 mysql
+          
           docker compose up -d mysql
           echo "Waiting for MySQL to be ready..."
-          sleep 20 # Give enough time for init scripts to run
+          sleep 30 # Increased wait time
 
       - name: Run DB Init Test
         run: node tests/integration/db_init_test.js
@@ -54,3 +59,7 @@ jobs:
           MYSQL_USER: test
           MYSQL_PASSWORD: test
           MYSQL_DATABASE: testdb
+      
+      - name: Dump MySQL Logs on Failure
+        if: failure()
+        run: docker compose logs mysql
