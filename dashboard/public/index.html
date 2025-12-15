@@ -756,19 +756,10 @@
                 <input type="hidden" id="posId">
                 <input type="hidden" id="posAccountId">
                 <input type="hidden" id="posSymbol">
-                <input type="hidden" id="posType">
                 <div class="form-group" id="posSymbolGroup">
                     <label for="posSymbol">Symbol</label>
                     <div id="posSymbolDisplay"
                         style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <div id="posTypeGroup">
-                        <label for="posType">Type</label>
-                        <div id="posTypeDisplay"
-                            style="padding: 8px; border: 1px solid #555; border-radius: 4px; background-color: #555; color: #fff; width: 100%;">
-                        </div>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1108,15 +1099,7 @@
                     </table>
                 </div>
                 
-                <div class="form-group">
-                    <label for="newSymbolType">Type</label>
-                    <select id="newSymbolType">
-                        <option value="stock">Stock</option>
-                        <option value="etf">ETF</option>
-                        <option value="bond">Bond</option>
-                        <option value="crypto">Crypto</option>
-                    </select>
-                </div>
+                <input type="hidden" id="newSymbolType">
                 <div class="form-group">
                     <label for="newSymbolAccount">Account</label>
                     <select id="newSymbolAccount" required></select>
@@ -1941,7 +1924,15 @@
                         }
                     } else {
                         if (!accountsCollapsed) {
-                            const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, type: 'stock', quantity: 0 };
+                            // Display type based on what's in holdings (visual only, backend determines actual type)
+                            let posType = 'stock';
+                            for (const account of accounts) {
+                                if (account.holdings.bonds.find(b => b.ticker === sym)) {
+                                    posType = 'bond';
+                                    break;
+                                }
+                            }
+                            const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, quantity: 0 };
                             const addPosJson = escapeHtml(JSON.stringify(addPosData));
                             rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
                         }
@@ -2459,13 +2450,11 @@
             document.getElementById('positionModalTitle').innerText = 'Add Position';
 
             document.getElementById('posAccountId').value = pos.account_id;
-            document.getElementById('posQuantity').value = pos.quantity;
+            document.getElementById('posQuantity').value = pos.quantity || 0;
             document.getElementById('posSymbol').value = pos.symbol || pos.ticker;
-            document.getElementById('posType').value = pos.type;
 
-            // Output-only fields
+            // Output-only fields (display only, backend determines actual type)
             document.getElementById('posSymbolDisplay').textContent = pos.symbol || pos.ticker;
-            document.getElementById('posTypeDisplay').textContent = (pos.type || '').charAt(0).toUpperCase() + (pos.type || '').slice(1);
             // Use account_name if present, otherwise look up
             let accountName = pos.account_name || '';
             if (!accountName && window.lastAssetsData && window.lastAssetsData.accounts) {
@@ -2474,11 +2463,10 @@
             }
             document.getElementById('posAccountDisplay').textContent = accountName;
 
-            // Hide Symbol/Type fields for cash
+            // Hide Symbol field for cash
             const isCash = pos.type === 'cash';
             const isBankCash = isCash && pos.isBankAccount;
             document.getElementById('posSymbolGroup').style.display = isCash ? 'none' : 'block';
-            document.getElementById('posTypeGroup').style.display = isBankCash ? 'none' : 'block';
             document.getElementById('btnDeletePosition').style.display = isBankCash ? 'none' : (pos.id ? 'block' : 'none');
 
             if (pos.id) {
@@ -2497,7 +2485,6 @@
                 // Backend expects ticker; keep symbol for backward compatibility.
                 ticker: symbol,
                 symbol,
-                type: document.getElementById('posType').value,
                 quantity: parseFloat(document.getElementById('posQuantity').value),
                 currency: 'USD'
             };
@@ -3646,14 +3633,14 @@
                 
                 // Populate metadata display
                 document.getElementById('symbolMetadataName').textContent = data.name || '—';
-                document.getElementById('symbolMetadataType').textContent = (data.type || 'STOCK').toUpperCase();
+                // Show detected type (auto-determined by backend from treasury registry + Yahoo metadata)
+                const detectedType = data.detectedType || data.type || 'STOCK';
+                document.getElementById('symbolMetadataType').textContent = detectedType.toUpperCase();
                 document.getElementById('symbolMetadataExchange').textContent = data.exchange || '—';
                 document.getElementById('symbolMetadataVerified').textContent = data.verified ? '✅ Yes' : '⚠️ Unverified';
                 
-                // Update form with metadata - map all bond-like types to 'bond'
-                const typeMap = { 'STOCK': 'stock', 'ETF': 'etf', 'BOND': 'bond', 'TREASURY': 'bond', 'CRYPTO': 'crypto' };
-                const typeValue = typeMap[data.type] || 'stock';
-                document.getElementById('newSymbolType').value = typeValue;
+                // Store detected type in hidden input (backend auto-detected)
+                document.getElementById('newSymbolType').value = detectedType.toLowerCase();
                 
                 displayEl.style.display = 'block';
                 statusEl.textContent = '⏳ Fetching current price...';
@@ -3663,7 +3650,7 @@
                     const priceResponse = await fetch('/api/fetch-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ticker: symbol, type: typeValue })
+                        body: JSON.stringify({ ticker: symbol, type: detectedType.toLowerCase() })
                     });
                     
                     if (priceResponse.ok) {

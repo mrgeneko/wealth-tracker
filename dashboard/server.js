@@ -1161,10 +1161,11 @@ app.delete('/api/accounts/:id', async (req, res) => {
 });
 
 // Positions
+// Type is auto-detected from treasury registry based on ticker
 app.post('/api/positions', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { account_id, ticker, type, quantity, currency } = normalized;
+    const { account_id, ticker, quantity, currency } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1172,14 +1173,18 @@ app.post('/api/positions', async (req, res) => {
     if (!Number.isFinite(quantity)) {
         return res.status(400).json({ error: 'quantity must be a valid number' });
     }
+    
     try {
+        // Auto-detect position type from treasury registry (don't trust frontend)
+        const detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
+        
         const [result] = await pool.execute(
             'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
-            [account_id, ticker, type, quantity, currency || 'USD']
+            [account_id, ticker, detectedType, quantity, currency || 'USD']
         );
         assetsCache = null;
         loadAssets();
-        res.json({ id: result.insertId, ...normalized });
+        res.json({ id: result.insertId, account_id, ticker, type: detectedType, quantity, currency: currency || 'USD' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1188,7 +1193,7 @@ app.post('/api/positions', async (req, res) => {
 app.put('/api/positions/:id', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { ticker, type, quantity, currency } = normalized;
+    const { ticker, quantity, currency } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1196,10 +1201,14 @@ app.put('/api/positions/:id', async (req, res) => {
     if (!Number.isFinite(quantity)) {
         return res.status(400).json({ error: 'quantity must be a valid number' });
     }
+    
     try {
+        // Auto-detect position type from treasury registry (don't trust frontend)
+        const detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
+        
         await pool.execute(
             'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
-            [ticker, type, quantity, currency || 'USD', req.params.id]
+            [ticker, detectedType, quantity, currency || 'USD', req.params.id]
         );
         assetsCache = null;
         loadAssets();

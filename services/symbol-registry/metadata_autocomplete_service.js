@@ -207,12 +207,40 @@ class MetadataAutocompleteService {
                 WHERE ticker = ?
             `, [normalizedTicker]);
 
+            const metadataRecord = metadata.length > 0 ? metadata[0] : null;
+
+            // Auto-detect type from authoritative sources
+            let detectedType = tickerData.security_type;
+
+            // Priority 1: Check if it's a bond (treasury registry)
+            if (tickerData.exchange === 'TREASURY') {
+                detectedType = 'bond';
+            }
+            // Priority 2: Use Yahoo metadata asset type (handles crypto, ETF, stock)
+            else if (metadataRecord && metadataRecord.asset_type) {
+                const assetType = metadataRecord.asset_type.toUpperCase();
+                // Map Yahoo assetType to our types: EQUITY, ETF, CRYPTOCURRENCY -> stock, etf, crypto
+                const typeMap = {
+                    'EQUITY': 'stock',
+                    'ETF': 'etf',
+                    'CRYPTOCURRENCY': 'crypto',
+                    'CRYPTO': 'crypto'
+                };
+                detectedType = typeMap[assetType] || 'stock';
+            }
+            // Priority 3: Fallback to registry type
+            else {
+                detectedType = tickerData.security_type || 'stock';
+            }
+
             return {
                 ticker: tickerData.ticker,
                 name: tickerData.name,
                 type: tickerData.security_type,
+                detectedType: detectedType,
+                exchange: tickerData.exchange,
                 verified: true,
-                metadata: metadata.length > 0 ? metadata[0] : null
+                metadata: metadataRecord
             };
         } catch (error) {
             console.error(`Error getting ticker details: ${error.message}`);
