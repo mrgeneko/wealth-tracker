@@ -577,6 +577,7 @@
             <button class="tablinks active" onclick="openTab(event, 'Accounts')">Accounts</button>
             <button class="tablinks" onclick="openTab(event, 'Historical')">Historical Values</button>
             <button class="tablinks" onclick="openTab(event, 'Projections')">Projections</button>
+            <button class="tablinks" onclick="openTab(event, 'Watchlists')">Watchlists</button>
         </div>
 
         <div id="Accounts" class="tab-content" style="display: block;">
@@ -646,6 +647,65 @@
         <div id="Projections" class="tab-content">
             <h2>Projections</h2>
             <p>Future wealth projections coming soon.</p>
+        </div>
+
+        <div id="Watchlists" class="tab-content">
+            <div class="section-header">
+                <h2>Watchlist Management</h2>
+                <button class="btn btn-primary" onclick="refreshWatchlistUI()">Refresh</button>
+            </div>
+
+            <div id="watchlistStatus" style="margin-bottom: 12px; color: #aaa; font-size: 0.9em;"></div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px;">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="watchlistProvider">Provider</label>
+                        <select id="watchlistProvider" onchange="onWatchlistProviderChanged()"></select>
+                    </div>
+                    <div id="watchlistProviderCaps" style="color: #cfcfcf; font-size: 0.9em; line-height: 1.5;"></div>
+                </div>
+
+                <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px;">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="watchlistTab">Watchlist Tab</label>
+                        <select id="watchlistTab"></select>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn" style="background-color: #555; color: white;" onclick="switchWatchlistTab()">Switch Tab</button>
+                        <button class="btn" style="background-color: #555; color: white;" onclick="loadWatchlistTickers()">Load Tickers</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                <h3 style="margin-top: 0;">Add Ticker</h3>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: end;">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="watchlistAddTicker">Ticker</label>
+                        <input id="watchlistAddTicker" type="text" placeholder="e.g., AAPL" />
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="watchlistAddAssetType">Asset Type</label>
+                        <select id="watchlistAddAssetType"></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="addWatchlistTicker()">Add</button>
+                </div>
+            </div>
+
+            <div class="section-header" style="margin-top: 0;">
+                <h3 style="margin: 0;">Tickers</h3>
+                <div style="color: #aaa; font-size: 0.9em;" id="watchlistTickersMeta"></div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Ticker</th>
+                        <th style="text-align:center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="watchlistTickersBody"></tbody>
+            </table>
         </div>
     </div>
 
@@ -2521,6 +2581,288 @@
 
             if (tabName === 'Logs') {
                 fetchLogs();
+            }
+
+            if (tabName === 'Watchlists') {
+                refreshWatchlistUI();
+            }
+        }
+
+        // --- Phase 11: Watchlist Management UI ---
+
+        let _watchlistProvidersCache = null;
+        let _watchlistInitializedOnce = false;
+
+        function setWatchlistStatus(message, isError = false) {
+            const el = document.getElementById('watchlistStatus');
+            if (!el) return;
+            el.style.color = isError ? '#ffb4a2' : '#aaa';
+            el.textContent = message || '';
+        }
+
+        async function watchlistFetchJson(url, options = {}) {
+            const resp = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {})
+                }
+            });
+            const text = await resp.text();
+            let data;
+            try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { error: text || 'Invalid JSON' }; }
+            if (!resp.ok) {
+                const msg = (data && data.error) ? data.error : `Request failed (${resp.status})`;
+                throw new Error(msg);
+            }
+            return data;
+        }
+
+        function getSelectedWatchlistProvider() {
+            const sel = document.getElementById('watchlistProvider');
+            return sel && sel.value ? sel.value : null;
+        }
+
+        function getSelectedWatchlistTab() {
+            const sel = document.getElementById('watchlistTab');
+            return sel && sel.value ? sel.value : null;
+        }
+
+        function renderWatchlistProviderCapabilities(providerId) {
+            const el = document.getElementById('watchlistProviderCaps');
+            if (!el) return;
+            const caps = _watchlistProvidersCache && _watchlistProvidersCache.capabilities
+                ? _watchlistProvidersCache.capabilities[providerId]
+                : null;
+
+            if (!caps) {
+                el.textContent = '';
+                return;
+            }
+
+            const initialized = Array.isArray(_watchlistProvidersCache.initialized)
+                ? _watchlistProvidersCache.initialized.includes(providerId)
+                : false;
+            const supported = Array.isArray(caps.supportedAssetTypes) ? caps.supportedAssetTypes.join(', ') : '';
+
+            el.innerHTML = `
+                <div><strong>${caps.displayName || providerId}</strong> (${providerId})</div>
+                <div>Initialized: <strong>${initialized ? 'Yes' : 'No'}</strong></div>
+                <div>Multiple watchlists: <strong>${caps.supportsMultipleWatchlists ? 'Yes' : 'No'}</strong></div>
+                <div>Requires login: <strong>${caps.requiresLogin ? 'Yes' : 'No'}</strong></div>
+                <div>Supported asset types: <strong>${supported || '—'}</strong></div>
+            `;
+
+            const assetSelect = document.getElementById('watchlistAddAssetType');
+            if (assetSelect) {
+                assetSelect.innerHTML = '';
+                const types = Array.isArray(caps.supportedAssetTypes) ? caps.supportedAssetTypes : ['stock'];
+                for (const t of types) {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    assetSelect.appendChild(opt);
+                }
+            }
+        }
+
+        async function loadWatchlistProviders() {
+            setWatchlistStatus('Loading providers...');
+            const data = await watchlistFetchJson('/api/watchlist/providers');
+            _watchlistProvidersCache = data;
+
+            const sel = document.getElementById('watchlistProvider');
+            if (!sel) return;
+
+            const capabilities = data && data.capabilities ? data.capabilities : {};
+            const providerIds = Object.keys(capabilities);
+            sel.innerHTML = '';
+            providerIds.forEach(pid => {
+                const cap = capabilities[pid] || {};
+                const opt = document.createElement('option');
+                opt.value = pid;
+                opt.textContent = cap.displayName ? `${cap.displayName} (${pid})` : pid;
+                sel.appendChild(opt);
+            });
+
+            if (providerIds.length === 0) {
+                setWatchlistStatus('No providers registered.', true);
+                return;
+            }
+
+            setWatchlistStatus(`Loaded ${providerIds.length} provider(s).`);
+        }
+
+        async function loadWatchlistTabs() {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId) return;
+            const sel = document.getElementById('watchlistTab');
+            if (!sel) return;
+
+            sel.innerHTML = '';
+            try {
+                const data = await watchlistFetchJson(`/api/watchlist/${providerId}/tabs`);
+                const tabs = (data && Array.isArray(data.tabs)) ? data.tabs : [];
+                tabs.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    sel.appendChild(opt);
+                });
+                if (tabs.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No tabs found';
+                    sel.appendChild(opt);
+                }
+            } catch (e) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Failed to load tabs';
+                sel.appendChild(opt);
+                throw e;
+            }
+        }
+
+        async function switchWatchlistTab() {
+            const providerId = getSelectedWatchlistProvider();
+            const watchlist = getSelectedWatchlistTab();
+            if (!providerId || !watchlist) return;
+
+            setWatchlistStatus(`Switching to tab: ${watchlist}...`);
+            await watchlistFetchJson(`/api/watchlist/${providerId}/switch`, {
+                method: 'POST',
+                body: JSON.stringify({ watchlist })
+            });
+            setWatchlistStatus(`Switched to tab: ${watchlist}`);
+        }
+
+        async function loadWatchlistTickers() {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId) return;
+
+            setWatchlistStatus('Loading tickers...');
+            const data = await watchlistFetchJson(`/api/watchlist/${providerId}/tickers`);
+            const tickers = (data && Array.isArray(data.tickers)) ? data.tickers : [];
+
+            const meta = document.getElementById('watchlistTickersMeta');
+            if (meta) {
+                const tab = getSelectedWatchlistTab();
+                meta.textContent = `${tickers.length} ticker(s)${tab ? ` (tab: ${tab})` : ''}`;
+            }
+
+            const tbody = document.getElementById('watchlistTickersBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            tickers.forEach(t => {
+                const tr = document.createElement('tr');
+                const safe = String(t || '').toUpperCase();
+                tr.innerHTML = `
+                    <td style="text-align:left;">${safe}</td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-danger" onclick="deleteWatchlistTicker('${safe}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (tickers.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="2" style="text-align:center; color:#aaa;">No tickers</td>`;
+                tbody.appendChild(tr);
+            }
+
+            setWatchlistStatus('Tickers loaded.');
+        }
+
+        async function addWatchlistTicker() {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId) return;
+
+            const tickerEl = document.getElementById('watchlistAddTicker');
+            const assetTypeEl = document.getElementById('watchlistAddAssetType');
+            const ticker = tickerEl ? tickerEl.value.trim().toUpperCase() : '';
+            const assetType = assetTypeEl ? assetTypeEl.value : 'stock';
+            const watchlist = getSelectedWatchlistTab();
+
+            if (!ticker) {
+                setWatchlistStatus('Ticker is required.', true);
+                return;
+            }
+
+            setWatchlistStatus(`Adding ${ticker}...`);
+            await watchlistFetchJson(`/api/watchlist/${providerId}/add`, {
+                method: 'POST',
+                body: JSON.stringify({ ticker, assetType, watchlist })
+            });
+
+            if (tickerEl) tickerEl.value = '';
+            setWatchlistStatus(`Added ${ticker}.`);
+            await loadWatchlistTickers();
+        }
+
+        async function deleteWatchlistTicker(ticker) {
+            const providerId = getSelectedWatchlistProvider();
+            const watchlist = getSelectedWatchlistTab();
+            if (!providerId || !ticker) return;
+
+            showConfirmModal(
+                'Delete Ticker',
+                `Delete ${ticker} from watchlist?`,
+                async () => {
+                    try {
+                        setWatchlistStatus(`Deleting ${ticker}...`);
+                        await watchlistFetchJson(`/api/watchlist/${providerId}/delete`, {
+                            method: 'POST',
+                            body: JSON.stringify({ ticker, watchlist })
+                        });
+                        setWatchlistStatus(`Deleted ${ticker}.`);
+                        await loadWatchlistTickers();
+                    } catch (e) {
+                        setWatchlistStatus(e.message || 'Delete failed', true);
+                    }
+                }
+            );
+        }
+
+        async function onWatchlistProviderChanged() {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId) return;
+
+            try {
+                renderWatchlistProviderCapabilities(providerId);
+                await loadWatchlistTabs();
+
+                // Best effort: switch to the first tab so tickers reflect the tab selection.
+                const firstTab = getSelectedWatchlistTab();
+                if (firstTab) {
+                    try { await switchWatchlistTab(); } catch (e) {}
+                }
+                await loadWatchlistTickers();
+            } catch (e) {
+                setWatchlistStatus(e.message || 'Failed to load provider', true);
+            }
+        }
+
+        async function refreshWatchlistUI() {
+            try {
+                if (!_watchlistInitializedOnce) {
+                    _watchlistInitializedOnce = true;
+                }
+                await loadWatchlistProviders();
+                const providerId = getSelectedWatchlistProvider();
+                if (providerId) {
+                    renderWatchlistProviderCapabilities(providerId);
+                    await loadWatchlistTabs();
+                    const tab = getSelectedWatchlistTab();
+                    if (tab) {
+                        try { await switchWatchlistTab(); } catch (e) {}
+                    }
+                    await loadWatchlistTickers();
+                }
+            } catch (e) {
+                setWatchlistStatus(e.message || 'Failed to refresh watchlists', true);
             }
         }
 
