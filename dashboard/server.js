@@ -374,9 +374,38 @@ initializeMetricsPool(pool);
 // Initialize symbol registry sync service to load CSV data on startup
 async function initializeSymbolRegistry() {
     try {
+        // Wait for MySQL to accept connections. `depends_on` does not guarantee readiness.
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const maxAttempts = parseInt(process.env.SYMBOL_REGISTRY_SYNC_DB_RETRIES || '30', 10);
+        const delayMs = parseInt(process.env.SYMBOL_REGISTRY_SYNC_DB_DELAY_MS || '1000', 10);
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                await pool.query('SELECT 1');
+                break;
+            } catch (e) {
+                const msg = (e && e.message) ? e.message : String(e);
+                console.warn(`[Symbol Registry] Waiting for MySQL (${attempt}/${maxAttempts})... ${msg}`);
+                if (attempt === maxAttempts) throw e;
+                await sleep(delayMs);
+            }
+        }
+
         const { SymbolRegistrySyncService, SymbolRegistryService } = require('./services/symbol-registry');
         const symbolService = new SymbolRegistryService(pool);
         const syncService = new SymbolRegistrySyncService(pool, symbolService);
+
+        // If already populated, avoid doing heavy sync work on every restart.
+        try {
+            const [existing] = await pool.query('SELECT COUNT(*) as count FROM ticker_registry');
+            const count = (existing && existing[0] && typeof existing[0].count === 'number') ? existing[0].count : 0;
+            if (count > 0) {
+                console.log('[Symbol Registry] ticker_registry already populated; skipping initial sync (count=' + count + ')');
+                return;
+            }
+        } catch (e) {
+            // If table is missing or query fails, proceed to sync attempt below (migrations may create it).
+            console.warn('[Symbol Registry] Could not check ticker_registry count before sync:', e.message);
+        }
         
         console.log('[Symbol Registry] Starting initial sync of CSV files...');
         const stats = await syncService.syncAll();
