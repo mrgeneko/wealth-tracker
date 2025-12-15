@@ -44,7 +44,6 @@ const { scrapeStockAnalysis } = require('./scrape_stockanalysis');
 const { scrapeStocktwits } = require('./scrape_stocktwits');
 const { scrapeWebull } = require('./scrape_webull');
 const { scrapeWSJ } = require('./scrape_wsj');
-const { scrapeYahoo, scrapeYahooBatch } = require('./scrape_yahoo');
 const { scrapeYCharts } = require('./scrape_ycharts');
 
 const { scrapeStockMarketWatch } = require('./scrape_stockmarketwatch');
@@ -658,39 +657,6 @@ async function runCycle(browser, outputDir) {
 		}
 	} else {
 		logDebug('Skipping tradingview watchlists scrape (interval not reached)');
-	}
-
-	// ======== YAHOO FINANCE2 API ===========
-	const yahooBatchName = 'yahoo_batch'
-	const yahooBatchMarker = path.join('/usr/src/app/logs/', `last.${yahooBatchName}.txt`);
-	const yahooBatchSettings = getScrapeGroupSettings(yahooBatchName, 45); // minutes
-	logDebug('yahooBatchInterval:' + yahooBatchSettings.interval)
-	if (shouldRunTask(yahooBatchSettings, yahooBatchMarker)) {
-		logDebug('Begin yahoo_batch api');
-		
-		// Fetch stock/etf positions from MySQL and map to security objects with ticker_yahoo
-		const positions = await fetchStockPositions();
-		logDebug(`Found ${positions.length} stock/etf positions for Yahoo batch: ${positions.map(p => p.ticker).join(', ')}`);
-		
-		const yahooSecurities = positions.map(p => ({
-			...p,
-			key: p.ticker,
-			ticker_yahoo: p.ticker
-		}));
-		
-		if (yahooSecurities.length) {
-			try {
-				// Phase 9: Record metrics during scraper execution
-				const batchResults = await recordScraperMetrics('yahoo_batch', async () => {
-					return await scrapeYahooBatch(browser, yahooSecurities, outputDir, { chunkSize: 50, delayMs: 500 });
-				}, {
-					url: 'https://query1.finance.yahoo.com'
-				});
-				logDebug(`Yahoo batch fetched ${batchResults.length} items`);
-			} catch (e) {
-				logDebug('Yahoo batch fetch error: ' + e);
-			}
-		}
 	}
 
 	// ======== STOCK POSITIONS (from MySQL) ===========

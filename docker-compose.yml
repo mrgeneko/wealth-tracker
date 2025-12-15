@@ -12,11 +12,6 @@ services:
       KAFKA_TOPIC: price_data
       # Health endpoint port exposed by the daemon
       HEALTH_PORT: "3002"
-      # Yahoo batch tuning (chunking, delays, retries)
-      YAHOO_CHUNK_SIZE: "2"
-      YAHOO_DELAY_MS: "5000"
-      YAHOO_MAX_RETRIES: "4"
-      YAHOO_BACKOFF_BASE_MS: "1000"
       # Phase 7: Page pool configuration
       PAGE_POOL_SIZE: "4"
       PAGE_ACQUIRE_TIMEOUT: "30000"
@@ -33,6 +28,44 @@ services:
       resources:
         limits:
           memory: 8g
+
+  api-scraper:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api-scraper
+    container_name: wealth-tracker-api-scraper
+    restart: unless-stopped
+    depends_on:
+      - kafka
+      - mysql
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: price_data
+      API_SCRAPER_HEALTH_PORT: "3020"
+      # Yahoo batch tuning (chunking, delays, retries)
+      YAHOO_CHUNK_SIZE: "2"
+      YAHOO_DELAY_MS: "5000"
+      YAHOO_MAX_RETRIES: "4"
+      YAHOO_BACKOFF_BASE_MS: "1000"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      CONFIG_DIR: /usr/src/app/config
+      DATA_DIR: /usr/src/app/data
+      LOG_DIR: /usr/src/app/logs
+    volumes:
+      - ./logs:/usr/src/app/logs
+      - ./data:/usr/src/app/data
+      - ./config:/usr/src/app/config
+    ports:
+      - "3020:3020"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3020/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   listing-sync:
     build:
