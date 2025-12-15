@@ -49,7 +49,16 @@ jobs:
           
           docker compose up -d mysql
           echo "Waiting for MySQL to be ready..."
-          sleep 30 # Increased wait time
+          
+          # Wait explicitly for MySQL to be responsive
+          until docker compose exec -T mysql mysqladmin ping -h "localhost" --silent; do
+            echo "Waiting for database connection..."
+            sleep 2
+          done
+          
+          echo "MySQL is up! Importing init script..."
+          # Explicitly run the script to guarantee execution and see errors if any
+          docker compose exec -T mysql mysql -u test -ptest testdb < scripts/init-db/001-listing-sync-watchlist.sql
 
       - name: Run DB Init Test
         run: node tests/integration/db_init_test.js
