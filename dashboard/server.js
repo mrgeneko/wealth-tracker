@@ -495,11 +495,9 @@ async function fetchAssetsFromDB() {
             const accPositions = positions.filter(p => p.account_id === acc.id);
 
             for (const pos of accPositions) {
-                const isCashTicker = pos.ticker && String(pos.ticker).trim().toUpperCase() === 'CASH';
-
                 // Determine display type
-                // Defensive: treat ticker CASH as cash even if stored type was incorrect.
-                const displayType = isCashTicker ? 'cash' : pos.type; // Default to stored type
+                // Type-driven only: cash is determined strictly by pos.type === 'cash'.
+                const displayType = pos.type; // Default to stored type
 
                 // Common position object
                 const positionData = {
@@ -1176,7 +1174,7 @@ app.delete('/api/accounts/:id', async (req, res) => {
 app.post('/api/positions', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { account_id, ticker, quantity, currency } = normalized;
+    const { account_id, ticker, quantity, currency, type } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1186,11 +1184,10 @@ app.post('/api/positions', async (req, res) => {
     }
     
     try {
-        // For cash positions, preserve type='cash'. Otherwise auto-detect from treasury registry.
-        let detectedType = 'stock';
-        if (ticker.toUpperCase() === 'CASH') {
-            detectedType = 'cash';
-        } else {
+        // Type-driven only: respect incoming type when provided.
+        // If type is not provided, fall back to bond auto-detection (else stock).
+        let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
+        if (!detectedType) {
             detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
         }
         
@@ -1209,7 +1206,7 @@ app.post('/api/positions', async (req, res) => {
 app.put('/api/positions/:id', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { ticker, quantity, currency } = normalized;
+    const { ticker, quantity, currency, type } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1219,11 +1216,10 @@ app.put('/api/positions/:id', async (req, res) => {
     }
     
     try {
-        // For cash positions, preserve type='cash'. Otherwise auto-detect from treasury registry.
-        let detectedType = 'stock';
-        if (ticker.toUpperCase() === 'CASH') {
-            detectedType = 'cash';
-        } else {
+        // Type-driven only: respect incoming type when provided.
+        // If type is not provided, fall back to bond auto-detection (else stock).
+        let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
+        if (!detectedType) {
             detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
         }
         
