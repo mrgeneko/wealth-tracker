@@ -23,16 +23,12 @@ This is the **Docker-recommended approach** for initializing databases in contai
   - `securities_earnings` - Earnings information
   - `security_splits` - Stock split information
 
-- **001-symbol-registry.sql** - Creates ticker registry tables for autocomplete and metadata tracking
-  - `ticker_registry` - Main ticker registry with permanent failure tracking
-  - `ticker_registry_metrics` - Coverage and refresh metrics
-  - `file_refresh_status` - File refresh status tracking
-  - `symbol_yahoo_metrics` - Extended Yahoo Finance metrics storage
-
-- **002-phase9-metrics.sql** - Creates WebSocket metrics tables for real-time dashboard
-  - `scraper_page_performance` - Per-request metrics from scrapers
-  - `scraper_daily_summary` - Aggregated daily metrics
-  - `scheduler_metrics` - Scheduler execution metrics
+- **001-listing-sync-watchlist.sql** - Adds watchlist management + update window tables (and optional listing sync/metrics tables)
+  - `watchlist_providers` - Provider registry (Investing.com, TradingView, etc.)
+  - `watchlist_instances` - Per-provider watchlist instances/URLs
+  - `update_windows` - Time-based gating for watchlist updates
+  - `listing_sync_status` - Optional status tracking for listing sync
+  - `listing_sync_metrics`, `page_pool_snapshots` - Optional metrics tables
 
 ## Single Source of Truth
 
