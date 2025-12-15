@@ -176,6 +176,54 @@ app.use('/api/autocomplete', autocompleteRouter);
 const { router: cleanupRouter } = require('./api/cleanup');
 app.use('/api/cleanup', cleanupRouter);
 
+// Phase 11: Watchlist Management Proxy (multi-provider)
+const SCRAPER_HOST = process.env.SCRAPER_HOST || 'scrapers';
+const SCRAPER_PORT = process.env.SCRAPER_PORT || '3002';
+
+async function proxyScraperJson(res, url, options = {}) {
+    try {
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let data;
+        try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { error: text || 'Invalid JSON from scraper' }; }
+        res.status(response.status).json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to contact scraper' });
+    }
+}
+
+app.get('/api/watchlist/providers', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/providers`);
+});
+
+app.get('/api/watchlist/:provider/status', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/status`);
+});
+
+app.get('/api/watchlist/:provider/tabs', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tabs`);
+});
+
+app.get('/api/watchlist/:provider/tickers', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tickers`);
+});
+
+app.post('/api/watchlist/:provider/add', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+    });
+});
+
+app.post('/api/watchlist/:provider/delete', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+    });
+});
+
 // Phase 9.3: Analytics Dashboard Route
 app.get('/analytics', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'analytics.html'));

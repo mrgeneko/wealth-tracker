@@ -26,6 +26,10 @@ const { publishToKafka } = require('./publish_to_kafka');
 const http = require('http');
 const { OnDemandScrapeApi, DEFAULT_ON_DEMAND_LIMITS } = require('./on_demand_scrape_api');
 
+// Phase 11: watchlist management API
+const { watchlistManager } = require('./watchlist/watchlist_manager');
+const { WatchlistConfigLoader } = require('../services/watchlist_config_loader');
+
 // Phase 7: page pool & persistent page registry
 const PagePool = require('./page_pool');
 const PersistentPageRegistry = require('./persistent_page_registry');
@@ -187,6 +191,53 @@ let globalBrowser = null;
 let pagePool = null;
 let persistentPages = null;
 let pagePoolBrowser = null;
+
+let watchlistConfigLoader = null;
+
+async function initializeWatchlistProviders(browser) {
+	try {
+		if (!browser) return;
+		watchlistConfigLoader = new WatchlistConfigLoader(getMysqlPool());
+		const providers = await watchlistConfigLoader.getProviders();
+		for (const [providerId, providerCfg] of Object.entries(providers || {})) {
+			if (!providerCfg || providerCfg.enabled === false) continue;
+			const watchlists = Array.isArray(providerCfg.watchlists) ? providerCfg.watchlists : [];
+			const first = watchlists.find(w => w && w.enabled !== false && w.url);
+			if (!first || !first.url) {
+				logDebug(`[Watchlist] No URL configured for provider ${providerId}; skipping initialization`);
+				continue;
+			}
+			try {
+				await watchlistManager.initializeProvider(providerId, browser, first.url);
+				logDebug(`[Watchlist] Initialized provider ${providerId} with ${first.key || 'default'} URL`);
+			} catch (e) {
+				logDebug(`[Watchlist] Failed to initialize provider ${providerId}: ${e.message}`);
+			}
+		}
+	} catch (e) {
+		logDebug('[Watchlist] initializeWatchlistProviders failed: ' + (e && e.message ? e.message : e));
+	}
+}
+
+function readJsonBody(req, { maxBytes = 1024 * 1024 } = {}) {
+	return new Promise((resolve, reject) => {
+		let body = '';
+		req.on('data', chunk => {
+			body += chunk;
+			if (body.length > maxBytes) {
+				reject(new Error('Request body too large'));
+				try { req.destroy(); } catch (e) {}
+			}
+		});
+		req.on('end', () => {
+			try {
+				resolve(body ? JSON.parse(body) : {});
+			} catch (e) {
+				reject(e);
+			}
+		});
+	});
+}
 
 async function shutdownScraperInfrastructure() {
 	if (pagePool) {
@@ -942,6 +993,8 @@ async function daemon() {
 	globalBrowser = browser;
 	// Phase 7: initialize page pool / persistent page registry
 	try { await initializeScraperInfrastructure(browser); } catch (e) {}
+	// Phase 11: initialize watchlist providers (best-effort)
+	try { await initializeWatchlistProviders(browser); } catch (e) {}
 
 	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
 	const HEARTBEAT_INTERVAL_MINUTES = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '5', 10);
@@ -950,7 +1003,7 @@ async function daemon() {
 	// start health server so external monitors can query status and (optionally) metrics
 	try {
 		const METRICS_ENABLED = (process.env.METRICS_ENABLED || 'false').toLowerCase() === 'true';
-		healthServer = http.createServer((req, res) => {
+		healthServer = http.createServer(async (req, res) => {
 			// Phase 8: On-demand scrape endpoint (uses PagePool + rate limiting)
 			if (req.url && req.url.startsWith('/scrape') && req.method === 'POST') {
 				onDemandScrapeApi.handle(req, res, {
@@ -960,6 +1013,111 @@ async function daemon() {
 					getConstructibleUrls,
 					scrapeGoogleWithPage
 				});
+				return;
+			}
+
+			// Phase 11: Watchlist management endpoints
+			try {
+				if (req.url === '/watchlist/providers' && req.method === 'GET') {
+					res.writeHead(200, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({
+						registered: watchlistManager.getRegisteredProviders(),
+						initialized: watchlistManager.getInitializedProviders(),
+						capabilities: watchlistManager.getAllCapabilities()
+					}));
+					return;
+				}
+
+				const statusMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/status$/);
+				if (statusMatch && req.method === 'GET') {
+					const providerId = statusMatch[1];
+					const controller = watchlistManager.getProvider(providerId);
+					if (!controller) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found or not initialized: ${providerId}` }));
+						return;
+					}
+					res.writeHead(200, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify(controller.getStatus()));
+					return;
+				}
+
+				const tabsMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tabs$/);
+				if (tabsMatch && req.method === 'GET') {
+					const providerId = tabsMatch[1];
+					const controller = watchlistManager.getProvider(providerId);
+					if (!controller) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						return;
+					}
+					const tabs = await controller.getWatchlistTabs();
+					res.writeHead(200, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({ provider: providerId, tabs }));
+					return;
+				}
+
+				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers$/);
+				if (tickersMatch && req.method === 'GET') {
+					const providerId = tickersMatch[1];
+					const controller = watchlistManager.getProvider(providerId);
+					if (!controller) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						return;
+					}
+					const tickers = await controller.listTickers();
+					res.writeHead(200, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({ provider: providerId, tickers, count: tickers.length }));
+					return;
+				}
+
+				const addMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/add$/);
+				if (addMatch && req.method === 'POST') {
+					const providerId = addMatch[1];
+					const controller = watchlistManager.getProvider(providerId);
+					if (!controller) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						return;
+					}
+					const body = await readJsonBody(req);
+					const { ticker, watchlist, assetType = 'stock' } = body || {};
+					if (!ticker) {
+						res.writeHead(400, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'ticker required' }));
+						return;
+					}
+					const result = await controller.addTicker(ticker, { watchlist, assetType });
+					res.writeHead(result && result.success ? 200 : 400, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({ provider: providerId, ...(result || {}) }));
+					return;
+				}
+
+				const deleteMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/delete$/);
+				if (deleteMatch && req.method === 'POST') {
+					const providerId = deleteMatch[1];
+					const controller = watchlistManager.getProvider(providerId);
+					if (!controller) {
+						res.writeHead(404, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: `Provider not found: ${providerId}` }));
+						return;
+					}
+					const body = await readJsonBody(req);
+					const { ticker, watchlist } = body || {};
+					if (!ticker) {
+						res.writeHead(400, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'ticker required' }));
+						return;
+					}
+					const result = await controller.deleteTicker(ticker, { watchlist });
+					res.writeHead(result && result.success ? 200 : 400, { 'Content-Type': 'application/json' });
+					res.end(JSON.stringify({ provider: providerId, ...(result || {}) }));
+					return;
+				}
+			} catch (e) {
+				res.writeHead(500, { 'Content-Type': 'application/json' });
+				res.end(JSON.stringify({ error: e.message }));
 				return;
 			}
 			if (req.url === '/health') {
