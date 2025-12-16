@@ -84,8 +84,8 @@ fi
 log_success "✓ Docker is running"
 
 # Check if MySQL container is running
-if ! docker ps | grep -q "wealth-tracker-mysql"; then
-  log_error "✗ MySQL container is not running"
+if [ -z "$(docker compose ps -q mysql)" ]; then
+  log_error "✗ MySQL service/container is not running"
   log_error "Please run: docker compose up -d"
   exit 1
 fi
@@ -132,7 +132,7 @@ if [ "$SKIP_MIGRATIONS" = false ]; then
   for migration in "${MIGRATION_FILES[@]}"; do
     log "  Running $(basename $migration)..."
     
-    if docker exec -i wealth-tracker-mysql mysql -uroot -proot wealth_tracker < "$PROJECT_DIR/$migration" >> "$SETUP_LOG" 2>> "$ERROR_LOG"; then
+    if docker compose exec -T mysql mysql -uroot -proot wealth_tracker < "$PROJECT_DIR/$migration" >> "$SETUP_LOG" 2>> "$ERROR_LOG"; then
       log_success "  ✓ $(basename $migration) completed"
     else
       log_error "  ✗ $(basename $migration) failed"
@@ -157,7 +157,7 @@ EXPECTED_TABLES=(
   "securities_dividends"
 )
 
-TABLES_OUTPUT=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SHOW TABLES;" 2>> "$ERROR_LOG")
+TABLES_OUTPUT=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SHOW TABLES;" 2>> "$ERROR_LOG")
 
 for table in "${EXPECTED_TABLES[@]}"; do
   if echo "$TABLES_OUTPUT" | grep -q "$table"; then
@@ -169,7 +169,7 @@ for table in "${EXPECTED_TABLES[@]}"; do
 done
 
 # Check if metadata_symbol column was added to positions
-COLUMN_CHECK=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SHOW COLUMNS FROM positions LIKE 'metadata_symbol';" 2>> "$ERROR_LOG")
+COLUMN_CHECK=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SHOW COLUMNS FROM positions LIKE 'metadata_symbol';" 2>> "$ERROR_LOG")
 
 if echo "$COLUMN_CHECK" | grep -q "metadata_symbol"; then
   log_success "  ✓ Column 'metadata_symbol' added to positions table"
@@ -184,16 +184,16 @@ log ""
 # Step 4: Check existing data
 log_info "Step 4: Checking existing data..."
 
-POSITION_COUNT=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM positions;" 2>> "$ERROR_LOG" | tail -1)
+POSITION_COUNT=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM positions;" 2>> "$ERROR_LOG" | tail -1)
 log "  Positions in database: $POSITION_COUNT"
 
 if [ "$POSITION_COUNT" -gt 0 ]; then
-  UNIQUE_SYMBOLS=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(DISTINCT ticker) FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH';" 2>> "$ERROR_LOG" | tail -1)
+  UNIQUE_SYMBOLS=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(DISTINCT ticker) FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH';" 2>> "$ERROR_LOG" | tail -1)
   log "  Unique symbols: $UNIQUE_SYMBOLS"
   
   # Show sample symbols
   log "  Sample symbols:"
-  docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH' LIMIT 5;" 2>> "$ERROR_LOG" | tail -n +2 | while read symbol; do
+  docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND ticker != 'CASH' LIMIT 5;" 2>> "$ERROR_LOG" | tail -n +2 | while read symbol; do
     log "    - $symbol"
   done
 else
@@ -214,7 +214,7 @@ if [ "$SKIP_POPULATION" = false ] && [ "$POSITION_COUNT" -gt 0 ]; then
     log_success "✓ Metadata population completed"
     
     # Check how many were populated
-    METADATA_COUNT=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM securities_metadata;" 2>> "$ERROR_LOG" | tail -1)
+    METADATA_COUNT=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM securities_metadata;" 2>> "$ERROR_LOG" | tail -1)
     log "  Securities in metadata table: $METADATA_COUNT"
   else
     log_error "✗ Metadata population failed"
@@ -255,7 +255,7 @@ log_info "Step 7: Final verification..."
 
 # Check record counts
 log "  Database record counts:"
-docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "
+docker compose exec mysql mysql -uroot -proot wealth_tracker -e "
   SELECT 'positions' as table_name, COUNT(*) as count FROM positions
   UNION ALL
   SELECT 'securities_metadata', COUNT(*) FROM securities_metadata
@@ -266,14 +266,14 @@ docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "
 " 2>> "$ERROR_LOG" | tee -a "$SETUP_LOG"
 
 # Check positions linked to metadata
-LINKED_COUNT=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM positions WHERE metadata_symbol IS NOT NULL;" 2>> "$ERROR_LOG" | tail -1)
+LINKED_COUNT=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM positions WHERE metadata_symbol IS NOT NULL;" 2>> "$ERROR_LOG" | tail -1)
 log ""
 log "  Positions linked to metadata: $LINKED_COUNT"
 
 # Show sample metadata
 log ""
 log "  Sample metadata records:"
-docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT symbol, short_name, quote_type, exchange, currency FROM securities_metadata LIMIT 5;" 2>> "$ERROR_LOG" | tee -a "$SETUP_LOG"
+docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT symbol, short_name, quote_type, exchange, currency FROM securities_metadata LIMIT 5;" 2>> "$ERROR_LOG" | tee -a "$SETUP_LOG"
 
 log ""
 log_success "✓ Final verification completed"
