@@ -1,5 +1,5 @@
 {
-  "name": "wealth-tracker-scrapers",
+  "name": "scrapers",
   "version": "1.0.0",
   "description": "web scraping via Chrome automation",
   "main": "scrapers/scrape_security_data.js",
