@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: docker/Dockerfile.scrapers
     platform: linux/amd64
-    container_name: wealth-tracker-scrapers
     environment:
       # Use internal Docker DNS hostname for Kafka instead of localhost
       KAFKA_BROKERS: kafka:9092
@@ -38,7 +37,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.api-scraper
-    container_name: wealth-tracker-api-scraper
     restart: unless-stopped
     depends_on:
       - kafka
@@ -76,7 +74,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.listing-sync
-    container_name: wealth-tracker-listing-sync
     restart: unless-stopped
     depends_on:
       - mysql
@@ -106,7 +103,6 @@ services:
     build:
       context: .
       dockerfile: dashboard/Dockerfile
-    container_name: wealth-tracker-dashboard
     restart: unless-stopped
     depends_on:
       - kafka
@@ -136,7 +132,6 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: wealth-tracker-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -163,7 +158,6 @@ services:
       - "2181:2181"
 
   kafka:
-    container_name: wealth-tracker-kafka
     image: confluentinc/cp-kafka:7.4.0
     restart: unless-stopped
     depends_on:
@@ -190,7 +184,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.consumer
-    container_name: wealth-tracker-kafka-consumer
     depends_on:
       - kafka
       - mysql
