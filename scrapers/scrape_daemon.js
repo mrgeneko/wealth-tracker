@@ -145,7 +145,7 @@ let mysqlPool = null;
 function getMysqlPool() {
 	if (!mysqlPool) {
 		mysqlPool = mysql.createPool({
-			host: process.env.MYSQL_HOST || 'wealth-tracker-mysql',
+			host: process.env.MYSQL_HOST || 'mysql',
 			port: parseInt(process.env.MYSQL_PORT || '3306', 10),
 			user: process.env.MYSQL_USER || 'test',
 			password: process.env.MYSQL_PASSWORD || 'test',
