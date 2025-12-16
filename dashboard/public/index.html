@@ -656,6 +656,20 @@
                 <tbody></tbody>
             </table>
 
+            <!-- Credit Cards and Loans (Debt) -->
+            <div class="section-header">
+                <h2 style="display: flex; align-items: center; gap: 10px;">
+                    <span>Credit Cards and Loans</span>
+                    <button class="icon-btn" title="Add Account" onclick="openAccountModal('debt')">
+                        <span class="plus-icon">+</span>
+                    </button>
+                </h2>
+            </div>
+            <table id="debt-grid">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+
             <!-- Fixed Assets -->
             <div class="section-header">
                 <h2 style="display: flex; align-items: center; gap: 10px;">
@@ -773,8 +787,9 @@
                     <input type="text" id="accName" required>
                 </div>
                 <div class="form-group">
-                    <label for="accType">Type</label>
-                    <input type="text" id="accType" placeholder="e.g., 401k, Roth IRA, Checking">
+                    <label for="accTypeSelect">Type</label>
+                    <select id="accTypeSelect"></select>
+                    <input type="hidden" id="accType">
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <button type="submit" class="btn btn-primary">Save</button>
@@ -1092,6 +1107,22 @@
                     </div>
                     <button class="btn btn-danger" onclick="clearCache()">Clear Cache</button>
                 </div>
+                <div class="settings-section">
+                    <h3>Account Types</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Manage enumerated account types used by the dashboard. Only admins should modify these.</p>
+                    <div id="accountTypesList" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <table id="accountTypesTable" style="width:100%; font-size:0.9em; border-collapse: collapse;">
+                            <thead>
+                                <tr><th style="text-align:left; padding:6px">Key</th><th style="text-align:left; padding:6px">Display</th><th style="padding:6px">Category</th><th style="padding:6px">Actions</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button class="btn btn-primary" onclick="openAccountTypeModal()">+ Add Type</button>
+                            <button class="btn" onclick="fetchAndRenderAccountTypes()">Refresh</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                 <button type="button" class="btn" style="background-color: #555; color: white;"
@@ -1131,6 +1162,37 @@
                 </div>
             </div>
         </div>
+
+                <!-- Account Type Modal -->
+                <div id="accountTypeModal" class="modal">
+                    <div class="modal-content" style="width: 420px;">
+                        <span class="close" onclick="closeModal('accountTypeModal')">&times;</span>
+                        <h2 id="accountTypeModalTitle">Account Type</h2>
+                        <form id="accountTypeForm">
+                            <input type="hidden" id="acctTypeId">
+                            <div class="form-group">
+                                <label for="acctTypeKey">Key</label>
+                                <input type="text" id="acctTypeKey" placeholder="machine_key" required />
+                            </div>
+                            <div class="form-group">
+                                <label for="acctTypeDisplay">Display Name</label>
+                                <input type="text" id="acctTypeDisplay" placeholder="Display Name" required />
+                            </div>
+                            <div class="form-group">
+                                <label for="acctTypeCategory">Category</label>
+                                <select id="acctTypeCategory">
+                                    <option value="investment">investment</option>
+                                    <option value="bank">bank</option>
+                                    <option value="debt">debt</option>
+                                </select>
+                            </div>
+                            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                                <button type="button" class="btn" onclick="closeModal('accountTypeModal')">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
     </div>
 
     <!-- Add Ticker Modal -->
@@ -1290,6 +1352,96 @@
             document.getElementById('addSymbolModal').style.display = 'block';
         }
 
+        function populateAccountTypeDropdown() {
+            const select = document.getElementById('accTypeSelect');
+            const hiddenKey = document.getElementById('accType');
+            if (!select || !window._accountTypes) return;
+            select.innerHTML = '';
+            window._accountTypes.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.display_name + ' (' + t.category + ')';
+                select.appendChild(opt);
+                // set hidden key if editing
+                if (hiddenKey && hiddenKey.value === t.key) opt.selected = true;
+            });
+        }
+
+        async function fetchAndRenderAccountTypes() {
+            try {
+                const res = await fetch('/api/account-types');
+                if (!res.ok) throw new Error('Failed to load');
+                const types = await res.json();
+                const tbody = document.querySelector('#accountTypesTable tbody');
+                tbody.innerHTML = '';
+                types.forEach(t => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding:6px">${escapeHtml(t.key)}</td>
+                        <td style="padding:6px">${escapeHtml(t.display_name)}</td>
+                        <td style="padding:6px">${escapeHtml(t.category)}</td>
+                        <td style="padding:6px"><button class="btn btn-sm" onclick='editAccountType(${JSON.stringify(t)})'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteAccountType(${t.id})">Delete</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                // update local cache
+                window._accountTypes = types;
+                populateAccountTypeDropdown();
+            } catch (e) {
+                console.warn('Failed to fetch account types:', e);
+            }
+        }
+
+        function openAccountTypeModal(type) {
+            document.getElementById('acctTypeId').value = '';
+            document.getElementById('acctTypeKey').value = '';
+            document.getElementById('acctTypeDisplay').value = '';
+            document.getElementById('acctTypeCategory').value = 'investment';
+            document.getElementById('accountTypeModalTitle').innerText = type ? 'Edit Account Type' : 'Add Account Type';
+            if (type) {
+                document.getElementById('acctTypeId').value = type.id;
+                document.getElementById('acctTypeKey').value = type.key;
+                document.getElementById('acctTypeDisplay').value = type.display_name;
+                document.getElementById('acctTypeCategory').value = type.category;
+            }
+            document.getElementById('accountTypeModal').style.display = 'block';
+        }
+
+        function editAccountType(t) { openAccountTypeModal(t); }
+
+        document.getElementById('accountTypeForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('acctTypeId').value;
+            const body = {
+                key: document.getElementById('acctTypeKey').value.trim(),
+                display_name: document.getElementById('acctTypeDisplay').value.trim(),
+                category: document.getElementById('acctTypeCategory').value
+            };
+            try {
+                let res;
+                if (id) {
+                    res = await fetch(`/api/account-types/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                } else {
+                    res = await fetch('/api/account-types', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                }
+                if (!res.ok) throw new Error('Save failed');
+                closeModal('accountTypeModal');
+                await fetchAndRenderAccountTypes();
+            } catch (err) {
+                console.error('Account type save error', err);
+                alert('Failed to save account type: ' + (err.message || ''));
+            }
+        };
+
+        async function deleteAccountType(id) {
+            if (!confirm('Disable this account type? Existing accounts will not be modified.')) return;
+            try {
+                const res = await fetch(`/api/account-types/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Delete failed');
+                await fetchAndRenderAccountTypes();
+            } catch (e) { console.error('Delete account type failed', e); alert('Delete failed'); }
+        }
+
         document.getElementById('addSymbolForm').onsubmit = async function (e) {
             e.preventDefault();
             const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
@@ -1405,6 +1557,14 @@
                 console.log('Assets received:', data);
                 lastAssetsData = data;
                 renderAll();
+                // Populate account type dropdown cache
+                try {
+                    const res = await fetch('/api/account-types');
+                    if (res.ok) {
+                        window._accountTypes = await res.json();
+                        populateAccountTypeDropdown();
+                    }
+                } catch (e) { console.warn('Failed to load account types:', e); }
                 const warn = document.getElementById('no-assets-warning');
                 if (warn) warn.style.display = 'none';
             } catch (error) {
@@ -1440,6 +1600,7 @@
             });
 
             const bankAccounts = lastAssetsData.accounts.filter(a => a.category === 'bank');
+            const debtAccounts = lastAssetsData.accounts.filter(a => a.category === 'debt');
 
             // Combine fixed assets
             const fixedAssets = [
@@ -1449,6 +1610,7 @@
 
             renderInvestmentGridWithFlashes('investment-grid', investmentAccounts, {});
             renderBankGrid('bank-grid', bankAccounts);
+            renderDebtGrid('debt-grid', debtAccounts);
             renderAssetGrid('asset-grid', fixedAssets);
 
             // Calculate Net Worth
@@ -1456,18 +1618,25 @@
             // Add fixed assets
             fixedAssets.forEach(a => netWorth += a.value);
             // Add accounts (calculated in render functions, but we can re-calc here or grab from DOM)
-            // Let's re-calc for accuracy
+            // Re-calc for accuracy. Debt accounts are entered as positive balances but
+            // should subtract from net worth.
             lastAssetsData.accounts.forEach(acc => {
-                if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
+                let accTotal = 0;
+                if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                 acc.holdings.stocks.forEach(p => {
                     const price = getPriceDataForSymbol(p.ticker)?.price || 0;
-                    netWorth += p.quantity * price;
+                    accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
                     const price = getPriceDataForSymbol(p.ticker)?.price || 0;
                     // Bonds use price/100
-                    netWorth += p.quantity * (price / 100.0);
+                    accTotal += p.quantity * (price / 100.0);
                 });
+                if (acc.category === 'debt') {
+                    netWorth -= accTotal;
+                } else {
+                    netWorth += accTotal;
+                }
             });
 
             document.getElementById('total-net-worth').innerText = `Total Net Worth: $${formatNumber(netWorth)}`;
@@ -1717,7 +1886,7 @@
             let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
-                if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                 acc.holdings.stocks.forEach(p => {
                     const priceData = getPriceDataForSymbol(p.ticker);
                     let price = priceData?.price || 0;
@@ -1755,14 +1924,31 @@
             }
 
             // Update Total Net Worth (includes fixed assets and bank accounts)
+            // Note: debt accounts are entered as positive balances but should be subtracted.
             let netWorth = grandTotal;
-            // Add fixed assets
             if (lastAssetsData) {
+                // Add fixed assets
                 (lastAssetsData.real_estate || []).forEach(a => netWorth += a.value);
                 (lastAssetsData.vehicles || []).forEach(a => netWorth += a.value);
                 // Add bank accounts
                 lastAssetsData.accounts.filter(a => a.category === 'bank').forEach(acc => {
                     if (acc.holdings.cash) netWorth += acc.holdings.cash.value;
+                });
+                // Subtract debt accounts (entered as positive balances)
+                lastAssetsData.accounts.filter(a => a.category === 'debt').forEach(acc => {
+                    let accTotal = 0;
+                    if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                    acc.holdings.stocks.forEach(p => {
+                        const priceData = getPriceDataForSymbol(p.ticker);
+                        const price = priceData?.price || 0;
+                        accTotal += p.quantity * price;
+                    });
+                    acc.holdings.bonds.forEach(p => {
+                        const priceData = getPriceDataForSymbol(p.ticker);
+                        const price = priceData?.price || 0;
+                        accTotal += p.quantity * (price / 100.0);
+                    });
+                    netWorth -= accTotal;
                 });
             }
             document.getElementById('total-net-worth').innerText = `Total Net Worth: $${formatNumber(netWorth)}`;
@@ -2235,7 +2421,7 @@
             let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
-                if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                 acc.holdings.stocks.forEach(p => {
                     const price = getPriceDataForSymbol(p.ticker)?.price || 0;
                     accTotal += p.quantity * price;
@@ -2321,7 +2507,59 @@
 
                 bodyHtml += `<tr>
                     <td><span class="clickable-cell" onclick="openAccountModal('bank', ${accJson})">${acc.name} <span class="edit-icon">✎</span></span></td>
-                    <td style="text-align: left">${acc.type}</td>
+                    <td style="text-align: left">${acc.type || ''}</td>
+                    <td>${valCell}</td>
+                </tr>`;
+            });
+
+            bodyHtml += `<tr class="total-row"><td colspan="2">TOTAL</td><td>${formatNumber(total)}</td></tr>`;
+            tbody.innerHTML = bodyHtml;
+        }
+
+        function renderDebtGrid(tableId, accounts) {
+            const gridTable = document.getElementById(tableId);
+            const thead = gridTable.querySelector('thead');
+            const tbody = gridTable.querySelector('tbody');
+
+            if (!accounts || accounts.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td>No debt accounts found.</td></tr>';
+                return;
+            }
+
+            thead.innerHTML = `<tr>
+                <th style="text-align: left">Account Name</th>
+                <th style="text-align: left">Type</th>
+                <th>Balance</th>
+            </tr>`;
+
+            let bodyHtml = '';
+            let total = 0;
+
+            accounts.forEach(acc => {
+                let val = 0;
+                // For debt accounts, balances are entered as positive numbers.
+                // Display them as positive, but net-worth math will subtract debt totals elsewhere.
+                let cashPos = acc.holdings && acc.holdings.cash;
+                if (cashPos) val = Math.abs(Number(cashPos.value) || 0);
+                total += val;
+
+                const accJson = escapeHtml(JSON.stringify(acc));
+
+                let valCell = '';
+                if (cashPos) {
+                    const posData = { id: cashPos.id, account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: val, isDebtAccount: true };
+                    const posJson = escapeHtml(JSON.stringify(posData));
+                    valCell = `<span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(val)} <span class="edit-icon">✎</span></span>`;
+                } else {
+                    const posData = { account_id: acc.id, symbol: 'CASH', type: 'cash', quantity: 0, isDebtAccount: true };
+                    const posJson = escapeHtml(JSON.stringify(posData));
+                    valCell = `<span class="clickable-cell" onclick="openPositionModal(${posJson})">${formatNumber(0)} <span class="edit-icon">✎</span></span>`;
+                }
+
+                bodyHtml += `<tr>
+                    <td><span class="clickable-cell" onclick="openAccountModal('debt', ${accJson})">${acc.name} <span class="edit-icon">✎</span></span></td>
+                    <td style="text-align: left">${acc.type || ''}</td>
                     <td>${valCell}</td>
                 </tr>`;
             });
@@ -2500,7 +2738,19 @@
                 document.getElementById('accountModalTitle').innerText = 'Edit Account';
                 document.getElementById('accId').value = account.id;
                 document.getElementById('accName').value = account.name;
-                document.getElementById('accType').value = account.type;
+                // Set dropdown to existing account_type if available
+                if (account.account_type_key) {
+                    document.getElementById('accType').value = account.account_type_key;
+                }
+                // Try to select matching option in accTypeSelect
+                const select = document.getElementById('accTypeSelect');
+                if (select) {
+                    for (const opt of select.options) {
+                        if (String(opt.value) === String(account.account_type_id) || opt.text === account.type) {
+                            opt.selected = true; break;
+                        }
+                    }
+                }
                 document.getElementById('accCategory').value = account.category;
                 document.getElementById('btnDeleteAccount').style.display = 'block';
             }
@@ -2510,9 +2760,11 @@
         document.getElementById('accountForm').onsubmit = async function (e) {
             e.preventDefault();
             const id = document.getElementById('accId').value;
+            const selectedTypeId = document.getElementById('accTypeSelect').value;
             const body = {
                 name: document.getElementById('accName').value,
-                type: document.getElementById('accType').value,
+                account_type_id: selectedTypeId ? Number(selectedTypeId) : null,
+                account_type_key: document.getElementById('accType').value,
                 category: document.getElementById('accCategory').value
             };
             const method = id ? 'PUT' : 'POST';
