@@ -384,7 +384,7 @@ See `PHASE_9_4_PLAN.md` for detailed roadmap
 1. Check `PHASE_9_QUICK_REFERENCE.md` → "Troubleshooting" section
 2. Review the specific implementation guide for the feature
 3. Check browser DevTools console for actual errors
-4. Check server logs: `docker logs wealth-tracker-dashboard` or `npm start` output
+4. Check server logs: `docker compose logs dashboard` or `npm start` output
 5. Verify database state: `SELECT * FROM scraper_page_performance LIMIT 5;`
 
 ### Performance Validation:

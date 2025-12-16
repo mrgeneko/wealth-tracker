@@ -100,7 +100,7 @@ scheduler_metrics
 ```bash
 docker compose down -v              # Remove existing volume
 docker compose up -d                # Start fresh - Docker initializes schema
-docker exec wealth-tracker-mysql mysql -u test -ptest testdb -e "SHOW TABLES;"
+docker compose exec mysql mysql -u test -ptest testdb -e "SHOW TABLES;"
 ```
 
 ### Application Migration (Testing)
@@ -119,7 +119,7 @@ node scripts/run-migrations.js
 docker compose up -d
 
 # Watch app startup logs (Application migrations also run)
-docker logs -f wealth-tracker-dashboard | grep -i migration
+docker compose logs -f dashboard | grep -i migration
 ```
 
 ## Adding New Migrations
@@ -163,11 +163,11 @@ When adding new tables/columns:
 
 **Tables not created on fresh container:**
 - Verify `scripts/init-db/` directory exists in docker-compose.yml volumes
-- Check MySQL container logs: `docker logs wealth-tracker-mysql`
+- Check MySQL container logs: `docker compose logs mysql`
 - Ensure files are `.sql` (lowercase extension)
 
 **Tables not created at app startup:**
-- Check dashboard logs: `docker logs wealth-tracker-dashboard`
+- Check dashboard logs: `docker compose logs dashboard`
 - Look for "DATABASE INITIALIZATION" messages
 - Verify `run-migrations.js` is being called from `server.js`
 - Check MYSQL_* environment variables are set

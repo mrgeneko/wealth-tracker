@@ -200,7 +200,6 @@ services:
 
   log-rotator:
     image: alpine:3.19
-    container_name: wealth-tracker-log-rotator
     restart: unless-stopped
     volumes:
       - ./logs:/usr/src/app/logs

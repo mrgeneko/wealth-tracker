@@ -3847,7 +3847,7 @@ CMD ["node", "services/api-scraper/index.js"]
     build:
       context: .
       dockerfile: docker/Dockerfile.api-scraper
-    container_name: wealth-tracker-api-scraper
+    container_name: api-scraper
     restart: unless-stopped
     depends_on:
       - kafka

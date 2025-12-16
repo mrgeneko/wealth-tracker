@@ -15,7 +15,7 @@ How it works (recommended flow)
 
 ```bash
 # from host (example using docker container name from compose)
-docker exec -i wealth-tracker-mysql mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < scripts/sql/001_add_positions_normalized_key.sql
+docker compose exec -T mysql mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < scripts/sql/001_add_positions_normalized_key.sql
 ```
 
 2) Backfill normalized_key for existing positions

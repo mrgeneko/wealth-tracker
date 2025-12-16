@@ -733,7 +733,7 @@ function updatePriceCache(item) {
 
 // Kafka Consumer Setup
 const kafka = new Kafka({
-    clientId: 'wealth-tracker-dashboard',
+    clientId: 'dashboard',
     brokers: KAFKA_BROKERS
 });
 

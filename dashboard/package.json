@@ -1,5 +1,5 @@
 {
-  "name": "wealth-tracker-dashboard",
+  "name": "dashboard",
   "version": "1.0.0",
   "description": "Real-time wealth tracker dashboard",
   "main": "server.js",
