@@ -146,6 +146,24 @@
             vertical-align: middle;
         }
 
+        /* Custom instant tooltip */
+        .custom-tooltip {
+            position: absolute;
+            background: #222;
+            color: #fff;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .08s ease;
+            z-index: 2000;
+            white-space: pre-wrap;
+            max-width: 360px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .custom-tooltip.visible { opacity: 1; }
+
         .form-group label {
             display: block;
             margin-bottom: 5px;
@@ -386,6 +404,23 @@
 
         .sort-indicator.active {
             color: #0d6efd;
+        }
+
+        /* Normalize header font-size so sortable labels match other headers */
+        #investment-grid th, .sortable-header {
+            font-size: 0.95em;
+            line-height: 1.1;
+        }
+
+        /* Reduce padding for compact columns */
+        #investment-grid th.col-prevclose, #investment-grid td[id^="prevClose-"] {
+            padding: 2px 6px;
+        }
+        #investment-grid th.col-source, #investment-grid td[id^="source-"] {
+            padding: 2px 6px;
+        }
+        #investment-grid th.col-valuechg, #investment-grid td[id^="valueChange-"] {
+            padding: 2px 6px;
         }
 
         /* Log Table Overrides */
@@ -1487,21 +1522,37 @@
                 }
                 let changeVal = price - prevClose;
                 let changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
+                // timeStr will hold display time (HH:MM:SS); timeDatePart holds MM/DD for tooltip
                 let timeStr = '-';
+                let timeDatePart = '';
                 let sourceStr = newPriceData.source || '-';
 
                 if (newPriceData.time) {
                     const d = new Date(newPriceData.time);
                     if (!isNaN(d.getTime())) {
-                        // Format as 'M/D HH:mm:ss'
+                        // Build display time (HH:mm:ss) and date part (M/D) for tooltip
                         const month = d.getMonth() + 1;
                         const day = d.getDate();
                         const hours = d.getHours().toString().padStart(2, '0');
                         const minutes = d.getMinutes().toString().padStart(2, '0');
                         const seconds = d.getSeconds().toString().padStart(2, '0');
-                        timeStr = `${month}/${day} ${hours}:${minutes}:${seconds}`;
+                        timeDatePart = `${month}/${day}`;
+                        timeStr = `${hours}:${minutes}:${seconds}`;
                     } else {
                         timeStr = newPriceData.time;
+                        timeDatePart = '';
+                    }
+                } else if (oldPriceData && oldPriceData.time) {
+                    // Fallback to previously-known time if current update lacks it
+                    const d = new Date(oldPriceData.time);
+                    if (!isNaN(d.getTime())) {
+                        const month = d.getMonth() + 1;
+                        const day = d.getDate();
+                        const hours = d.getHours().toString().padStart(2, '0');
+                        const minutes = d.getMinutes().toString().padStart(2, '0');
+                        const seconds = d.getSeconds().toString().padStart(2, '0');
+                        timeDatePart = `${month}/${day}`;
+                        timeStr = `${hours}:${minutes}:${seconds}`;
                     }
                 }
 
@@ -1580,11 +1631,10 @@
                             let tooltip = '';
                             if (sourceMeta) tooltip += `Source: ${sourceMeta}`;
                             if (timeMeta) tooltip += (tooltip ? '\n' : '') + `Time: ${timeMeta}`;
-                            if (tooltip) {
-                                prevCloseCell.innerHTML = `${formatNumber(parsedPrev)} <span class="prev-close-info" title="${escapeHtml(tooltip)}">ℹ</span>`;
-                            } else {
-                                prevCloseCell.textContent = formatNumber(parsedPrev);
-                            }
+                            // Set the cell text and attach the tooltip text to dataset (no separate 'i' icon)
+                            prevCloseCell.textContent = formatNumber(parsedPrev);
+                            if (tooltip) prevCloseCell.dataset.tooltip = tooltip;
+                            else delete prevCloseCell.dataset.tooltip;
                         } else {
                             // incoming invalid value: do not overwrite existing cell
                         }
@@ -1626,6 +1676,8 @@
                         applyTextFlash(timeCell);
                     }
                     timeCell.textContent = timeStr;
+                    if (timeDatePart) timeCell.dataset.tooltip = timeDatePart;
+                    else delete timeCell.dataset.tooltip;
                 }
 
                 // Update source cell (text flash)
@@ -1784,8 +1836,7 @@
                 }
                 return '<span class="sort-indicator">⇅</span>';
             };
-            let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Symbol${sortIndicator('symbol')}</th>`;
-            headerHtml += `<th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('name')">Name${sortIndicator('name')}</th>`;
+            let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Ticker${sortIndicator('symbol')}</th>`;
 
 
             if (accountsCollapsed) {
@@ -1800,7 +1851,7 @@
                 });
             }
 
-            headerHtml += `<th>Prev Close</th><th>Price</th><th>P/E</th><th>Yield</th><th>Change</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Change %${sortIndicator('changePct')}</th><th>Time</th><th>Source</th><th class="sortable-header" onclick="sortInvestmentGrid('valueChange')">Value Change${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
+            headerHtml += `<th class="col-prevclose">Prev Close</th><th>Price</th><th>P/E</th><th>Yield</th><th>Chg</th><th class="sortable-header" onclick="sortInvestmentGrid('changePct')">Chg %${sortIndicator('changePct')}</th><th>Time</th><th class="col-source">Source</th><th class="sortable-header col-valuechg" onclick="sortInvestmentGrid('valueChange')">Value Chg${sortIndicator('valueChange')}</th><th class="sortable-header" onclick="sortInvestmentGrid('total')">Total${sortIndicator('total')}</th></tr>`;
             thead.innerHTML = headerHtml;
 
             let bodyHtml = '';
@@ -1815,6 +1866,7 @@
                 let changeVal = 0;
                 let prevClose = 0;
                 let timeStr = '-';
+                let timeDatePart = '';
                 let sourceStr = '-';
                 let color = '#e0e0e0';
 
@@ -1851,18 +1903,32 @@
                     changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
                     console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
 
+                    // Prefer to display only HH:MM:SS and store MM/DD for tooltip
+                    timeDatePart = '';
                     if (newPriceData.time) {
                         const d = new Date(newPriceData.time);
                         if (!isNaN(d.getTime())) {
-                            // Format as 'M/D HH:mm:ss'
                             const month = d.getMonth() + 1;
                             const day = d.getDate();
                             const hours = d.getHours().toString().padStart(2, '0');
                             const minutes = d.getMinutes().toString().padStart(2, '0');
                             const seconds = d.getSeconds().toString().padStart(2, '0');
-                            timeStr = `${month}/${day} ${hours}:${minutes}:${seconds}`;
+                            timeDatePart = `${month}/${day}`;
+                            timeStr = `${hours}:${minutes}:${seconds}`;
                         } else {
                             timeStr = newPriceData.time;
+                            timeDatePart = '';
+                        }
+                    } else if (oldPricesLookup && oldPricesLookup.time) {
+                        const d = new Date(oldPricesLookup.time);
+                        if (!isNaN(d.getTime())) {
+                            const month = d.getMonth() + 1;
+                            const day = d.getDate();
+                            const hours = d.getHours().toString().padStart(2, '0');
+                            const minutes = d.getMinutes().toString().padStart(2, '0');
+                            const seconds = d.getSeconds().toString().padStart(2, '0');
+                            timeDatePart = `${month}/${day}`;
+                            timeStr = `${hours}:${minutes}:${seconds}`;
                         }
                     }
 
@@ -1924,8 +1990,9 @@
                 rowInfo.name = metaName;
                 rowInfo.sector = metaSector;
 
-                let rowHtml = `<tr><td style="text-align: left; font-weight: bold;">${sym}</td>`;
-                rowHtml += `<td style="text-align: left; max-width: 105px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(metaName)}">${metaName}</td>`;
+                // Show the symbol and expose the full name as a hover tooltip on the Symbol cell
+                // Show symbol and attach tooltip text to `data-tooltip` for custom tooltip handling
+                let rowHtml = `<tr><td style="text-align: left; font-weight: bold; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" data-tooltip="${escapeHtml(metaName)}">${sym}</td>`;
 
 
                 let symTotalValue = 0;
@@ -2024,7 +2091,8 @@
                     if (prevCloseSource) prevCloseTooltip += `Source: ${prevCloseSource}`;
                     if (prevCloseTime) prevCloseTooltip += (prevCloseTooltip ? '\n' : '') + `Time: ${prevCloseTime}`;
                 }
-                rowHtml += `<td id="prevClose-${sym}" ${prevCloseTooltip ? `title="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}${prevCloseTooltip ? ` <span class="prev-close-info" title="${escapeHtml(prevCloseTooltip)}">ℹ</span>` : ''}</td>`;
+                // Render Prev Close without the separate info icon; attach tooltip text to `data-tooltip` if available
+                rowHtml += `<td id="prevClose-${sym}" ${prevCloseTooltip ? `data-tooltip="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}</td>`;
                 rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
                 rowHtml += `<td>${metaPE}</td>`;
                 rowHtml += `<td>${metaYield}</td>`;
@@ -2076,7 +2144,7 @@
                     }
                 }
 
-                rowHtml += `<td id="${timeCellId}" class="${timeFlashClass}" style="font-size: 0.7em; color: #e0e0e0; font-weight: 600;">${timeStr}</td>`;
+                rowHtml += `<td id="${timeCellId}" class="${timeFlashClass}" style="font-size: 0.7em; color: #e0e0e0; font-weight: 600;" ${timeDatePart ? `data-tooltip="${escapeHtml(timeDatePart)}"` : ''}>${timeStr}</td>`;
                 rowHtml += `<td id="${sourceCellId}" class="${sourceFlashClass}" style="font-size: 0.7em; color: #e0e0e0; font-weight: 600;">${sourceStr}</td>`;
 
                 grandTotalValueChange += symTotalValueChange;
@@ -2129,9 +2197,8 @@
             });
 
             // Cash Row
-            // IMPORTANT: This table always starts with Symbol/Name/Sector columns.
-            // Ensure CASH aligns with those columns (Name/Sector should be blank).
-            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td><td></td>';
+            // IMPORTANT: This table starts with the Symbol column. Ensure CASH aligns with that column (Name removed).
+            let cashRowHtml = '<tr><td style="text-align: left; font-weight: bold;">CASH</td>';
             let totalCash = 0;
             accounts.forEach(acc => {
                 let cashVal = 0;
@@ -2156,15 +2223,15 @@
             if (accountsCollapsed) {
                 cashRowHtml += '<td style="text-align: center;">-</td>';
             }
-            // Placeholder cells for: Prev Close, Price, P/E, Yield, Change, Change %, Time, Source, Value Change
+            // Placeholder cells for: Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source, Value Chg
             cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
 
             // Account Totals
-            // IMPORTANT: Keep alignment with Symbol/Name/Sector columns.
-            // Name/Sector should be blank for TOTAL.
-            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td><td></td>';
+            // IMPORTANT: Keep alignment with Symbol/Sector columns.
+            // Symbol/Sector should be blank for TOTAL where applicable.
+            let totalRowHtml = '<tr class="total-row"><td>TOTAL</td>';
             let grandTotal = 0;
             accounts.forEach(acc => {
                 let accTotal = 0;
@@ -2190,7 +2257,7 @@
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
-            // Placeholder cells for: Prev Close, Price, P/E, Yield, Change, Change %, Time, Source
+            // Placeholder cells for: Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source
             totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
             totalRowHtml += `<td id="total-row-value-change" style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
             totalRowHtml += `<td id="total-row-grand-total">${formatNumber(grandTotal, 0)}</td></tr>`;
@@ -4022,6 +4089,51 @@
             initializeScheduler();
             initializeStatisticsFilter();
         });
+
+        // ----- Custom instant tooltip behavior -----
+        (function () {
+            const tip = document.createElement('div');
+            tip.className = 'custom-tooltip';
+            document.body.appendChild(tip);
+
+            function showFor(el) {
+                const text = el.dataset.tooltip || '';
+                if (!text) return;
+                tip.textContent = text;
+                const r = el.getBoundingClientRect();
+                const left = Math.round(r.left + window.scrollX);
+                const top = Math.round(r.bottom + 6 + window.scrollY);
+                tip.style.left = left + 'px';
+                tip.style.top = top + 'px';
+                tip.classList.add('visible');
+            }
+
+            function hide() {
+                tip.classList.remove('visible');
+            }
+
+            // Show immediately on pointerenter, hide on pointerleave
+            document.addEventListener('pointerenter', function (e) {
+                const el = e.target.closest('[data-tooltip]');
+                if (!el) return;
+                showFor(el);
+            }, true);
+
+            document.addEventListener('pointerleave', function (e) {
+                const el = e.target.closest('[data-tooltip]');
+                if (!el) return;
+                hide();
+            }, true);
+
+            // Reposition if the pointer moves inside the element
+            document.addEventListener('pointermove', function (e) {
+                const el = e.target.closest('[data-tooltip]');
+                if (!el) return;
+                const r = el.getBoundingClientRect();
+                tip.style.left = Math.round(r.left + window.scrollX) + 'px';
+                tip.style.top = Math.round(r.bottom + 6 + window.scrollY) + 'px';
+            }, true);
+        })();
 
     </script>
 </body>
