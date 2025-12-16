@@ -133,7 +133,7 @@ docker compose ps
 ```
 3. View logs for scrapers (follow):
 ```bash
-docker logs -f wealth-tracker-scrapers
+docker compose logs -f scrapers
 ```
 
 Optional: start the log rotator sidecar that compresses and prunes old logs (recommended when running long-lived scrapers):
@@ -211,7 +211,7 @@ If you are using Docker Desktop, you can manage the application through the GUI:
    ```
 2. **View in Dashboard**: Open the Docker Desktop Dashboard. You will see a `wealth-tracker` application group.
 3. **Inspect Containers**: Click on the `wealth-tracker` group to expand it. You will see services like `scrapers`, `dashboard`, `kafka`, `mysql`, etc.
-4. **View Logs**: Click on any container (e.g., `wealth-tracker-scrapers`) to view its live logs. This is equivalent to running `docker logs -f <container_name>`.
+4. **View Logs**: Click on any service (e.g., `scrapers`) to view its live logs with `docker compose logs -f <service>`.
 5. **Access Terminal**: To run commands inside a container, click the "Terminal" or "Exec" tab in the container view. This is useful for debugging or checking files inside the container.
 6. **Control Stack**: Use the Play/Stop/Restart buttons in the dashboard to manage the entire application or individual services.
 
@@ -260,7 +260,7 @@ Defines the securities to track and their data sources.
 ### 3. Dashboard Assets (Database Driven)
 The dashboard now reads asset data (accounts, positions, real estate, vehicles) from the **MySQL database**. 
 
-- **Primary Source**: MySQL database (`wealth-tracker-mysql` container).
+- **Primary Source**: MySQL database (service `mysql`).
 - **Management**: 
     - **Add/Edit/Delete**: Use the dashboard web interface to manage accounts and positions in real-time.
     - **API**: Use the dashboard API endpoints (`/api/accounts`, `/api/positions`, etc.) for programmatic access.
@@ -305,10 +305,10 @@ docker compose stop scrapers
 
 This sends SIGTERM to the Node process; the daemon attempts to close the Puppeteer browser and flush shutdown messages to logs/stdout before exiting.
 
-- You can view logs with:
+  - You can view logs with:
 
 ```bash
-docker logs --tail 200 wealth-tracker-scrapers
+docker compose logs --tail 200 scrapers
 ```
 
 ### Heartbeat
@@ -332,7 +332,7 @@ Heartbeat messages appear in both the scraper log files under `/usr/src/app/logs
 [2025-11-17T23:18:47.802Z] Received SIGTERM, shutting down...
 [2025-11-17T23:18:47.812Z] Browser closed.
 ```
-If you do not see them, please ensure you are checking `docker logs --tail 200 wealth-tracker-scrapers` immediately after stopping.
+If you do not see them, please ensure you are checking `docker compose logs --tail 200 scrapers` immediately after stopping.
 ### Heartbeat (liveness)
 - The daemon emits a heartbeat to both the timestamped log file and stdout periodically so external monitors can detect liveness.
 - Default heartbeat interval: 5 minutes.
@@ -396,7 +396,7 @@ services:
 - Use `tail -f` on the most recent log file or `docker logs` for real-time output.
 If you need to inspect the latest log file inside the running container you can run:
 ```bash
-docker exec -it wealth-tracker-scrapers sh -c '\
+docker compose exec -it scrapers sh -c '\
   LATEST=$(ls -1t /usr/src/app/logs/scrape_daemon*.log | head -n1) && \
   echo "Latest: $LATEST" && tail -n 200 "$LATEST"'
 ```
@@ -666,11 +666,11 @@ To update your wealth-tracker deployment to the latest code or configuration, fo
      ```
 
 5. **Verify Update**
-   - Check that containers are running the new version:
-     ```bash
-     docker compose ps
-     docker logs -f wealth-tracker-scrapers
-     ```
+```bash
+# Check that containers are running the new version:
+docker compose ps
+docker compose logs -f scrapers
+```
 
 **Note:**
 - If you updated configuration files (e.g., `.env`, `config.json`), most changes are picked up automatically, but some may require a container restart.

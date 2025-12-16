@@ -284,4 +284,4 @@ depends_on:
 - [ ] Wait 30 seconds for initialization
 - [ ] Check dashboard loads (http://localhost:3001)
 - [ ] Verify accounts appear
-- [ ] Check logs for errors: `docker logs wealth-tracker-dashboard | grep -i error`
+- [ ] Check logs for errors: `docker compose logs dashboard | grep -i error`

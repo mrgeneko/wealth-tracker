@@ -94,8 +94,8 @@ When adding new columns or data fields:
 
 5. **Verify data** integrity
    ```bash
-   docker exec wealth-tracker-mysql mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE \
-     -e "SELECT COUNT(*), COUNT(new_field) FROM securities_metadata;"
+  docker compose exec mysql mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE \
+    -e "SELECT COUNT(*), COUNT(new_field) FROM securities_metadata;"
    ```
 
 6. **Document completion** 
@@ -114,7 +114,7 @@ When adding new columns or data fields:
 ./scripts/migrations/run_all_migrations.sh
 
 # Run specific migration
-docker exec -i wealth-tracker-mysql mysql -uroot -proot wealth_tracker < scripts/migrations/sql/009_add_new_field.sql
+docker compose exec -T mysql mysql -uroot -proot wealth_tracker < scripts/migrations/sql/009_add_new_field.sql
 ```
 
 ---

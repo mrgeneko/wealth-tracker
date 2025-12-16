@@ -9,14 +9,14 @@ echo ""
 
 # Check if tables exist
 echo "Checking tables..."
-TABLES=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SHOW TABLES;" 2>/dev/null | grep -E "securities_metadata|securities_earnings|securities_dividends")
+TABLES=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SHOW TABLES;" 2>/dev/null | grep -E "securities_metadata|securities_earnings|securities_dividends")
 
 if [ -z "$TABLES" ]; then
   echo "❌ Metadata tables NOT found"
   echo ""
   echo "Next step: Run migrations"
   echo "  for file in scripts/sql/00{2,3,4,5}_*.sql; do"
-  echo "    docker exec -i wealth-tracker-mysql mysql -uroot -proot wealth_tracker < \"\$file\""
+  echo "    docker compose exec -T mysql mysql -uroot -proot wealth_tracker < \"\$file\""
   echo "  done"
 else
   echo "✓ Metadata tables found:"
@@ -25,7 +25,7 @@ else
   
   # Check record counts
   echo "Record counts:"
-  docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "
+  docker compose exec mysql mysql -uroot -proot wealth_tracker -e "
     SELECT 'securities_metadata' as table_name, COUNT(*) as count FROM securities_metadata
     UNION ALL
     SELECT 'securities_earnings', COUNT(*) FROM securities_earnings
@@ -38,7 +38,7 @@ else
   echo ""
   
   # Check positions with metadata
-  LINKED=$(docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "
+  LINKED=$(docker compose exec mysql mysql -uroot -proot wealth_tracker -e "
     SELECT COUNT(*) FROM positions WHERE metadata_symbol IS NOT NULL;
   " 2>/dev/null | tail -1)
   
