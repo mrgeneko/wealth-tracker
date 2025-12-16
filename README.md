@@ -590,7 +590,7 @@ The dashboard provides full data portability through import and export functiona
 **Export Data:**
 - Downloads all accounts, positions, and fixed assets as a JSON file
 - Includes metadata like export date and version
-- File format: `wealth-tracker-export-YYYY-MM-DD.json`
+- File format: `export-YYYY-MM-DD.json`
 
 **Import Data:**
 - Reads exported JSON files and replaces all existing data
