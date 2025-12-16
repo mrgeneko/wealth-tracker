@@ -224,7 +224,7 @@ open http://localhost:3001
 ./scripts/validate-fresh-container.sh
 
 # 2. Review logs
-docker logs wealth-tracker-dashboard | grep -i error
+docker compose logs dashboard | grep -i error
 
 # 3. Check detailed troubleshooting
 cat FRESH_CONTAINER_ISSUES.md

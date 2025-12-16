@@ -6,7 +6,7 @@
 # Run all migrations inside the MySQL container
 for file in scripts/sql/00{2,3,4,5}_*.sql; do
   echo "Running $(basename $file)..."
-  docker exec -i wealth-tracker-mysql mysql -uroot -proot wealth_tracker < "$file"
+  docker compose exec -T mysql mysql -uroot -proot wealth_tracker < "$file"
 done
 ```
 
@@ -28,13 +28,13 @@ node scripts/populate_popular_securities.js --all
 
 ```bash
 # Check tables were created
-docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SHOW TABLES;"
+docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SHOW TABLES;"
 
 # Check metadata count
-docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM securities_metadata;"
+docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT COUNT(*) FROM securities_metadata;"
 
 # View sample data
-docker exec wealth-tracker-mysql mysql -uroot -proot wealth_tracker -e "SELECT symbol, short_name, quote_type FROM securities_metadata LIMIT 5;"
+docker compose exec mysql mysql -uroot -proot wealth_tracker -e "SELECT symbol, short_name, quote_type FROM securities_metadata LIMIT 5;"
 ```
 
 ---

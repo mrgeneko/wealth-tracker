@@ -496,9 +496,9 @@ describe('Settings Modal - Import/Export Data', () => {
 
         test('should create proper filename with date', () => {
             const date = new Date().toISOString().split('T')[0];
-            const filename = `wealth-tracker-export-${date}.json`;
+            const filename = `export-${date}.json`;
 
-            expect(filename).toMatch(/wealth-tracker-export-\d{4}-\d{2}-\d{2}\.json/);
+            expect(filename).toMatch(/export-\d{4}-\d{2}-\d{2}\.json/);
         });
     });
 });

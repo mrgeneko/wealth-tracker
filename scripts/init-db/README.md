@@ -52,5 +52,5 @@ docker compose down -v
 docker compose up -d
 
 # Verify tables were created
-docker exec wealth-tracker-mysql mysql -u test -ptest testdb -e "SHOW TABLES;"
+docker compose exec mysql mysql -u test -ptest testdb -e "SHOW TABLES;"
 ```
