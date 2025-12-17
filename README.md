@@ -264,6 +264,11 @@ The dashboard now reads asset data (accounts, positions, real estate, vehicles) 
 - **Management**: 
     - **Add/Edit/Delete**: Use the dashboard web interface to manage accounts and positions in real-time.
     - **API**: Use the dashboard API endpoints (`/api/accounts`, `/api/positions`, etc.) for programmatic access.
+      - New: `/api/account-types` exposes the seeded account type enumerations. Use this endpoint to populate dropdowns and manage custom types.
+
+    Database migration notes:
+    - The initialization script `scripts/init-db/000-base-schema.sql` now creates an `account_types` table and seeds common account types. The `accounts` table references `account_type_id` (was previously a free-text `type`).
+    - Because backwards compatibility is not required, reinitialize your database (drop and recreate) to pick up the new schema.
 
 ### 4. Dashboard HTTPS Configuration
 The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `dashboard/certs/`. If found, it starts an HTTPS server; otherwise, it falls back to HTTP.
