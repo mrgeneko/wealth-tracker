@@ -1,5 +1,89 @@
 # wealth-tracker
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/docker-%3E%3D20.10-blue)](https://www.docker.com/)
+
 Lightweight scrapers and processors for personal portfolio tracking.
+
+**A real-time portfolio tracking system** that scrapes stock, ETF, and bond prices from multiple sources (Yahoo Finance, Google Finance, Robinhood, and more), stores data in MySQL, publishes to Kafka, and provides a live web dashboard with WebSocket updates.
+
+## Table of Contents
+
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start-docker-compose)
+- [Architecture](#architecture)
+- [Current Development Status](#current-development-status)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- **Multi-Source Data Collection**: Scrapes from 15+ financial data providers
+- **Real-time Updates**: WebSocket-based dashboard with sub-100ms latency
+- **Comprehensive Coverage**: Stocks, ETFs, bonds, and US Treasury securities
+- **Flexible Configuration**: Database-backed update windows and watchlists
+- **Docker-First**: Fully containerized with Docker Compose
+- **Production Ready**: 615+ unit tests, extensive error handling, logging
+
+## Prerequisites
+
+Before running this project, ensure you have:
+
+- **Node.js**: v18.0.0 or higher ([Download](https://nodejs.org/))
+- **Docker**: v20.10 or higher ([Download](https://www.docker.com/get-started))
+- **Docker Compose**: v2.0 or higher (included with Docker Desktop)
+- **Git**: For cloning the repository
+- **8GB RAM minimum**: Recommended for running all services
+- **Ports Available**: 3001 (dashboard), 3306 (MySQL), 9092 (Kafka), 2181 (Zookeeper)
+
+### Environment Setup
+
+1. Create a `.env` file in the project root:
+```bash
+cp .env.example .env
+```
+
+2. Configure required credentials:
+```env
+# MySQL
+MYSQL_ROOT_PASSWORD=your_secure_password
+MYSQL_DATABASE=wealth_tracker
+MYSQL_USER=wealth_user
+MYSQL_PASSWORD=your_secure_password
+
+# Investing.com (optional, for investing.com watchlists)
+INVESTING_EMAIL=your_email@example.com
+INVESTING_PASSWORD=your_password
+```
+
+3. Create your configuration:
+```bash
+cp config/config.example.json config/config.json
+# Edit config/config.json with your portfolio settings
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Docker Compose Stack                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌──────────────┐      ┌──────────────┐      ┌───────────┐ │
+│  │   Scrapers   │─────▶│    Kafka     │─────▶│  Consumer │ │
+│  │  (Puppeteer) │      │  (Messages)  │      │  (Python) │ │
+│  └──────────────┘      └──────────────┘      └─────┬─────┘ │
+│         │                                            │       │
+│         │                                            ▼       │
+│         │              ┌──────────────┐      ┌───────────┐ │
+│         └─────────────▶│    MySQL     │◀─────│ Dashboard │ │
+│                        │  (Storage)   │      │ (Web UI)  │ │
+│                        └──────────────┘      └───────────┘ │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## Current Development Status
 
@@ -745,3 +829,52 @@ Stores dividend history and upcoming payments.
 - `payment_date`: Payment date
 - `dividend_amount`: Amount per share
 
+---
+
+## Contributing
+
+Contributions are welcome! This project is open source under the GPLv3 license.
+
+### How to Contribute
+
+1. **Fork the repository** on GitHub
+2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Make your changes** with clear, descriptive commits
+4. **Add tests** for new functionality
+5. **Run the test suite** (`npm test`) to ensure everything passes
+6. **Submit a pull request** with a clear description of your changes
+
+### Development Guidelines
+
+- Follow existing code style and conventions
+- Write unit tests for new features
+- Update documentation as needed
+- Keep commits focused and atomic
+- Use descriptive commit messages
+
+### Reporting Issues
+
+Found a bug or have a feature request? Please [open an issue](https://github.com/mrgeneko/wealth-tracker/issues) with:
+- Clear description of the problem or feature
+- Steps to reproduce (for bugs)
+- Expected vs actual behavior
+- Environment details (OS, Node version, Docker version)
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
+
+### What This Means
+
+- ✅ You can freely use, modify, and distribute this software
+- ✅ You can use it for commercial purposes
+- ⚠️  Any modifications must also be open source under GPLv3
+- ⚠️  You must include the original copyright and license notice
+
+**Copyright © 2025 Gene Ko**
+
+---
+
+**Built with**: Node.js, Puppeteer, MySQL, Kafka, Docker, WebSockets
+
+**Questions?** Open an issue or start a discussion on GitHub.
