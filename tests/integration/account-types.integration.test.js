@@ -1,21 +1,19 @@
 const request = require('supertest');
 
-jest.resetModules();
-
-// Fake DB state for account_types
-const fakeAccountTypes = [
+// Fake DB state for account_types - prefixed with 'mock' for Jest hoisting
+const mockAccountTypes = [
     { id: 1, key: 'individual_brokerage', display_name: 'Individual Brokerage', category: 'investment', tax_treatment: 'taxable', custodial: 0, requires_ssn: 0, active: 1, sort_order: 100 },
     { id: 2, key: 'roth_ira', display_name: 'Roth IRA', category: 'investment', tax_treatment: 'tax_deferred', custodial: 0, requires_ssn: 1, active: 1, sort_order: 200 }
 ];
 
-const fakePool = {
+const mockPool = {
     query: jest.fn(async (sql, params) => {
         if (typeof sql === 'string' && sql.includes('FROM account_types')) {
-            return [fakeAccountTypes];
+            return [mockAccountTypes];
         }
         if (typeof sql === 'string' && sql.indexOf('SELECT id FROM account_types') === 0) {
             const key = params && params[0];
-            const found = fakeAccountTypes.find(a => a.key === key);
+            const found = mockAccountTypes.find(a => a.key === key);
             return [found ? [{ id: found.id }] : []];
         }
         return [[]];
@@ -28,7 +26,10 @@ const fakePool = {
     })
 };
 
-jest.doMock('mysql2/promise', () => ({ createPool: () => fakePool }));
+// IMPORTANT: Mock mysql2/promise BEFORE requiring the server module
+// This ensures the server uses the fake pool instead of a real connection.
+// Variables prefixed with 'mock' are allowed in jest.mock factory functions.
+jest.mock('mysql2/promise', () => ({ createPool: () => mockPool }));
 
 const { app } = require('../../dashboard/server');
 
@@ -46,6 +47,6 @@ describe('Integration - account-types API', () => {
         const res = await request(app).post('/api/account-types').auth('admin', 'admin').send(payload);
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('id', 123);
-        expect(fakePool.execute).toHaveBeenCalled();
+        expect(mockPool.execute).toHaveBeenCalled();
     });
 });
