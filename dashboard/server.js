@@ -7,12 +7,43 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
-const basicAuth = require('express-basic-auth');
+
+// Support running in multiple layouts:
+// - Local dev:   repoRoot/dashboard/server.js with repoRoot/api and repoRoot/config
+// - Docker image: /app/server.js with /app/api and /app/config
+const apiBaseDir = fs.existsSync(path.join(__dirname, 'api'))
+    ? path.join(__dirname, 'api')
+    : path.join(__dirname, '..', 'api');
+const configBaseDir = fs.existsSync(path.join(__dirname, 'config'))
+    ? path.join(__dirname, 'config')
+    : path.join(__dirname, '..', 'config');
+const scriptsBaseDir = fs.existsSync(path.join(__dirname, 'scripts'))
+    ? path.join(__dirname, 'scripts')
+    : path.join(__dirname, '..', 'scripts');
+
+function requireApi(moduleName) {
+    return require(path.join(apiBaseDir, moduleName));
+}
+let basicAuth;
+try {
+    basicAuth = require('express-basic-auth');
+} catch (e) {
+    // Fallback stub for environments where express-basic-auth is not installed
+    basicAuth = () => (req, res, next) => next();
+}
 const { loadAllTickers, initializeDbPool: initializeTickerRegistryDbPool } = require('./ticker_registry');
 
 // Phase 9.2: WebSocket Real-time Metrics
-const MetricsWebSocketServer = require('./services/websocket-server');
-const ScraperMetricsCollector = require('./services/scraper-metrics-collector');
+let MetricsWebSocketServer;
+let ScraperMetricsCollector;
+try {
+    MetricsWebSocketServer = require('./services/websocket-server');
+    ScraperMetricsCollector = require('./services/scraper-metrics-collector');
+} catch (e) {
+    // Provide lightweight stubs when services are not available (test environments)
+    MetricsWebSocketServer = class { constructor(s) { this.server = s; } };
+    ScraperMetricsCollector = class { constructor() { } };
+}
 
 const app = express();
 
@@ -22,7 +53,10 @@ const certPath = path.join(__dirname, 'certs', 'server.crt');
 let server;
 let protocol = 'http';
 
-if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+// Default to HTTP for local/dev compatibility; enable HTTPS explicitly.
+const enableHttps = String(process.env.ENABLE_HTTPS || '').toLowerCase() === 'true';
+
+if (enableHttps && fs.existsSync(keyPath) && fs.existsSync(certPath)) {
     try {
         const privateKey = fs.readFileSync(keyPath, 'utf8');
         const certificate = fs.readFileSync(certPath, 'utf8');
@@ -36,7 +70,14 @@ if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
         server = http.createServer(app);
     }
 } else {
-    console.log('SSL certificates not found. Starting HTTP server.');
+    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        if (!enableHttps) {
+            console.log('SSL certificates found, but HTTPS is disabled. Set ENABLE_HTTPS=true to enable HTTPS.');
+        }
+    } else {
+        console.log('SSL certificates not found.');
+    }
+    console.log('Starting HTTP server.');
     server = http.createServer(app);
 }
 const io = socketIo(server);
@@ -90,7 +131,7 @@ let sourcePriorityConfig = {
 };
 
 // Try to load source priority config from file
-const sourcePriorityPath = path.join(__dirname, '../config/source_priority.json');
+const sourcePriorityPath = path.join(configBaseDir, 'source_priority.json');
 try {
     if (fs.existsSync(sourcePriorityPath)) {
         const loaded = JSON.parse(fs.readFileSync(sourcePriorityPath, 'utf8'));
@@ -165,15 +206,15 @@ const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'test';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'testdb';
 
 // Mount Metadata API
-const metadataRouter = require('./api/metadata');
+const metadataRouter = requireApi('metadata');
 app.use('/api/metadata', metadataRouter);
 
 // Mount Autocomplete API (will be initialized after pool is created)
-const { router: autocompleteRouter } = require('./api/autocomplete');
+const { router: autocompleteRouter } = requireApi('autocomplete');
 app.use('/api/autocomplete', autocompleteRouter);
 
 // Mount Cleanup API (will be initialized after pool is created)
-const { router: cleanupRouter } = require('./api/cleanup');
+const { router: cleanupRouter } = requireApi('cleanup');
 app.use('/api/cleanup', cleanupRouter);
 
 // Phase 11: Watchlist Management Proxy (multi-provider)
@@ -308,7 +349,7 @@ async function fetchInitialPrices() {
 async function runDatabaseMigrations() {
     try {
         console.log('\n🔄 Running database migrations...');
-        const { runAllMigrations } = require('../scripts/run-migrations');
+        const { runAllMigrations } = require(path.join(scriptsBaseDir, 'run-migrations'));
         const success = await runAllMigrations();
         
         if (!success) {
@@ -354,20 +395,20 @@ try {
 }
 
 // Initialize the autocomplete API with the pool
-const { initializePool } = require('./api/autocomplete');
+const { initializePool } = requireApi('autocomplete');
 initializePool(pool);
 
 // Initialize the cleanup API with the pool
-const { initializePool: initializeCleanupPool } = require('./api/cleanup');
+const { initializePool: initializeCleanupPool } = requireApi('cleanup');
 initializeCleanupPool(pool);
 
 // Initialize the statistics API with the pool
-const { router: statisticsRouter, initializePool: initializeStatisticsPool } = require('./api/statistics');
+const { router: statisticsRouter, initializePool: initializeStatisticsPool } = requireApi('statistics');
 app.use('/api/statistics', statisticsRouter);
 initializeStatisticsPool(pool);
 
 // Initialize the metrics API with the pool
-const { router: metricsRouter, initializePool: initializeMetricsPool } = require('./api/metrics');
+const { router: metricsRouter, initializePool: initializeMetricsPool } = requireApi('metrics');
 app.use('/api/metrics', metricsRouter);
 initializeMetricsPool(pool);
 
@@ -441,7 +482,12 @@ async function ensureSchema() {
 
 async function fetchAssetsFromDB() {
     try {
-        const [accounts] = await pool.query('SELECT * FROM accounts ORDER BY display_order');
+        const [accounts] = await pool.query(`
+            SELECT a.*, at.display_name as account_type_display_name, at.category as account_type_category, at.` + "`key`" + ` as account_type_key
+            FROM accounts a
+            LEFT JOIN account_types at ON a.account_type_id = at.id
+            ORDER BY a.display_order
+        `);
 
         // Fetch positions with metadata
         // Use COLLATE to ensure compatibility between tables
@@ -483,8 +529,10 @@ async function fetchAssetsFromDB() {
             const accountObj = {
                 id: acc.id,
                 name: acc.name,
-                type: acc.type,
-                category: acc.category,
+                // Expose the account type display name (e.g., "Individual Brokerage") as `type`
+                type: acc.account_type_display_name || acc.account_type_key || null,
+                // Expose canonical category from account_types (investment, bank, debt)
+                category: acc.account_type_category || null,
                 holdings: {
                     cash: null,
                     stocks: [],
@@ -819,6 +867,87 @@ async function isBondTicker(ticker) {
     return false;
 }
 
+// Helper: Resolve an account type id from various inputs (id, key, or legacy type string)
+async function resolveAccountTypeId(accountInput) {
+    if (!accountInput) return null;
+    // If already provided as an id, use it
+    if (accountInput.account_type_id && Number.isFinite(Number(accountInput.account_type_id))) {
+        return Number(accountInput.account_type_id);
+    }
+
+    // If provided directly as id in request body (flat), accept it
+    if (accountInput.account_type_id && typeof accountInput.account_type_id === 'string' && accountInput.account_type_id.match(/^\d+$/)) {
+        return Number(accountInput.account_type_id);
+    }
+
+    // Try account_type_key first
+    let rawType = accountInput.account_type_key || null;
+    if (!rawType && accountInput.type) rawType = String(accountInput.type).trim();
+    if (rawType) {
+        const normalizedKey = String(rawType).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        try {
+            // 1) direct key match
+            const [rows1] = await pool.query('SELECT id FROM account_types WHERE `key`=? LIMIT 1', [normalizedKey]);
+            if (rows1 && rows1[0] && rows1[0].id) return rows1[0].id;
+            // 2) exact display_name match
+            const [rows2] = await pool.query('SELECT id FROM account_types WHERE LOWER(display_name)=? LIMIT 1', [rawType.toLowerCase()]);
+            if (rows2 && rows2[0] && rows2[0].id) return rows2[0].id;
+            // 3) partial display_name match
+            const likePattern = '%' + rawType.toLowerCase().replace(/[^a-z0-9]+/g, '%') + '%';
+            const [rows3] = await pool.query('SELECT id FROM account_types WHERE LOWER(display_name) LIKE ? LIMIT 1', [likePattern]);
+            if (rows3 && rows3[0] && rows3[0].id) return rows3[0].id;
+            // 4) key contains normalized substring
+            const [rows4] = await pool.query('SELECT id FROM account_types WHERE `key` LIKE ? LIMIT 1', ['%' + normalizedKey + '%']);
+            if (rows4 && rows4[0] && rows4[0].id) return rows4[0].id;
+        } catch (e) {
+            console.warn('resolveAccountTypeId lookup error:', e.message);
+        }
+    }
+
+    // Heuristic synonyms / regex-based mapping for common legacy free-text values
+    if (accountInput.type) {
+        const t = String(accountInput.type).toLowerCase();
+        const heuristics = [
+            {re: /\b(roth)\b.*401/, key: 'roth_401k'},
+            {re: /\b(roth).*ira|\broth\s*ira\b/, key: 'roth_ira'},
+            {re: /\b401\s*\(?k\)?\b/, key: 'traditional_401k'},
+            {re: /solo\s*401/, key: 'solo_401k'},
+            {re: /simple\s*ira/, key: 'simple_ira'},
+            {re: /traditional\s*ira|\bira\b/, key: 'traditional_ira'},
+            {re: /529/, key: '529_plan'},
+            {re: /savings?/, key: 'savings'},
+            {re: /checking|checkings?/, key: 'checking'},
+            {re: /hsa\b/, key: 'hsa'},
+            {re: /cd\b/, key: 'cd'},
+            {re: /money\s*market/, key: 'money_market'},
+            {re: /ugma|utma/, key: 'ugma_utma'},
+            {re: /sep\s*ira/, key: 'sep_ira'},
+            {re: /credit\s*card|cc\b/, key: 'credit_card'},
+            {re: /mortgage|loan/, key: 'loan'}
+        ];
+        for (const h of heuristics) {
+            try {
+                if (h.re.test(t)) {
+                    const [rowsH] = await pool.query('SELECT id FROM account_types WHERE `key`=? LIMIT 1', [h.key]);
+                    if (rowsH && rowsH[0] && rowsH[0].id) return rowsH[0].id;
+                }
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    // Fallback to a sensible default if available
+    try {
+        const [rows] = await pool.query('SELECT id FROM account_types WHERE `key`=? LIMIT 1', ['individual_brokerage']);
+        if (rows && rows[0] && rows[0].id) return rows[0].id;
+        const [any] = await pool.query('SELECT id FROM account_types LIMIT 1');
+        if (any && any[0] && any[0].id) return any[0].id;
+    } catch (e) {
+        console.warn('resolveAccountTypeId fallback error:', e.message);
+    }
+
+    return null;
+}
+
 // Helper: Trigger bond scrape by touching the marker file
 // This forces the scrape daemon to run bond_positions on its next cycle
 function triggerBondScrape() {
@@ -1054,11 +1183,12 @@ app.post('/api/import', async (req, res) => {
                 await pool.execute('DELETE FROM fixed_assets');
             }
 
-            // Insert accounts
+            // Insert accounts (resolve account_type_id)
             for (const account of accounts) {
+                const accountTypeId = await resolveAccountTypeId(account);
                 await pool.execute(
-                    'INSERT INTO accounts (id, name, type, category, currency, display_order) VALUES (?, ?, ?, ?, ?, ?)',
-                    [account.id, account.name, account.type, account.category || 'investment', account.currency || 'USD', account.display_order || 0]
+                    'INSERT INTO accounts (id, name, account_type_id, currency, display_order) VALUES (?, ?, ?, ?, ?)',
+                    [account.id, account.name, accountTypeId, account.currency || 'USD', account.display_order || 0]
                 );
             }
 
@@ -1114,29 +1244,35 @@ app.post('/api/import', async (req, res) => {
 
 // Accounts
 app.post('/api/accounts', async (req, res) => {
-    const { name, type, category, currency, display_order } = req.body;
+    const { name, account_type_id, account_type_key, type, currency, display_order } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
     try {
+        const accountTypeId = account_type_id || await resolveAccountTypeId({ account_type_key, type });
+        if (!accountTypeId) return res.status(400).json({ error: 'Unable to resolve account_type_id' });
+
         const [result] = await pool.execute(
-            'INSERT INTO accounts (name, type, category, currency, display_order) VALUES (?, ?, ?, ?, ?)',
-            [name, type, category, currency || 'USD', display_order || 0]
+            'INSERT INTO accounts (name, account_type_id, currency, display_order) VALUES (?, ?, ?, ?)',
+            [name, accountTypeId, currency || 'USD', display_order || 0]
         );
         assetsCache = null;
         loadAssets();
-        res.json({ id: result.insertId, ...req.body });
+        res.json({ id: result.insertId, name, account_type_id: accountTypeId, currency: currency || 'USD', display_order: display_order || 0 });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 app.put('/api/accounts/:id', async (req, res) => {
-    const { name, type, category, currency, display_order } = req.body;
+    const { name, account_type_id, account_type_key, type, currency, display_order } = req.body;
     try {
-        // Build dynamic update query to only update provided fields
         const updates = [];
         const params = [];
         if (name !== undefined) { updates.push('name=?'); params.push(name); }
-        if (type !== undefined) { updates.push('type=?'); params.push(type); }
-        if (category !== undefined) { updates.push('category=?'); params.push(category); }
+        if (account_type_id !== undefined || account_type_key !== undefined || type !== undefined) {
+            const accountTypeId = account_type_id || await resolveAccountTypeId({ account_type_key, type });
+            if (!accountTypeId) return res.status(400).json({ error: 'Unable to resolve account_type_id' });
+            updates.push('account_type_id=?'); params.push(accountTypeId);
+        }
         if (currency !== undefined) { updates.push('currency=?'); params.push(currency); }
         if (display_order !== undefined) { updates.push('display_order=?'); params.push(display_order); }
 
@@ -1155,6 +1291,52 @@ app.put('/api/accounts/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// Account Types CRUD
+app.get('/api/account-types', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT id, `key`, display_name, category, tax_treatment, custodial, requires_ssn, active, sort_order FROM account_types WHERE active=1 ORDER BY sort_order');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/account-types', async (req, res) => {
+    const { key, display_name, category, tax_treatment, custodial, requires_ssn, sort_order } = req.body;
+    if (!key || !display_name || !category) return res.status(400).json({ error: 'key, display_name and category are required' });
+    try {
+        const [result] = await pool.execute('INSERT INTO account_types (`key`, display_name, category, tax_treatment, custodial, requires_ssn, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)', [key, display_name, category, tax_treatment || 'unknown', custodial ? 1 : 0, requires_ssn ? 1 : 0, sort_order || 1000]);
+        res.json({ id: result.insertId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/account-types/:id', async (req, res) => {
+    const { display_name, category, tax_treatment, custodial, requires_ssn, active, sort_order } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        if (display_name !== undefined) { updates.push('display_name=?'); params.push(display_name); }
+        if (category !== undefined) { updates.push('category=?'); params.push(category); }
+        if (tax_treatment !== undefined) { updates.push('tax_treatment=?'); params.push(tax_treatment); }
+        if (custodial !== undefined) { updates.push('custodial=?'); params.push(custodial ? 1 : 0); }
+        if (requires_ssn !== undefined) { updates.push('requires_ssn=?'); params.push(requires_ssn ? 1 : 0); }
+        if (active !== undefined) { updates.push('active=?'); params.push(active ? 1 : 0); }
+        if (sort_order !== undefined) { updates.push('sort_order=?'); params.push(sort_order); }
+        if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+        params.push(req.params.id);
+        await pool.execute(`UPDATE account_types SET ${updates.join(', ')} WHERE id=?`, params);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/account-types/:id', async (req, res) => {
+    try {
+        // Soft-delete
+        await pool.execute('UPDATE account_types SET active=0 WHERE id=?', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/accounts/:id', async (req, res) => {

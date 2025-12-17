@@ -14,16 +14,58 @@
 -- - security_splits: Stock split information
 
 -- Create accounts table
+-- Create account_types table (enumerated list of account types)
+CREATE TABLE IF NOT EXISTS account_types (
+  id INT NOT NULL AUTO_INCREMENT,
+  `key` VARCHAR(100) NOT NULL,
+  display_name VARCHAR(255) NOT NULL,
+  category ENUM('investment','bank','debt') NOT NULL,
+  tax_treatment ENUM('pre-tax','post-tax','tax-exempt','unknown') NOT NULL DEFAULT 'unknown',
+  custodial TINYINT(1) DEFAULT 0,
+  requires_ssn TINYINT(1) DEFAULT 0,
+  active TINYINT(1) DEFAULT 1,
+  sort_order INT DEFAULT 1000,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_account_type_key (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Seed common account types
+INSERT INTO account_types (`key`, display_name, category, tax_treatment, custodial, requires_ssn, sort_order)
+VALUES
+  ('individual_brokerage', 'Individual Brokerage', 'investment', 'post-tax', 0, 0, 100),
+  ('traditional_401k', 'Traditional 401(k)', 'investment', 'pre-tax', 0, 0, 110),
+  ('roth_401k', 'Roth 401(k)', 'investment', 'post-tax', 0, 0, 120),
+  ('solo_401k', 'Solo 401(k)', 'investment', 'pre-tax', 0, 0, 130),
+  ('simple_ira', 'Simple IRA', 'investment', 'pre-tax', 0, 0, 140),
+  ('traditional_ira', 'Traditional IRA', 'investment', 'pre-tax', 0, 0, 150),
+  ('roth_ira', 'Roth IRA', 'investment', 'post-tax', 0, 0, 160),
+  ('529_plan', '529(c)', 'investment', 'tax-exempt', 0, 0, 170),
+  ('savings', 'Savings', 'bank', 'unknown', 0, 0, 200),
+  ('checking', 'Checking', 'bank', 'unknown', 0, 0, 210),
+  ('hsa', 'HSA', 'bank', 'tax-exempt', 0, 0, 220),
+  ('cd', 'CD', 'bank', 'unknown', 0, 0, 230),
+  ('money_market', 'Money Market', 'bank', 'unknown', 0, 0, 240),
+  ('ugma_utma', 'UGMA/UTMA', 'investment', 'post-tax', 1, 1, 300),
+  ('sep_ira', 'SEP IRA', 'investment', 'pre-tax', 0, 0, 310),
+  ('credit_card', 'Credit Card', 'debt', 'unknown', 0, 0, 400),
+  ('loan', 'Loan', 'debt', 'unknown', 0, 0, 410),
+  ('mortgage', 'Mortgage', 'debt', 'unknown', 0, 0, 420)
+ON DUPLICATE KEY UPDATE display_name=VALUES(display_name);
+
+-- Create accounts table (references account_types)
 CREATE TABLE IF NOT EXISTS accounts (
   id INT NOT NULL AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
-  type VARCHAR(50) DEFAULT NULL,
-  category ENUM('bank','investment') NOT NULL,
+  account_type_id INT NOT NULL,
   display_order INT DEFAULT 0,
   currency VARCHAR(10) DEFAULT 'USD',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  KEY idx_account_type_id (account_type_id),
+  CONSTRAINT fk_accounts_account_type FOREIGN KEY (account_type_id) REFERENCES account_types (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create positions table (holdings in accounts)
