@@ -148,7 +148,7 @@ describe('TTM Migration Integration Test', () => {
     }
 
     // Run backfill to compute adjusted_dividend_amount
-    await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=TTMTEST', '--apply']);
+    await runScript('node', ['scripts/maintenance/backfill_adjusted_dividends.js', '--symbol=TTMTEST', '--apply']);
 
     // Now recompute TTM
     await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTMTEST', '--apply']);

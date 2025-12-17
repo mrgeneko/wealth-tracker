@@ -22,6 +22,11 @@ wealth_tracker/scripts/__pycache__/*
 
 *.pyc
 
+# Test coverage reports
+coverage/
+.nyc_output/
+*.lcov
+
 # Ignore SSL certificates and private keys
 *.pem
 *.key
