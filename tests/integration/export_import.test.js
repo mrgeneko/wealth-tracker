@@ -119,8 +119,8 @@ describe('Export/Import Integration Test', () => {
 
     const { accounts, positions, fixed_assets } = importData.data;
 
-    // Start transaction
-    await conn.execute('START TRANSACTION');
+    // Start transaction (use query for transaction control statements)
+    await conn.query('START TRANSACTION');
 
     try {
       // Clear existing data
@@ -167,11 +167,11 @@ describe('Export/Import Integration Test', () => {
         }
       }
 
-      // Commit transaction
-      await conn.execute('COMMIT');
+      // Commit transaction (use query for transaction control statements)
+      await conn.query('COMMIT');
     } catch (error) {
-      // Rollback on error
-      await conn.execute('ROLLBACK');
+      // Rollback on error (use query for transaction control statements)
+      await conn.query('ROLLBACK');
       throw error;
     }
   }
