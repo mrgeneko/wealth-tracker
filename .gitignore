@@ -19,7 +19,20 @@ nasdaq-listed.csv.*
 nyse-listed.csv.*
 us-treasury-auctions.csv.backup.*
 wealth_tracker/scripts/__pycache__/*
+
 *.pyc
+
+# Ignore SSL certificates and private keys
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+*.csr
+certs/
+ssl/
+private/
 
 
 
