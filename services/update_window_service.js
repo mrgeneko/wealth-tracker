@@ -49,7 +49,8 @@ class UpdateWindowService {
 	}
 
 	_findApplicableWindows(windows, ticker, providerId, watchlistKey) {
-		return windows
+		// First, filter to get matching windows
+		const matching = windows
 			.filter(w => w && w.enabled)
 			.filter(w => {
 				if (w.ticker && w.ticker !== ticker && w.ticker !== 'default') return false;
@@ -58,17 +59,27 @@ class UpdateWindowService {
 				if (w.watchlistKey && watchlistKey && w.watchlistKey !== watchlistKey) return false;
 				if (w.watchlistKey && !watchlistKey) return false;
 				return true;
-			})
-			.sort((a, b) => {
-				const score = (w) => {
-					let s = w.priority || 0;
-					if (w.ticker && w.ticker !== 'default') s += 1000;
-					if (w.watchlistKey) s += 100;
-					if (w.providerId) s += 10;
-					return s;
-				};
-				return score(b) - score(a);
 			});
+
+		// Check if there are any ticker-specific windows (non-default)
+		const hasTickerSpecific = matching.some(w => w.ticker && w.ticker !== 'default');
+
+		// If ticker-specific windows exist, exclude all default windows
+		const filtered = hasTickerSpecific
+			? matching.filter(w => w.ticker !== 'default')
+			: matching;
+
+		// Sort by priority (highest first)
+		return filtered.sort((a, b) => {
+			const score = (w) => {
+				let s = w.priority || 0;
+				if (w.ticker && w.ticker !== 'default') s += 1000;
+				if (w.watchlistKey) s += 100;
+				if (w.providerId) s += 10;
+				return s;
+			};
+			return score(b) - score(a);
+		});
 	}
 
 	async _getWindows() {
