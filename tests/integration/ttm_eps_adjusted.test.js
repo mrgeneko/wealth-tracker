@@ -137,7 +137,7 @@ describe('TTM EPS Adjusted Integration Test', () => {
     }
 
     // Backfill adjusted EPS
-    await runScript('node', ['scripts/archive/backfill_adjusted_eps.js', '--symbol=TTM_EPS_ADJ', '--apply']);
+    await runScript('node', ['scripts/maintenance/backfill_adjusted_eps.js', '--symbol=TTM_EPS_ADJ', '--apply']);
 
     // Now recompute ttm to pick up adjusted eps
     await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=TTM_EPS_ADJ', '--apply']);
