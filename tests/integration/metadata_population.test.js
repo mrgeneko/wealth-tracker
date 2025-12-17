@@ -140,9 +140,9 @@ describe('Metadata Population Integration Tests', () => {
     test('Populate multiple symbols (2 symbols for CI)', async () => {
       // Create test account first
       await connection.execute(
-        `INSERT INTO accounts (id, name, type) VALUES (?, ?, ?)
+        `INSERT INTO accounts (id, name, account_type_id) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE name = VALUES(name)`,
-        [1, 'Test Account', 'individual']
+        [1, 'Test Account', 1]
       );
 
       // Create test positions for just 2 symbols to keep tests fast
