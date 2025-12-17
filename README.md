@@ -14,7 +14,6 @@ Lightweight scrapers and processors for personal portfolio tracking.
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start-docker-compose)
 - [Architecture](#architecture)
-- [Current Development Status](#current-development-status)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -26,6 +25,8 @@ Lightweight scrapers and processors for personal portfolio tracking.
 - **Flexible Configuration**: Database-backed update windows and watchlists
 - **Docker-First**: Fully containerized with Docker Compose
 - **Production Ready**: 615+ unit tests, extensive error handling, logging
+ - **Real-time Updates**: WebSocket-based dashboard with low-latency (sub-second) updates
+ - **Production Ready**: extensive unit tests, robust error handling, and logging
 
 ## Prerequisites
 
@@ -85,95 +86,6 @@ cp config/config.example.json config/config.json
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Current Development Status
-
-### ✅ Phase 9: Complete - WebSocket Real-time Metrics & Analytics Dashboard
-
-**Phase 9.2** ✅ **COMPLETE** - Real-time WebSocket infrastructure for streaming scraper and scheduler metrics
-- WebSocket server with 1,000+ concurrent client capacity
-- Metrics collector with database persistence and 7-day retention
-- Automatic reconnection with exponential backoff
-- 18 comprehensive unit tests
-
-**Phase 9.3** ✅ **COMPLETE** - Analytics dashboard with advanced charting
-- Responsive 6-section dashboard (Overview, Scrapers, Navigation, Scraping, Scheduler, Alerts)
-- Chart Adapter pattern for library independence (easily swap Chart.js for ECharts, D3.js)
-- 10+ real-time charts with sub-100ms latency
-- Professional UI with statistics and trend analysis
-
-**Phase 9.4** 🔄 **PLANNING** - Performance optimization and advanced features
-- Database query optimization (80-90% reduction)
-- Redis/in-memory caching layer
-- Load testing framework (validated to 1000+ concurrent users)
-- Custom dashboard configurations
-- Threshold-based alerts
-
-📊 **Deliverables**: 6,000+ lines of production code | 18 unit tests | Complete documentation  
-📈 **Performance**: <100ms real-time latency | 5,000+ concurrent users | <100ms queries
-
-For detailed Phase 9 information, see:
-- `PHASE_9_COMPLETE_SUMMARY.md` - Executive summary
-- `PHASE_9_3_COMPLETION_SUMMARY.md` - Dashboard UI details
-- `PHASE_9_2_COMPLETION_SUMMARY.md` - WebSocket infrastructure details
-- `PHASE_9_4_PLAN.md` - Next phase planning (performance optimization)
-
----
-
-## Recent Feature Updates
-
-- **Architecture Refactor (Listing Sync + On-Demand Scrape):**
-  - Listing Sync Service HTTP API: see [docs/LISTING_SYNC_SERVICE.md](docs/LISTING_SYNC_SERVICE.md)
-  - Consolidated API reference (including `POST /scrape`): see [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
-  - API Scraper Service (Yahoo batch, non-browser): see [docs/API_SCRAPER_SERVICE.md](docs/API_SCRAPER_SERVICE.md)
-  - On-demand browser scrape endpoint (scrapers health server): `POST http://localhost:3002/scrape`
-  - API scraper health endpoint: `GET http://localhost:3020/health`
-
-- **Security Metadata System:**
-  - Complete system for rich security data: Names, Sectors, Market Caps, P/E Ratios, Dividends, Earnings.
-  - **Automated Population**: Fetches metadata from Yahoo Finance for all positions automatically.
-  - **Background Refresh**: Keeps popular securities (S&P 500, ETFs) updated via cron jobs.
-  - **API Integration**: REST API for autocomplete, prefetch, and batch operations.
-  - **Documentation**: See `docs/SECURITY_METADATA.md` for full details.
-    - **P/E (trailing_pe) refresh cadence**: trailing P/E values are loaded from Yahoo metadata and refreshed as part of the metadata population workflow (see details below).
-
-- **New StockEvents Scraper:**
-  - Added support for stockevents.app as a new data source for stocks, ETFs, bonds, and mutual funds
-  - Implements text-based parsing for price and change data extraction
-  - Handles "Today" timestamps for current trading data
-  - Integrated into the scraper daemon with configurable settings
-  - THIS WAS DISABLED FOR NOW BECAUSE BOND PRICES LOOK BAD and stock prices may be delayed
-
-- **Codebase Consistency Improvements:**
-  - Renamed `regular_last_price` field to `regular_price` across all scraper files, Python scripts, and dashboard code
-  - Updated 20+ files including all major scrapers (Google, Robinhood, Yahoo, etc.)
-  - Improved field naming consistency throughout the application
-
-- **Enhanced Dashboard Settings:**
-  - Added gear icon (⚙️) in top right corner with dropdown menu
-  - Moved Logs access from main tab navigation to gear dropdown
-  - Comprehensive settings modal with auto-refresh controls, theme selection, and data management
-  - Added Import/Export functionality for complete data portability
-  - Settings persist in browser localStorage
-  - **Logs Modal Improvements**: Large 98% window size modal with resizable panes, Escape key support, and close button
-
-- **Data Management Features:**
-  - **Export Data**: Download complete portfolio data as JSON
-  - **Import Data**: Restore portfolio data from exported JSON files
-  - Full database replacement with transaction safety
-  - Backup and migration capabilities between environments
-
-- **Expanded Exchange Listings:**
-  - The system now downloads and processes `other-listed.csv` from the nyse-other-listings GitHub repository, adding 6,800+ tickers from additional exchanges (NYSE MKT, NYSE ARCA, BATS, IEX, and others).
-  - Exchange codes are mapped as follows: A → NYSE MKT, N → NYSE, P → NYSE ARCA, Z → BATS, V → IEX.
-  - The dashboard autocomplete and ticker registry now include these new exchanges, with color-coded badges for each type.
-
-- **Dashboard Autocomplete & Badges:**
-  - The autocomplete dropdown and investment tables now support all ~14,200 tickers from NASDAQ, NYSE, OTHER_LISTED, and TREASURY, with distinct badges for each exchange type.
-
-- **Ticker Registry & Listings Update:**
-  - `scripts/update_exchange_listings.js` now updates NASDAQ, NYSE, and OTHER_LISTED files for ticker lookup.
-  - New file: `config/other-listed.csv` contains additional US-listed tickers.
-
 This repository contains Node.js scraper code that runs a persistent daemon to collect price and watchlist data from multiple sources (Yahoo Finance, Google Finance, Robinhood, StockEvents, and more) using Puppeteer/Chrome, publishes messages to Kafka, and provides a real-time web dashboard for portfolio tracking. The system supports comprehensive data management with import/export capabilities and persistent settings.
 This README focuses on running the project in Docker, the long-running scraper daemon, and operational instructions (start/stop/logs/heartbeat). For additional operational notes see `DAEMON.md`.
 ---
@@ -211,11 +123,13 @@ docker compose up -d scrapers
 # or start the entire stack
 docker compose up -d
 ```
-2. See running services:
+Note about memory limits: `deploy` settings in `docker-compose.yml` are only honored by Docker Swarm. To enforce runtime memory limits with plain Docker Compose, set a service-level memory limit appropriate for your environment (e.g., `mem_limit` or `resources` fields depending on your Compose version).
+
+3. See running services:
 ```bash
 docker compose ps
 ```
-3. View logs for scrapers (follow):
+4. View logs for scrapers (follow):
 ```bash
 docker compose logs -f scrapers
 ```
@@ -286,19 +200,6 @@ Tip: to run a single integration test file, pass Jest args after `--`.
 npm run test:integration -- --runTestsByPath tests/integration/listing_sync_e2e.test.js
 ```
 
-## Docker Desktop Setup
-If you are using Docker Desktop, you can manage the application through the GUI:
-
-1. **Start the Stack**: Open a terminal in the project directory and run:
-   ```bash
-   docker compose up -d
-   ```
-2. **View in Dashboard**: Open the Docker Desktop Dashboard. You will see a `wealth-tracker` application group.
-3. **Inspect Containers**: Click on the `wealth-tracker` group to expand it. You will see services like `scrapers`, `dashboard`, `kafka`, `mysql`, etc.
-4. **View Logs**: Click on any service (e.g., `scrapers`) to view its live logs with `docker compose logs -f <service>`.
-5. **Access Terminal**: To run commands inside a container, click the "Terminal" or "Exec" tab in the container view. This is useful for debugging or checking files inside the container.
-6. **Control Stack**: Use the Play/Stop/Restart buttons in the dashboard to manage the entire application or individual services.
-
 ---
 ## Managing Configuration
 
@@ -315,6 +216,9 @@ If you are using Docker Desktop, you can manage the application through the GUI:
   - `0 1 1 * * cd /path/to/wealth-tracker && node scripts/populate_popular_securities.js --all --force >> logs/metadata_monthly.log 2>&1` (monthly full refresh)
 
 - On-demand / manual refresh options:
+
+Note on daemon vs host cron: the `scrapers` container runs as a long-lived daemon (continuous scraping) and does not require cron for normal operation. The `config/metadata_cron.conf` file is a host-side cron template intended for periodic metadata population or maintenance tasks (for example full DB refreshes). Use the daemon for continuous price collection and use the cron jobs for scheduled metadata refreshes or host-level maintenance.
+
   - API: POST /api/metadata/prefetch (prefetch metadata for a single ticker and update DB immediately)
   - CLI:
     - `node scripts/populate_securities_metadata.js --ticker TICKER` (single ticker)
@@ -337,10 +241,6 @@ Defines the securities to track and their data sources.
 - **Update**: Edit the file on your host machine.
 - **Apply**: The scraper daemon automatically reloads this file when it changes. No restart needed.
 
-**Note on Data vs. Config Directories:**
-- `/usr/src/app/data` (Runtime/Persistent): This is the "live" folder where the application looks for configuration. It is mounted from your host (e.g., `~/wealth_tracker_data`), so changes persist across container restarts.
-- `/usr/src/app/config` (Template/Default): This directory inside the container holds the default configuration files copied during the build. If `config.json` is missing from the `data` folder at startup, the entrypoint script copies the default one from `config` to `data` to ensure the app can start.
-
 ### 3. Dashboard Assets (Database Driven)
 The dashboard now reads asset data (accounts, positions, real estate, vehicles) from the **MySQL database**. 
 
@@ -350,9 +250,6 @@ The dashboard now reads asset data (accounts, positions, real estate, vehicles) 
     - **API**: Use the dashboard API endpoints (`/api/accounts`, `/api/positions`, etc.) for programmatic access.
       - New: `/api/account-types` exposes the seeded account type enumerations. Use this endpoint to populate dropdowns and manage custom types.
 
-    Database migration notes:
-    - The initialization script `scripts/init-db/000-base-schema.sql` now creates an `account_types` table and seeds common account types. The `accounts` table references `account_type_id` (was previously a free-text `type`).
-    - Because backwards compatibility is not required, reinitialize your database (drop and recreate) to pick up the new schema.
 
 ### 4. Dashboard HTTPS Configuration
 The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `dashboard/certs/`. If found, it starts an HTTPS server; otherwise, it falls back to HTTP.
@@ -539,9 +436,6 @@ The scraper daemon supports configurable scrape groups in `config.json`. Each gr
 | :--- | :--- |
 | `investing_watchlists` | Scrapes Investing.com watchlist pages |
 | `yahoo_batch` | Batch fetches prices from Yahoo Finance API |
-| `tradingview_watchlists` | Scrapes TradingView watchlist pages |
-| `stockevents` | Scrapes stockevents.app for stocks, ETFs, bonds, and mutual funds |
-| `stocks_etfs` | Scrapes individual stock/ETF pages from configured sources |
 | `stock_positions` | **Queries MySQL** for positions with type 'stock' or 'etf', then scrapes prices using round-robin source selection |
 | `bond_positions` | **Queries MySQL** for positions with type 'bond', then scrapes prices (currently uses Webull bond quotes) |
 | `bonds` | Scrapes bond prices from configured sources |
@@ -597,7 +491,6 @@ The system supports multiple data sources with varying capabilities for price da
 | **YCharts** | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | **Google Finance** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | **Robinhood** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| **StockEvents** | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Investing.com** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | **Webull** | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
 
@@ -610,30 +503,7 @@ The system supports multiple data sources with varying capabilities for price da
 ---
 ## Dashboard Features
 
-The dashboard provides real-time portfolio tracking with the following features:
 
-### Investment Accounts Table
-- **Flash Animations**: Price, Change, and Value columns flash green/red when values change
-- **Prev Close Column**: Shows previous day's closing price from source data
-- **Change/Change %**: Calculated dynamically from Price and Prev Close
-- **Sortable Columns**: Click column headers to sort by Symbol, Change %, Value Change, or Total
-- **Draggable Columns**: Drag account column headers to reorder accounts
-- **Click to Edit**: Click any cell to edit position quantity
-
-### Add Position Modal
-When clicking the "+" button in an empty cell:
-- Symbol, Type, and Account are displayed as read-only labels (not editable)
-- Only the Quantity field is editable
-- The Account field shows the account name for the column where "+" was clicked
-
-### Real-Time Updates
-- Price data streams via Socket.IO from Kafka
-- In-place cell updates preserve CSS animations
-- Net Worth and Total row update automatically
-
-### Dashboard Settings
-
-The dashboard includes a comprehensive settings system accessible via the gear icon (⚙️) in the top right corner. The gear icon displays a dropdown menu with "Logs" and "Settings" options.
 
 #### Settings Modal
 
@@ -648,9 +518,6 @@ The Settings modal provides the following configuration options:
 - **Export Data**: Download all account and position data as a JSON file
 - **Import Data**: Upload and restore data from an exported JSON file (replaces all existing data)
 - **Clear Cache**: Clear browser cache and reload the dashboard
-
-**Keyboard Shortcuts:**
-- **Escape Key**: Close any open modal (Settings, Logs, Add Symbol, etc.)
 
 #### Settings Storage
 
@@ -691,75 +558,6 @@ The dashboard provides full data portability through import and export functiona
 This allows you to backup your portfolio data, migrate between environments, or restore from backups.
 
 The "Clear Cache" option resets all settings to defaults and clears any cached data, which can be useful for troubleshooting.
-
----
-## Troubleshooting
-- Chrome launch/connect failures:
-	- Common errors include `ECONNREFUSED 127.0.0.1:9222` or Chromium startup errors. The daemon attempts to connect to an existing debugging port and will launch Chrome if necessary. See the container logs for Chrome startup stderr.
-	- Ensure the container has enough memory and the Chrome binary exists at `/opt/google/chrome/chrome` in the image.
-If you repeatedly see connection failures, rebuild the `scrapers` image and verify the container logs; the daemon includes retries with backoff when Chrome is not immediately available.
-- Kafka connectivity:
-	- If you see DNS or connection errors for Kafka, ensure `KAFKA_BROKERS` points to the correct host:port and that the Kafka container is reachable from the scrapers container (compose network). For local compose this is usually `kafka:9092`.
-- Stale lock files / concurrency:
-  - This project uses a long-running daemon pattern instead of cron + lock scripts. The legacy `scrape_security_data_lock.sh` and cron-related files have been removed from the image. If you previously used cron, remove any external cron entries that run the scraper.
-If you need to revert to scheduled runs instead of the daemon, let me know and I can add a controlled external runner or health-check wrapper.
----
-## Files of interest
-- `scrape_daemon.js` — main daemon that orchestrates scrapes and publishes to Kafka.
-- `scrapers/scrape_stockevents.js` — scraper for stockevents.app data source.
-- `entrypoint_unified.sh` — container entrypoint that launches Node as PID 1.
-- `Dockerfile.scrapers` — build for the scrapers image.
-- `docker-compose.yml` — compose configuration for local development.
-- `DAEMON.md` — additional daemon operational notes (included in repo).
-- `scripts/update_exchange_listings.js` — downloads and updates NASDAQ, NYSE, and OTHER exchange listings for ticker lookup.
-- `config/other-listed.csv` — new file containing additional US-listed tickers.
----
-## Contributing
-PRs are welcome. When working on scrapers locally prefer building the scrapers image and running via Docker Compose for a consistent environment.
----
-If you want more operational features (health endpoint, metrics, or structured JSON logs), tell me which one and I can add it as a follow-up change.
-
----
-## Updating an Existing Docker Installation
-
-To update your wealth-tracker deployment to the latest code or configuration, follow these steps:
-
-1. **Pull the Latest Code**
-   - If you cloned the repository with git, run:
-     ```bash
-     git pull origin main
-     # Or switch to the desired branch/tag
-     git checkout <branch-or-tag>
-     ```
-
-2. **Rebuild Docker Images**
-   - If the code or dependencies have changed, rebuild the affected images:
-     ```bash
-     docker compose build
-     # Or rebuild only a specific service (e.g., scrapers):
-     docker compose build scrapers
-     ```
-
-3. **Restart Services**
-   - Restart the updated containers to apply changes:
-     ```bash
-     docker compose up -d
-     # Or restart a specific service:
-     docker compose up -d scrapers
-     ```
-
-4. **(Optional) Prune Old Images**
-   - To free disk space, remove unused images:
-     ```bash
-     docker image prune -f
-     ```
-
-5. **Verify Update**
-```bash
-# Check that containers are running the new version:
-docker compose ps
-docker compose logs -f scrapers
-```
 
 **Note:**
 - If you updated configuration files (e.g., `.env`, `config.json`), most changes are picked up automatically, but some may require a container restart.
@@ -830,35 +628,6 @@ Stores dividend history and upcoming payments.
 - `dividend_amount`: Amount per share
 
 ---
-
-## Contributing
-
-Contributions are welcome! This project is open source under the GPLv3 license.
-
-### How to Contribute
-
-1. **Fork the repository** on GitHub
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Make your changes** with clear, descriptive commits
-4. **Add tests** for new functionality
-5. **Run the test suite** (`npm test`) to ensure everything passes
-6. **Submit a pull request** with a clear description of your changes
-
-### Development Guidelines
-
-- Follow existing code style and conventions
-- Write unit tests for new features
-- Update documentation as needed
-- Keep commits focused and atomic
-- Use descriptive commit messages
-
-### Reporting Issues
-
-Found a bug or have a feature request? Please [open an issue](https://github.com/mrgeneko/wealth-tracker/issues) with:
-- Clear description of the problem or feature
-- Steps to reproduce (for bugs)
-- Expected vs actual behavior
-- Environment details (OS, Node version, Docker version)
 
 ## License
 
