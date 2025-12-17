@@ -1,7 +1,9 @@
-FROM python:3.13
+FROM python:3.13-slim
 WORKDIR /app
 COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+	pip install --upgrade pip && \
+	pip install --no-cache-dir -r requirements.txt
 COPY . /app
 RUN pip install -e .
 CMD ["python", "-m", "wealth_tracker.scripts.consume_kafka_ck"]

@@ -5,8 +5,10 @@ RUN npm install -g pm2
 
 WORKDIR /app
 
+# Copy package files first for better caching
 COPY dashboard/package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+	npm install
 
 # Copy application files - all under /app for consistent paths
 COPY dashboard/ .
