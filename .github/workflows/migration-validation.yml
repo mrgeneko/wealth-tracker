@@ -7,6 +7,7 @@ on:
       - 'tests/integration/migration/**'
       - '.github/workflows/migration-validation.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
