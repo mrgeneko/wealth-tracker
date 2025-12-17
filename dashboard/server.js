@@ -1144,13 +1144,48 @@ app.get('/api/logs/:filename', async (req, res) => {
     }
 });
 
+// Helper function to export raw database rows for import compatibility
+async function fetchRawDataForExport() {
+    try {
+        // Fetch raw accounts with all fields needed for import
+        const [accounts] = await pool.query(`
+            SELECT id, name, account_type_id, currency, display_order
+            FROM accounts
+            ORDER BY display_order
+        `);
+
+        // Fetch raw positions with all fields from schema
+        const [positions] = await pool.query(`
+            SELECT id, account_id, ticker, description, quantity, type,
+                   exchange, currency, maturity_date, coupon, normalized_key
+            FROM positions
+        `);
+
+        // Fetch raw fixed_assets
+        const [fixedAssets] = await pool.query(`
+            SELECT id, name, type, value, currency, display_order
+            FROM fixed_assets
+            ORDER BY display_order
+        `);
+
+        return {
+            accounts: accounts,
+            positions: positions,
+            fixed_assets: fixedAssets
+        };
+    } catch (error) {
+        console.error('Error fetching raw export data:', error);
+        throw error;
+    }
+}
+
 // API to export all data
 app.get('/api/export', async (req, res) => {
     try {
-        const data = await fetchAssetsFromDB();
+        const data = await fetchRawDataForExport();
         const exportData = {
             exportDate: new Date().toISOString(),
-            version: '1.0',
+            version: '2.0',  // Updated version to indicate new format
             data: data
         };
         res.json(exportData);
@@ -1195,17 +1230,18 @@ app.post('/api/import', async (req, res) => {
             // Insert positions
             for (const position of positions) {
                 await pool.execute(
-                    'INSERT INTO positions (account_id, ticker, quantity, type, exchange, currency, maturity_date, coupon, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO positions (account_id, ticker, description, quantity, type, exchange, currency, maturity_date, coupon, normalized_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         position.account_id,
-                        position.ticker,
+                        position.ticker || null,
+                        position.description || null,
                         position.quantity,
                         position.type,
                         position.exchange || null,
                         position.currency || 'USD',
                         position.maturity_date || null,
                         position.coupon || null,
-                        position.display_order || 0
+                        position.normalized_key || null
                     ]
                 );
             }
