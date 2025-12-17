@@ -39,6 +39,9 @@ const { app } = require('../../dashboard/server');
 describe('Integration - account-types API', () => {
     test('GET /api/account-types returns active account types', async () => {
         const res = await request(app).get('/api/account-types').auth('admin', 'admin');
+        if (res.status !== 200) {
+            console.error('GET /api/account-types failed:', res.status, res.body);
+        }
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
         expect(res.body.length).toBeGreaterThanOrEqual(1);
@@ -48,6 +51,9 @@ describe('Integration - account-types API', () => {
     test('POST /api/account-types creates a new account type', async () => {
         const payload = { key: 'test_bank', display_name: 'Test Bank', category: 'bank' };
         const res = await request(app).post('/api/account-types').auth('admin', 'admin').send(payload);
+        if (res.status !== 200) {
+            console.error('POST /api/account-types failed:', res.status, res.body);
+        }
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('id', 123);
         expect(mockExecute).toHaveBeenCalled();
