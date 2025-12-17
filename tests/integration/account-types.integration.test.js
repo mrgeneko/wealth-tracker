@@ -34,9 +34,16 @@ jest.mock('mysql2/promise', () => {
     };
 });
 
-const { app } = require('../../dashboard/server');
+const { app, server, pool, assetsPollingInterval } = require('../../dashboard/server');
 
 describe('Integration - account-types API', () => {
+    afterAll(async () => {
+        // Clean up open handles to allow Jest to exit
+        if (assetsPollingInterval) clearInterval(assetsPollingInterval);
+        if (server && server.close) server.close();
+        if (pool && pool.end) await pool.end().catch(() => {});
+    });
+
     test('GET /api/account-types returns active account types', async () => {
         const res = await request(app).get('/api/account-types').auth('admin', 'admin');
         if (res.status !== 200) {

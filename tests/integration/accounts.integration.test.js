@@ -35,9 +35,16 @@ jest.mock('mysql2/promise', () => {
     };
 });
 
-const { app } = require('../../dashboard/server');
+const { app, server, pool, assetsPollingInterval } = require('../../dashboard/server');
 
 describe('Integration - accounts API (account_type mapping)', () => {
+    afterAll(async () => {
+        // Clean up open handles to allow Jest to exit
+        if (assetsPollingInterval) clearInterval(assetsPollingInterval);
+        if (server && server.close) server.close();
+        if (pool && pool.end) await pool.end().catch(() => {});
+    });
+
     test('POST /api/accounts accepts legacy free-text type and resolves to account_type_id', async () => {
         const payload = { name: 'My Roth', type: 'Roth IRA' };
         const res = await request(app).post('/api/accounts').auth('admin', 'admin').send(payload);
