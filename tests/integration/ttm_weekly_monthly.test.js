@@ -175,7 +175,7 @@ describe('TTM Weekly/Monthly Dividend Integration Tests', () => {
     await connection.execute(`INSERT INTO securities_dividends (ticker, ex_dividend_date, dividend_amount, dividend_type, status, data_source) VALUES (?, ?, ?, 'STOCK', 'paid', 'test')`, [sym, await isoDateDaysAgo(15), 5.0]);
 
     // Backfill adjusted_dividend_amount (no splits present, so same as raw)
-    await runScript('node', ['scripts/archive/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
+    await runScript('node', ['scripts/maintenance/backfill_adjusted_dividends.js', '--symbol=' + sym, '--apply']);
 
     // Recompute TTM (should include only cash payments by current recompute logic)
     await runScript('node', ['scripts/maintenance/recompute_ttm.js', '--symbol=' + sym, '--apply']);
