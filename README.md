@@ -112,23 +112,41 @@ The easiest way to run the full stack locally (Kafka, Zookeeper, MySQL, scrapers
 ./scripts/validate-fresh-container.sh
 ```
 
-2. Build and start services:
+2. Start all services:
 ```bash
-# build the scrapers image and start the scrapers service only
-docker compose build scrapers
-docker compose up -d scrapers
-# or start the entire stack
 docker compose up -d
 ```
+
+This starts the complete stack:
+- **MySQL**: Database for storing prices and portfolio data
+- **Kafka + Zookeeper**: Message broker for real-time price updates
+- **Scrapers**: Collects prices from multiple financial data sources
+- **API Scraper**: Fetches prices via Yahoo Finance API
+- **Kafka Consumer**: Processes price messages and stores them in MySQL
+- **Dashboard**: Web interface at http://localhost:3001
+- **Listing Sync**: Maintains symbol registry from NASDAQ/NYSE feeds
+
 Note about memory limits: `deploy` settings in `docker-compose.yml` are only honored by Docker Swarm. To enforce runtime memory limits with plain Docker Compose, set a service-level memory limit appropriate for your environment (e.g., `mem_limit` or `resources` fields depending on your Compose version).
 
-3. See running services:
+3. Access the dashboard:
 ```bash
-docker compose ps
+# Open in your browser
+open http://localhost:3001
 ```
-4. View logs for scrapers (follow):
+
+Default credentials: `admin` / `wealthtracker` (configurable in `.env`)
+
+4. Monitor services:
 ```bash
+# See all running services
+docker compose ps
+
+# View logs from all services
+docker compose logs -f
+
+# View logs from specific service
 docker compose logs -f scrapers
+docker compose logs -f dashboard
 ```
 
 Optional: start the log rotator sidecar that compresses and prunes old logs (recommended when running long-lived scrapers):
@@ -155,13 +173,36 @@ Notes:
 - `retention_days` removes `.log` and `.gz` files older than the value.
 - `compression_level` follows `gzip` levels (1 = fastest, 9 = best compression).
 - `loop_seconds` controls how often the rotator checks and compresses old logs.
-4. Stop just the scrapers gracefully:
+
+### Starting Individual Services
+
+If you want to run only specific services:
+
 ```bash
-docker compose stop scrapers
+# Start only the database
+docker compose up -d mysql
+
+# Start scrapers only (requires mysql and kafka)
+docker compose up -d mysql kafka zookeeper scrapers
+
+# Start dashboard only (requires mysql and kafka)
+docker compose up -d mysql kafka zookeeper dashboard
 ```
-To stop and remove all compose services:
+
+### Stopping Services
+
 ```bash
+# Stop specific service
+docker compose stop scrapers
+
+# Stop all services
+docker compose stop
+
+# Stop and remove all containers, networks
 docker compose down
+
+# Stop and remove everything including volumes (⚠️ deletes database data)
+docker compose down -v
 ```
 
 ## How to Run Integration Tests (Docker MySQL)
@@ -254,40 +295,15 @@ The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `das
 **Development (Self-Signed):**
 Generate a self-signed certificate using OpenSSL:
 ```bash
-# wealth-tracker
-
-Lightweight, containerized scrapers and processors for personal portfolio tracking.
-
-Overview
-- Scrapes prices and metadata, stores results in MySQL, publishes updates to Kafka, and serves a realtime dashboard.
-
-Quick start
-1. Copy example env and start services:
-```bash
-cp .env.example .env
-docker compose up -d
-```
-2. Follow scrapers logs:
-```bash
-docker compose logs -f scrapers
+mkdir -p dashboard/certs
+openssl req -x509 -newkey rsa:4096 -keyout dashboard/certs/server.key -out dashboard/certs/server.crt -days 365 -nodes -subj "/CN=localhost"
 ```
 
-Essential config
-- `.env`: database and credentials (copy from `.env.example`).
-- `config/config.json`: scraper/dashboard settings (mounted into containers from `./config`).
-- Logs: the project mounts a host `./logs` directory to `/usr/src/app/logs`; create it if needed: `mkdir -p ./logs`.
+**Production:**
+Use a certificate from a trusted CA (e.g., Let's Encrypt) and place the files in `dashboard/certs/`.
 
-Runtime notes
-- The `scrapers` service runs as a long-lived daemon (no cron required for continuous scraping). Use `config/metadata_cron.conf` only for host-level, scheduled metadata maintenance jobs.
-- Health: the scrapers health endpoint defaults to `3002` (example):
-```bash
-curl http://localhost:3002/health
-```
+## License
 
-Where to find more
-- Operational details, troubleshooting, and archived phase docs live under `docs/`.
+GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.
 
-License
-- GNU GPLv3 — see `LICENSE`.
-
-Questions or changes: open an issue or a PR.
+Copyright (C) 2025 Gene Ko
