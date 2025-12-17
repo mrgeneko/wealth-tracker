@@ -19,9 +19,6 @@ Lightweight scrapers and processors for personal portfolio tracking.
 
 ## Features
 
-- **Multi-Source Data Collection**: Scrapes from 15+ financial data providers
-## Features
-
 - **Multi-Source Data Collection**: Scrapes from multiple financial data providers
 - **Real-time Updates**: WebSocket-based dashboard for live price updates
 - **Comprehensive Coverage**: Stocks, ETFs, bonds, and US Treasury securities
@@ -258,393 +255,40 @@ The dashboard supports HTTPS. It looks for `server.key` and `server.crt` in `das
 **Development (Self-Signed):**
 Generate a self-signed certificate using OpenSSL:
 ```bash
-mkdir -p dashboard/certs
-openssl req -nodes -new -x509 -keyout dashboard/certs/server.key -out dashboard/certs/server.crt -days 365
-```
-When prompted, you can enter `US` for Country Name and any value for Organization Name.
+# wealth-tracker
 
-**Production:**
-Obtain a certificate from a trusted Certificate Authority (CA) like Let's Encrypt. Place the private key as `dashboard/certs/server.key` and the certificate chain as `dashboard/certs/server.crt`.
+Lightweight, containerized scrapers and processors for personal portfolio tracking.
 
-**Apply:**
-Rebuild the dashboard container to copy the new certificates:
+Overview
+- Scrapes prices and metadata, stores results in MySQL, publishes updates to Kafka, and serves a realtime dashboard.
+
+Quick start
+1. Copy example env and start services:
 ```bash
-docker compose up -d --build dashboard
+cp .env.example .env
+docker compose up -d
 ```
-
----
-## Scraper Daemon (behavior)
-- The scrapers container runs `node /usr/src/app/scrapers/scrape_daemon.js` as PID 1 (via `entrypoint_unified.sh`).
-- The scraper maintains a single Puppeteer browser instance and runs scrape cycles in an internal loop (no cron required).
-- Scraped records are published to Kafka using the configured brokers and topic.
-- Logs are written to the mounted logs directory (host: `/Users/gene/wealth_tracker_logs` mapped to container `/usr/src/app/logs`) and also written to stdout so `docker logs` shows them.
----
-## Scraper Daemon: Operational Notes
-
-The scrapers run as a long-lived daemon inside the `scrapers` container. Key operational notes:
-
-- The container runs `node /usr/src/app/scrapers/scrape_daemon.js` as PID 1 (via `entrypoint_unified.sh`), so Docker signals (SIGTERM/SIGINT) are delivered directly to the Node process.
-- To stop the scraper gracefully run:
-
+2. Follow scrapers logs:
 ```bash
-docker compose stop scrapers
+docker compose logs -f scrapers
 ```
 
-This sends SIGTERM to the Node process; the daemon attempts to close the Puppeteer browser and flush shutdown messages to logs/stdout before exiting.
+Essential config
+- `.env`: database and credentials (copy from `.env.example`).
+- `config/config.json`: scraper/dashboard settings (mounted into containers from `./config`).
+- Logs: the project mounts a host `./logs` directory to `/usr/src/app/logs`; create it if needed: `mkdir -p ./logs`.
 
-  - You can view logs with:
-
+Runtime notes
+- The `scrapers` service runs as a long-lived daemon (no cron required for continuous scraping). Use `config/metadata_cron.conf` only for host-level, scheduled metadata maintenance jobs.
+- Health: the scrapers health endpoint defaults to `3002` (example):
 ```bash
-docker compose logs --tail 200 scrapers
-```
-
-### Heartbeat
-
-The daemon emits a heartbeat message periodically so external monitors can detect liveness. By default the interval is 5 minutes. To change it, set the `HEARTBEAT_INTERVAL_MINUTES` environment variable for the `scrapers` service in `docker-compose.yml`.
-
-Example (5-minute heartbeat):
-
-```yaml
-services:
-	scrapers:
-		environment:
-			HEARTBEAT_INTERVAL_MINUTES: 5
-```
-
-Heartbeat messages appear in both the scraper log files under `/usr/src/app/logs` and in `docker logs` output as lines starting with `HEARTBEAT: daemon alive`.
-### Graceful shutdown
-- `docker compose stop scrapers` sends SIGTERM to the Node PID 1; the daemon traps SIGTERM/SIGINT, closes the Puppeteer browser, flushes shutdown messages to stdout and file logs, and exits.
-- You should see shutdown messages in `docker logs` similar to:
-```
-[2025-11-17T23:18:47.802Z] Received SIGTERM, shutting down...
-[2025-11-17T23:18:47.812Z] Browser closed.
-```
-If you do not see them, please ensure you are checking `docker compose logs --tail 200 scrapers` immediately after stopping.
-### Heartbeat (liveness)
-- The daemon emits a heartbeat to both the timestamped log file and stdout periodically so external monitors can detect liveness.
-- Default heartbeat interval: 5 minutes.
-- To change the interval, set the environment variable `HEARTBEAT_INTERVAL_MINUTES` for the `scrapers` service in `docker-compose.yml`.
-Example:
-```yaml
-services:
-	scrapers:
-	environment:
-	HEARTBEAT_INTERVAL_MINUTES: 5
-```
-Heartbeat messages look like:
-```
-[2025-11-17T23:18:45.194Z] HEARTBEAT: daemon alive
-```
-
-### Health endpoint
-
-- The daemon exposes a small HTTP health endpoint on `HEALTH_PORT` (default `3000`). If you expose the port in `docker-compose.yml`, you can query it from the host.
-- **Note**: The root path `/` returns 404 Not Found. You must use one of the specific paths below:
-  - `/health`: Returns JSON status including uptime, last cycle status, and basic metrics.
-  - `/metrics`: Returns Prometheus-formatted metrics (if `METRICS_ENABLED=true`).
-
-```bash
-# Check health status
 curl http://localhost:3002/health
-
-# Check metrics (if enabled)
-curl http://localhost:3002/metrics
 ```
 
-- Example `docker-compose.yml` snippet to expose the port and set the env var:
+Where to find more
+- Operational details, troubleshooting, and archived phase docs live under `docs/`.
 
-```yaml
-services:
-	scrapers:
-		ports:
-			- "5901:5901"
-			- "3002:3002"
-		environment:
-			HEALTH_PORT: "3002"
-```
----
-## Important Environment Variables
-- `KAFKA_BROKERS`: Kafka bootstrap servers (example: `kafka:9092`) — configured in `docker-compose.yml` for local compose.
-- `KAFKA_TOPIC`: Topic to publish price data to (default set in code/config). Example: `price_data`.
-- `HEARTBEAT_INTERVAL_MINUTES`: Heartbeat interval in minutes (default `5`).
-Update these in the `docker-compose.yml` service block for `scrapers` as needed. Example service env block:
-```yaml
-services:
-	scrapers:
-	environment:
-	KAFKA_BROKERS: "kafka:9092"
-	KAFKA_TOPIC: "price_data"
-	HEARTBEAT_INTERVAL_MINUTES: "5"
-```
----
-## Logs & Data
-- Logs are saved in the container under `/usr/src/app/logs`. In this workspace they are typically mounted to your host at `/Users/gene/wealth_tracker_logs`.
-- Each run creates timestamped log files like `scrape_daemon.20251117_231700.log` and sidecar JSON/HTML files for scraped content.
-- Use `tail -f` on the most recent log file or `docker logs` for real-time output.
-If you need to inspect the latest log file inside the running container you can run:
-```bash
-docker compose exec -it scrapers sh -c '\
-  LATEST=$(ls -1t /usr/src/app/logs/scrape_daemon*.log | head -n1) && \
-  echo "Latest: $LATEST" && tail -n 200 "$LATEST"'
-```
----
-## Database Schema
-The system persists the latest price updates to a MySQL database in the `latest_prices` table. This allows the dashboard to load the most recent data immediately upon startup.
+License
+- GNU GPLv3 — see `LICENSE`.
 
-### Table: `latest_prices`
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `ticker` | `VARCHAR(50)` | Primary Key. The stock symbol (e.g., "AAPL", "US500"). |
-| `price` | `DECIMAL(18, 4)` | The current price. |
-| `previous_close_price` | `DECIMAL(18, 4)` | The previous day's closing price. |
-| `source` | `VARCHAR(50)` | The data source (e.g., "investing (regular)"). |
-| `quote_time` | `DATETIME` | The timestamp of the quote from the source. |
-| `capture_time` | `DATETIME` | The timestamp when the price was captured by the scraper. |
-| `updated_at` | `TIMESTAMP` | Automatically updated timestamp of the record modification. |
-
-**Note:** The dashboard calculates Change and Change % dynamically:
-- **Change** = Price - Previous Close
-- **Change %** = (Price - Previous Close) / Previous Close × 100
-
----
-## Development notes
-- The scraper code uses `puppeteer-extra` with stealth plugin to drive Chrome. The container image provides a Chrome installation and Xvfb/VNC for a display.
-- The scrapers publish messages via `publish_to_kafka.js` using the `KAFKA_BROKERS` environment variable.
-- To run locally (without Docker) you must have a compatible Chrome and Node.js environment; most development and testing occurs inside the container for environment parity.
-If you run the scrapers outside Docker, set `KAFKA_BROKERS` to a reachable broker list (for example `localhost:9094` when running Kafka locally). Inside Docker Compose use the service DNS name (for example `kafka:9092`).
-
----
-## Scrape Groups
-
-The scraper daemon supports configurable scrape groups in `config.json`. Each group has an `interval` (minutes) and `enabled` flag:
-
-```json
-{
-  "scrape_groups": {
-    "investing_watchlists": { "interval": 1, "enabled": true },
-    "yahoo_batch": { "interval": 30, "enabled": true },
-    "stock_positions": { "interval": 30, "enabled": true },
-    "bond_positions": { "interval": 30, "enabled": true },
-    "bonds": { "interval": 240, "enabled": true },
-    "us_listings": { "interval": 1440, "enabled": true }
-  }
-}
-```
-
-### Available Scrape Groups
-
-| Group | Description |
-| :--- | :--- |
-| `investing_watchlists` | Scrapes Investing.com watchlist pages |
-| `yahoo_batch` | Batch fetches prices from Yahoo Finance API |
-| `stock_positions` | **Queries MySQL** for positions with type 'stock' or 'etf', then scrapes prices using round-robin source selection |
-| `bond_positions` | **Queries MySQL** for positions with type 'bond', then scrapes prices (currently uses Webull bond quotes) |
-| `bonds` | Scrapes bond prices from configured sources |
-| `us_listings` | Updates NYSE/NASDAQ exchange listings for ticker lookup |
-
-The `stock_positions` and `bond_positions` groups dynamically query the database for your actual holdings, ensuring prices are fetched for securities you own without manual configuration.
-
----
-## US Treasury Securities Listings Scrape Group
-
-### Overview
-This group downloads the latest US Treasury Securities Auctions Data (bills, notes, bonds) from fiscaldata.treasury.gov. The data includes CUSIP, Security Type, Security Term, Auction Date, Issue Date, Maturity Date, and more.
-
-- **Script:** `scripts/update_treasury_listings.js`
-- **Output file:** `config/us-treasury-auctions.csv`
-- **Scrape group config:**
-  ```json
-  "us_treasury_listings": { "interval": 1440, "enabled": true }
-  ```
-- **Integration:** The scraper daemon runs this group on schedule, similar to other scrape groups.
-
-### How It Works
-- Uses Puppeteer to automate browser download (required because the CSV is generated client-side via blob URL).
-- The script checks if the new file is more than 5% smaller than the previous file. If so, it aborts the update and logs a warning to prevent accidental data loss.
-- On successful download, the previous file is backed up with a timestamp.
-
-### Safety Check Example
-If the new CSV file is significantly smaller than the previous one (by more than 5%), the update is aborted and a warning is logged:
-```
-WARNING: New file is 12.3% smaller than existing file
-  Old size: 123456 bytes, New size: 108234 bytes
-Aborting update to prevent data loss. Delete the old file manually if this is intentional.
-```
-
-### Manual Run
-To manually update the Treasury listings:
-```bash
-node scripts/update_treasury_listings.js
-```
-
-### Troubleshooting
-- If the script aborts due to file size reduction, review the downloaded file and delete the old file manually if the update is valid.
-- The script requires Puppeteer and Chrome; ensure dependencies are installed if running outside Docker.
-
----
-## Data Source Capabilities
-
-The system supports multiple data sources with varying capabilities for price data extraction:
-
-| Source | Real-time | Pre-market | After-hours | Previous Close | Stock Prices | Bond Prices |
-|--------|-----------|------------|-------------|----------------|---------------|-------------|
-| **Yahoo Finance** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **YCharts** | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
-| **Google Finance** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| **Robinhood** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| **Investing.com** | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| **Webull** | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
-
-**Notes:**
-- **Previous Close**: Some sources (like YCharts) do not expose previous close price data in their HTML/API, so the `previous_close_price` field remains null for these sources. The dashboard calculates change and change % using available data.
-- **Real-time**: Indicates if the source provides live price updates during market hours
-- **Pre-market/After-hours**: Extended trading hours support
-- **Stock/Bond Prices**: Asset type support
-
----
-## Dashboard Features
-
-
-
-#### Settings Modal
-
-The Settings modal provides the following configuration options:
-
-**Dashboard Preferences:**
-- **Auto refresh account and positions**: Toggle automatic data refreshing (default: enabled)
-- **Refresh interval**: Set how often data refreshes (30 seconds, 1 minute, 5 minutes, 10 minutes)
-- **Theme**: Choose between Dark and Light themes (default: Dark)
-
-**System:**
-- **Export Data**: Download all account and position data as a JSON file
-- **Import Data**: Upload and restore data from an exported JSON file (replaces all existing data)
-- **Clear Cache**: Clear browser cache and reload the dashboard
-
-#### Settings Storage
-
-All settings are stored locally in your browser's localStorage and persist between sessions. Settings are specific to each browser/device and are not synced across different browsers or devices.
-
-#### Logs Access
-
-The "Logs" option in the gear dropdown opens a large 98% window size modal providing access to system logs with enhanced functionality:
-- File browser showing all log files with timestamps and sizes
-- Click any log file to view its contents
-- Resizable panes for file list and log viewer
-- Real-time log updates
-- **Modal Features**: Large screen coverage, Escape key to close, close button, and click-outside-to-close
-
-#### Settings Persistence
-
-Settings are automatically saved when you click "Save Settings" and applied immediately. The dashboard remembers your preferences including:
-- Auto-refresh preferences and intervals
-- Theme selection (Dark/Light)
-- Any custom configurations you set
-
-#### Data Import/Export
-
-The dashboard provides full data portability through import and export functionality:
-
-**Export Data:**
-- Downloads all accounts, positions, and fixed assets as a JSON file
-- Includes metadata like export date and version
-- File format: `export-YYYY-MM-DD.json`
-
-**Import Data:**
-- Reads exported JSON files and replaces all existing data
-- Validates file format before importing
-- Uses database transactions for data integrity
-- Automatically refreshes the dashboard after successful import
-- **Warning**: Import completely replaces existing data - use with caution
-
-This allows you to backup your portfolio data, migrate between environments, or restore from backups.
-
-The "Clear Cache" option resets all settings to defaults and clears any cached data, which can be useful for troubleshooting.
-
-**Note:**
-- If you updated configuration files (e.g., `.env`, `config.json`), most changes are picked up automatically, but some may require a container restart.
-- If you updated the database schema, run any required migration scripts before restarting services.
-- For Docker Desktop, you can also use the GUI to rebuild and restart containers.
-
----
-
-## Database Schema
-
-The project uses a MySQL database to store asset and portfolio information.
-
-### Tables
-
-#### `accounts`
-Stores information about bank and investment accounts.
-- `id`: Primary Key
-- `name`: Account name (e.g., "Chase Checking")
-- `type`: Account type (e.g., "checking", "roth ira")
-- `category`: 'bank' or 'investment'
-- `display_order`: Integer for sorting in the UI
-- `currency`: Default 'USD'
-
-#### `positions`
-Stores individual holdings within an account.
-- `id`: Primary Key
-- `account_id`: Foreign Key to `accounts`
-- `symbol`: Ticker symbol (e.g., "AAPL", "CASH"). Now supports up to 50 characters for options and long tickers.
-- `quantity`: Number of shares or amount
-- `type`: 'stock', 'etf', 'bond', 'cash', 'crypto', 'other'
-- `exchange`: Stock exchange (optional)
-- `currency`: Trading currency
-- `maturity_date`: For bonds
-- `coupon`: For bonds
-
-#### `fixed_assets`
-Stores non-financial assets like real estate and vehicles.
-- `id`: Primary Key
-- `name`: Description of the asset
-- `type`: 'real_estate', 'vehicle', 'other'
-- `value`: Estimated value
-- `currency`: Valuation currency
-- `display_order`: Integer for sorting
-
-#### `securities_metadata`
-Stores rich metadata for securities (stocks, ETFs, etc.).
-- `symbol`: Primary Key (e.g., "AAPL")
-- `long_name`: Full company name
-- `quote_type`: 'EQUITY', 'ETF', 'MUTUALFUND'
-- `sector`: Industry sector
-- `market_cap`: Market capitalization
-- `dividend_yield`: Annual dividend yield
-- `trailing_pe`: P/E Ratio
-- `exchange`: Stock exchange (e.g., "Nms", "Nyi")
-
-#### `securities_earnings`
-Stores upcoming and past earnings events.
-- `symbol`: Foreign Key to `securities_metadata`
-- `earnings_date`: Date of earnings release
-- `eps_estimate`: Consensus EPS estimate
-- `revenue_estimate`: Consensus revenue estimate
-
-#### `securities_dividends`
-Stores dividend history and upcoming payments.
-- `symbol`: Foreign Key to `securities_metadata`
-- `ex_dividend_date`: Ex-dividend date
-- `payment_date`: Payment date
-- `dividend_amount`: Amount per share
-
----
-
-## License
-
-This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
-
-### What This Means
-
-- ✅ You can freely use, modify, and distribute this software
-- ✅ You can use it for commercial purposes
-- ⚠️  Any modifications must also be open source under GPLv3
-- ⚠️  You must include the original copyright and license notice
-
-**Copyright © 2025 Gene Ko**
-
----
-
-**Built with**: Node.js, Puppeteer, MySQL, Kafka, Docker, WebSockets
-
-**Questions?** Open an issue or start a discussion on GitHub.
+Questions or changes: open an issue or a PR.
