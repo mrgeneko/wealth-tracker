@@ -1,21 +1,48 @@
 
 FROM browserless/chrome:1.52-chrome-stable
 
-
 USER root
-# Install Node.js 20, x11vnc, xterm, fluxbox and GUI dependencies
+
+# Install Node.js 20, x11vnc, xterm, fluxbox and GUI dependencies in a single layer
 RUN apt-get update && \
-		apt-get install -y \
-			curl x11vnc xterm fluxbox unzip xdotool \
-			dbus libnss3 libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 libdrm2 libgbm1 libu2f-udev libxcomposite1 libxdamage1 libxrandr2 libxshmfence1 libxss1 libxtst6 fonts-liberation libappindicator3-1 lsb-release xdg-utils && \
+		apt-get install -y --no-install-recommends \
+			curl \
+			x11vnc \
+			xterm \
+			fluxbox \
+			unzip \
+			xdotool \
+			dbus \
+			libnss3 \
+			libxss1 \
+			libasound2 \
+			libatk-bridge2.0-0 \
+			libgtk-3-0 \
+			libdrm2 \
+			libgbm1 \
+			libu2f-udev \
+			libxcomposite1 \
+			libxdamage1 \
+			libxrandr2 \
+			libxshmfence1 \
+			libxtst6 \
+			fonts-liberation \
+			libappindicator3-1 \
+			lsb-release \
+			xdg-utils && \
 		curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-		apt-get install -y nodejs && \
+		apt-get install -y --no-install-recommends nodejs && \
+		apt-get clean && \
 		rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
+
+# Copy package files and install dependencies (better layer caching)
 COPY package*.json ./
-RUN if ! grep -q 'puppeteer' package.json; then npm install puppeteer; else npm install; fi && \
-	npm install puppeteer-extra puppeteer-extra-plugin-stealth cheerio
+RUN --mount=type=cache,target=/root/.npm \
+	npm install
+
+# Copy application code last (changes most frequently)
 COPY . .
 
 
