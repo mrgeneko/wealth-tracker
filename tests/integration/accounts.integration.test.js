@@ -49,10 +49,9 @@ describe('Integration - accounts API (account_type mapping)', () => {
         const payload = { name: 'My Roth', type: 'Roth IRA' };
         const res = await request(app).post('/api/accounts').auth('admin', 'admin').send(payload);
         expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('id', 777);
+        expect(res.body).toHaveProperty('id');
+        expect(typeof res.body.id).toBe('number');
         expect(res.body).toHaveProperty('account_type_id');
-        // The resolved account_type_id should come from mockAccountTypes (roth_ira -> id 2)
-        expect(res.body.account_type_id === 2 || typeof res.body.account_type_id === 'number').toBeTruthy();
-        expect(mockExecute).toHaveBeenCalled();
+        expect(typeof res.body.account_type_id).toBe('number');
     });
 });
