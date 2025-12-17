@@ -17,6 +17,9 @@ services:
       PAGE_MAX_OPERATIONS: "100"
       PAGE_NAVIGATION_TIMEOUT: "30000"
 
+      # Increase Node/V8 heap for the headless scraper to avoid OOM
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
       # Investing.com watchlist automation (optional)
       # Set these in your local `.env` to enable automatic login.
       INVESTING_EMAIL: ${INVESTING_EMAIL}
