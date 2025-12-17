@@ -1207,8 +1207,8 @@ app.post('/api/import', async (req, res) => {
 
         const { accounts, positions, fixed_assets } = importData.data;
 
-        // Start transaction
-        await pool.execute('START TRANSACTION');
+        // Start transaction (use query for transaction control statements)
+        await pool.query('START TRANSACTION');
 
         try {
             // Clear existing data
@@ -1256,8 +1256,8 @@ app.post('/api/import', async (req, res) => {
                 }
             }
 
-            // Commit transaction
-            await pool.execute('COMMIT');
+            // Commit transaction (use query for transaction control statements)
+            await pool.query('COMMIT');
 
             // Clear cache so dashboard refreshes with new data
             assetsCache = null;
@@ -1265,8 +1265,8 @@ app.post('/api/import', async (req, res) => {
             res.json({ success: true, message: 'Data imported successfully' });
 
         } catch (error) {
-            // Rollback on error
-            await pool.execute('ROLLBACK');
+            // Rollback on error (use query for transaction control statements)
+            await pool.query('ROLLBACK');
             throw error;
         }
 
