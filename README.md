@@ -20,11 +20,10 @@ Lightweight scrapers and processors for personal portfolio tracking.
 ## Features
 
 - **Multi-Source Data Collection**: Scrapes from multiple financial data providers
-- **Real-time Updates**: WebSocket-based dashboard for live price updates
-- **Comprehensive Coverage**: Stocks, ETFs, bonds, and US Treasury securities
-- **Flexible Configuration**: Database-backed update windows and watchlists
+- **Multi-Source Data Collection**: Scrapes from multiple financial data providers
+- **Streaming Updates**: WebSocket-based dashboard for live price updates
+- **Comprehensive Coverage**: Stocks, ETFs, and US Treasury securities
 - **Docker-First**: Fully containerized with Docker Compose
-- **Production Ready**: Robust error handling and logging
 
 ## Prerequisites
 
@@ -240,7 +239,7 @@ Defines the securities to track and their data sources.
 - **Apply**: The scraper daemon automatically reloads this file when it changes. No restart needed.
 
 ### 3. Dashboard Assets (Database Driven)
-The dashboard now reads asset data (accounts, positions, real estate, vehicles) from the **MySQL database**. 
+The dashboard reads asset data (accounts, positions, real estate, vehicles) from the **MySQL database**. 
 
 - **Primary Source**: MySQL database (service `mysql`).
 - **Management**: 
