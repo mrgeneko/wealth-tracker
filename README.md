@@ -20,13 +20,14 @@ Lightweight scrapers and processors for personal portfolio tracking.
 ## Features
 
 - **Multi-Source Data Collection**: Scrapes from 15+ financial data providers
-- **Real-time Updates**: WebSocket-based dashboard with sub-100ms latency
+## Features
+
+- **Multi-Source Data Collection**: Scrapes from multiple financial data providers
+- **Real-time Updates**: WebSocket-based dashboard for live price updates
 - **Comprehensive Coverage**: Stocks, ETFs, bonds, and US Treasury securities
 - **Flexible Configuration**: Database-backed update windows and watchlists
 - **Docker-First**: Fully containerized with Docker Compose
-- **Production Ready**: 615+ unit tests, extensive error handling, logging
- - **Real-time Updates**: WebSocket-based dashboard with low-latency (sub-second) updates
- - **Production Ready**: extensive unit tests, robust error handling, and logging
+- **Production Ready**: Robust error handling and logging
 
 ## Prerequisites
 
