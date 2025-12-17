@@ -36,3 +36,7 @@ private/
 
 
 
+
+!data/.gitkeep
+!mysql/.gitkeep
+!logs/.gitkeep
