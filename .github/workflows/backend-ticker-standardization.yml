@@ -10,6 +10,7 @@ on:
       - 'tests/integration/backend/**'
       - '.github/workflows/backend-ticker-standardization.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
