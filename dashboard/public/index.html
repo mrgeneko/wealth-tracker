@@ -3374,15 +3374,8 @@
             try {
                 setWatchlistStatus(`Saving watchlist instance...`);
 
-                // Try to update first, if it fails, create new
-                const updateResponse = await fetch(`/api/watchlist/${providerId}/instances/${encodeURIComponent(key)}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ watchlist_url: url, interval_seconds: interval })
-                });
-
-                if (!updateResponse.ok && updateResponse.status === 404) {
-                    // Instance doesn't exist, create new one
+                // Try POST first (create new), if it fails try PUT (update existing)
+                try {
                     await watchlistFetchJson(`/api/watchlist/${providerId}/instances`, {
                         method: 'POST',
                         body: JSON.stringify({
@@ -3391,8 +3384,15 @@
                             interval_seconds: interval
                         })
                     });
-                } else if (!updateResponse.ok) {
-                    throw new Error('Failed to save watchlist instance');
+                } catch (postError) {
+                    // If POST failed (likely duplicate key), try UPDATE instead
+                    await watchlistFetchJson(`/api/watchlist/${providerId}/instances/${encodeURIComponent(key)}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            watchlist_url: url,
+                            interval_seconds: interval
+                        })
+                    });
                 }
 
                 setWatchlistStatus(`Saved watchlist instance: ${key}`);
