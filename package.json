@@ -31,7 +31,8 @@
     "migrate:execute": "node scripts/migrations/execute-migration-ticker.js",
     "migrate:execute:verify-only": "node scripts/migrations/execute-migration-ticker.js --verify-only",
     "migrate:rollback": "node scripts/migrations/execute-migration-ticker.js --rollback",
-    "migrate:backfill": "node scripts/backfill_ticker_terminology.js"
+    "migrate:backfill": "node scripts/backfill_ticker_terminology.js",
+    "cleanup:branches": "bash scripts/cleanup_git_branches.sh"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
