@@ -246,7 +246,8 @@ app.get('/api/watchlist/:provider/tabs', async (req, res) => {
 });
 
 app.get('/api/watchlist/:provider/tickers', async (req, res) => {
-    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tickers`);
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tickers${queryString}`);
 });
 
 app.post('/api/watchlist/:provider/switch', async (req, res) => {
@@ -270,6 +271,33 @@ app.post('/api/watchlist/:provider/delete', async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req.body || {})
+    });
+});
+
+// Watchlist instance management endpoints
+app.get('/api/watchlist/:provider/instances', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/instances`);
+});
+
+app.post('/api/watchlist/:provider/instances', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/instances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+    });
+});
+
+app.put('/api/watchlist/:provider/instances/:key', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/instances/${encodeURIComponent(req.params.key)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+    });
+});
+
+app.delete('/api/watchlist/:provider/instances/:key', async (req, res) => {
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/instances/${encodeURIComponent(req.params.key)}`, {
+        method: 'DELETE'
     });
 });
 
@@ -1402,13 +1430,24 @@ app.post('/api/positions', async (req, res) => {
     }
     
     try {
+        // Valid position types based on ENUM definition
+        const validTypes = ['stock', 'etf', 'bond', 'cash', 'crypto', 'other'];
+
         // Type-driven only: respect incoming type when provided.
         // If type is not provided, fall back to bond auto-detection (else stock).
         let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
+
+        // Validate type against ENUM values
+        if (detectedType && !validTypes.includes(detectedType)) {
+            return res.status(400).json({
+                error: `Invalid type '${detectedType}'. Must be one of: ${validTypes.join(', ')}`
+            });
+        }
+
         if (!detectedType) {
             detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
         }
-        
+
         const [result] = await pool.execute(
             'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
             [account_id, ticker, detectedType, quantity, currency || 'USD']
@@ -1434,13 +1473,24 @@ app.put('/api/positions/:id', async (req, res) => {
     }
     
     try {
+        // Valid position types based on ENUM definition
+        const validTypes = ['stock', 'etf', 'bond', 'cash', 'crypto', 'other'];
+
         // Type-driven only: respect incoming type when provided.
         // If type is not provided, fall back to bond auto-detection (else stock).
         let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
+
+        // Validate type against ENUM values
+        if (detectedType && !validTypes.includes(detectedType)) {
+            return res.status(400).json({
+                error: `Invalid type '${detectedType}'. Must be one of: ${validTypes.join(', ')}`
+            });
+        }
+
         if (!detectedType) {
             detectedType = await isBondTicker(ticker) ? 'bond' : 'stock';
         }
-        
+
         await pool.execute(
             'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
             [ticker, detectedType, quantity, currency || 'USD', req.params.id]

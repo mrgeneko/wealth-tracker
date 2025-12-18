@@ -206,12 +206,23 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 		}
 	}
 
-	async listTickers() {
+	async listTickers(watchlist = null) {
 		if (!this.isInitialized) {
 			throw new Error('Controller not initialized');
 		}
 
-		return await this.page.$$eval(
+		// Switch to the specified watchlist tab if provided
+		if (watchlist) {
+			logDebug(`[InvestingCom] listTickers called with watchlist: ${watchlist}, current: ${this.currentWatchlist}`);
+			if (watchlist !== this.currentWatchlist) {
+				const switched = await this.switchToTab(watchlist);
+				if (!switched) {
+					throw new Error(`Failed to switch to watchlist: ${watchlist}`);
+				}
+			}
+		}
+
+		const tickers = await this.page.$$eval(
 			this.config.selectors.tickerRow,
 			(rows, symbolSelector) => {
 				const out = [];
@@ -226,6 +237,9 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 			},
 			this.config.selectors.tickerSymbol
 		);
+
+		logDebug(`[InvestingCom] Found ${tickers.length} tickers on ${watchlist || this.currentWatchlist || 'current tab'}`);
+		return tickers;
 	}
 
 	async addTicker(ticker, options = {}) {

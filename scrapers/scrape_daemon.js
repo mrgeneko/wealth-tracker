@@ -1318,7 +1318,7 @@ async function daemon() {
 					return;
 				}
 
-				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers$/);
+				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers(\?.*)?$/);
 				if (tickersMatch && req.method === 'GET') {
 					const providerId = tickersMatch[1];
 					const controller = await ensureProviderInitialized(providerId);
@@ -1326,9 +1326,12 @@ async function daemon() {
 						await writeProviderNotReady(providerId);
 						return;
 					}
-					const tickers = await controller.listTickers();
+					// Parse query parameters to get watchlist name
+					const url = new URL(req.url, `http://${req.headers.host}`);
+					const watchlist = url.searchParams.get('watchlist');
+					const tickers = await controller.listTickers(watchlist);
 					res.writeHead(200, { 'Content-Type': 'application/json' });
-					res.end(JSON.stringify({ provider: providerId, tickers, count: tickers.length }));
+					res.end(JSON.stringify({ provider: providerId, tickers, count: tickers.length, watchlist }));
 					return;
 				}
 
@@ -1371,6 +1374,178 @@ async function daemon() {
 					const result = await controller.deleteTicker(ticker, { watchlist });
 					res.writeHead(result && result.success ? 200 : 400, { 'Content-Type': 'application/json' });
 					res.end(JSON.stringify({ provider: providerId, ...(result || {}) }));
+					return;
+				}
+
+				// Watchlist instance management endpoints
+				const instancesMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/instances$/);
+				if (instancesMatch && req.method === 'GET') {
+					const providerIdStr = instancesMatch[1];
+					const pool = getMysqlPool();
+					if (!pool) {
+						res.writeHead(503, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'Database not available' }));
+						return;
+					}
+					try {
+						// Get numeric provider ID from string identifier
+						const [providerRows] = await pool.query(
+							'SELECT id FROM watchlist_providers WHERE provider_id = ?',
+							[providerIdStr]
+						);
+						if (providerRows.length === 0) {
+							res.writeHead(404, { 'Content-Type': 'application/json' });
+							res.end(JSON.stringify({ error: 'Provider not found' }));
+							return;
+						}
+						const providerId = providerRows[0].id;
+
+						const [rows] = await pool.query(
+							'SELECT watchlist_key, watchlist_url, interval_seconds, enabled FROM watchlist_instances WHERE provider_id = ? ORDER BY watchlist_key',
+							[providerId]
+						);
+						res.writeHead(200, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ provider: providerIdStr, instances: rows }));
+					} catch (err) {
+						res.writeHead(500, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: err.message }));
+					}
+					return;
+				}
+
+				const createInstanceMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/instances$/);
+				if (createInstanceMatch && req.method === 'POST') {
+					const providerIdStr = createInstanceMatch[1];
+					const pool = getMysqlPool();
+					if (!pool) {
+						res.writeHead(503, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'Database not available' }));
+						return;
+					}
+					const body = await readJsonBody(req);
+					const { watchlist_key, watchlist_url, interval_seconds = 120, enabled = true } = body || {};
+					if (!watchlist_key || !watchlist_url) {
+						res.writeHead(400, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'watchlist_key and watchlist_url required' }));
+						return;
+					}
+					try {
+						// Get numeric provider ID from string identifier
+						const [providerRows] = await pool.query(
+							'SELECT id FROM watchlist_providers WHERE provider_id = ?',
+							[providerIdStr]
+						);
+						if (providerRows.length === 0) {
+							res.writeHead(404, { 'Content-Type': 'application/json' });
+							res.end(JSON.stringify({ error: 'Provider not found' }));
+							return;
+						}
+						const providerId = providerRows[0].id;
+
+						await pool.query(
+							'INSERT INTO watchlist_instances (provider_id, watchlist_key, watchlist_url, interval_seconds, enabled) VALUES (?, ?, ?, ?, ?)',
+							[providerId, watchlist_key, watchlist_url, interval_seconds, enabled]
+						);
+						res.writeHead(201, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ success: true, provider: providerIdStr, watchlist_key }));
+					} catch (err) {
+						res.writeHead(500, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: err.message }));
+					}
+					return;
+				}
+
+				const updateInstanceMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/instances\/([^/]+)$/);
+				if (updateInstanceMatch && req.method === 'PUT') {
+					const providerIdStr = updateInstanceMatch[1];
+					const watchlistKey = decodeURIComponent(updateInstanceMatch[2]);
+					const pool = getMysqlPool();
+					if (!pool) {
+						res.writeHead(503, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'Database not available' }));
+						return;
+					}
+					const body = await readJsonBody(req);
+					const { watchlist_url, interval_seconds, enabled } = body || {};
+					if (!watchlist_url && interval_seconds === undefined && enabled === undefined) {
+						res.writeHead(400, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'At least one field (watchlist_url, interval_seconds, enabled) required' }));
+						return;
+					}
+					try {
+						// Get numeric provider ID from string identifier
+						const [providerRows] = await pool.query(
+							'SELECT id FROM watchlist_providers WHERE provider_id = ?',
+							[providerIdStr]
+						);
+						if (providerRows.length === 0) {
+							res.writeHead(404, { 'Content-Type': 'application/json' });
+							res.end(JSON.stringify({ error: 'Provider not found' }));
+							return;
+						}
+						const providerId = providerRows[0].id;
+
+						const updates = [];
+						const values = [];
+						if (watchlist_url !== undefined) {
+							updates.push('watchlist_url = ?');
+							values.push(watchlist_url);
+						}
+						if (interval_seconds !== undefined) {
+							updates.push('interval_seconds = ?');
+							values.push(interval_seconds);
+						}
+						if (enabled !== undefined) {
+							updates.push('enabled = ?');
+							values.push(enabled);
+						}
+						values.push(providerId, watchlistKey);
+						await pool.query(
+							`UPDATE watchlist_instances SET ${updates.join(', ')} WHERE provider_id = ? AND watchlist_key = ?`,
+							values
+						);
+						res.writeHead(200, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ success: true, provider: providerIdStr, watchlist_key: watchlistKey }));
+					} catch (err) {
+						res.writeHead(500, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: err.message }));
+					}
+					return;
+				}
+
+				const deleteInstanceMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/instances\/([^/]+)$/);
+				if (deleteInstanceMatch && req.method === 'DELETE') {
+					const providerIdStr = deleteInstanceMatch[1];
+					const watchlistKey = decodeURIComponent(deleteInstanceMatch[2]);
+					const pool = getMysqlPool();
+					if (!pool) {
+						res.writeHead(503, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: 'Database not available' }));
+						return;
+					}
+					try {
+						// Get numeric provider ID from string identifier
+						const [providerRows] = await pool.query(
+							'SELECT id FROM watchlist_providers WHERE provider_id = ?',
+							[providerIdStr]
+						);
+						if (providerRows.length === 0) {
+							res.writeHead(404, { 'Content-Type': 'application/json' });
+							res.end(JSON.stringify({ error: 'Provider not found' }));
+							return;
+						}
+						const providerId = providerRows[0].id;
+
+						await pool.query(
+							'DELETE FROM watchlist_instances WHERE provider_id = ? AND watchlist_key = ?',
+							[providerId, watchlistKey]
+						);
+						res.writeHead(200, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ success: true, provider: providerIdStr, watchlist_key: watchlistKey }));
+					} catch (err) {
+						res.writeHead(500, { 'Content-Type': 'application/json' });
+						res.end(JSON.stringify({ error: err.message }));
+					}
 					return;
 				}
 			} catch (e) {

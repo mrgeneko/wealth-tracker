@@ -717,7 +717,7 @@
 
                 <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px;">
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label for="watchlistTab">Watchlist Tab</label>
+                        <label for="watchlistTab">Watchlist Name</label>
                         <select id="watchlistTab"></select>
                     </div>
                     <div style="display: flex; gap: 10px;">
@@ -725,6 +725,51 @@
                             onclick="switchWatchlistTab()">Switch Tab</button>
                         <button class="btn" style="background-color: #555; color: white;"
                             onclick="loadWatchlistTickers()">Load Tickers</button>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                <h3 style="margin-top: 0;">Watchlist URLs</h3>
+                <div id="watchlistInstancesList" style="margin-bottom: 16px; max-height: 200px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 0.9em;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left; padding: 8px;">Watchlist Name</th>
+                                <th style="text-align:left; padding: 8px;">URL</th>
+                                <th style="text-align:center; padding: 8px;">Interval (sec)</th>
+                                <th style="text-align:center; padding: 8px;">Enabled</th>
+                                <th style="text-align:center; padding: 8px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="watchlistInstancesBody"></tbody>
+                    </table>
+                </div>
+                <div style="border-top: 1px solid #333; padding-top: 12px;">
+                    <h4 style="margin-top: 0; margin-bottom: 10px;">Add/Update Watchlist URL</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 2fr 100px auto; gap: 10px; align-items: end;">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="watchlistInstanceKey">Watchlist Name</label>
+                            <input id="watchlistInstanceKey" type="text" list="watchlistNameSuggestions" placeholder="e.g., primary" />
+                            <datalist id="watchlistNameSuggestions">
+                                <option value="primary">
+                                <option value="secondary">
+                                <option value="tertiary">
+                                <option value="watchlist1">
+                                <option value="watchlist2">
+                                <option value="watchlist3">
+                            </datalist>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="watchlistInstanceUrl">URL</label>
+                            <input id="watchlistInstanceUrl" type="text" placeholder="https://www.investing.com/portfolio/?portfolioID=..." />
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="watchlistInstanceInterval">Interval (sec)</label>
+                            <input id="watchlistInstanceInterval" type="number" value="120" min="20" step="10" />
+                        </div>
+                        <button class="btn btn-primary" onclick="saveWatchlistInstance()">Save</button>
                     </div>
                 </div>
             </div>
@@ -3091,6 +3136,11 @@
             }
 
             setWatchlistStatus(`Loaded ${providerIds.length} provider(s).`);
+
+            // Trigger change event to load tabs and instances for the first provider
+            if (providerIds.length > 0) {
+                await onWatchlistProviderChanged();
+            }
         }
 
         async function loadWatchlistTabs() {
@@ -3158,12 +3208,13 @@
             }
 
             setWatchlistStatus('Loading tickers...');
-            const data = await watchlistFetchJson(`/api/watchlist/${providerId}/tickers`);
+            const tab = getSelectedWatchlistTab();
+            const url = tab ? `/api/watchlist/${providerId}/tickers?watchlist=${encodeURIComponent(tab)}` : `/api/watchlist/${providerId}/tickers`;
+            const data = await watchlistFetchJson(url);
             const tickers = (data && Array.isArray(data.tickers)) ? data.tickers : [];
 
             const meta = document.getElementById('watchlistTickersMeta');
             if (meta) {
-                const tab = getSelectedWatchlistTab();
                 meta.textContent = `${tickers.length} ticker(s)${tab ? ` (tab: ${tab})` : ''}`;
             }
 
@@ -3252,12 +3303,142 @@
             );
         }
 
+        async function loadWatchlistInstances() {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId) return;
+
+            const tbody = document.getElementById('watchlistInstancesBody');
+            if (!tbody) return;
+
+            try {
+                const data = await watchlistFetchJson(`/api/watchlist/${providerId}/instances`);
+                const instances = (data && Array.isArray(data.instances)) ? data.instances : [];
+
+                tbody.innerHTML = '';
+                instances.forEach(inst => {
+                    const tr = document.createElement('tr');
+                    const truncatedUrl = inst.watchlist_url.length > 60
+                        ? inst.watchlist_url.substring(0, 60) + '...'
+                        : inst.watchlist_url;
+                    tr.innerHTML = `
+                        <td style="padding: 8px;">${inst.watchlist_key}</td>
+                        <td style="padding: 8px; font-size: 0.85em;" title="${inst.watchlist_url}">${truncatedUrl}</td>
+                        <td style="text-align:center; padding: 8px;">${inst.interval_seconds}</td>
+                        <td style="text-align:center; padding: 8px;">${inst.enabled ? '✓' : '✗'}</td>
+                        <td style="text-align:center; padding: 8px;">
+                            <button class="btn" style="background-color: #555; color: white; padding: 4px 8px; font-size: 0.85em;"
+                                onclick="editWatchlistInstance('${inst.watchlist_key}', '${inst.watchlist_url.replace(/'/g, "\\'")}', ${inst.interval_seconds})">Edit</button>
+                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.85em;"
+                                onclick="deleteWatchlistInstance('${inst.watchlist_key}')">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                if (instances.length === 0) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td colspan="5" style="text-align:center; color:#aaa; padding: 16px;">No watchlist URLs configured</td>`;
+                    tbody.appendChild(tr);
+                }
+            } catch (e) {
+                setWatchlistStatus('Failed to load watchlist instances: ' + e.message, true);
+            }
+        }
+
+        function editWatchlistInstance(key, url, interval) {
+            document.getElementById('watchlistInstanceKey').value = key;
+            document.getElementById('watchlistInstanceUrl').value = url;
+            document.getElementById('watchlistInstanceInterval').value = interval;
+        }
+
+        async function saveWatchlistInstance() {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId) {
+                setWatchlistStatus('Please select a provider first.', true);
+                return;
+            }
+
+            const keyEl = document.getElementById('watchlistInstanceKey');
+            const urlEl = document.getElementById('watchlistInstanceUrl');
+            const intervalEl = document.getElementById('watchlistInstanceInterval');
+
+            const key = keyEl ? keyEl.value.trim() : '';
+            const url = urlEl ? urlEl.value.trim() : '';
+            const interval = intervalEl ? parseInt(intervalEl.value) : 120;
+
+            if (!key || !url) {
+                setWatchlistStatus('Key and URL are required.', true);
+                return;
+            }
+
+            try {
+                setWatchlistStatus(`Saving watchlist instance...`);
+
+                // Try POST first (create new), if it fails try PUT (update existing)
+                try {
+                    await watchlistFetchJson(`/api/watchlist/${providerId}/instances`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            watchlist_key: key,
+                            watchlist_url: url,
+                            interval_seconds: interval
+                        })
+                    });
+                } catch (postError) {
+                    // If POST failed (likely duplicate key), try UPDATE instead
+                    await watchlistFetchJson(`/api/watchlist/${providerId}/instances/${encodeURIComponent(key)}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            watchlist_url: url,
+                            interval_seconds: interval
+                        })
+                    });
+                }
+
+                setWatchlistStatus(`Saved watchlist instance: ${key}`);
+
+                // Clear form
+                if (keyEl) keyEl.value = '';
+                if (urlEl) urlEl.value = '';
+                if (intervalEl) intervalEl.value = '120';
+
+                await loadWatchlistInstances();
+                await loadWatchlistTabs();
+            } catch (e) {
+                setWatchlistStatus('Failed to save: ' + e.message, true);
+            }
+        }
+
+        async function deleteWatchlistInstance(key) {
+            const providerId = getSelectedWatchlistProvider();
+            if (!providerId || !key) return;
+
+            showConfirmModal(
+                'Delete Watchlist',
+                `Delete watchlist "${key}"? This will remove the URL configuration.`,
+                async () => {
+                    try {
+                        setWatchlistStatus(`Deleting watchlist instance...`);
+                        await watchlistFetchJson(`/api/watchlist/${providerId}/instances/${encodeURIComponent(key)}`, {
+                            method: 'DELETE'
+                        });
+                        setWatchlistStatus(`Deleted watchlist instance: ${key}`);
+                        await loadWatchlistInstances();
+                        await loadWatchlistTabs();
+                    } catch (e) {
+                        setWatchlistStatus('Delete failed: ' + e.message, true);
+                    }
+                }
+            );
+        }
+
         async function onWatchlistProviderChanged() {
             const providerId = getSelectedWatchlistProvider();
             if (!providerId) return;
 
             try {
                 renderWatchlistProviderCapabilities(providerId);
+                await loadWatchlistInstances();
 
                 if (!isWatchlistProviderInitialized(providerId)) {
                     renderWatchlistNotInitializedState(providerId);
@@ -3286,6 +3467,7 @@
                 const providerId = getSelectedWatchlistProvider();
                 if (providerId) {
                     renderWatchlistProviderCapabilities(providerId);
+                    await loadWatchlistInstances();
 
                     if (!isWatchlistProviderInitialized(providerId)) {
                         renderWatchlistNotInitializedState(providerId);
