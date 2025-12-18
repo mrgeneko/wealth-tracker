@@ -4,6 +4,31 @@
  */
 
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
+
+async function initializeSchema(conn) {
+	// Execute init-db scripts required for watchlist tables
+	const scripts = [
+		path.join(__dirname, '../..', 'scripts/init-db/000-base-schema.sql'),
+		path.join(__dirname, '../..', 'scripts/init-db/001-listing-sync-watchlist.sql')
+	];
+
+	for (const scriptPath of scripts) {
+		if (!fs.existsSync(scriptPath)) continue;
+		const sql = fs.readFileSync(scriptPath, 'utf8');
+		const statements = sql.split(';').filter(s => s.trim().length > 0);
+		for (const stmt of statements) {
+			try {
+				await conn.query(stmt);
+			} catch (err) {
+				// Ignore errors during idempotent initialization
+				console.warn('Warning executing init script statement:', err.message);
+			}
+		}
+	}
+}
+
 
 describe('Watchlist Instance CRUD Integration Test', () => {
 	let connection;
@@ -31,6 +56,9 @@ describe('Watchlist Instance CRUD Integration Test', () => {
 			connection = null;
 			return;
 		}
+
+		// Initialize DB schema for watchlist tables
+		await initializeSchema(connection);
 
 		// Create a test provider
 		await connection.query(
