@@ -717,7 +717,7 @@
 
                 <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px;">
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label for="watchlistTab">Watchlist Tab</label>
+                        <label for="watchlistTab">Watchlist Name</label>
                         <select id="watchlistTab"></select>
                     </div>
                     <div style="display: flex; gap: 10px;">
@@ -736,7 +736,7 @@
                     <table style="width: 100%; font-size: 0.9em;">
                         <thead>
                             <tr>
-                                <th style="text-align:left; padding: 8px;">Key</th>
+                                <th style="text-align:left; padding: 8px;">Watchlist Name</th>
                                 <th style="text-align:left; padding: 8px;">URL</th>
                                 <th style="text-align:center; padding: 8px;">Interval (sec)</th>
                                 <th style="text-align:center; padding: 8px;">Enabled</th>
@@ -750,8 +750,16 @@
                     <h4 style="margin-top: 0; margin-bottom: 10px;">Add/Update Watchlist URL</h4>
                     <div style="display: grid; grid-template-columns: 1fr 2fr 100px auto; gap: 10px; align-items: end;">
                         <div class="form-group" style="margin: 0;">
-                            <label for="watchlistInstanceKey">Key</label>
-                            <input id="watchlistInstanceKey" type="text" placeholder="e.g., primary" />
+                            <label for="watchlistInstanceKey">Watchlist Name</label>
+                            <input id="watchlistInstanceKey" type="text" list="watchlistNameSuggestions" placeholder="e.g., primary" />
+                            <datalist id="watchlistNameSuggestions">
+                                <option value="primary">
+                                <option value="secondary">
+                                <option value="tertiary">
+                                <option value="watchlist1">
+                                <option value="watchlist2">
+                                <option value="watchlist3">
+                            </datalist>
                         </div>
                         <div class="form-group" style="margin: 0;">
                             <label for="watchlistInstanceUrl">URL</label>
