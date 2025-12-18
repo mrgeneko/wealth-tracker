@@ -44,19 +44,6 @@
     "maxOperationsPerPage": 100,
     "navigationTimeout": 30000
   },
-  "investing_watchlists": {
-    "url": "https://www.investing.com/portfolio/?portfolioID=YOUR_PORTFOLIO_ID_HERE",
-    "watchlists": [
-      {
-        "key": "primary",
-        "interval": 20
-      },
-      {
-        "key": "secondary",
-        "interval": 300
-      }
-    ]
-  },
   "webull_watchlists": {
     "url": "https://www.webull.com/watch",
     "watchlists": [
