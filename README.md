@@ -102,8 +102,6 @@ This script checks for:
 - ✅ Docker and Docker Compose installation
 - ✅ Existing containers/volumes
 
-If validation fails, fix the errors before proceeding. See [FRESH_CONTAINER_ISSUES.md](FRESH_CONTAINER_ISSUES.md) for detailed troubleshooting.
-
 ## Quick Start (Docker Compose)
 The easiest way to run the full stack locally (Kafka, Zookeeper, MySQL, scrapers, etc.) is with Docker Compose.
 
