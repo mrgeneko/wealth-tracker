@@ -62,7 +62,7 @@ class BaseWatchlistController {
 		throw new Error('deleteTicker() must be implemented by subclass');
 	}
 
-	async listTickers() {
+	async listTickers(watchlist = null) {
 		throw new Error('listTickers() must be implemented by subclass');
 	}
 

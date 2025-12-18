@@ -246,7 +246,8 @@ app.get('/api/watchlist/:provider/tabs', async (req, res) => {
 });
 
 app.get('/api/watchlist/:provider/tickers', async (req, res) => {
-    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tickers`);
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    await proxyScraperJson(res, `http://${SCRAPER_HOST}:${SCRAPER_PORT}/watchlist/${req.params.provider}/tickers${queryString}`);
 });
 
 app.post('/api/watchlist/:provider/switch', async (req, res) => {

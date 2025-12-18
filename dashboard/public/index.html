@@ -3128,6 +3128,11 @@
             }
 
             setWatchlistStatus(`Loaded ${providerIds.length} provider(s).`);
+
+            // Trigger change event to load tabs and instances for the first provider
+            if (providerIds.length > 0) {
+                await onWatchlistProviderChanged();
+            }
         }
 
         async function loadWatchlistTabs() {
@@ -3195,12 +3200,13 @@
             }
 
             setWatchlistStatus('Loading tickers...');
-            const data = await watchlistFetchJson(`/api/watchlist/${providerId}/tickers`);
+            const tab = getSelectedWatchlistTab();
+            const url = tab ? `/api/watchlist/${providerId}/tickers?watchlist=${encodeURIComponent(tab)}` : `/api/watchlist/${providerId}/tickers`;
+            const data = await watchlistFetchJson(url);
             const tickers = (data && Array.isArray(data.tickers)) ? data.tickers : [];
 
             const meta = document.getElementById('watchlistTickersMeta');
             if (meta) {
-                const tab = getSelectedWatchlistTab();
                 meta.textContent = `${tickers.length} ticker(s)${tab ? ` (tab: ${tab})` : ''}`;
             }
 

@@ -1318,7 +1318,7 @@ async function daemon() {
 					return;
 				}
 
-				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers$/);
+				const tickersMatch = req.url && req.url.match(/^\/watchlist\/([^/]+)\/tickers(\?.*)?$/);
 				if (tickersMatch && req.method === 'GET') {
 					const providerId = tickersMatch[1];
 					const controller = await ensureProviderInitialized(providerId);
@@ -1326,9 +1326,12 @@ async function daemon() {
 						await writeProviderNotReady(providerId);
 						return;
 					}
-					const tickers = await controller.listTickers();
+					// Parse query parameters to get watchlist name
+					const url = new URL(req.url, `http://${req.headers.host}`);
+					const watchlist = url.searchParams.get('watchlist');
+					const tickers = await controller.listTickers(watchlist);
 					res.writeHead(200, { 'Content-Type': 'application/json' });
-					res.end(JSON.stringify({ provider: providerId, tickers, count: tickers.length }));
+					res.end(JSON.stringify({ provider: providerId, tickers, count: tickers.length, watchlist }));
 					return;
 				}
 
