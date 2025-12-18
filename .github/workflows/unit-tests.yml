@@ -59,7 +59,9 @@ jobs:
       - name: Initialize watchlist schema for integration tests
         run: |
           echo "Creating watchlist tables for integration testing..."
-          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u test -ptest $MYSQL_DATABASE < scripts/init-db/001-listing-sync-watchlist.sql || true
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u test -ptest $MYSQL_DATABASE < scripts/init-db/001-listing-sync-watchlist.sql
+          echo "Verifying watchlist tables were created..."
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u test -ptest $MYSQL_DATABASE -e "SHOW TABLES LIKE 'watchlist_%';"
 
       - name: Run all symbol registry and API tests
         run: npm test 2>&1
