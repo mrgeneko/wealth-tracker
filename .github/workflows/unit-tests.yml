@@ -53,8 +53,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run database migration
-        run: node scripts/migrations/011_create_symbol_registry.js
+      - name: Initialize database schema
+        run: |
+          echo "Creating base schema tables..."
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u test -ptest $MYSQL_DATABASE < scripts/init-db/000-base-schema.sql
+          echo "Verifying ticker_registry table was created..."
+          mysql -h $MYSQL_HOST -P $MYSQL_PORT -u test -ptest $MYSQL_DATABASE -e "SHOW TABLES LIKE 'ticker_registry%';"
 
       - name: Initialize watchlist schema for integration tests
         run: |

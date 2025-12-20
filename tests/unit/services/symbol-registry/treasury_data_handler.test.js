@@ -102,28 +102,28 @@ describe('TreasuryDataHandler', () => {
   });
 
   describe('Security Type Extraction', () => {
-    test('extractSecurityType should return TREASURY for regular bonds', () => {
+    test('extractSecurityType should return US_TREASURY for all treasury records', () => {
       const record = { 'Security Type': 'Bill' };
       const type = handler.extractSecurityType(record);
-      expect(type).toBe('TREASURY');
+      expect(type).toBe('US_TREASURY');
     });
 
-    test('extractSecurityType should return TREASURY for notes', () => {
+    test('extractSecurityType should return US_TREASURY for notes', () => {
       const record = { 'Security Type': 'Note' };
       const type = handler.extractSecurityType(record);
-      expect(type).toBe('TREASURY');
+      expect(type).toBe('US_TREASURY');
     });
 
-    test('extractSecurityType should return BOND for bonds', () => {
+    test('extractSecurityType should return US_TREASURY for bonds', () => {
       const record = { 'Security Type': 'Bond' };
       const type = handler.extractSecurityType(record);
-      expect(type).toBe('BOND');
+      expect(type).toBe('US_TREASURY');
     });
 
-    test('extractSecurityType should be case insensitive', () => {
+    test('extractSecurityType should always return US_TREASURY', () => {
       const record = { 'Security Type': 'BOND' };
       const type = handler.extractSecurityType(record);
-      expect(type).toBe('BOND');
+      expect(type).toBe('US_TREASURY');
     });
   });
 
@@ -237,7 +237,7 @@ describe('TreasuryDataHandler', () => {
       
       expect(formatted.ticker).toBe('912810 QC 0');
       expect(formatted.exchange).toBe('OTC');
-      expect(formatted.security_type).toBe('TREASURY');
+      expect(formatted.security_type).toBe('US_TREASURY');
       expect(formatted.source).toBe('TREASURY_FILE');
       expect(formatted.has_yahoo_metadata).toBe(false);
       expect(formatted.maturity_date).toBe('2025-01-06');

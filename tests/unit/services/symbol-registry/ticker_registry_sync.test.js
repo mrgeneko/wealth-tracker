@@ -260,9 +260,9 @@ describe('SymbolRegistrySyncService', () => {
       expect(syncService.inferSecurityType('Corporate Bond')).toBe('BOND');
     });
 
-    test('should detect TREASURY', () => {
-      expect(syncService.inferSecurityType('US Treasury Note')).toBe('TREASURY');
-      expect(syncService.inferSecurityType('Treasury Bill')).toBe('TREASURY');
+    test('should detect US_TREASURY', () => {
+      expect(syncService.inferSecurityType('US Treasury Note')).toBe('US_TREASURY');
+      expect(syncService.inferSecurityType('Treasury Bill')).toBe('US_TREASURY');
     });
 
     test('should default to EQUITY for stocks', () => {

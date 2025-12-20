@@ -292,8 +292,8 @@ CREATE TABLE IF NOT EXISTS ticker_registry (
   id INT NOT NULL AUTO_INCREMENT,
   ticker VARCHAR(50) NOT NULL,
   name VARCHAR(500) DEFAULT NULL,
-  exchange VARCHAR(50) DEFAULT NULL,
-  security_type ENUM('EQUITY','ETF','BOND','TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') DEFAULT 'EQUITY',
+  exchange VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
+  security_type ENUM('NOT_SET','EQUITY','ETF','BOND','US_TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') NOT NULL DEFAULT 'NOT_SET',
   source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_FILE','TREASURY_FILE','TREASURY_HISTORICAL','YAHOO','USER_ADDED') NOT NULL,
   has_yahoo_metadata TINYINT(1) DEFAULT 0,
   permanently_failed TINYINT(1) DEFAULT 0,
@@ -305,21 +305,24 @@ CREATE TABLE IF NOT EXISTS ticker_registry (
   maturity_date DATE DEFAULT NULL,
   security_term VARCHAR(50) DEFAULT NULL,
   underlying_ticker VARCHAR(50) DEFAULT NULL,
+  underlying_exchange VARCHAR(50) DEFAULT NULL,
+  underlying_security_type ENUM('NOT_SET','EQUITY','ETF','BOND','US_TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') DEFAULT NULL,
   strike_price DECIMAL(18,4) DEFAULT NULL,
   option_type ENUM('CALL','PUT') DEFAULT NULL,
   expiration_date DATE DEFAULT NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY ticker (ticker),
+  UNIQUE KEY unique_ticker_context (ticker, exchange, security_type),
   KEY idx_ticker (ticker),
   KEY idx_security_type (security_type),
   KEY idx_sort_rank (sort_rank),
   KEY idx_maturity_date (maturity_date),
   KEY idx_expiration_date (expiration_date),
-  KEY idx_underlying_ticker (underlying_ticker),
+  KEY idx_underlying (underlying_ticker, underlying_exchange, underlying_security_type),
   KEY idx_permanently_failed (permanently_failed),
-  CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker) REFERENCES ticker_registry (ticker) ON DELETE SET NULL
+  CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker, underlying_exchange, underlying_security_type)
+    REFERENCES ticker_registry (ticker, exchange, security_type) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS ticker_registry_metrics (

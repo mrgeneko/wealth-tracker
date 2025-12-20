@@ -72,8 +72,8 @@ describe('SymbolRegistryService', () => {
       expect(rank).toBe(700);
     });
 
-    test('calculateSortRank should rank TREASURY as 800', () => {
-      const rank = service.calculateSortRank('TREASURY', false, null);
+    test('calculateSortRank should rank US_TREASURY as 800', () => {
+      const rank = service.calculateSortRank('US_TREASURY', false, null);
       expect(rank).toBe(800);
     });
 
@@ -255,14 +255,14 @@ describe('SymbolRegistryService', () => {
       expect(futuresRank).toBeLessThan(optionRank);
     });
 
-    test('Option should rank better than Treasury', () => {
+    test('Option should rank better than US_TREASURY', () => {
       const optionRank = service.calculateSortRank('OPTION', false, null);
-      const treasuryRank = service.calculateSortRank('TREASURY', false, null);
+      const treasuryRank = service.calculateSortRank('US_TREASURY', false, null);
       expect(optionRank).toBeLessThan(treasuryRank);
     });
 
-    test('Treasury should rank better than Other', () => {
-      const treasuryRank = service.calculateSortRank('TREASURY', false, null);
+    test('US_TREASURY should rank better than Other', () => {
+      const treasuryRank = service.calculateSortRank('US_TREASURY', false, null);
       const otherRank = service.calculateSortRank('OTHER', false, null);
       expect(treasuryRank).toBeLessThan(otherRank);
     });
