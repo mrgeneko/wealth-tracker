@@ -108,6 +108,8 @@ class SymbolRegistryService {
         maturity_date = null,
         security_term = null,
         underlying_ticker = null,
+        underlying_exchange = null,
+        underlying_security_type = null,
         strike_price = null,
         option_type = null,
         expiration_date = null
@@ -118,51 +120,63 @@ class SymbolRegistryService {
         throw new Error('security_type is required and must be explicitly provided (cannot be NOT_SET)');
       }
 
+      // Validate that exchange is provided
+      if (!exchange) {
+        throw new Error('exchange is required and must be explicitly provided');
+      }
+
       const sortRank = this.calculateSortRank(security_type, has_yahoo_metadata, usd_trading_volume);
 
-      // Check if symbol exists
+      // Check if symbol exists with this specific context (ticker + exchange + security_type)
       const [existing] = await conn.query(
-        'SELECT source FROM ticker_registry WHERE ticker = ?',
-        [symbol]
+        'SELECT source FROM ticker_registry WHERE ticker = ? AND exchange = ? AND security_type = ?',
+        [symbol, exchange, security_type]
       );
 
       if (existing.length > 0) {
-        // Symbol exists - update if new source has higher priority
+        // Symbol exists in this context - update if new source has higher priority
         const oldSource = existing[0].source;
         if (this.shouldUpdateSource(oldSource, source)) {
           // New source is more authoritative - update it
           await conn.query(
-            `UPDATE ticker_registry 
-             SET name = ?, exchange = ?, security_type = ?, source = ?, 
+            `UPDATE ticker_registry
+             SET name = ?, source = ?,
                  has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?,
                  issue_date = ?, maturity_date = ?, security_term = ?,
-                 underlying_ticker = ?, strike_price = ?, option_type = ?, expiration_date = ?,
+                 underlying_ticker = ?, underlying_exchange = ?, underlying_security_type = ?,
+                 strike_price = ?, option_type = ?, expiration_date = ?,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE ticker = ?`,
-            [name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sortRank,
-             issue_date, maturity_date, security_term, underlying_ticker, strike_price, option_type, expiration_date,
-             symbol]
+             WHERE ticker = ? AND exchange = ? AND security_type = ?`,
+            [name, source, has_yahoo_metadata, usd_trading_volume, sortRank,
+             issue_date, maturity_date, security_term,
+             underlying_ticker, underlying_exchange, underlying_security_type,
+             strike_price, option_type, expiration_date,
+             symbol, exchange, security_type]
           );
         } else {
           // Old source is more authoritative - just update metadata if present
           if (has_yahoo_metadata || usd_trading_volume) {
             await conn.query(
-              `UPDATE ticker_registry 
+              `UPDATE ticker_registry
                SET has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?, updated_at = CURRENT_TIMESTAMP
-               WHERE ticker = ?`,
-              [has_yahoo_metadata, usd_trading_volume, sortRank, symbol]
+               WHERE ticker = ? AND exchange = ? AND security_type = ?`,
+              [has_yahoo_metadata, usd_trading_volume, sortRank, symbol, exchange, security_type]
             );
           }
         }
       } else {
         // New symbol - insert it
         await conn.query(
-          `INSERT INTO ticker_registry 
+          `INSERT INTO ticker_registry
            (ticker, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sort_rank,
-            issue_date, maturity_date, security_term, underlying_ticker, strike_price, option_type, expiration_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            issue_date, maturity_date, security_term,
+            underlying_ticker, underlying_exchange, underlying_security_type,
+            strike_price, option_type, expiration_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [symbol, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sortRank,
-           issue_date, maturity_date, security_term, underlying_ticker, strike_price, option_type, expiration_date]
+           issue_date, maturity_date, security_term,
+           underlying_ticker, underlying_exchange, underlying_security_type,
+           strike_price, option_type, expiration_date]
         );
       }
     } finally {
@@ -172,12 +186,13 @@ class SymbolRegistryService {
 
   /**
    * Get a symbol from the registry with optional metadata enrichment
+   * If exchange and security_type are provided, returns exact match
+   * Otherwise returns all matches for the ticker (for handling collisions)
    */
-  async lookupSymbol(symbol) {
+  async lookupSymbol(symbol, exchange = null, security_type = null) {
     const conn = await this.dbPool.getConnection();
     try {
-      const [results] = await conn.query(
-        `SELECT 
+      let query = `SELECT
           sr.ticker,
           COALESCE(sm.long_name, sm.short_name, sr.name) as name,
           sr.security_type,
@@ -192,12 +207,29 @@ class SymbolRegistryService {
           sm.ttm_dividend_amount,
           sm.ttm_eps
          FROM ticker_registry sr
-         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker
-         WHERE sr.ticker = ?`,
-        [symbol]
-      );
+         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker COLLATE utf8mb4_0900_ai_ci
+         WHERE sr.ticker = ?`;
 
-      return results.length > 0 ? results[0] : null;
+      const params = [symbol];
+
+      // If exchange and security_type provided, do exact lookup
+      if (exchange && security_type) {
+        query += ' AND sr.exchange = ? AND sr.security_type = ?';
+        params.push(exchange, security_type);
+      } else {
+        // Otherwise order by sort_rank to get most relevant first
+        query += ' ORDER BY sr.sort_rank ASC';
+      }
+
+      const [results] = await conn.query(query, params);
+
+      // If specific context provided, return single result or null
+      if (exchange && security_type) {
+        return results.length > 0 ? results[0] : null;
+      }
+
+      // Otherwise return all matches (for collision handling)
+      return results.length > 0 ? results : null;
     } finally {
       conn.release();
     }
@@ -215,7 +247,7 @@ class SymbolRegistryService {
       const prefixMatch = `${query}%`;
 
       const [results] = await conn.query(
-        `SELECT 
+        `SELECT
           sr.ticker,
           COALESCE(sm.long_name, sm.short_name, sr.name) as name,
           sr.security_type,
@@ -227,13 +259,13 @@ class SymbolRegistryService {
           sm.dividend_yield,
           sm.trailing_pe
          FROM ticker_registry sr
-         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker
-         WHERE 
-          sr.ticker LIKE ? 
+         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker COLLATE utf8mb4_0900_ai_ci
+         WHERE
+          sr.ticker LIKE ?
           OR sr.name LIKE ?
           OR sm.short_name LIKE ?
           OR sm.long_name LIKE ?
-         ORDER BY 
+         ORDER BY
           CASE WHEN sr.ticker = ? THEN 1
                WHEN sr.ticker LIKE ? THEN 2
                ELSE 3 END,
