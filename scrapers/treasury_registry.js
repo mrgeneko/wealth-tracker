@@ -36,7 +36,7 @@ async function loadTreasuryCache() {
     const conn = await dbPool.getConnection();
     try {
         const [rows] = await conn.execute(
-            "SELECT ticker FROM ticker_registry WHERE security_type = 'TREASURY'"
+            "SELECT ticker FROM ticker_registry WHERE security_type = 'US_TREASURY'"
         );
         treasuryCache = new Set((rows || []).map(r => String(r.ticker || '').toUpperCase()).filter(Boolean));
         console.log(`[TreasuryRegistry] Loaded ${treasuryCache.size} treasury securities from database`);
@@ -75,7 +75,7 @@ async function getTreasuryDetails(ticker) {
         const [rows] = await conn.execute(
             `SELECT ticker, name, issue_date, maturity_date, security_term
        FROM ticker_registry
-       WHERE ticker = ? AND security_type = 'TREASURY'
+       WHERE ticker = ? AND security_type = 'US_TREASURY'
        LIMIT 1`,
             [String(ticker).toUpperCase()]
         );

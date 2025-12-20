@@ -225,28 +225,24 @@ class TreasuryDataHandler {
 
   /**
    * Extract security type from record
+   * All treasury securities should be classified as US_TREASURY
+   * (BOND type is reserved for corporate bonds)
    */
   extractSecurityType(record) {
-    const secType = record['Security Type'] || 
-                   record['security_type'] || 
-                   record['Type'] || 
-                   record['type'] ||
-                   'TREASURY';
-
-    return secType.toUpperCase().includes('BOND') ? 'BOND' : 'TREASURY';
+    // All records from treasury files are US Treasury securities
+    return 'US_TREASURY';
   }
 
   /**
    * Format treasury name for display in autocomplete
-   * Format: {SecurityType} {SecurityTerm} | Issue: {IssueDate} | Maturity: {MaturityDate}
+   * Format: US TREASURY {SecurityTerm} | Issue: {IssueDate} | Maturity: {MaturityDate}
    */
   formatTreasuryName(record) {
-    const securityType = this.extractSecurityType(record);
-    const securityTerm = this.extractSecurityTerm(record) || 'Treasury';
+    const securityTerm = this.extractSecurityTerm(record) || 'Security';
     const issueDate = this.formatDateForDisplay(this.parseIssueDate(record));
     const maturityDate = this.formatDateForDisplay(this.parseMaturityDate(record));
 
-    return `${securityType} ${securityTerm} | Issue: ${issueDate} | Maturity: ${maturityDate}`;
+    return `US TREASURY ${securityTerm} | Issue: ${issueDate} | Maturity: ${maturityDate}`;
   }
 
   /**

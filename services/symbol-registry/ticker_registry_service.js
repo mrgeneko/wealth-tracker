@@ -41,8 +41,8 @@ class SymbolRegistryService {
       'FX': 500,
       'FUTURES': 600,
       'OPTION': 700,
-      'TREASURY': 800,
-      'BOND': 850,
+      'US_TREASURY': 800,  // US Treasury securities
+      'BOND': 850,  // Reserved for corporate bonds
       'MUTUAL_FUND': 900,
       'OTHER': 1000
     };

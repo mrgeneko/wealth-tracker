@@ -175,7 +175,7 @@ class SymbolRegistrySyncService {
     if (lowerName.includes('warrant')) return 'WARRANT';
     if (lowerName.includes('preferred')) return 'PREFERRED';
     if (lowerName.includes('bond')) return 'BOND';
-    if (lowerName.includes('note') || lowerName.includes('bill')) return 'TREASURY';
+    if (lowerName.includes('note') || lowerName.includes('bill')) return 'US_TREASURY';
 
     // Default to EQUITY for most stocks
     return 'EQUITY';
