@@ -73,7 +73,7 @@ class SymbolRegistryService {
     const priorities = {
       'NASDAQ_FILE': 1,
       'NYSE_FILE': 2,
-      'OTHER_FILE': 3,
+      'OTHER_LISTED_FILE': 3,
       'TREASURY_FILE': 4,
       'TREASURY_HISTORICAL': 5,
       'YAHOO': 6,
@@ -148,10 +148,10 @@ class SymbolRegistryService {
                  updated_at = CURRENT_TIMESTAMP
              WHERE ticker = ? AND exchange = ? AND security_type = ?`,
             [name, source, has_yahoo_metadata, usd_trading_volume, sortRank,
-             issue_date, maturity_date, security_term,
-             underlying_ticker, underlying_exchange, underlying_security_type,
-             strike_price, option_type, expiration_date,
-             symbol, exchange, security_type]
+              issue_date, maturity_date, security_term,
+              underlying_ticker, underlying_exchange, underlying_security_type,
+              strike_price, option_type, expiration_date,
+              symbol, exchange, security_type]
           );
         } else {
           // Old source is more authoritative - just update metadata if present
@@ -174,9 +174,9 @@ class SymbolRegistryService {
             strike_price, option_type, expiration_date)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [symbol, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sortRank,
-           issue_date, maturity_date, security_term,
-           underlying_ticker, underlying_exchange, underlying_security_type,
-           strike_price, option_type, expiration_date]
+            issue_date, maturity_date, security_term,
+            underlying_ticker, underlying_exchange, underlying_security_type,
+            strike_price, option_type, expiration_date]
         );
       }
     } finally {

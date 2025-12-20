@@ -50,7 +50,7 @@ describe('SymbolRegistrySyncService', () => {
         const priorities = {
           'NASDAQ_FILE': 1,
           'NYSE_FILE': 2,
-          'OTHER_FILE': 3,
+          'OTHER_LISTED_FILE': 3,
           'YAHOO': 6,
           'USER_ADDED': 7
         };
@@ -87,7 +87,7 @@ describe('SymbolRegistrySyncService', () => {
     test('should have file paths configured', () => {
       expect(SymbolRegistrySyncService.CONFIG.NASDAQ_FILE).toContain('nasdaq-listed.csv');
       expect(SymbolRegistrySyncService.CONFIG.NYSE_FILE).toContain('nyse-listed.csv');
-      expect(SymbolRegistrySyncService.CONFIG.OTHER_FILE).toContain('other-listed.csv');
+      expect(SymbolRegistrySyncService.CONFIG.OTHER_LISTED_FILE).toContain('other-listed.csv');
     });
   });
 
@@ -228,18 +228,18 @@ describe('SymbolRegistrySyncService', () => {
       expect(symbols).toHaveLength(3);
       expect(symbols[0]).toMatchObject({
         ticker: 'SDAQ',
-        exchange: 'BATS Global Markets (BATS)',
-        source: 'OTHER_FILE'
+        exchange: 'BATS',
+        source: 'OTHER_LISTED_FILE'
       });
       expect(symbols[1]).toMatchObject({
         ticker: 'NVBU',
-        exchange: 'Investors\' Exchange, LLC (IEXG)',
-        source: 'OTHER_FILE'
+        exchange: 'IEXG',
+        source: 'OTHER_LISTED_FILE'
       });
       expect(symbols[2]).toMatchObject({
         ticker: 'UNKNOWN',
         exchange: 'OTHER',
-        source: 'OTHER_FILE'
+        source: 'OTHER_LISTED_FILE'
       });
     });
 

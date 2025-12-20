@@ -5,7 +5,7 @@ const mysql = require('mysql2/promise');
 // Force SymbolRegistrySyncService to use tiny fixture CSVs (avoid huge real files and any network).
 process.env.NASDAQ_FILE = path.join(__dirname, '../fixtures/listings/nasdaq-listed.small.csv');
 process.env.NYSE_FILE = path.join(__dirname, '../fixtures/listings/nyse-listed.small.csv');
-process.env.OTHER_FILE = path.join(__dirname, '../fixtures/listings/other-listed.small.csv');
+process.env.OTHER_LISTED_FILE = path.join(__dirname, '../fixtures/listings/other-listed.small.csv');
 
 const { ListingSyncService } = require('../../services/listing-sync/listing_sync_service');
 
@@ -27,7 +27,7 @@ function requestJson({ port, method, pathname, body }) {
 				res.on('data', (c) => { data += c; });
 				res.on('end', () => {
 					let parsed = null;
-					try { parsed = data ? JSON.parse(data) : null; } catch (e) {}
+					try { parsed = data ? JSON.parse(data) : null; } catch (e) { }
 					resolve({ status: res.statusCode, headers: res.headers, body: parsed, raw: data });
 				});
 			}

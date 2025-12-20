@@ -431,9 +431,9 @@ The system now uses these key tables:
 ticker_registry (Single Source of Truth)
   ├── ticker (PK)
   ├── name
-  ├── exchange (NASDAQ, NYSE, OTHER, TREASURY)
-  ├── security_type (EQUITY, ETF, CRYPTO, TREASURY, BOND)
-  ├── source (NASDAQ_FILE, NYSE_FILE, OTHER_FILE, TREASURY_FILE)
+  ├── exchange (NASDAQ, NYSE, OTHER, OTC)
+  ├── security_type (EQUITY, ETF, CRYPTO, US_TREASURY, BOND, etc.)
+  ├── source (NASDAQ_FILE, NYSE_FILE, OTHER_LISTED_FILE, TREASURY_FILE, etc.)
   ├── sort_rank (for ordering)
   ├── has_yahoo_metadata
   └── ... other fields

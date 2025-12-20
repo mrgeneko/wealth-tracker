@@ -138,8 +138,8 @@ describe('SymbolRegistryService', () => {
       expect(service.getSourcePriority('NYSE_FILE')).toBe(2);
     });
 
-    test('getSourcePriority should return 3 for OTHER_FILE', () => {
-      expect(service.getSourcePriority('OTHER_FILE')).toBe(3);
+    test('getSourcePriority should return 3 for OTHER_LISTED_FILE', () => {
+      expect(service.getSourcePriority('OTHER_LISTED_FILE')).toBe(3);
     });
 
     test('getSourcePriority should return 4 for TREASURY_FILE', () => {
@@ -177,7 +177,7 @@ describe('SymbolRegistryService', () => {
     });
 
     test('Source priority order should match design specification', () => {
-      const sources = ['NASDAQ_FILE', 'NYSE_FILE', 'OTHER_FILE', 'TREASURY_FILE', 'TREASURY_HISTORICAL', 'YAHOO', 'USER_ADDED'];
+      const sources = ['NASDAQ_FILE', 'NYSE_FILE', 'OTHER_LISTED_FILE', 'TREASURY_FILE', 'TREASURY_HISTORICAL', 'YAHOO', 'USER_ADDED'];
       for (let i = 0; i < sources.length - 1; i++) {
         expect(service.getSourcePriority(sources[i])).toBeLessThan(
           service.getSourcePriority(sources[i + 1])

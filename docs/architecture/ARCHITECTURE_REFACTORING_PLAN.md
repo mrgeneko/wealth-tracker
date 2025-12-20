@@ -415,13 +415,13 @@ const CSV_COLUMN_MAPPINGS = {
     name: 'Security Name',
     exchange: (row) => row['Exchange'] || 'OTHER',
     security_type: () => 'EQUITY',
-    source: () => 'OTHER_FILE'
+    source: () => 'OTHER_LISTED_FILE'
   },
   TREASURY: {
     ticker: 'CUSIP',
     name: 'Security Description',
-    exchange: () => 'TREASURY',
-    security_type: () => 'TREASURY',
+    exchange: () => 'OTC',
+    security_type: () => 'US_TREASURY',
     source: () => 'TREASURY_FILE',
     issue_date: 'Issue Date',
     maturity_date: 'Maturity Date',

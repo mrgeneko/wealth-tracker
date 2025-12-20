@@ -124,7 +124,7 @@ services:
       BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD}
       NASDAQ_FILE: /app/config/nasdaq-listed.csv
       NYSE_FILE: /app/config/nyse-listed.csv
-      OTHER_FILE: /app/config/other-listed.csv
+      OTHER_LISTED_FILE: /app/config/other-listed.csv
       TREASURY_AUCTIONS_FILE: /app/config/us-treasury-auctions.csv
       TREASURY_HISTORICAL_FILE: /app/config/Auctions_Query_19791115_20251215.csv
     volumes:
