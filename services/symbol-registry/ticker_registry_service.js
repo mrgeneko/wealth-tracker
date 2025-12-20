@@ -33,6 +33,7 @@ class SymbolRegistryService {
    */
   calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume) {
     const typeRanks = {
+      'NOT_SET': 9999,  // Sentinel value - should never be used
       'EQUITY': 100,
       'ETF': 200,
       'CRYPTO': 300,
@@ -99,7 +100,7 @@ class SymbolRegistryService {
         symbol,
         name,
         exchange,
-        security_type = 'EQUITY',
+        security_type,
         source,
         has_yahoo_metadata = false,
         usd_trading_volume = null,
@@ -111,6 +112,11 @@ class SymbolRegistryService {
         option_type = null,
         expiration_date = null
       } = symbolData;
+
+      // Validate that security_type is provided and not the sentinel value
+      if (!security_type || security_type === 'NOT_SET') {
+        throw new Error('security_type is required and must be explicitly provided (cannot be NOT_SET)');
+      }
 
       const sortRank = this.calculateSortRank(security_type, has_yahoo_metadata, usd_trading_volume);
 
