@@ -43,17 +43,20 @@ This document outlines the design, implementation, and testing plan for improvin
 
 ### New Database Schema
 
-#### `symbol_registry` Table
+#### `ticker_registry` Table
 
 ```sql
-CREATE TABLE symbol_registry (
+CREATE TABLE ticker_registry (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    symbol VARCHAR(50) NOT NULL UNIQUE,
+    ticker VARCHAR(50) NOT NULL,
     name VARCHAR(500),
-    exchange VARCHAR(50),
-    security_type ENUM('EQUITY', 'ETF', 'BOND', 'TREASURY', 'MUTUAL_FUND', 'OPTION', 'CRYPTO', 'FX', 'FUTURES', 'INDEX', 'OTHER') DEFAULT 'EQUITY',
-    source ENUM('NASDAQ_FILE', 'NYSE_FILE', 'OTHER_FILE', 'TREASURY_FILE', 'TREASURY_HISTORICAL', 'YAHOO', 'USER_ADDED') NOT NULL,
-    has_yahoo_metadata BOOLEAN DEFAULT FALSE,
+    exchange VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
+    security_type ENUM('NOT_SET','EQUITY','ETF','BOND','US_TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') NOT NULL DEFAULT 'NOT_SET',
+    source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_LISTED_FILE','TREASURY_FILE','TREASURY_HISTORICAL','YAHOO','USER_ADDED') NOT NULL,
+    has_yahoo_metadata TINYINT(1) DEFAULT 0,
+    permanently_failed TINYINT(1) DEFAULT 0,
+    permanent_failure_reason VARCHAR(255) DEFAULT NULL,
+    permanent_failure_at TIMESTAMP NULL DEFAULT NULL,
     usd_trading_volume DECIMAL(20, 2) NULL,
     sort_rank INT DEFAULT 1000,  -- Lower = higher priority in autocomplete
     
@@ -62,8 +65,10 @@ CREATE TABLE symbol_registry (
     maturity_date DATE NULL,     -- Also used for bonds
     security_term VARCHAR(50) NULL, -- e.g., "4-Week", "10-Year"
     
-    -- Option-specific fields
-    underlying_symbol VARCHAR(50) NULL,  -- e.g., "NVDA" for NVDA options
+    -- Option/Context-specific fields
+    underlying_ticker VARCHAR(50) DEFAULT NULL,
+    underlying_exchange VARCHAR(50) DEFAULT NULL,
+    underlying_security_type ENUM('NOT_SET','EQUITY','ETF','BOND','US_TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') DEFAULT NULL,
     strike_price DECIMAL(18, 4) NULL,
     option_type ENUM('CALL', 'PUT') NULL,
     expiration_date DATE NULL,   -- For options and futures
@@ -73,25 +78,26 @@ CREATE TABLE symbol_registry (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Indexes
-    INDEX idx_symbol (symbol),
+    UNIQUE KEY unique_ticker_context (ticker, exchange, security_type),
+    INDEX idx_ticker (ticker),
     INDEX idx_security_type (security_type),
     INDEX idx_sort_rank (sort_rank),
     INDEX idx_maturity_date (maturity_date),
     INDEX idx_expiration_date (expiration_date),
-    INDEX idx_underlying_symbol (underlying_symbol)
+    INDEX idx_underlying (underlying_ticker, underlying_exchange, underlying_security_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-#### `symbol_registry_metrics` Table
+#### `ticker_registry_metrics` Table
 
 ```sql
-CREATE TABLE symbol_registry_metrics (
+CREATE TABLE ticker_registry_metrics (
     id INT AUTO_INCREMENT PRIMARY KEY,
     metric_date DATE NOT NULL,
     source VARCHAR(50) NOT NULL,
-    total_symbols INT NOT NULL,
-    symbols_with_yahoo_metadata INT NOT NULL,
-    symbols_without_yahoo_metadata INT NOT NULL,
+    total_tickers INT NOT NULL,
+    tickers_with_yahoo_metadata INT NOT NULL,
+    tickers_without_yahoo_metadata INT NOT NULL,
     last_file_refresh_at TIMESTAMP NULL,
     file_download_duration_ms INT NULL,
     avg_yahoo_fetch_duration_ms INT NULL,
@@ -111,8 +117,8 @@ CREATE TABLE file_refresh_status (
     last_refresh_duration_ms INT NULL,
     last_refresh_status ENUM('SUCCESS', 'FAILED', 'IN_PROGRESS') DEFAULT 'SUCCESS',
     last_error_message TEXT NULL,
-    symbols_added INT DEFAULT 0,
-    symbols_updated INT DEFAULT 0,
+    tickers_added INT DEFAULT 0,
+    tickers_updated INT DEFAULT 0,
     next_refresh_due_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -124,7 +130,7 @@ CREATE TABLE file_refresh_status (
 When a symbol exists in multiple sources, `source` is determined by priority:
 
 1. **File sources take precedence over USER_ADDED** - If a user adds a symbol that later appears in a file, update source to the file
-2. **More authoritative files win** - Priority: NASDAQ_FILE > NYSE_FILE > OTHER_FILE > TREASURY_FILE > TREASURY_HISTORICAL > YAHOO > USER_ADDED
+2. **More authoritative files win** - Priority: NASDAQ_FILE > NYSE_FILE > OTHER_LISTED_FILE > TREASURY_FILE > TREASURY_HISTORICAL > YAHOO > USER_ADDED
 3. **`has_yahoo_metadata`** - Set to TRUE if metadata exists in `securities_metadata`, regardless of source
 
 ### Sort Rank Calculation
@@ -139,17 +145,18 @@ function calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume) {
     // Security type ranking (lower = better)
     // Priority: Equities > ETFs > Crypto > Indices > FX > Futures > Options > Treasuries
     const typeRanks = {
-        'EQUITY': 100,
-        'ETF': 200,
-        'CRYPTO': 300,
-        'INDEX': 400,
-        'FX': 500,
-        'FUTURES': 600,
-        'OPTION': 700,
-        'TREASURY': 800,
-        'BOND': 850,
-        'MUTUAL_FUND': 900,
-        'OTHER': 1000
+      'NOT_SET': 9999,
+      'EQUITY': 100,
+      'ETF': 200,
+      'CRYPTO': 300,
+      'INDEX': 400,
+      'FX': 500,
+      'FUTURES': 600,
+      'OPTION': 700,
+      'US_TREASURY': 800,
+      'BOND': 850,
+      'MUTUAL_FUND': 900,
+      'OTHER': 1000
     };
     rank = typeRanks[securityType] || 1000;
     
@@ -297,7 +304,7 @@ New autocomplete query that searches `symbol_registry`:
 
 ```sql
 SELECT 
-    sr.symbol,
+    sr.ticker,
     COALESCE(sm.long_name, sm.short_name, sr.name) as name,
     sr.security_type,
     COALESCE(sm.exchange, sr.exchange) as exchange,
@@ -305,16 +312,16 @@ SELECT
     sr.maturity_date,
     sr.issue_date,
     sr.security_term
-FROM symbol_registry sr
+FROM ticker_registry sr
 LEFT JOIN securities_metadata sm ON sr.symbol = sm.symbol
 WHERE 
-    sr.symbol LIKE ? 
+    sr.ticker LIKE ? 
     OR sr.name LIKE ?
     OR sm.short_name LIKE ?
     OR sm.long_name LIKE ?
 ORDER BY 
-    CASE WHEN sr.symbol = ? THEN 1
-         WHEN sr.symbol LIKE ? THEN 2
+    CASE WHEN sr.ticker = ? THEN 1
+         WHEN sr.ticker LIKE ? THEN 2
          ELSE 3 END,
     sr.sort_rank ASC,
     sr.symbol ASC

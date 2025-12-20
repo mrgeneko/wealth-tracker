@@ -25,7 +25,7 @@ EXISTING METRICS INVENTORY
    Already persisted:
    
    - metric_date: Date of metrics entry
-   - source: File source (NASDAQ_FILE, NYSE_FILE, OTHER_FILE, TREASURY_FILE)
+   - source: File source (NASDAQ_FILE, NYSE_FILE, OTHER_LISTED_FILE, TREASURY_FILE)
    - total_symbols: Count of symbols loaded
    - symbols_with_yahoo_metadata: Count with metadata
    - symbols_without_yahoo_metadata: Count without metadata
@@ -56,7 +56,7 @@ EXISTING METRICS INVENTORY
    - security_type: EQUITY, ETF, BOND, TREASURY
    - has_yahoo_metadata: 0/1 flag
    - sort_rank: Rank for sorting by priority
-   - source: Where symbol came from
+   - source: Where symbol came from (NASDAQ_FILE, NYSE_FILE, OTHER_LISTED_FILE, TREASURY_FILE)
    - Various financial fields (dividend, P/E ratio, etc.)
    
    Phase 9 Action: Aggregate for analytics charts
@@ -312,8 +312,8 @@ Metadata Population
 └─ PHASE 9: Visualize in analytics dashboard
 
 Database Tables
-├─ symbol_registry_metrics (Phase 8, used in Phase 9)
-├─ file_refresh_status (Phase 8, used in Phase 9)
+├─ file_refresh_status (Phase 8, used in Phase 9, file_type: OTHER)
+├─ symbol_registry_metrics (Phase 8, used in Phase 9, source: OTHER_LISTED_FILE)
 ├─ scraper_performance_metrics (NEW in Phase 9)
 └─ scheduler_metrics (NEW in Phase 9)
 
