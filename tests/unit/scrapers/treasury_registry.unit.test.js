@@ -32,7 +32,7 @@ describe('Treasury Registry (Phase 5)', () => {
     test('loadTreasuryCache loads tickers and caches results', async () => {
         const registry = require('../../../scrapers/treasury_registry');
 
-        const sql = "SELECT ticker FROM ticker_registry WHERE security_type = 'TREASURY'";
+        const sql = "SELECT ticker FROM ticker_registry WHERE security_type = 'US_TREASURY'";
         const rows = [{ ticker: '912810EX2' }, { ticker: '912797SE8' }];
 
         const rowsByQuery = new Map([[sql, rows]]);
@@ -58,7 +58,7 @@ describe('Treasury Registry (Phase 5)', () => {
     test('isTreasury uses cache and is case-insensitive', async () => {
         const registry = require('../../../scrapers/treasury_registry');
 
-        const sql = "SELECT ticker FROM ticker_registry WHERE security_type = 'TREASURY'";
+        const sql = "SELECT ticker FROM ticker_registry WHERE security_type = 'US_TREASURY'";
         const rowsByQuery = new Map([[sql, [{ ticker: '912810EX2' }]]]);
         const { pool, conn } = makePool(rowsByQuery);
         registry.initializeDbPool(pool);
@@ -75,7 +75,7 @@ describe('Treasury Registry (Phase 5)', () => {
 
         const detailSql = `SELECT ticker, name, issue_date, maturity_date, security_term
        FROM ticker_registry
-       WHERE ticker = ? AND security_type = 'TREASURY'
+       WHERE ticker = ? AND security_type = 'US_TREASURY'
        LIMIT 1`;
 
         const rowsByQuery = new Map([
