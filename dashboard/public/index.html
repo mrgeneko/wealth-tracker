@@ -160,9 +160,12 @@
             z-index: 2000;
             white-space: pre-wrap;
             max-width: 360px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
-        .custom-tooltip.visible { opacity: 1; }
+
+        .custom-tooltip.visible {
+            opacity: 1;
+        }
 
         .form-group label {
             display: block;
@@ -287,6 +290,11 @@
             color: #fff;
         }
 
+        .ticker-exchange.crypto {
+            background: #f7931a;
+            color: #fff;
+        }
+
         .ticker-name {
             font-size: 0.85em;
             color: #aaa;
@@ -407,19 +415,25 @@
         }
 
         /* Normalize header font-size so sortable labels match other headers */
-        #investment-grid th, .sortable-header {
+        #investment-grid th,
+        .sortable-header {
             font-size: 0.95em;
             line-height: 1.1;
         }
 
         /* Reduce padding for compact columns */
-        #investment-grid th.col-prevclose, #investment-grid td[id^="prevClose-"] {
+        #investment-grid th.col-prevclose,
+        #investment-grid td[id^="prevClose-"] {
             padding: 2px 6px;
         }
-        #investment-grid th.col-source, #investment-grid td[id^="source-"] {
+
+        #investment-grid th.col-source,
+        #investment-grid td[id^="source-"] {
             padding: 2px 6px;
         }
-        #investment-grid th.col-valuechg, #investment-grid td[id^="valueChange-"] {
+
+        #investment-grid th.col-valuechg,
+        #investment-grid td[id^="valueChange-"] {
             padding: 2px 6px;
         }
 
@@ -751,7 +765,8 @@
                     <div style="display: grid; grid-template-columns: 1fr 2fr 100px auto; gap: 10px; align-items: end;">
                         <div class="form-group" style="margin: 0;">
                             <label for="watchlistInstanceKey">Watchlist Name</label>
-                            <input id="watchlistInstanceKey" type="text" list="watchlistNameSuggestions" placeholder="e.g., primary" />
+                            <input id="watchlistInstanceKey" type="text" list="watchlistNameSuggestions"
+                                placeholder="e.g., primary" />
                             <datalist id="watchlistNameSuggestions">
                                 <option value="primary">
                                 <option value="secondary">
@@ -763,7 +778,8 @@
                         </div>
                         <div class="form-group" style="margin: 0;">
                             <label for="watchlistInstanceUrl">URL</label>
-                            <input id="watchlistInstanceUrl" type="text" placeholder="https://www.investing.com/portfolio/?portfolioID=..." />
+                            <input id="watchlistInstanceUrl" type="text"
+                                placeholder="https://www.investing.com/portfolio/?portfolioID=..." />
                         </div>
                         <div class="form-group" style="margin: 0;">
                             <label for="watchlistInstanceInterval">Interval (sec)</label>
@@ -1154,11 +1170,18 @@
                 </div>
                 <div class="settings-section">
                     <h3>Account Types</h3>
-                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Manage enumerated account types used by the dashboard. Only admins should modify these.</p>
-                    <div id="accountTypesList" style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Manage enumerated account types used
+                        by the dashboard. Only admins should modify these.</p>
+                    <div id="accountTypesList"
+                        style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
                         <table id="accountTypesTable" style="width:100%; font-size:0.9em; border-collapse: collapse;">
                             <thead>
-                                <tr><th style="text-align:left; padding:6px">Key</th><th style="text-align:left; padding:6px">Display</th><th style="padding:6px">Category</th><th style="padding:6px">Actions</th></tr>
+                                <tr>
+                                    <th style="text-align:left; padding:6px">Key</th>
+                                    <th style="text-align:left; padding:6px">Display</th>
+                                    <th style="padding:6px">Category</th>
+                                    <th style="padding:6px">Actions</th>
+                                </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
@@ -1208,36 +1231,36 @@
             </div>
         </div>
 
-                <!-- Account Type Modal -->
-                <div id="accountTypeModal" class="modal">
-                    <div class="modal-content" style="width: 420px;">
-                        <span class="close" onclick="closeModal('accountTypeModal')">&times;</span>
-                        <h2 id="accountTypeModalTitle">Account Type</h2>
-                        <form id="accountTypeForm">
-                            <input type="hidden" id="acctTypeId">
-                            <div class="form-group">
-                                <label for="acctTypeKey">Key</label>
-                                <input type="text" id="acctTypeKey" placeholder="machine_key" required />
-                            </div>
-                            <div class="form-group">
-                                <label for="acctTypeDisplay">Display Name</label>
-                                <input type="text" id="acctTypeDisplay" placeholder="Display Name" required />
-                            </div>
-                            <div class="form-group">
-                                <label for="acctTypeCategory">Category</label>
-                                <select id="acctTypeCategory">
-                                    <option value="investment">investment</option>
-                                    <option value="bank">bank</option>
-                                    <option value="debt">debt</option>
-                                </select>
-                            </div>
-                            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                                <button type="button" class="btn" onclick="closeModal('accountTypeModal')">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save</button>
-                            </div>
-                        </form>
+        <!-- Account Type Modal -->
+        <div id="accountTypeModal" class="modal">
+            <div class="modal-content" style="width: 420px;">
+                <span class="close" onclick="closeModal('accountTypeModal')">&times;</span>
+                <h2 id="accountTypeModalTitle">Account Type</h2>
+                <form id="accountTypeForm">
+                    <input type="hidden" id="acctTypeId">
+                    <div class="form-group">
+                        <label for="acctTypeKey">Key</label>
+                        <input type="text" id="acctTypeKey" placeholder="machine_key" required />
                     </div>
-                </div>
+                    <div class="form-group">
+                        <label for="acctTypeDisplay">Display Name</label>
+                        <input type="text" id="acctTypeDisplay" placeholder="Display Name" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="acctTypeCategory">Category</label>
+                        <select id="acctTypeCategory">
+                            <option value="investment">investment</option>
+                            <option value="bank">bank</option>
+                            <option value="debt">debt</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                        <button type="button" class="btn" onclick="closeModal('accountTypeModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Add Ticker Modal -->
@@ -1250,8 +1273,7 @@
                     <label for="newSymbol">Ticker</label>
                     <div style="display: flex; gap: 5px;">
                         <input type="text" id="newSymbol" required maxlength="50"
-                            style="text-transform:uppercase; flex: 1;" class="awesomplete" autocomplete="off"
-                            onchange="lookupSymbolMetadata()">
+                            style="text-transform:uppercase; flex: 1;" class="awesomplete" autocomplete="off">
                         <button type="button" class="btn btn-primary" id="btnLookupSymbol"
                             onclick="lookupSymbolMetadata()" style="padding: 8px 12px;">🔍</button>
                     </div>
@@ -1342,27 +1364,52 @@
                     filter: () => true, // We filter on server
                     sort: false, // We sort on server
                     data: function (item) {
-                        return { label: item.value, value: item.value };
+                        return { label: item.ticker, value: item.id };
                     },
-                    item: function (item) {
-                        // Retrieve full metadata from our side-channel store
+                    item: function (item, input) {
+                        // Retrieve full metadata from our side-channel store using the unique id
                         const meta = metadataStore[item.value] || {};
                         const name = meta.name || 'Unknown Name';
                         const exchange = meta.exchange || 'Unknown';
                         const exchangeClass = (exchange || '').toLowerCase().replace(/\s+/g, '-');
+                        const ticker = meta.ticker || item.label;
 
                         const li = document.createElement('li');
                         li.innerHTML = `
                                     <div class="ticker-item">
                                         <div class="ticker-main">
-                                            <span class="ticker-symbol">${item.value}</span>
+                                            <span class="ticker-symbol">${ticker}</span>
                                             <span class="ticker-exchange ${exchangeClass}">${exchange}</span>
                                         </div>
                                         <div class="ticker-name">${name}</div>
                                     </div>
                                 `;
                         return li;
+                    },
+                    replace: function (text) {
+                        this.input.value = text.label; // text.label is the ticker
                     }
+                });
+
+                let skipNextLookup = false;
+
+                // Selection handler to trigger details fetch by ID
+                input.addEventListener('awesomplete-selectcomplete', function (event) {
+                    const selectedId = event.text.value;
+                    const ticker = event.text.label;
+
+                    skipNextLookup = true;
+                    // Trigger details fetch using the specific ID to avoid ambiguity
+                    lookupSymbolMetadata(selectedId);
+                });
+
+                // Manual change handler (if user types and tabs out without selection)
+                input.addEventListener('change', function () {
+                    if (skipNextLookup) {
+                        skipNextLookup = false;
+                        return;
+                    }
+                    lookupSymbolMetadata();
                 });
 
                 // Dynamic fetch listener
@@ -1376,17 +1423,13 @@
                             const res = await fetch(`/api/autocomplete/search?q=${encodeURIComponent(query)}`);
                             const data = await res.json();
 
-                            // Update the side-channel store
+                            // Update the side-channel store using ID
                             data.results.forEach(t => {
-                                metadataStore[t.ticker] = t;
+                                metadataStore[t.id] = t;
                             });
 
-                            const list = data.results.map(t => ({
-                                label: t.ticker,
-                                value: t.ticker
-                            }));
-
-                            symbolAutocomplete.list = list;
+                            // Pass full result objects to Awesomplete
+                            symbolAutocomplete.list = data.results;
                         } catch (err) {
                             console.error('Autocomplete error:', err);
                         }
@@ -1454,7 +1497,7 @@
 
         function editAccountType(t) { openAccountTypeModal(t); }
 
-        document.getElementById('accountTypeForm').onsubmit = async function(e) {
+        document.getElementById('accountTypeForm').onsubmit = async function (e) {
             e.preventDefault();
             const id = document.getElementById('acctTypeId').value;
             const body = {
@@ -1465,9 +1508,9 @@
             try {
                 let res;
                 if (id) {
-                    res = await fetch(`/api/account-types/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                    res = await fetch(`/api/account-types/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 } else {
-                    res = await fetch('/api/account-types', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                    res = await fetch('/api/account-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 }
                 if (!res.ok) throw new Error('Save failed');
                 closeModal('accountTypeModal');
@@ -4154,7 +4197,7 @@
         /**
          * Lookup symbol metadata from autocomplete API (Phase 7)
          */
-        async function lookupSymbolMetadata() {
+        async function lookupSymbolMetadata(id = null) {
             const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
             const statusEl = document.getElementById('symbolLookupStatus');
             const displayEl = document.getElementById('symbolMetadataDisplay');
@@ -4173,7 +4216,8 @@
                 statusEl.textContent = '🔍 Checking symbol...';
                 statusEl.style.display = 'block';
 
-                const response = await fetch(`/api/autocomplete/details/${symbol}`);
+                const url = id ? `/api/autocomplete/details/${symbol}?id=${id}` : `/api/autocomplete/details/${symbol}`;
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     if (response.status === 404) {

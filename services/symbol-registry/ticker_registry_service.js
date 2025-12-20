@@ -31,7 +31,7 @@ class SymbolRegistryService {
    * 
    * Priority: Equities > ETFs > Crypto > Indices > FX > Futures > Options > Treasuries
    */
-  calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume) {
+  calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume, marketCap) {
     const typeRanks = {
       'NOT_SET': 9999,  // Sentinel value - should never be used
       'EQUITY': 100,
@@ -60,6 +60,13 @@ class SymbolRegistryService {
       else if (usdTradingVolume > 100000000) rank -= 30;  // > $100M
       else if (usdTradingVolume > 10000000) rank -= 20;   // > $10M
       else if (usdTradingVolume > 1000000) rank -= 10;    // > $1M
+    }
+
+    // Market-cap adjustment for Crypto
+    if (securityType === 'CRYPTO' && marketCap) {
+      if (marketCap > 100000000000) rank -= 50; // > $100B (BTC, ETH)
+      else if (marketCap > 10000000000) rank -= 40; // > $10B
+      else if (marketCap > 1000000000) rank -= 30; // > $1B
     }
 
     return rank;
@@ -112,7 +119,8 @@ class SymbolRegistryService {
         underlying_security_type = null,
         strike_price = null,
         option_type = null,
-        expiration_date = null
+        expiration_date = null,
+        market_cap = null
       } = symbolData;
 
       // Validate that security_type is provided and not the sentinel value
@@ -125,7 +133,7 @@ class SymbolRegistryService {
         throw new Error('exchange is required and must be explicitly provided');
       }
 
-      const sortRank = this.calculateSortRank(security_type, has_yahoo_metadata, usd_trading_volume);
+      const sortRank = this.calculateSortRank(security_type, has_yahoo_metadata, usd_trading_volume, market_cap);
 
       // Check if symbol exists with this specific context (ticker + exchange + security_type)
       const [existing] = await conn.query(
@@ -141,13 +149,13 @@ class SymbolRegistryService {
           await conn.query(
             `UPDATE ticker_registry
              SET name = ?, source = ?,
-                 has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?,
+                 has_yahoo_metadata = ?, usd_trading_volume = ?, market_cap = ?, sort_rank = ?,
                  issue_date = ?, maturity_date = ?, security_term = ?,
                  underlying_ticker = ?, underlying_exchange = ?, underlying_security_type = ?,
                  strike_price = ?, option_type = ?, expiration_date = ?,
                  updated_at = CURRENT_TIMESTAMP
              WHERE ticker = ? AND exchange = ? AND security_type = ?`,
-            [name, source, has_yahoo_metadata, usd_trading_volume, sortRank,
+            [name, source, has_yahoo_metadata, usd_trading_volume, market_cap, sortRank,
               issue_date, maturity_date, security_term,
               underlying_ticker, underlying_exchange, underlying_security_type,
               strike_price, option_type, expiration_date,
@@ -158,9 +166,9 @@ class SymbolRegistryService {
           if (has_yahoo_metadata || usd_trading_volume) {
             await conn.query(
               `UPDATE ticker_registry
-               SET has_yahoo_metadata = ?, usd_trading_volume = ?, sort_rank = ?, updated_at = CURRENT_TIMESTAMP
-               WHERE ticker = ? AND exchange = ? AND security_type = ?`,
-              [has_yahoo_metadata, usd_trading_volume, sortRank, symbol, exchange, security_type]
+                SET has_yahoo_metadata = ?, usd_trading_volume = ?, market_cap = ?, sort_rank = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE ticker = ? AND exchange = ? AND security_type = ?`,
+              [has_yahoo_metadata, usd_trading_volume, market_cap, sortRank, symbol, exchange, security_type]
             );
           }
         }
@@ -168,12 +176,12 @@ class SymbolRegistryService {
         // New symbol - insert it
         await conn.query(
           `INSERT INTO ticker_registry
-           (ticker, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sort_rank,
-            issue_date, maturity_date, security_term,
-            underlying_ticker, underlying_exchange, underlying_security_type,
-            strike_price, option_type, expiration_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [symbol, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, sortRank,
+            (ticker, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, market_cap, sort_rank,
+             issue_date, maturity_date, security_term,
+             underlying_ticker, underlying_exchange, underlying_security_type,
+             strike_price, option_type, expiration_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [symbol, name, exchange, security_type, source, has_yahoo_metadata, usd_trading_volume, market_cap, sortRank,
             issue_date, maturity_date, security_term,
             underlying_ticker, underlying_exchange, underlying_security_type,
             strike_price, option_type, expiration_date]

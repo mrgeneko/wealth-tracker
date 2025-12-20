@@ -14,6 +14,8 @@ const { CsvDownloader } = require('./csv_downloader');
 const { createHttpApi } = require('./http_api');
 const SymbolRegistryService = require('../symbol-registry/ticker_registry_service');
 const SymbolRegistrySyncService = require('../symbol-registry/symbol_registry_sync');
+const { CryptoListingOrchestrator } = require('../../scripts/setup/update_crypto_listings');
+const path = require('path');
 
 const DEFAULT_CONFIG = {
   syncIntervalMinutes: 1440,
@@ -84,7 +86,7 @@ class ListingSyncService {
     if (this.config.enableAutoSync) {
       const intervalMs = this.config.syncIntervalMinutes * 60 * 1000;
       this.syncTimer = setInterval(() => {
-        this.syncAll().catch(() => {});
+        this.syncAll().catch(() => { });
       }, intervalMs);
     }
 
@@ -125,6 +127,8 @@ class ListingSyncService {
       // Exchange file types require file download/update.
       if (fileType === 'NASDAQ' || fileType === 'NYSE' || fileType === 'OTHER') {
         download = await this.downloader.downloadAndUpdate(fileType);
+      } else if (fileType === 'CRYPTO_INVESTING') {
+        await this.updateCryptoListings();
       }
 
       const stats = await this.syncService.syncFileType(fileType);
@@ -174,6 +178,12 @@ class ListingSyncService {
     return await this.symbolRegistryService.lookupSymbol(ticker);
   }
 
+  async updateCryptoListings() {
+    console.log('[ListingSyncService] Updating crypto listings...');
+    const orchestrator = new CryptoListingOrchestrator();
+    await orchestrator.updateAll();
+  }
+
   async syncAll() {
     const start = Date.now();
     this.stats.totalSyncs++;
@@ -182,8 +192,11 @@ class ListingSyncService {
       // 1) Ensure listing CSVs are up to date
       const downloadResults = await this.downloader.downloadAndUpdateAll();
 
+      // 1b) Update crypto listings (scraping)
+      await this.updateCryptoListings();
+
       // 2) Sync into DB via the existing registry sync implementation
-      const fileTypes = ['NASDAQ', 'NYSE', 'OTHER', 'TREASURY'];
+      const fileTypes = ['NASDAQ', 'NYSE', 'OTHER', 'TREASURY', 'CRYPTO_INVESTING'];
       const syncResults = {};
       for (const ft of fileTypes) {
         // Treasury loads from TreasuryDataHandler; exchange file types from CSV

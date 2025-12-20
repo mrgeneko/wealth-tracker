@@ -38,13 +38,16 @@ describe('SymbolRegistrySyncService', () => {
 
     // Mock symbol registry service
     mockSymbolService = {
-      calculateSortRank: jest.fn((type, hasYahoo, volume) => {
+      calculateSortRank: jest.fn((type, hasYahoo, volume, marketCap) => {
         const typeRanks = {
           'EQUITY': 100,
           'ETF': 200,
+          'CRYPTO': 300,
           'OTHER': 1000
         };
-        return typeRanks[type] || 1000;
+        let rank = typeRanks[type] || 1000;
+        if (type === 'CRYPTO' && marketCap > 1000000000) rank -= 30;
+        return rank;
       }),
       shouldUpdateSource: jest.fn((oldSource, newSource) => {
         const priorities = {
@@ -250,7 +253,55 @@ describe('SymbolRegistrySyncService', () => {
 
       const symbols = syncService.parseOtherSymbols(records);
 
-      expect(symbols[0].exchange).toBe('OTHER');
+      expect(syncService.parseOtherSymbols(records)[0].exchange).toBe('OTHER');
+    });
+  });
+
+  describe('parseCryptoSymbols', () => {
+    test('should parse valid crypto records', () => {
+      const records = [
+        { symbol: 'BTC', name: 'Bitcoin', market_cap: '1.5T', rank: '1' },
+        { symbol: 'ETH', name: 'Ethereum', market_cap: '400B', rank: '2' }
+      ];
+
+      const symbols = syncService.parseCryptoSymbols(records);
+
+      expect(symbols).toHaveLength(2);
+      expect(symbols[0]).toMatchObject({
+        ticker: 'BTC',
+        name: 'Bitcoin',
+        exchange: 'CRYPTO',
+        security_type: 'CRYPTO',
+        market_cap: 1500000000000
+      });
+      expect(symbols[1].market_cap).toBe(400000000000);
+    });
+
+    test('should handle various market cap formats', () => {
+      const records = [
+        { symbol: 'ALT1', name: 'Alpha', market_cap: '$100.5M' },
+        { symbol: 'ALT2', name: 'Beta', market_cap: ' 50.2 B ' },
+        { symbol: 'ALT3', name: 'Gamma', market_cap: '1,200,000' },
+        { symbol: 'ALT4', name: 'Delta', market_cap: 'N/A' }
+      ];
+
+      const symbols = syncService.parseCryptoSymbols(records);
+
+      expect(symbols[0].market_cap).toBe(100500000);
+      expect(symbols[1].market_cap).toBe(50200000000);
+      expect(symbols[2].market_cap).toBe(1200000);
+      expect(symbols[3].market_cap).toBeNull();
+    });
+
+    test('should trim crypto fields', () => {
+      const records = [
+        { symbol: '  BTC  ', name: '  Bitcoin  ', market_cap: ' 1T ' }
+      ];
+
+      const symbols = syncService.parseCryptoSymbols(records);
+
+      expect(symbols[0].ticker).toBe('BTC');
+      expect(symbols[0].name).toBe('Bitcoin');
     });
   });
 
@@ -324,6 +375,7 @@ describe('SymbolRegistrySyncService', () => {
         source: 'NASDAQ_FILE',
         has_yahoo_metadata: false,
         usd_trading_volume: null,
+        market_cap: null,
         issue_date: null,
         maturity_date: null,
         security_term: null,
@@ -424,7 +476,7 @@ describe('SymbolRegistrySyncService', () => {
         expect.stringContaining('INSERT INTO ticker_registry'),
         expect.arrayContaining(['AAPL', 'Apple Inc.', 'NASDAQ', 'EQUITY', 'NASDAQ_FILE'])
       );
-      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', false, undefined);
+      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', false, undefined, undefined);
     });
 
     test('should calculate sort rank correctly', async () => {
@@ -442,7 +494,7 @@ describe('SymbolRegistrySyncService', () => {
 
       await syncService.insertSymbol(mockConnection, symbolData);
 
-      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', true, undefined);
+      expect(mockSymbolService.calculateSortRank).toHaveBeenCalledWith('EQUITY', true, undefined, undefined);
     });
   });
 
@@ -603,8 +655,8 @@ describe('SymbolRegistrySyncService', () => {
 
       const allStats = await syncService.syncAll();
 
-      expect(allStats.total_files).toBe(4);
-      expect(allStats.files).toHaveLength(4);
+      expect(allStats.total_files).toBe(5);
+      expect(allStats.files).toHaveLength(5);
       expect(allStats).toHaveProperty('total_records');
       expect(allStats).toHaveProperty('total_inserted');
       expect(allStats).toHaveProperty('total_updated');

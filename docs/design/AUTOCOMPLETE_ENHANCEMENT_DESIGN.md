@@ -52,12 +52,13 @@ CREATE TABLE ticker_registry (
     name VARCHAR(500),
     exchange VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
     security_type ENUM('NOT_SET','EQUITY','ETF','BOND','US_TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') NOT NULL DEFAULT 'NOT_SET',
-    source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_LISTED_FILE','TREASURY_FILE','TREASURY_HISTORICAL','YAHOO','USER_ADDED') NOT NULL,
+    source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_LISTED_FILE','TREASURY_FILE','TREASURY_HISTORICAL','CRYPTO_INVESTING_FILE','YAHOO','USER_ADDED') NOT NULL,
     has_yahoo_metadata TINYINT(1) DEFAULT 0,
     permanently_failed TINYINT(1) DEFAULT 0,
     permanent_failure_reason VARCHAR(255) DEFAULT NULL,
     permanent_failure_at TIMESTAMP NULL DEFAULT NULL,
     usd_trading_volume DECIMAL(20, 2) NULL,
+    market_cap DECIMAL(20, 2) NULL,
     sort_rank INT DEFAULT 1000,  -- Lower = higher priority in autocomplete
     
     -- Treasury-specific fields
@@ -112,7 +113,7 @@ CREATE TABLE ticker_registry_metrics (
 ```sql
 CREATE TABLE file_refresh_status (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    file_type ENUM('NASDAQ', 'NYSE', 'OTHER', 'TREASURY') NOT NULL UNIQUE,
+    file_type ENUM('NASDAQ', 'NYSE', 'OTHER', 'TREASURY', 'CRYPTO_INVESTING') NOT NULL UNIQUE,
     last_refresh_at TIMESTAMP NULL,
     last_refresh_duration_ms INT NULL,
     last_refresh_status ENUM('SUCCESS', 'FAILED', 'IN_PROGRESS') DEFAULT 'SUCCESS',
@@ -139,7 +140,7 @@ The `sort_rank` field determines autocomplete ordering:
 
 
 ```javascript
-function calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume) {
+function calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume, marketCap) {
     let rank = 1000;
     
     // Security type ranking (lower = better)
@@ -169,7 +170,14 @@ function calculateSortRank(securityType, hasYahooMetadata, usdTradingVolume) {
         else if (usdTradingVolume > 100000000) rank -= 30;  // > $100M
         else if (usdTradingVolume > 10000000) rank -= 20;   // > $10M
         else if (usdTradingVolume > 1000000) rank -= 10;    // > $1M
+    // Market-cap adjustment for Crypto
+    if (securityType === 'CRYPTO' && marketCap) {
+        if (marketCap > 100000000000) rank -= 50; // > $100B (BTC, ETH)
+        else if (marketCap > 10000000000) rank -= 40; // > $10B
+        else if (marketCap > 1000000000) rank -= 30; // > $1B
     }
+    
+    // Exact match bonus (handled in SQL order by, but can be reflected here)
     
     return rank;
 }
@@ -679,6 +687,27 @@ METRICS_LOG_FILE=/app/logs/registry_metrics.log
 3. Update `docs/METADATA_SYSTEM_COMPLETE.md`
 4. Identify and remove obsolete code (see Cleanup Candidates below)
 5. Add inline code documentation
+
+### Phase 12: Crypto Listing Scraper (Est. 2-3 hours)
+
+1. Create `scripts/setup/update_crypto_listings.js` using Puppeteer
+2. Implement `InvestingProvider` for crypto scraping
+3. Update `SymbolRegistrySyncService` to parse market cap with units (T/B/M)
+4. Integrate with `ListingSyncService` and `docker-compose.yml`
+
+### Phase 13: Autocomplete Disambiguation (Est. 1-2 hours)
+
+1. Include `id` in `MetadataAutocompleteService` search results
+2. Support `GET /api/autocomplete/details/:ticker?id=:id` in API
+3. Update Frontend `metadataStore` to use unique IDs as keys
+4. Add `CRYPTO` orange badge styling to autocomplete UI
+5. Handle `awesomplete-selectcomplete` with ID-aware lookup
+
+### Phase 14: Security Type Normalization (Est. 0.5 hours)
+
+1. Implement `_normalizeSecurityType` helper in `MetadataAutocompleteService`
+2. Map `EQUITY`/`STOCK` to `stock`, `TREASURY` to `bond`, etc.
+3. Ensure compatibility with dashboard validation `['stock', 'etf', 'bond', 'cash', 'crypto', 'other']`
 
 ---
 

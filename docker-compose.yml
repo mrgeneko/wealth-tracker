@@ -68,7 +68,7 @@ services:
     ports:
       - "3020:3020"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3020/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      test: [ "CMD", "node", "-e", "fetch('http://localhost:3020/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -77,6 +77,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.listing-sync
+    platform: linux/amd64
     restart: unless-stopped
     depends_on:
       - mysql
@@ -97,7 +98,7 @@ services:
     ports:
       - "3010:3010"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      test: [ "CMD", "node", "-e", "fetch('http://localhost:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 30s
       timeout: 10s
       retries: 3

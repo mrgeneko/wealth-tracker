@@ -5,6 +5,7 @@ The Listing Sync Service keeps symbol listing files and the `ticker_registry` ta
 ## Purpose
 
 - Download/update listings into the local `config/` directory (NASDAQ/NYSE/OTHER)
+- Scrape crypto listings from Investing.com into `investing-crypto.csv`
 - Sync listings into MySQL (`ticker_registry`) using the existing symbol registry sync pipeline
 - Provide an HTTP API so other services (dashboard, ops tooling) can trigger syncs and lookups
 
@@ -48,7 +49,7 @@ All responses are JSON.
   - 200: `{ "success": true, "results": { "downloads": {...}, "sync": {...} } }`
 
 - `POST /sync/file/:type`
-  - `type` in `{ NASDAQ, NYSE, OTHER, TREASURY }`
+  - `type` in `{ NASDAQ, NYSE, OTHER, TREASURY, CRYPTO_INVESTING }`
 
 - `POST /sync/tickers`
   - Body: `{ "tickers": ["AAPL", "MSFT"] }`

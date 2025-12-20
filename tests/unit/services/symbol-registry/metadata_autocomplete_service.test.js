@@ -85,9 +85,9 @@ describe('MetadataAutocompleteService', () => {
             ];
 
             mockPool.query.mockResolvedValueOnce([mockResults]);
-            
+
             const results = await service.searchTickers('AAPL', { includeMetadata: false });
-            
+
             expect(results).toHaveLength(1);
             expect(results[0].ticker).toBe('AAPL');
             expect(mockPool.query).toHaveBeenCalled();
@@ -112,9 +112,9 @@ describe('MetadataAutocompleteService', () => {
             ];
 
             mockPool.query.mockResolvedValueOnce([mockResults, []]);
-            
+
             const results = await service.searchTickers('AAPL', { includeMetadata: true });
-            
+
             expect(results).toHaveLength(1);
             // Note: metadata is formatted from the row fields, not a separate stats call
             expect(results[0].ticker).toBe('AAPL');
@@ -122,7 +122,7 @@ describe('MetadataAutocompleteService', () => {
 
         test('should handle search errors', async () => {
             mockPool.query.mockRejectedValueOnce(new Error('Database error'));
-            
+
             await expect(service.searchTickers('TEST')).rejects.toThrow();
         });
     });
@@ -133,9 +133,9 @@ describe('MetadataAutocompleteService', () => {
     describe('_getMetadataStats', () => {
         test('should return empty stats for no symbols', async () => {
             mockConnection.execute.mockResolvedValueOnce([[], []]);
-            
+
             const stats = await service._getMetadataStats(mockConnection);
-            
+
             expect(stats.total).toBe(0);
             expect(stats.complete).toBe(0);
             expect(stats.percentage).toBe(0);
@@ -146,9 +146,9 @@ describe('MetadataAutocompleteService', () => {
                 total: 100,
                 with_metadata: 75
             }], []]);
-            
+
             const stats = await service._getMetadataStats(mockConnection);
-            
+
             expect(stats.total).toBe(100);
             expect(stats.complete).toBe(75);
             expect(stats.percentage).toBe(75);
@@ -166,9 +166,9 @@ describe('MetadataAutocompleteService', () => {
                 security_type: 'STOCK',
                 symbol_verified: true
             };
-            
+
             const result = service._formatResult(row);
-            
+
             expect(result.ticker).toBe('AAPL');
             expect(result.name).toBe('Apple Inc.');
             expect(result.type).toBe('STOCK');
@@ -188,9 +188,9 @@ describe('MetadataAutocompleteService', () => {
                 ttm_eps: 6.2,
                 currency: 'USD'
             };
-            
+
             const result = service._formatResult(row);
-            
+
             expect(result.metadata).toBeDefined();
             expect(result.metadata.pe).toBe(28.5);
         });
@@ -201,9 +201,9 @@ describe('MetadataAutocompleteService', () => {
                 name: null,
                 security_type: 'STOCK'
             };
-            
+
             const result = service._formatResult(row);
-            
+
             expect(result.name).toBe('XYZ');
         });
     });
@@ -214,9 +214,9 @@ describe('MetadataAutocompleteService', () => {
     describe('getTickerDetails', () => {
         test('should return null for non-existent ticker', async () => {
             mockConnection.execute.mockResolvedValueOnce([[], []]);
-            
+
             const details = await service.getTickerDetails('NOTFOUND');
-            
+
             expect(details).toBeNull();
             expect(mockConnection.release).toHaveBeenCalled();
         });
@@ -227,13 +227,13 @@ describe('MetadataAutocompleteService', () => {
                 name: 'Apple Inc.',
                 security_type: 'STOCK'
             };
-            
+
             mockConnection.execute
                 .mockResolvedValueOnce([[tickerData], []])
                 .mockResolvedValueOnce([[], []]);
-            
+
             const details = await service.getTickerDetails('AAPL');
-            
+
             expect(details.ticker).toBe('AAPL');
             expect(details.name).toBe('Apple Inc.');
             expect(details.metadata).toBeNull();
@@ -250,13 +250,13 @@ describe('MetadataAutocompleteService', () => {
                 market_cap: '2.5T',
                 trailing_pe: 28.5
             };
-            
+
             mockConnection.execute
                 .mockResolvedValueOnce([[tickerData], []])
                 .mockResolvedValueOnce([[metadataData], []]);
-            
+
             const details = await service.getTickerDetails('AAPL');
-            
+
             expect(details.metadata).toBeDefined();
             expect(details.metadata.market_cap).toBe('2.5T');
         });
@@ -265,11 +265,28 @@ describe('MetadataAutocompleteService', () => {
             mockConnection.execute
                 .mockResolvedValueOnce([[], []])
                 .mockResolvedValueOnce([[], []]);
-            
+
             await service.getTickerDetails('test');
-            
+
             const callArgs = mockConnection.execute.mock.calls[0];
             expect(callArgs[1][0]).toBe('TEST');
+        });
+
+        test('should normalize EQUITY to stock in detectedType', async () => {
+            const tickerData = {
+                ticker: 'BTA',
+                name: 'BlackRock Taxable Municipal Bond',
+                security_type: 'EQUITY'
+            };
+
+            mockConnection.execute
+                .mockResolvedValueOnce([[tickerData], []])
+                .mockResolvedValueOnce([[], []]);
+
+            const details = await service.getTickerDetails('BTA');
+
+            expect(details.type).toBe('EQUITY');
+            expect(details.detectedType).toBe('stock');
         });
     });
 
@@ -280,9 +297,9 @@ describe('MetadataAutocompleteService', () => {
         test('should return empty array when no tickers need metadata', async () => {
             // mysql2/promise returns [results, fields]
             mockConnection.query.mockResolvedValueOnce([[], []]);
-            
+
             const results = await service.getTickersNeedingMetadata();
-            
+
             expect(results).toEqual([]);
             expect(mockConnection.release).toHaveBeenCalled();
         });
@@ -296,17 +313,17 @@ describe('MetadataAutocompleteService', () => {
                 ],
                 []
             ]);
-            
+
             const results = await service.getTickersNeedingMetadata();
-            
+
             expect(results).toEqual(['AAPL', 'GOOGL', 'MSFT']);
         });
 
         test('should respect limit parameter', async () => {
             mockConnection.query.mockResolvedValueOnce([[], []]);
-            
+
             await service.getTickersNeedingMetadata(50);
-            
+
             // Since we now use query with embedded limit, check it was called
             expect(mockConnection.query).toHaveBeenCalled();
             const sql = mockConnection.query.mock.calls[0][0];
@@ -320,18 +337,18 @@ describe('MetadataAutocompleteService', () => {
     describe('markMetadataFetched', () => {
         test('should mark symbol metadata as fetched', async () => {
             mockConnection.execute.mockResolvedValueOnce({});
-            
+
             const result = await service.markMetadataFetched('AAPL');
-            
+
             expect(result).toBe(true);
             expect(mockConnection.release).toHaveBeenCalled();
         });
 
         test('should normalize symbol to uppercase', async () => {
             mockConnection.execute.mockResolvedValueOnce({});
-            
+
             await service.markMetadataFetched('aapl');
-            
+
             const callArgs = mockConnection.execute.mock.calls[0];
             expect(callArgs[1][0]).toBe('AAPL');
         });
@@ -353,31 +370,31 @@ describe('MetadataAutocompleteService', () => {
                     { security_type: 'ETF', count: 400, with_metadata: 250 }
                 ], []])
                 .mockResolvedValueOnce([[{ queue_size: 250 }], []])
-                .mockResolvedValueOnce([[{ 
+                .mockResolvedValueOnce([[{
                     recent_updates: 10,
                     avg_processing_time_seconds: 1.5
                 }], []]);
-            
+
             const stats = await service.getStatistics();
-            
+
             expect(stats.summary).toBeDefined();
             expect(stats.summary.total_symbols).toBe(1000);
             expect(stats.summary.with_metadata).toBe(750);
             expect(stats.summary.without_metadata).toBe(250);
             expect(stats.summary.completion_percentage).toBe(75);
-            
+
             // Test queue metrics
             expect(stats.queue).toBeDefined();
             expect(stats.queue.size).toBe(250);
             expect(stats.queue.estimated_completion_minutes).toBe(9); // 250 * 2 / 60 = 8.33, rounded up
             expect(stats.queue.status).toBe('pending');
-            
+
             // Test processing metrics
             expect(stats.processing).toBeDefined();
             expect(stats.processing.recent_updates_last_hour).toBe(10);
             expect(stats.processing.avg_processing_time_seconds).toBe(1.5);
             expect(stats.processing.throttling_delay_seconds).toBe(2);
-            
+
             expect(stats.byType).toHaveLength(2);
             expect(mockConnection.release).toHaveBeenCalled();
         });
@@ -390,13 +407,13 @@ describe('MetadataAutocompleteService', () => {
                 }], []])
                 .mockResolvedValueOnce([[], []])
                 .mockResolvedValueOnce([[{ queue_size: 0 }], []])
-                .mockResolvedValueOnce([[{ 
+                .mockResolvedValueOnce([[{
                     recent_updates: 5,
                     avg_processing_time_seconds: 2.1
                 }], []]);
-            
+
             const stats = await service.getStatistics();
-            
+
             expect(stats.queue.size).toBe(0);
             expect(stats.queue.estimated_completion_minutes).toBe(0);
             expect(stats.queue.status).toBe('complete');
@@ -410,13 +427,13 @@ describe('MetadataAutocompleteService', () => {
                 }], []])
                 .mockResolvedValueOnce([[], []])
                 .mockResolvedValueOnce([[{ queue_size: 20 }], []])
-                .mockResolvedValueOnce([[{ 
+                .mockResolvedValueOnce([[{
                     recent_updates: null,
                     avg_processing_time_seconds: null
                 }], []]);
-            
+
             const stats = await service.getStatistics();
-            
+
             expect(stats.processing.recent_updates_last_hour).toBe(0);
             expect(stats.processing.avg_processing_time_seconds).toBe(0);
         });
@@ -430,9 +447,9 @@ describe('MetadataAutocompleteService', () => {
             mockConnection.execute
                 .mockResolvedValueOnce({})
                 .mockResolvedValueOnce({});
-            
+
             const result = await service.refreshTickerMetadata('AAPL');
-            
+
             expect(result.ticker).toBe('AAPL');
             expect(result.status).toBe('reset');
             expect(mockConnection.execute).toHaveBeenCalledTimes(2);
@@ -443,9 +460,9 @@ describe('MetadataAutocompleteService', () => {
             mockConnection.execute
                 .mockResolvedValueOnce({})
                 .mockResolvedValueOnce({});
-            
+
             await service.refreshTickerMetadata('aapl');
-            
+
             const firstCall = mockConnection.execute.mock.calls[0];
             expect(firstCall[1][0]).toBe('AAPL');
         });
@@ -511,27 +528,62 @@ describe('MetadataAutocompleteService', () => {
     });
 
     // ============================================================================
+    // Type Normalization Tests
+    // ============================================================================
+    describe('_normalizeSecurityType', () => {
+        test('should map EQUITY to stock', () => {
+            expect(service._normalizeSecurityType('EQUITY')).toBe('stock');
+            expect(service._normalizeSecurityType('STOCK')).toBe('stock');
+        });
+
+        test('should map ETF to etf', () => {
+            expect(service._normalizeSecurityType('ETF')).toBe('etf');
+        });
+
+        test('should map CRYPTO/CRYPTOCURRENCY to crypto', () => {
+            expect(service._normalizeSecurityType('CRYPTO')).toBe('crypto');
+            expect(service._normalizeSecurityType('CRYPTOCURRENCY')).toBe('crypto');
+        });
+
+        test('should map TREASURY/BOND to bond', () => {
+            expect(service._normalizeSecurityType('TREASURY')).toBe('bond');
+            expect(service._normalizeSecurityType('BOND')).toBe('bond');
+            expect(service._normalizeSecurityType('US_TREASURY')).toBe('bond');
+        });
+
+        test('should map options/futures to other', () => {
+            expect(service._normalizeSecurityType('OPTION')).toBe('other');
+            expect(service._normalizeSecurityType('FUTURES')).toBe('other');
+        });
+
+        test('should fall back to stock for unknown types', () => {
+            expect(service._normalizeSecurityType('UNKNOWN')).toBe('stock');
+            expect(service._normalizeSecurityType(null)).toBe('stock');
+        });
+    });
+
+    // ============================================================================
     // Connection Management Tests (Pool-based - no explicit connection release needed)
     // ============================================================================
     describe('Connection Management', () => {
         test('should always close connection on success', async () => {
             mockPool.query.mockResolvedValueOnce([[]]);
-            
+
             await service.searchTickers('TEST', { includeMetadata: false });
-            
+
             // Pool.query manages connections internally, no explicit release needed
             expect(mockPool.query).toHaveBeenCalled();
         });
 
         test('should always close connection on error', async () => {
             mockPool.query.mockRejectedValueOnce(new Error('Error'));
-            
+
             try {
                 await service.searchTickers('TEST', { includeMetadata: false });
             } catch (e) {
                 // Expected
             }
-            
+
             // Pool.query manages connections internally, no explicit release needed
             expect(mockPool.query).toHaveBeenCalled();
         });
@@ -543,26 +595,26 @@ describe('MetadataAutocompleteService', () => {
     describe('Edge Cases', () => {
         test('should handle whitespace in query', async () => {
             mockPool.query.mockResolvedValueOnce([[]]);
-            
+
             await service.searchTickers('  AAPL  ', { includeMetadata: false });
-            
+
             const callArgs = mockPool.query.mock.calls[0];
             expect(callArgs[1][0]).toBe('AAPL%');
         });
 
         test('should handle special characters gracefully', async () => {
             mockPool.query.mockResolvedValueOnce([[]]);
-            
+
             await service.searchTickers("test'", { includeMetadata: false });
-            
+
             expect(mockPool.query).toHaveBeenCalled();
         });
 
         test('should handle empty database results', async () => {
             mockPool.query.mockResolvedValueOnce([[]]);
-            
+
             const results = await service.searchTickers('NOTEXIST', { includeMetadata: false });
-            
+
             expect(results).toEqual([]);
         });
 
@@ -575,9 +627,9 @@ describe('MetadataAutocompleteService', () => {
                 trailing_pe: null,
                 dividend_yield: null
             };
-            
+
             const result = service._formatResult(row);
-            
+
             expect(result.metadata).toBeDefined();
         });
     });
