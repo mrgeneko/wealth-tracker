@@ -187,12 +187,17 @@
 
         /* Awesomplete Autocomplete Styles (Dark Theme) */
         .awesomplete>ul {
+            position: absolute; /* remove from document flow so it doesn't expand modal */
+            z-index: 2000; /* sit above modal content & symbol info */
+            left: 0; /* align with the input container */
+            box-sizing: border-box;
             background: #2d2d2d;
             border: 1px solid #555;
             border-radius: 4px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             max-height: 350px;
             overflow-y: auto;
+            min-width: 220px;
         }
 
         .awesomplete>ul>li {
@@ -222,6 +227,34 @@
         .awesomplete mark {
             background: #0d6efd;
             color: #fff;
+        }
+
+        /* Fixes for Symbol Metadata display to keep it inside modal */
+        #symbolMetadataDisplay {
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: hidden; /* prevent accidental overflow */
+        }
+
+        #symbolMetadataDisplay table {
+            width: 100%;
+            min-width: 0; /* override global min-width */
+            table-layout: fixed; /* prevent long content from expanding table */
+            border-collapse: collapse;
+        }
+
+        #symbolMetadataDisplay td:first-child {
+            width: 35%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #symbolMetadataDisplay td:last-child {
+            width: 65%;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            text-align: right;
         }
 
         /* Ticker item styling */
@@ -1271,7 +1304,7 @@
             <form id="addSymbolForm">
                 <div class="form-group">
                     <label for="newSymbol">Ticker</label>
-                    <div style="display: flex; gap: 5px;">
+                    <div style="display: flex; gap: 5px; align-items: center;">
                         <input type="text" id="newSymbol" required maxlength="50"
                             style="text-transform:uppercase; flex: 1;" class="awesomplete" autocomplete="off">
                         <button type="button" class="btn btn-primary" id="btnLookupSymbol"
@@ -1283,7 +1316,7 @@
 
                 <!-- Symbol Metadata Display (Phase 7) -->
                 <div id="symbolMetadataDisplay"
-                    style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none;">
+                    style="background: #2a2a2a; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none; max-width: 100%; box-sizing: border-box;">
                     <p style="margin: 0 0 8px 0; font-size: 0.9em; color: #888;">Symbol Information</p>
                     <table style="width: 100%; font-size: 0.85em;">
                         <tbody>
