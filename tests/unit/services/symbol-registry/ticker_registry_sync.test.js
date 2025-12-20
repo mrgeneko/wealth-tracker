@@ -216,19 +216,41 @@ describe('SymbolRegistrySyncService', () => {
   });
 
   describe('parseOtherSymbols', () => {
-    test('should parse valid OTHER listed records', () => {
+    test('should parse valid OTHER listed records with exchange mapping', () => {
+      const records = [
+        { 'ACT Symbol': 'SDAQ', 'Company Name': 'Example Corp', 'Exchange': 'Z' },
+        { 'ACT Symbol': 'NVBU', 'Company Name': 'AllianzIM ETF', 'Exchange': 'V' },
+        { 'ACT Symbol': 'UNKNOWN', 'Company Name': 'Unknown', 'Exchange': '?' }
+      ];
+
+      const symbols = syncService.parseOtherSymbols(records);
+
+      expect(symbols).toHaveLength(3);
+      expect(symbols[0]).toMatchObject({
+        ticker: 'SDAQ',
+        exchange: 'BATS Global Markets (BATS)',
+        source: 'OTHER_FILE'
+      });
+      expect(symbols[1]).toMatchObject({
+        ticker: 'NVBU',
+        exchange: 'Investors\' Exchange, LLC (IEXG)',
+        source: 'OTHER_FILE'
+      });
+      expect(symbols[2]).toMatchObject({
+        ticker: 'UNKNOWN',
+        exchange: 'OTHER',
+        source: 'OTHER_FILE'
+      });
+    });
+
+    test('should default to OTHER if Exchange column is missing', () => {
       const records = [
         { 'ACT Symbol': 'SDAQ', 'Company Name': 'Example Corp' }
       ];
 
       const symbols = syncService.parseOtherSymbols(records);
 
-      expect(symbols).toHaveLength(1);
-      expect(symbols[0]).toMatchObject({
-        ticker: 'SDAQ',
-        exchange: 'OTHER',
-        source: 'OTHER_FILE'
-      });
+      expect(symbols[0].exchange).toBe('OTHER');
     });
   });
 
@@ -332,7 +354,7 @@ describe('SymbolRegistrySyncService', () => {
   describe('loadCsvFile', () => {
     // Note: loadCsvFile tests require actual file mocking which is complex
     // These will be tested via integration tests during syncFileType
-    
+
     test('should skip csv load tests', () => {
       expect(true).toBe(true);
     });
@@ -485,7 +507,7 @@ describe('SymbolRegistrySyncService', () => {
       ];
 
       const stats = await syncService.processBatch(symbols);
-      
+
       // processBatch catches errors and increments error count
       expect(stats.errors).toBeGreaterThan(0);
       expect(mockConnection.release).toHaveBeenCalled();
@@ -691,7 +713,7 @@ describe('SymbolRegistrySyncService', () => {
     test('should return comprehensive registry summary', async () => {
       jest.clearAllMocks();
       mockPool.getConnection.mockResolvedValue(mockConnection);
-      
+
       mockConnection.query
         .mockResolvedValueOnce([
           [{ count: 20000 }]

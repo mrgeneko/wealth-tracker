@@ -18,7 +18,16 @@ class SymbolRegistrySyncService {
     NYSE_FILE: process.env.NYSE_FILE || path.join(__dirname, '../../config/nyse-listed.csv'),
     OTHER_FILE: process.env.OTHER_FILE || path.join(__dirname, '../../config/other-listed.csv'),
     BATCH_SIZE: parseInt(process.env.SYNC_BATCH_SIZE || '500', 10),
-    ENABLE_SYNC_ON_STARTUP: process.env.ENABLE_SYNC_ON_STARTUP !== 'false'
+    ENABLE_SYNC_ON_STARTUP: process.env.ENABLE_SYNC_ON_STARTUP !== 'false',
+    // Mapping from Nasdaq Symbol Directory exchange codes to readable names
+    // Source: https://www.nasdaqtrader.com/trader.aspx?id=symboldirdefs
+    EXCHANGE_MAPPING: {
+      'A': 'NYSE MKT',
+      'N': 'New York Stock Exchange (NYSE)',
+      'P': 'NYSE ARCA',
+      'Z': 'BATS Global Markets (BATS)',
+      'V': 'Investors\' Exchange, LLC (IEXG)'
+    }
   };
 
   constructor(dbPool, symbolRegistryService) {
@@ -68,7 +77,7 @@ class SymbolRegistrySyncService {
     return {
       ticker: 'ACT Symbol',
       name: 'Company Name',
-      exchange: null // Will be set to OTHER
+      exchange: 'Exchange'
     };
   }
 
@@ -99,7 +108,7 @@ class SymbolRegistrySyncService {
         const name = r['Security Name'].trim();
         // Determine security type: ETF if 'ETF' in name, otherwise EQUITY
         const securityType = name.toUpperCase().includes('ETF') ? 'ETF' : 'EQUITY';
-        
+
         return {
           ticker: r.Symbol.trim(),
           name: name,
@@ -121,7 +130,7 @@ class SymbolRegistrySyncService {
         const name = r['Company Name'].trim();
         // Determine security type: ETF if 'ETF' in name, otherwise EQUITY (no bonds/treasuries in NYSE)
         const securityType = name.toUpperCase().includes('ETF') ? 'ETF' : 'EQUITY';
-        
+
         return {
           ticker: r['ACT Symbol'].trim(),
           name: name,
@@ -148,11 +157,15 @@ class SymbolRegistrySyncService {
         } else if (name.toUpperCase().includes('ETF')) {
           securityType = 'ETF';
         }
-        
+
+        // Map exchange code to readable name, fallback to 'OTHER'
+        const exchangeCode = r['Exchange'];
+        const exchange = this.constructor.CONFIG.EXCHANGE_MAPPING[exchangeCode] || 'OTHER';
+
         return {
           ticker: r['ACT Symbol'].trim(),
           name: name,
-          exchange: 'OTHER',
+          exchange: exchange,
           source: 'OTHER_FILE',
           security_type: securityType,
           cusip: null
@@ -254,11 +267,11 @@ class SymbolRegistrySyncService {
 
       // Record successful sync
       await this.updateFileRefreshStatus(
-        fileType, 
-        'SUCCESS', 
-        stats.duration_ms, 
-        stats.inserted, 
-        stats.updated, 
+        fileType,
+        'SUCCESS',
+        stats.duration_ms,
+        stats.inserted,
+        stats.updated,
         null
       );
 
