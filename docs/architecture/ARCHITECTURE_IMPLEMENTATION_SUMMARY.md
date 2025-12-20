@@ -352,6 +352,30 @@ POST /api/watchlists/sync
 
 ---
 
+### Phase 12: Crypto Listing Scraper & Market Cap Sorting ✅
+**Commits**: `current`
+**Status**: Production Ready
+
+**What Was Built**:
+- `scripts/setup/update_crypto_listings.js` - Puppeteer-based scraper for Investing.com
+- Enhanced `SymbolRegistrySyncService` to parse market cap with unit suffixes (T, B, M)
+- Integrated into `ListingSyncService` for automated refreshes
+- Updated `TickerRegistryService.calculateSortRank` for market-cap based crypto prioritization
+
+**Key Features**:
+- Provider pattern for extensible crypto data sourcing
+- Market cap-aware sorting for crypto symbols in autocomplete
+- Headless browser support in `listing-sync` container
+- Atomic CSV file updates for data integrity
+
+**Impact**:
+- ✅ Automatic discovery of 100+ top crypto assets
+- ✅ Major cryptos (BTC, ETH) prioritized in search results
+- ✅ Robust parsing of large numeric market cap values
+- ✅ Continuous data freshness via `ListingSyncService`
+
+---
+
 ## Additional Work (Post-Phase 11)
 
 ### Type Detection Refactoring ✅
@@ -411,6 +435,7 @@ POST /api/watchlists/sync
 | **Memory (Scraper)** | 500 MB | 700 MB | +40% (for 4x throughput) |
 | **API Response Time** | N/A | 2-5 ms (avg) | ✅ Sub-10ms |
 | **Registry Load Time** | 2-3 sec (CSV) | 50-200 ms (DB) | **10-30x** ↓ |
+| **Crypto Presence** | None/Manual | 100+ Auto-refreshed | 🆕 **Integrated** |
 
 ### Architecture Quality
 | Aspect | Before | After |
@@ -436,6 +461,7 @@ ticker_registry (Single Source of Truth)
   ├── source (NASDAQ_FILE, NYSE_FILE, OTHER_LISTED_FILE, TREASURY_FILE, etc.)
   ├── sort_rank (for ordering)
   ├── has_yahoo_metadata
+  ├── market_cap (added for Sort Rank)
   └── ... other fields
 
 securities_metadata

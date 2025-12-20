@@ -27,7 +27,8 @@ class SymbolRegistrySyncService {
       'P': 'NYSE ARCA',
       'Z': 'BATS',
       'V': 'IEXG'
-    }
+    },
+    CRYPTO_INVESTING_FILE: process.env.CRYPTO_INVESTING_FILE || path.join(__dirname, '../../config/investing-crypto.csv')
   };
 
   constructor(dbPool, symbolRegistryService) {
@@ -44,7 +45,8 @@ class SymbolRegistrySyncService {
       'NASDAQ': { path: this.constructor.CONFIG.NASDAQ_FILE, columns: this.getNasdaqColumns() },
       'NYSE': { path: this.constructor.CONFIG.NYSE_FILE, columns: this.getNyseColumns() },
       'OTHER': { path: this.constructor.CONFIG.OTHER_LISTED_FILE, columns: this.getOtherColumns() },
-      'TREASURY': { path: null, columns: null } // Loaded via TreasuryDataHandler
+      'TREASURY': { path: null, columns: null }, // Loaded via TreasuryDataHandler
+      'CRYPTO_INVESTING': { path: this.constructor.CONFIG.CRYPTO_INVESTING_FILE, columns: this.getCryptoColumns() }
     };
   }
 
@@ -78,6 +80,18 @@ class SymbolRegistrySyncService {
       ticker: 'ACT Symbol',
       name: 'Company Name',
       exchange: 'Exchange'
+    };
+  }
+
+  /**
+   * CRYPTO CSV columns: symbol, name, market_cap, rank
+   */
+  getCryptoColumns() {
+    return {
+      ticker: 'symbol',
+      name: 'name',
+      exchange: null, // Will be set to CRYPTO
+      market_cap: 'market_cap'
     };
   }
 
@@ -174,6 +188,36 @@ class SymbolRegistrySyncService {
   }
 
   /**
+   * Parse Crypto symbols from CSV records
+   */
+  parseCryptoSymbols(records) {
+    return records.map(r => {
+      // Handle market cap suffix (T, B, M) if present, though scraper likely cleans it.
+      // Scraper output is numeric-like but might have suffix if logic changed.
+      // Plan specified scraper outputs cleaned strings or we clean here.
+      // Let's implement robust cleaning.
+      let mktCapString = (r.market_cap || '0').toString().toUpperCase().replace(/[$, ]/g, '');
+      let multiplier = 1;
+
+      if (mktCapString.endsWith('T')) { multiplier = 1e12; mktCapString = mktCapString.slice(0, -1); }
+      else if (mktCapString.endsWith('B')) { multiplier = 1e9; mktCapString = mktCapString.slice(0, -1); }
+      else if (mktCapString.endsWith('M')) { multiplier = 1e6; mktCapString = mktCapString.slice(0, -1); }
+
+      const marketCapValue = parseFloat(mktCapString) * multiplier;
+
+      return {
+        ticker: r.symbol.trim(),
+        name: r.name.trim(),
+        exchange: 'CRYPTO',
+        source: 'CRYPTO_INVESTING_FILE',
+        security_type: 'CRYPTO',
+        market_cap: isNaN(marketCapValue) ? null : marketCapValue,
+        cusip: null
+      };
+    });
+  }
+
+  /**
    * Infer security type from name using keywords
    */
   inferSecurityType(name) {
@@ -206,6 +250,7 @@ class SymbolRegistrySyncService {
       source: symbolData.source,
       has_yahoo_metadata: false,
       usd_trading_volume: null,
+      market_cap: symbolData.market_cap || null,
       issue_date: null,
       maturity_date: null,
       security_term: null,
@@ -243,10 +288,13 @@ class SymbolRegistrySyncService {
         records = await this.loadCsvFile(this.constructor.CONFIG.NYSE_FILE);
         records = this.parseNyseSymbols(records);
       } else if (fileType === 'OTHER') {
-        records = await this.loadCsvFile(this.constructor.CONFIG.OTHER_FILE);
+        records = await this.loadCsvFile(this.constructor.CONFIG.OTHER_LISTED_FILE);
         records = this.parseOtherSymbols(records);
       } else if (fileType === 'TREASURY') {
         records = await this.treasuryHandler.loadTreasuryData();
+      } else if (fileType === 'CRYPTO_INVESTING') {
+        records = await this.loadCsvFile(this.constructor.CONFIG.CRYPTO_INVESTING_FILE);
+        records = this.parseCryptoSymbols(records);
       }
 
       stats.total_records = records.length;
@@ -404,15 +452,16 @@ class SymbolRegistrySyncService {
     const sql = `
       INSERT INTO ticker_registry (
         ticker, name, exchange, security_type, source, has_yahoo_metadata, 
-        usd_trading_volume, sort_rank, issue_date, maturity_date, security_term, 
+        usd_trading_volume, market_cap, sort_rank, issue_date, maturity_date, security_term, 
         underlying_ticker, strike_price, option_type, expiration_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const sortRank = this.symbolRegistryService.calculateSortRank(
       symbolData.security_type,
       symbolData.has_yahoo_metadata,
-      symbolData.usd_trading_volume
+      symbolData.usd_trading_volume,
+      symbolData.market_cap
     );
 
     await conn.query(sql, [
@@ -423,6 +472,7 @@ class SymbolRegistrySyncService {
       symbolData.source,
       symbolData.has_yahoo_metadata ? 1 : 0,
       symbolData.usd_trading_volume || null,
+      symbolData.market_cap || null,
       sortRank,
       symbolData.issue_date || null,
       symbolData.maturity_date || null,
@@ -441,14 +491,15 @@ class SymbolRegistrySyncService {
     const sql = `
       UPDATE ticker_registry
       SET name = ?, exchange = ?, security_type = ?, source = ?,
-          usd_trading_volume = ?, sort_rank = ?, updated_at = NOW()
+          usd_trading_volume = ?, market_cap = ?, sort_rank = ?, updated_at = NOW()
       WHERE id = ?
     `;
 
     const sortRank = this.symbolRegistryService.calculateSortRank(
       symbolData.security_type,
       symbolData.has_yahoo_metadata,
-      symbolData.usd_trading_volume
+      symbolData.usd_trading_volume,
+      symbolData.market_cap
     );
 
     await conn.query(sql, [
@@ -457,6 +508,7 @@ class SymbolRegistrySyncService {
       symbolData.security_type,
       symbolData.source,
       symbolData.usd_trading_volume || null,
+      symbolData.market_cap || null,
       sortRank,
       symbolId
     ]);
@@ -468,7 +520,7 @@ class SymbolRegistrySyncService {
    */
   async syncAll() {
     const allStats = {
-      total_files: 4,
+      total_files: 5,
       files: [],
       total_records: 0,
       total_inserted: 0,
@@ -478,7 +530,7 @@ class SymbolRegistrySyncService {
       start_time: new Date()
     };
 
-    for (const fileType of ['NASDAQ', 'NYSE', 'OTHER', 'TREASURY']) {
+    for (const fileType of ['NASDAQ', 'NYSE', 'OTHER', 'TREASURY', 'CRYPTO_INVESTING']) {
       try {
         console.log('[SymbolRegistrySync] Starting sync for', fileType);
         const stats = await this.syncFileType(fileType);

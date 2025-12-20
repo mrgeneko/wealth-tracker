@@ -127,6 +127,30 @@ describe('SymbolRegistryService', () => {
       const rank = service.calculateSortRank('EQUITY', true, 2000000000);
       expect(rank).toBe(10);
     });
+
+    test('calculateSortRank for CRYPTO should apply market cap bonus > $100B', () => {
+      const baseRank = service.calculateSortRank('CRYPTO', false, null);
+      const rankWith100BCap = service.calculateSortRank('CRYPTO', false, null, 150000000000);
+      expect(rankWith100BCap).toBe(baseRank - 50);
+    });
+
+    test('calculateSortRank for CRYPTO should apply market cap bonus > $10B', () => {
+      const baseRank = service.calculateSortRank('CRYPTO', false, null);
+      const rankWith10BCap = service.calculateSortRank('CRYPTO', false, null, 15000000000);
+      expect(rankWith10BCap).toBe(baseRank - 40);
+    });
+
+    test('calculateSortRank for CRYPTO should apply market cap bonus > $1B', () => {
+      const baseRank = service.calculateSortRank('CRYPTO', false, null);
+      const rankWith1BCap = service.calculateSortRank('CRYPTO', false, null, 1500000000);
+      expect(rankWith1BCap).toBe(baseRank - 30);
+    });
+
+    test('calculateSortRank for CRYPTO should not apply cap bonus for < $1B', () => {
+      const baseRank = service.calculateSortRank('CRYPTO', false, null);
+      const rankWithSmallCap = service.calculateSortRank('CRYPTO', false, null, 500000000);
+      expect(rankWithSmallCap).toBe(baseRank);
+    });
   });
 
   describe('Source Priority', () => {

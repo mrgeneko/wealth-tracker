@@ -97,8 +97,11 @@ describe('WebSocket Metrics System - Phase 9.2', () => {
 
         client.on('close', () => {
           expect(connectedMessage).toBe(true);
-          expect(metricsWS.clients.size).toBe(0);
-          done();
+          // Give the server a moment to recognize the connection has closed
+          setTimeout(() => {
+            expect(metricsWS.clients.size).toBe(0);
+            done();
+          }, 100);
         });
       });
     });

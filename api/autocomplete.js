@@ -128,7 +128,10 @@ router.get('/details/:ticker', requirePool, async (req, res) => {
 
     try {
         const service = new MetadataAutocompleteService(connectionPool);
-        const details = await service.getTickerDetails(ticker);
+        const id = req.query.id;
+        const details = id
+            ? await service.getTickerDetailsById(id)
+            : await service.getTickerDetails(ticker);
 
         if (!details) {
             return res.status(404).json({

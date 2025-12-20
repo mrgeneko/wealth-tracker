@@ -3,6 +3,12 @@ const mysql = require('mysql2/promise');
 
 const { ListingSyncService } = require('../../../../services/listing-sync/listing_sync_service');
 
+jest.mock('../../../../scripts/setup/update_crypto_listings', () => ({
+  CryptoListingOrchestrator: jest.fn().mockImplementation(() => ({
+    updateAll: jest.fn().mockResolvedValue(true)
+  }))
+}));
+
 describe('ListingSyncService (Phase 1)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -51,7 +57,7 @@ describe('ListingSyncService (Phase 1)', () => {
     const res = await svc.syncAll();
 
     expect(downloader.downloadAndUpdateAll).toHaveBeenCalled();
-    expect(syncService.syncFileType).toHaveBeenCalledTimes(4);
+    expect(syncService.syncFileType).toHaveBeenCalledTimes(5);
     expect(res.success).toBe(true);
   });
 });

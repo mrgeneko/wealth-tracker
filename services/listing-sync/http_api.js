@@ -119,7 +119,7 @@ function createHttpApi(service) {
       if (pathname.startsWith('/sync/file/') && method === 'POST') {
         const fileTypeRaw = pathname.slice('/sync/file/'.length);
         const fileType = normalizeFileType(decodeURIComponent(fileTypeRaw));
-        const allowed = new Set(['NASDAQ', 'NYSE', 'OTHER', 'TREASURY']);
+        const allowed = new Set(['NASDAQ', 'NYSE', 'OTHER', 'TREASURY', 'CRYPTO_INVESTING']);
         if (!fileType || !allowed.has(fileType)) {
           writeJson(res, 400, { error: 'Invalid file type', allowed: Array.from(allowed) });
           return;

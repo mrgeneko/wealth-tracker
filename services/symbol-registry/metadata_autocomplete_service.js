@@ -38,7 +38,7 @@ class MetadataAutocompleteService {
      */
     async searchTickers(query, options = {}) {
         const searchQuery = query.toUpperCase().trim();
-        
+
         if (searchQuery.length < this.config.MIN_QUERY_LENGTH) {
             return [];
         }
@@ -69,10 +69,10 @@ class MetadataAutocompleteService {
     async _searchWithRanking(connection, query, limit, includeMetadata) {
         // Ensure limit is an integer and within bounds
         const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
-        
+
         // Escape SQL wildcards in the user input
         const escapedQuery = query.replace(/[%_]/g, '\\$&');
-        
+
         // Use connection.query with string interpolation for LIMIT
         const sql = `
             SELECT 
@@ -80,7 +80,8 @@ class MetadataAutocompleteService {
                 sr.name,
                 sr.security_type,
                 sr.exchange,
-                sr.source
+                sr.source,
+                sr.id
             FROM ticker_registry sr
             WHERE sr.ticker LIKE ? OR sr.name LIKE ?
             ORDER BY 
@@ -134,6 +135,7 @@ class MetadataAutocompleteService {
      */
     _formatResult(row, stats = null) {
         const base = {
+            id: row.id,
             ticker: row.ticker,
             name: row.name || row.ticker,
             type: row.security_type || 'UNKNOWN',
@@ -177,12 +179,69 @@ class MetadataAutocompleteService {
     }
 
     /**
+     * Map internal/Yahoo security types to standard dashboard types
+     * Standard types: stock, etf, bond, cash, crypto, other
+     */
+    _normalizeSecurityType(type) {
+        if (!type) return 'stock';
+
+        const t = String(type).toUpperCase().trim();
+
+        const typeMap = {
+            // Equities
+            'EQUITY': 'stock',
+            'STOCK': 'stock',
+            'MUTUAL_FUND': 'stock',
+            'INDEX': 'stock',
+
+            // ETFs
+            'ETF': 'etf',
+            'EXCHANGE_TRADED_FUND': 'etf',
+
+            // Bonds/Treasuries
+            'BOND': 'bond',
+            'TREASURY': 'bond',
+            'US_TREASURY': 'bond',
+
+            // Crypto
+            'CRYPTO': 'crypto',
+            'CRYPTOCURRENCY': 'crypto',
+
+            // Cash
+            'CASH': 'cash',
+            'MONEY_MARKET': 'cash',
+
+            // Other
+            'OPTION': 'other',
+            'FUTURES': 'other',
+            'FX': 'other',
+            'OTHER': 'other'
+        };
+
+        return typeMap[t] || 'stock';
+    }
+
+    /**
      * Get detailed metadata for a single ticker
      * Used for "Add Position" modal
      */
     async getTickerDetails(ticker) {
         const normalizedTicker = ticker.toUpperCase();
-        
+        return this._getDetailsByCriteria('ticker = ?', [normalizedTicker]);
+    }
+
+    /**
+     * Get detailed metadata for a single item by registry ID
+     * @param {number} id - Registry ID
+     */
+    async getTickerDetailsById(id) {
+        return this._getDetailsByCriteria('id = ?', [id]);
+    }
+
+    /**
+     * Internal helper for ticker details lookup
+     */
+    async _getDetailsByCriteria(whereClause, params) {
         let connection;
         try {
             connection = await this.pool.getConnection();
@@ -191,8 +250,8 @@ class MetadataAutocompleteService {
             const [registry] = await connection.execute(`
                 SELECT *
                 FROM ticker_registry 
-                WHERE ticker = ?
-            `, [normalizedTicker]);
+                WHERE ${whereClause}
+            `, params);
 
             if (registry.length === 0) {
                 return null;
@@ -200,38 +259,28 @@ class MetadataAutocompleteService {
 
             const tickerData = registry[0];
 
-            // Get metadata if available
             const [metadata] = await connection.execute(`
                 SELECT *
                 FROM securities_metadata
                 WHERE ticker = ?
-            `, [normalizedTicker]);
+            `, [tickerData.ticker]);
 
             const metadataRecord = metadata.length > 0 ? metadata[0] : null;
 
-            // Auto-detect type from authoritative sources
-            let detectedType = tickerData.security_type;
+            // Auto-detect and normalize type from authoritative sources
+            let detectedType = this._normalizeSecurityType(tickerData.security_type);
 
             // Priority 1: Check if it's a bond (treasury registry)
-            // Use security_type rather than exchange; treasuries trade OTC.
             if (tickerData.security_type === 'TREASURY' || tickerData.security_type === 'BOND') {
                 detectedType = 'bond';
             }
             // Priority 2: Use Yahoo metadata asset type (handles crypto, ETF, stock)
             else if (metadataRecord && metadataRecord.asset_type) {
-                const assetType = metadataRecord.asset_type.toUpperCase();
-                // Map Yahoo assetType to our types: EQUITY, ETF, CRYPTOCURRENCY -> stock, etf, crypto
-                const typeMap = {
-                    'EQUITY': 'stock',
-                    'ETF': 'etf',
-                    'CRYPTOCURRENCY': 'crypto',
-                    'CRYPTO': 'crypto'
-                };
-                detectedType = typeMap[assetType] || 'stock';
+                detectedType = this._normalizeSecurityType(metadataRecord.asset_type);
             }
-            // Priority 3: Fallback to registry type
-            else {
-                detectedType = tickerData.security_type || 'stock';
+            // Priority 3: Use quote_type if available in metadata
+            else if (metadataRecord && metadataRecord.quote_type) {
+                detectedType = this._normalizeSecurityType(metadataRecord.quote_type);
             }
 
             return {
@@ -293,7 +342,7 @@ class MetadataAutocompleteService {
      */
     async markMetadataFetched(ticker) {
         const normalizedTicker = ticker.toUpperCase();
-        
+
         let connection;
         try {
             connection = await this.pool.getConnection();
@@ -363,7 +412,7 @@ class MetadataAutocompleteService {
                 WHERE has_yahoo_metadata = 0 
                 AND security_type IN ('EQUITY', 'ETF', 'MUTUAL_FUND')
             `);
-            
+
             // Get recent processing metrics from securities_metadata updates
             const [processingResult] = await connection.execute(`
                 SELECT 
@@ -373,11 +422,11 @@ class MetadataAutocompleteService {
                 WHERE last_updated >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
                 AND created_at IS NOT NULL
             `);
-            
+
             const queueSize = queueResult[0].queue_size;
             const recentUpdates = processingResult[0].recent_updates || 0;
             const avgProcessingTime = processingResult[0].avg_processing_time_seconds || 0;
-            
+
             // Estimate time to complete queue (based on 2s throttling)
             const estimatedMinutes = queueSize > 0 ? Math.ceil((queueSize * 2) / 60) : 0;
 
@@ -425,7 +474,7 @@ class MetadataAutocompleteService {
      */
     async refreshTickerMetadata(ticker) {
         const normalizedTicker = ticker.toUpperCase();
-        
+
         let connection;
         try {
             connection = await this.pool.getConnection();
