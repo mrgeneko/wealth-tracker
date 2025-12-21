@@ -59,9 +59,16 @@ class CryptoListingOrchestrator {
         // Columns: symbol,name,market_cap,rank
         const header = 'symbol,name,market_cap,rank\n';
         const rows = data.map(item => {
+            // For crypto symbols, append "/USD" if not already present
+            // Investing.com watchlists require currency pair format
+            let symbol = item.symbol;
+            if (!symbol.includes('/')) {
+                symbol = `${symbol}/USD`;
+            }
+
             // Escape commas in names if present
             const safeName = item.name.includes(',') ? `"${item.name}"` : item.name;
-            const safeSymbol = item.symbol.includes(',') ? `"${item.symbol}"` : item.symbol;
+            const safeSymbol = symbol.includes(',') ? `"${symbol}"` : symbol;
             return `${safeSymbol},${safeName},${item.market_cap},${item.rank}`;
         }).join('\n');
 
