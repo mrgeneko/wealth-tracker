@@ -77,7 +77,9 @@ CREATE TABLE IF NOT EXISTS positions (
   ticker VARCHAR(50) DEFAULT NULL,
   description VARCHAR(255) DEFAULT NULL,
   quantity DECIMAL(20,8) DEFAULT NULL,
-  type ENUM('stock','etf','bond','cash','crypto','other') NOT NULL,
+  security_type VARCHAR(20) NOT NULL,           -- CHANGED: renamed from 'type', now VARCHAR
+  source VARCHAR(50) DEFAULT NULL,               -- NEW: track data source
+  pricing_provider VARCHAR(50) DEFAULT NULL,     -- NEW: track pricing provider
   exchange VARCHAR(50) DEFAULT NULL,
   currency VARCHAR(10) DEFAULT 'USD',
   maturity_date DATE DEFAULT NULL,
@@ -89,6 +91,8 @@ CREATE TABLE IF NOT EXISTS positions (
   KEY account_id (account_id),
   KEY idx_positions_ticker (ticker),
   KEY idx_positions_normalized_key (normalized_key),
+  KEY idx_positions_ticker_security_type (ticker, security_type),    -- NEW
+  KEY idx_positions_pricing_provider (pricing_provider),             -- NEW
   CONSTRAINT positions_ibfk_1 FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -106,8 +110,10 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create latest_prices table
+-- Support multiple prices per ticker (one per security_type)
 CREATE TABLE IF NOT EXISTS latest_prices (
   ticker VARCHAR(50) NOT NULL,
+  security_type VARCHAR(20) NOT NULL DEFAULT 'EQUITY',  -- NEW: support multiple security types per ticker
   price DECIMAL(18,4) DEFAULT NULL,
   previous_close_price DECIMAL(18,4) DEFAULT NULL,
   prev_close_source VARCHAR(50) DEFAULT NULL,
@@ -116,7 +122,8 @@ CREATE TABLE IF NOT EXISTS latest_prices (
   quote_time DATETIME DEFAULT NULL,
   capture_time DATETIME DEFAULT NULL,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (ticker)
+  PRIMARY KEY (ticker, security_type),           -- CHANGED: composite key
+  KEY idx_latest_prices_ticker (ticker)          -- NEW: for ticker-only lookups
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_metadata table
@@ -295,6 +302,8 @@ CREATE TABLE IF NOT EXISTS ticker_registry (
   exchange VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
   security_type ENUM('NOT_SET','EQUITY','ETF','BOND','US_TREASURY','MUTUAL_FUND','OPTION','CRYPTO','FX','FUTURES','INDEX','OTHER') NOT NULL DEFAULT 'NOT_SET',
   source ENUM('NASDAQ_FILE','NYSE_FILE','OTHER_LISTED_FILE','TREASURY_FILE','TREASURY_HISTORICAL','YAHOO','USER_ADDED','CRYPTO_INVESTING_FILE') NOT NULL,
+  pricing_provider VARCHAR(50) DEFAULT NULL,     -- NEW: routing for price fetching
+  display_name VARCHAR(200) DEFAULT NULL,        -- NEW: for autocomplete display
   has_yahoo_metadata TINYINT(1) DEFAULT 0,
   permanently_failed TINYINT(1) DEFAULT 0,
   permanent_failure_reason VARCHAR(255) DEFAULT NULL,
@@ -322,6 +331,7 @@ CREATE TABLE IF NOT EXISTS ticker_registry (
   KEY idx_expiration_date (expiration_date),
   KEY idx_underlying (underlying_ticker, underlying_exchange, underlying_security_type),
   KEY idx_permanently_failed (permanently_failed),
+  KEY idx_pricing_provider (pricing_provider),   -- NEW
   CONSTRAINT fk_underlying_ticker FOREIGN KEY (underlying_ticker, underlying_exchange, underlying_security_type)
     REFERENCES ticker_registry (ticker, exchange, security_type) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -421,3 +431,54 @@ CREATE TABLE IF NOT EXISTS scheduler_metrics (
   PRIMARY KEY (id),
   KEY idx_source_time (scraper_source,created_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- SEED DATA: Source Tracking Feature
+-- ============================================================================
+
+-- Populate pricing_provider for existing ticker_registry sources
+-- This establishes the default routing for price fetching
+
+UPDATE ticker_registry
+SET pricing_provider = 'YAHOO'
+WHERE source IN ('NASDAQ_FILE', 'NYSE_FILE', 'OTHER_LISTED_FILE')
+  AND security_type IN ('EQUITY', 'ETF')
+  AND pricing_provider IS NULL;
+
+UPDATE ticker_registry
+SET pricing_provider = 'TREASURY_GOV'
+WHERE security_type = 'US_TREASURY'
+  AND pricing_provider IS NULL;
+
+UPDATE ticker_registry
+SET pricing_provider = 'INVESTING_COM'
+WHERE source = 'CRYPTO_INVESTING_FILE'
+  AND security_type = 'CRYPTO'
+  AND pricing_provider IS NULL;
+
+-- Generate display_name for autocomplete
+-- Format: "TICKER - Name (SECURITY_TYPE, source_domain)"
+-- Examples:
+--   "BTC - Bitcoin (CRYPTO, investing.com)"
+--   "AAPL - Apple Inc. (EQUITY, NASDAQ)"
+
+UPDATE ticker_registry
+SET display_name = CONCAT(
+  ticker, ' - ',
+  COALESCE(name, 'Unknown'),
+  ' (',
+  security_type, ', ',
+  CASE source
+    WHEN 'CRYPTO_INVESTING_FILE' THEN 'investing.com'
+    WHEN 'NASDAQ_FILE' THEN 'NASDAQ'
+    WHEN 'NYSE_FILE' THEN 'NYSE'
+    WHEN 'OTHER_LISTED_FILE' THEN 'Other Listed'
+    WHEN 'TREASURY_FILE' THEN 'treasury.gov'
+    WHEN 'TREASURY_HISTORICAL' THEN 'treasury.gov'
+    WHEN 'YAHOO' THEN 'Yahoo Finance'
+    WHEN 'USER_ADDED' THEN 'User Added'
+    ELSE source
+  END,
+  ')'
+)
+WHERE display_name IS NULL;
