@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
 -- - source: Handle crypto ticker variations (BTC.X vs BTC-USD) and multi-exchange tickers (BP on NYSE vs LSE)
 CREATE TABLE IF NOT EXISTS latest_prices (
   ticker VARCHAR(50) NOT NULL,
-  security_type VARCHAR(20) NOT NULL DEFAULT 'EQUITY',
+  security_type VARCHAR(20) NOT NULL DEFAULT 'NOT_SET',
   source VARCHAR(50) NOT NULL DEFAULT 'unknown',
   price DECIMAL(18,4) DEFAULT NULL,
   previous_close_price DECIMAL(18,4) DEFAULT NULL,

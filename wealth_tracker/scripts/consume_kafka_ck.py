@@ -68,7 +68,7 @@ def get_db_connection():
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS latest_prices (
                     ticker VARCHAR(50) NOT NULL,
-                    security_type VARCHAR(20) NOT NULL DEFAULT 'EQUITY',
+                    security_type VARCHAR(20) NOT NULL DEFAULT 'NOT_SET',
                     source VARCHAR(50) NOT NULL DEFAULT 'unknown',
                     price DECIMAL(18, 4),
                     previous_close_price DECIMAL(18, 4),
@@ -96,12 +96,12 @@ def process_message(data):
         logging.warning("Skipping message missing key")
         return
 
-    # Extract security_type (default to EQUITY for backward compatibility)
-    security_type = data.get('security_type', 'EQUITY')
+    # Extract security_type (default to NOT_SET to be explicit about missing data)
+    security_type = data.get('security_type', 'NOT_SET')
     if isinstance(security_type, str):
         security_type = security_type.upper()
     else:
-        security_type = 'EQUITY'
+        security_type = 'NOT_SET'
 
     # Extract source for composite key (ticker, security_type, source)
     # This handles crypto ticker variations (BTC.X vs BTC-USD) and
