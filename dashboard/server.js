@@ -520,11 +520,12 @@ async function fetchAssetsFromDB() {
         // Fetch positions with metadata
         // Use COLLATE to ensure compatibility between tables
         const [positions] = await pool.query(`
-            SELECT p.*, 
-                   sm.short_name, sm.sector, sm.market_cap, 
-                   sm.dividend_yield, sm.trailing_pe, 
+            SELECT p.*,
+                   sm.short_name, sm.sector, sm.market_cap,
+                   sm.dividend_yield, sm.trailing_pe,
                    sm.ttm_dividend_amount, sm.ttm_eps,
-                   sm.quote_type, sm.exchange as meta_exchange
+                   sm.quote_type, sm.exchange as meta_exchange,
+                   p.security_type as type
             FROM positions p
             LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker COLLATE utf8mb4_unicode_ci
         `);
@@ -581,6 +582,9 @@ async function fetchAssetsFromDB() {
                     ticker: pos.ticker,
                     quantity: parseFloat(pos.quantity),
                     cost_basis: pos.cost_basis ? parseFloat(pos.cost_basis) : 0,
+                    // Source tracking fields
+                    source: pos.source || null,
+                    pricing_provider: pos.pricing_provider || null,
                     // Metadata fields (from JOIN)
                     short_name: pos.short_name || null,
                     sector: pos.sector || null,
@@ -1451,7 +1455,7 @@ app.delete('/api/accounts/:id', async (req, res) => {
 app.post('/api/positions', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { account_id, ticker, quantity, currency, type } = normalized;
+    const { account_id, ticker, quantity, currency, type, source, pricing_provider } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1459,16 +1463,16 @@ app.post('/api/positions', async (req, res) => {
     if (!Number.isFinite(quantity)) {
         return res.status(400).json({ error: 'quantity must be a valid number' });
     }
-    
+
     try {
-        // Valid position types based on ENUM definition
+        // Valid position types based on VARCHAR definition
         const validTypes = ['stock', 'etf', 'bond', 'cash', 'crypto', 'other'];
 
         // Type-driven only: respect incoming type when provided.
         // If type is not provided, fall back to bond auto-detection (else stock).
         let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
 
-        // Validate type against ENUM values
+        // Validate type against allowed values
         if (detectedType && !validTypes.includes(detectedType)) {
             return res.status(400).json({
                 error: `Invalid type '${detectedType}'. Must be one of: ${validTypes.join(', ')}`
@@ -1480,12 +1484,21 @@ app.post('/api/positions', async (req, res) => {
         }
 
         const [result] = await pool.execute(
-            'INSERT INTO positions (account_id, ticker, type, quantity, currency) VALUES (?, ?, ?, ?, ?)',
-            [account_id, ticker, detectedType, quantity, currency || 'USD']
+            'INSERT INTO positions (account_id, ticker, security_type, quantity, currency, source, pricing_provider) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [account_id, ticker, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null]
         );
         assetsCache = null;
         loadAssets();
-        res.json({ id: result.insertId, account_id, ticker, type: detectedType, quantity, currency: currency || 'USD' });
+        res.json({
+            id: result.insertId,
+            account_id,
+            ticker,
+            type: detectedType,
+            quantity,
+            currency: currency || 'USD',
+            source: source || null,
+            pricing_provider: pricing_provider || null
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1494,7 +1507,7 @@ app.post('/api/positions', async (req, res) => {
 app.put('/api/positions/:id', async (req, res) => {
     const { normalizePositionBody } = require('./position_body');
     const normalized = normalizePositionBody(req.body);
-    const { ticker, quantity, currency, type } = normalized;
+    const { ticker, quantity, currency, type, source, pricing_provider } = normalized;
 
     if (!ticker) {
         return res.status(400).json({ error: 'ticker is required' });
@@ -1502,16 +1515,16 @@ app.put('/api/positions/:id', async (req, res) => {
     if (!Number.isFinite(quantity)) {
         return res.status(400).json({ error: 'quantity must be a valid number' });
     }
-    
+
     try {
-        // Valid position types based on ENUM definition
+        // Valid position types based on VARCHAR definition
         const validTypes = ['stock', 'etf', 'bond', 'cash', 'crypto', 'other'];
 
         // Type-driven only: respect incoming type when provided.
         // If type is not provided, fall back to bond auto-detection (else stock).
         let detectedType = (type && String(type).trim()) ? String(type).trim().toLowerCase() : null;
 
-        // Validate type against ENUM values
+        // Validate type against allowed values
         if (detectedType && !validTypes.includes(detectedType)) {
             return res.status(400).json({
                 error: `Invalid type '${detectedType}'. Must be one of: ${validTypes.join(', ')}`
@@ -1523,8 +1536,8 @@ app.put('/api/positions/:id', async (req, res) => {
         }
 
         await pool.execute(
-            'UPDATE positions SET ticker=?, type=?, quantity=?, currency=? WHERE id=?',
-            [ticker, detectedType, quantity, currency || 'USD', req.params.id]
+            'UPDATE positions SET ticker=?, security_type=?, quantity=?, currency=?, source=?, pricing_provider=? WHERE id=?',
+            [ticker, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null, req.params.id]
         );
         assetsCache = null;
         loadAssets();

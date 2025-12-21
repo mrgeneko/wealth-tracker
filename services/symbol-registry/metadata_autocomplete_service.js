@@ -75,17 +75,19 @@ class MetadataAutocompleteService {
 
         // Use connection.query with string interpolation for LIMIT
         const sql = `
-            SELECT 
+            SELECT
                 sr.ticker,
                 sr.name,
                 sr.security_type,
                 sr.exchange,
                 sr.source,
+                sr.pricing_provider,
+                sr.display_name,
                 sr.id
             FROM ticker_registry sr
             WHERE sr.ticker LIKE ? OR sr.name LIKE ?
-            ORDER BY 
-                CASE 
+            ORDER BY
+                CASE
                     WHEN sr.ticker = ? THEN 1
                     WHEN sr.ticker LIKE ? THEN 2
                     WHEN sr.name LIKE ? THEN 3
@@ -140,6 +142,9 @@ class MetadataAutocompleteService {
             name: row.name || row.ticker,
             type: row.security_type || 'UNKNOWN',
             exchange: row.exchange || this._getExchange(row.ticker),
+            source: row.source,
+            pricing_provider: row.pricing_provider,
+            display_name: row.display_name,
             verified: true
         };
 
@@ -289,6 +294,9 @@ class MetadataAutocompleteService {
                 type: tickerData.security_type,
                 detectedType: detectedType,
                 exchange: tickerData.exchange,
+                source: tickerData.source,
+                pricing_provider: tickerData.pricing_provider,
+                display_name: tickerData.display_name,
                 verified: true,
                 metadata: metadataRecord
             };
