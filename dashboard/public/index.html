@@ -1335,6 +1335,14 @@
                                 <td style="text-align: right; padding: 4px 0;"><span
                                         id="symbolMetadataExchange">—</span></td>
                             </tr>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <td style="padding: 4px 0; color: #aaa;">Source:</td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataSource">—</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #444;">
+                                <td style="padding: 4px 0; color: #aaa;">Price Provider:</td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataPricingProvider">—</span></td>
+                            </tr>
                             <tr>
                                 <td style="padding: 4px 0; color: #aaa;">Verified:</td>
                                 <td style="text-align: right; padding: 4px 0;"><span
@@ -1345,6 +1353,8 @@
                 </div>
 
                 <input type="hidden" id="newSymbolType">
+                <input type="hidden" id="newSymbolSource">
+                <input type="hidden" id="newSymbolPricingProvider">
                 <div class="form-group">
                     <label for="newSymbolAccount">Account</label>
                     <select id="newSymbolAccount" required></select>
@@ -1367,6 +1377,7 @@
         // Ticker autocomplete setup
         let symbolAutocomplete = null;
         let autocompleteTimeout = null;
+        let metadataStore = {}; // Moved to module scope to avoid closure issues
 
         function openAddSymbolModal() {
             document.getElementById('addSymbolError').style.display = 'none';
@@ -1386,8 +1397,6 @@
 
             // Initialize Awesomplete
             const input = document.getElementById('newSymbol');
-            // Store metadata by symbol to bypass Awesomplete's data stripping
-            let metadataStore = {};
 
             if (!symbolAutocomplete) {
                 symbolAutocomplete = new Awesomplete(input, {
@@ -1402,6 +1411,7 @@
                     item: function (item, input) {
                         // Retrieve full metadata from our side-channel store using the unique id
                         const meta = metadataStore[item.value] || {};
+                        const displayName = meta.display_name || '';
                         const name = meta.name || 'Unknown Name';
                         const exchange = meta.exchange || 'Unknown';
                         const exchangeClass = (exchange || '').toLowerCase().replace(/\s+/g, '-');
@@ -1414,7 +1424,7 @@
                                             <span class="ticker-symbol">${ticker}</span>
                                             <span class="ticker-exchange ${exchangeClass}">${exchange}</span>
                                         </div>
-                                        <div class="ticker-name">${name}</div>
+                                        <div class="ticker-name">${displayName || name}</div>
                                     </div>
                                 `;
                         return li;
@@ -1567,6 +1577,8 @@
             e.preventDefault();
             const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
             const type = document.getElementById('newSymbolType').value;
+            const source = document.getElementById('newSymbolSource').value;
+            const pricing_provider = document.getElementById('newSymbolPricingProvider').value;
             const accountId = document.getElementById('newSymbolAccount').value;
             const quantity = parseFloat(document.getElementById('newSymbolQuantity').value);
             if (!symbol || !accountId || isNaN(quantity)) return;
@@ -1621,7 +1633,9 @@
                         ticker: symbol,
                         type,
                         quantity,
-                        currency
+                        currency,
+                        source,
+                        pricing_provider
                     })
                 });
                 if (!response.ok) {
@@ -4271,10 +4285,14 @@
                 const detectedType = data.detectedType || data.type || 'STOCK';
                 document.getElementById('symbolMetadataType').textContent = detectedType.toUpperCase();
                 document.getElementById('symbolMetadataExchange').textContent = data.exchange || '—';
+                document.getElementById('symbolMetadataSource').textContent = data.source || '—';
+                document.getElementById('symbolMetadataPricingProvider').textContent = data.pricing_provider || '—';
                 document.getElementById('symbolMetadataVerified').textContent = data.verified ? '✅ Yes' : '⚠️ Unverified';
 
-                // Store detected type in hidden input (backend auto-detected)
+                // Store detected type, source, and pricing_provider in hidden inputs
                 document.getElementById('newSymbolType').value = detectedType.toLowerCase();
+                document.getElementById('newSymbolSource').value = data.source || '';
+                document.getElementById('newSymbolPricingProvider').value = data.pricing_provider || '';
 
                 displayEl.style.display = 'block';
                 statusEl.textContent = '⏳ Fetching current price...';
@@ -4597,6 +4615,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             applySettings();
             fetchAssets();
+            fetchAndRenderAccountTypes();
             initializeScheduler();
             initializeStatisticsFilter();
         });
