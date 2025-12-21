@@ -1377,6 +1377,7 @@
         // Ticker autocomplete setup
         let symbolAutocomplete = null;
         let autocompleteTimeout = null;
+        let metadataStore = {}; // Moved to module scope to avoid closure issues
 
         function openAddSymbolModal() {
             document.getElementById('addSymbolError').style.display = 'none';
@@ -1396,8 +1397,6 @@
 
             // Initialize Awesomplete
             const input = document.getElementById('newSymbol');
-            // Store metadata by symbol to bypass Awesomplete's data stripping
-            let metadataStore = {};
 
             if (!symbolAutocomplete) {
                 symbolAutocomplete = new Awesomplete(input, {
