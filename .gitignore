@@ -19,6 +19,7 @@ nasdaq-listed.csv.*
 nyse-listed.csv.*
 us-treasury-auctions.csv.backup.*
 wealth_tracker/scripts/__pycache__/*
+tmp/*
 
 *.pyc
 
