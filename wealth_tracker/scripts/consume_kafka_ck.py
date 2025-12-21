@@ -60,19 +60,24 @@ def get_db_connection():
                 password=MYSQL_PASSWORD,
                 database=MYSQL_DATABASE
             )
-            # Ensure table exists
+            # Ensure table exists with security_type and source support
+            # Composite PRIMARY KEY (ticker, security_type, source) to handle:
+            # - Crypto ticker variations across sources (BTC.X vs BTC-USD)
+            # - Same ticker on multiple exchanges (BP on NYSE vs LSE)
             cursor = db_conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS latest_prices (
-                    ticker VARCHAR(50) PRIMARY KEY,
+                    ticker VARCHAR(50) NOT NULL,
+                    security_type VARCHAR(20) NOT NULL DEFAULT 'NOT_SET',
+                    source VARCHAR(50) NOT NULL DEFAULT 'unknown',
                     price DECIMAL(18, 4),
                     previous_close_price DECIMAL(18, 4),
                     prev_close_source VARCHAR(50),
                     prev_close_time DATETIME,
-                    source VARCHAR(50),
                     quote_time DATETIME,
                     capture_time DATETIME,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (ticker, security_type, source)
                 )
             """)
             db_conn.commit()
@@ -85,11 +90,25 @@ def get_db_connection():
 
 def process_message(data):
     logging.info(f"Processing message: {data}")
-    
+
     ticker = data.get('key')
     if not ticker:
         logging.warning("Skipping message missing key")
         return
+
+    # Extract security_type (default to NOT_SET to be explicit about missing data)
+    security_type = data.get('security_type', 'NOT_SET')
+    if isinstance(security_type, str):
+        security_type = security_type.upper()
+    else:
+        security_type = 'NOT_SET'
+
+    # Extract source for composite key (ticker, security_type, source)
+    # This handles crypto ticker variations (BTC.X vs BTC-USD) and
+    # multi-exchange tickers (BP on NYSE vs LSE)
+    base_source = data.get('source', 'unknown')
+    if not base_source or not isinstance(base_source, str):
+        base_source = 'unknown'
 
     # Helper to clean price strings
     def clean_val(v):
@@ -166,8 +185,8 @@ def process_message(data):
         except ValueError:
             quote_time = None
 
-    base_source = data.get('source', 'unknown')
-    final_source = f"{base_source} ({price_source})" if base_source else price_source
+    # Construct final_source with price_source detail
+    final_source = f"{base_source} ({price_source})"
 
     # Determine prev_close metadata
     prev_close_source = data.get('previous_close_source') or base_source if previous_close_price > 0 else None
@@ -180,9 +199,12 @@ def process_message(data):
             # Use source-priority merge for previous_close_price:
             # Only update prev_close fields if incoming has a valid value AND
             # (no existing value OR incoming source has higher/equal priority)
+            # Composite PRIMARY KEY: (ticker, security_type, source)
+            # - source distinguishes crypto ticker variations (BTC.X vs BTC-USD)
+            # - source distinguishes multi-exchange tickers (BP on NYSE vs LSE)
             sql = """
-                INSERT INTO latest_prices (ticker, price, previous_close_price, prev_close_source, prev_close_time, source, quote_time, capture_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO latest_prices (ticker, security_type, source, price, previous_close_price, prev_close_source, prev_close_time, quote_time, capture_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     price = VALUES(price),
                     previous_close_price = CASE
@@ -197,24 +219,24 @@ def process_message(data):
                         WHEN VALUES(previous_close_price) IS NOT NULL THEN VALUES(prev_close_time)
                         ELSE prev_close_time
                     END,
-                    source = VALUES(source),
                     quote_time = VALUES(quote_time),
                     capture_time = VALUES(capture_time)
             """
             vals = (
                 ticker,
+                security_type,
+                base_source,
                 price_val,
                 previous_close_price if previous_close_price > 0 else None,
                 prev_close_source,
                 prev_close_time,
-                final_source,
                 quote_time,
                 capture_time
             )
             cursor.execute(sql, vals)
             conn.commit()
             cursor.close()
-            logging.info(f"Upserted {ticker} to DB: {price_val} ({final_source}), prev_close={previous_close_price if previous_close_price > 0 else 'preserved'}")
+            logging.info(f"Upserted {ticker} ({security_type}) to DB: {price_val} ({final_source}), prev_close={previous_close_price if previous_close_price > 0 else 'preserved'}")
             logging.debug(f"prev_close_source={prev_close_source}, prev_close_time={prev_close_time}")
         except Exception as e:
             logging.error(f"Error writing to DB: {e}")

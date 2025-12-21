@@ -106,17 +106,22 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create latest_prices table
+-- Support multiple prices per ticker using composite key (ticker, security_type, source)
+-- - security_type: Distinguish BTC as crypto vs ETF vs stock
+-- - source: Handle crypto ticker variations (BTC.X vs BTC-USD) and multi-exchange tickers (BP on NYSE vs LSE)
 CREATE TABLE IF NOT EXISTS latest_prices (
   ticker VARCHAR(50) NOT NULL,
+  security_type VARCHAR(20) NOT NULL DEFAULT 'NOT_SET',
+  source VARCHAR(50) NOT NULL DEFAULT 'unknown',
   price DECIMAL(18,4) DEFAULT NULL,
   previous_close_price DECIMAL(18,4) DEFAULT NULL,
   prev_close_source VARCHAR(50) DEFAULT NULL,
   prev_close_time DATETIME DEFAULT NULL,
-  source VARCHAR(50) DEFAULT NULL,
   quote_time DATETIME DEFAULT NULL,
   capture_time DATETIME DEFAULT NULL,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (ticker)
+  PRIMARY KEY (ticker, security_type, source),
+  KEY idx_latest_prices_ticker (ticker)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_metadata table
