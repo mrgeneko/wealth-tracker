@@ -996,73 +996,99 @@ function triggerBondScrape() {
 // Used when adding a new ticker to ensure immediate price display
 // Also publishes to Kafka so the price persists to MySQL via the consumer
 app.post('/api/fetch-price', async (req, res) => {
-    const { ticker, type } = req.body;
+    const { ticker, type, security_type, pricing_provider } = req.body;
 
     if (!ticker || !ticker.trim()) {
         return res.status(400).json({ error: 'Ticker is required' });
     }
 
     const cleanTicker = ticker.trim().toUpperCase();
-    
+
+    // Determine security type (prefer security_type, fallback to type for compatibility)
+    let securityType = security_type || type || 'stock';
+
     // Detect if this is a bond (by type parameter or treasury registry lookup)
-    const isBond = type === 'bond' || await isBondTicker(cleanTicker);
-    
+    const isBond = securityType === 'bond' || await isBondTicker(cleanTicker);
+
     if (isBond) {
+        securityType = 'bond';
         // For bonds, trigger the scrape daemon to fetch prices on its next cycle
         // This avoids duplicating the Webull scraping code
         console.log(`[FetchPrice] Detected bond ${cleanTicker}, triggering scrape daemon...`);
         const triggered = triggerBondScrape();
-        
+
         return res.json({
             ticker: cleanTicker,
+            security_type: securityType,
             isBond: true,
             triggered: triggered,
-            message: triggered 
+            message: triggered
                 ? 'Bond price will be fetched by scrape daemon on next cycle'
                 : 'Failed to trigger scrape daemon, check logs',
             note: 'Bond prices are scraped asynchronously via Webull'
         });
     }
-    
-    // Stock/ETF: Use Yahoo Finance
-    try {
-        // Load yahoo-finance2 v3 (requires instantiation)
-        const YahooFinanceClass = require('yahoo-finance2').default || require('yahoo-finance2');
-        const yahooFinance = new YahooFinanceClass({
-            suppressNotices: ['yahooSurvey', 'rippieTip']
-        });
-        
-        console.log(`[FetchPrice] Fetching current price for ${cleanTicker}...`);
-        const quote = await yahooFinance.quote(cleanTicker);
 
-        if (!quote || !quote.regularMarketPrice) {
+    // Use PriceRouter for intelligent routing
+    try {
+        const PriceRouter = require('../services/price-router');
+        const priceRouter = new PriceRouter({ pool });
+
+        console.log(`[FetchPrice] Fetching price for ${cleanTicker} (${securityType})...`);
+
+        // Fetch price using router (handles provider selection and fallback)
+        const priceData = await priceRouter.fetchPrice(cleanTicker, securityType, {
+            pricingProvider: pricing_provider,
+            allowFallback: true
+        });
+
+        if (!priceData || !priceData.price) {
             return res.status(404).json({
                 error: 'No price data returned',
-                ticker: cleanTicker
+                ticker: cleanTicker,
+                security_type: securityType
             });
         }
 
-        const price = quote.regularMarketPrice;
-        const previousClose = quote.regularMarketPreviousClose || null;
-        const now = new Date().toISOString();
+        const { price, previous_close_price, currency, time, source, pricing_provider: usedProvider } = priceData;
+
+        // Build cache key with security type to support multiple prices per ticker
+        const cacheKey = `${cleanTicker}:${securityType}`;
 
         // Update the in-memory price cache for immediate display
-        priceCache[cleanTicker] = {
+        priceCache[cacheKey] = {
+            ticker: cleanTicker,
+            security_type: securityType,
             price: price,
-            previous_close_price: previousClose,
-            prev_close_source: 'yahoo',
-            prev_close_time: now,
-            currency: quote.currency || 'USD',
-            time: now,
-            source: 'yahoo'
+            previous_close_price: previous_close_price,
+            prev_close_source: source,
+            prev_close_time: time,
+            currency: currency || 'USD',
+            time: time,
+            source: source,
+            pricing_provider: usedProvider
         };
+
+        // Also update legacy cache key (ticker only) for backward compatibility
+        if (!priceCache[cleanTicker] || securityType === 'stock') {
+            priceCache[cleanTicker] = priceCache[cacheKey];
+        }
 
         // Broadcast to all connected clients for immediate UI update
         io.emit('price_update', priceCache);
 
-        console.log(`[FetchPrice] Updated price cache for ${cleanTicker}: $${price}`);
+        console.log(`[FetchPrice] Updated price cache for ${cleanTicker} (${securityType}): $${price} via ${usedProvider}`);
 
-        // Publish to Kafka so the consumer persists to MySQL
+        // Save to database with security_type
+        let dbSaved = false;
+        try {
+            await priceRouter.savePriceToDatabase(priceData);
+            dbSaved = true;
+        } catch (dbErr) {
+            console.error(`[FetchPrice] Database save failed:`, dbErr.message);
+        }
+
+        // Publish to Kafka so the consumer persists to MySQL (legacy flow)
         let kafkaPublished = false;
         try {
             const { Kafka } = require('kafkajs');
@@ -1072,21 +1098,22 @@ app.post('/api/fetch-price', async (req, res) => {
             });
             const producer = kafka.producer();
             await producer.connect();
-            
+
             // Format message to match what the Kafka consumer expects
-            // Consumer uses data.get('key') for the ticker
             const kafkaMessage = {
-                key: cleanTicker,                    // Required by consumer
+                key: cleanTicker,
                 ticker: cleanTicker,
+                security_type: securityType,
                 normalized_key: cleanTicker,
                 regular_price: price,
-                previous_close_price: previousClose,
-                currency: quote.currency || 'USD',
-                time: now,
-                source: 'yahoo',
+                previous_close_price: previous_close_price,
+                currency: currency || 'USD',
+                time: time,
+                source: source,
+                pricing_provider: usedProvider,
                 scraper: 'dashboard-fetch'
             };
-            
+
             await producer.send({
                 topic: process.env.KAFKA_TOPIC || 'price_data',
                 messages: [{
@@ -1094,30 +1121,34 @@ app.post('/api/fetch-price', async (req, res) => {
                     value: JSON.stringify(kafkaMessage)
                 }]
             });
-            
+
             await producer.disconnect();
             kafkaPublished = true;
             console.log(`[FetchPrice] Published ${cleanTicker} to Kafka for persistence`);
         } catch (kafkaErr) {
             console.error(`[FetchPrice] Kafka publish failed for ${cleanTicker}:`, kafkaErr.message);
-            // Don't fail the request - price is already in cache for immediate display
+            // Don't fail the request - price is already in cache and database
         }
 
         res.json({
             ticker: cleanTicker,
+            security_type: securityType,
             price: price,
-            previousClose: previousClose,
-            currency: quote.currency || 'USD',
-            timestamp: now,
+            previousClose: previous_close_price,
+            currency: currency || 'USD',
+            timestamp: time,
+            pricing_provider: usedProvider,
             cached: true,
-            persisted: kafkaPublished
+            persisted_db: dbSaved,
+            persisted_kafka: kafkaPublished
         });
 
     } catch (error) {
         console.error(`[FetchPrice] Error fetching price for ${cleanTicker}:`, error.message);
         res.status(500).json({
             error: error.message,
-            ticker: cleanTicker
+            ticker: cleanTicker,
+            security_type: securityType
         });
     }
 });
