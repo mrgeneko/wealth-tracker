@@ -12,9 +12,20 @@ function parseArg(name, defaultValue) {
   return arg.split('=')[1];
 }
 
+function parseCsvArg(name) {
+  const value = parseArg(name, null);
+  if (!value) return null;
+  const items = value
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return items.length ? items : null;
+}
+
 (async function main() {
   const outDir = parseArg('outdir', 'artifacts/test-results');
   const testsDir = parseArg('testsdir', 'tests/integration');
+  const includeFiles = parseCsvArg('include');
 
   // ensure output dir exists
   fs.mkdirSync(outDir, { recursive: true });
@@ -27,8 +38,18 @@ function parseArg(name, defaultValue) {
     'dashboard_integration.test.js',
     'db_init_test.js'
   ]);
-  const files = fs.readdirSync(testsDir)
+  let files = fs.readdirSync(testsDir)
     .filter(f => f.endsWith('.js') && !skipFiles.has(f));
+
+  if (includeFiles) {
+    const includeSet = new Set(includeFiles);
+    const missing = includeFiles.filter(f => !files.includes(f));
+    if (missing.length) {
+      console.error('Requested --include files not found in', testsDir, ':', missing.join(', '));
+      process.exit(1);
+    }
+    files = files.filter(f => includeSet.has(f));
+  }
   if (!files.length) {
     console.error('No integration tests found in', testsDir);
     process.exit(1);
