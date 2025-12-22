@@ -636,6 +636,35 @@
             background-color: #3d3d3d;
             color: #ffffff;
         }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 0.75em;
+            font-weight: 600;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 4px;
+            margin-right: 4px;
+        }
+
+        .badge-secondary {
+            background-color: #6c757d;
+            color: #fff;
+        }
+
+        .badge-info {
+            background-color: #17a2b8;
+            color: #fff;
+        }
+
+        .type-cell {
+            text-align: left !important;
+            white-space: nowrap;
+        }
     </style>
 </head>
 
@@ -903,6 +932,24 @@
                 <input type="hidden" id="posId">
                 <input type="hidden" id="posAccountId">
                 <input type="hidden" id="posSymbol">
+                <div class="form-group">
+                    <label for="posType">Security Type</label>
+                    <select id="posType">
+                        <option value="stock">Stock</option>
+                        <option value="etf">ETF</option>
+                        <option value="crypto">Crypto</option>
+                        <option value="bond">Bond</option>
+                        <option value="cash">Cash</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="posSource">Source</label>
+                    <input type="text" id="posSource" placeholder="e.g. GOOGLE, YAHOO, INVESTING_COM">
+                </div>
+                <div class="form-group">
+                    <label for="posPricingProvider">Pricing Provider</label>
+                    <input type="text" id="posPricingProvider" placeholder="e.g. yahoo, webull, investing-crypto">
+                </div>
                 <div class="form-group" id="posSymbolGroup">
                     <label for="posSymbol">Symbol</label>
                     <div id="posSymbolDisplay"
@@ -1352,7 +1399,17 @@
                     </table>
                 </div>
 
-                <input type="hidden" id="newSymbolType">
+                <div class="form-group">
+                    <label for="newSymbolType">Security Type</label>
+                    <select id="newSymbolType" required onchange="lookupSymbolMetadata()">
+                        <option value="stock">Stock</option>
+                        <option value="etf">ETF</option>
+                        <option value="crypto">Crypto</option>
+                        <option value="bond">Bond</option>
+                        <option value="cash">Cash</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
                 <input type="hidden" id="newSymbolSource">
                 <input type="hidden" id="newSymbolPricingProvider">
                 <div class="form-group">
@@ -1582,13 +1639,21 @@
             const accountId = document.getElementById('newSymbolAccount').value;
             const quantity = parseFloat(document.getElementById('newSymbolQuantity').value);
             if (!symbol || !accountId || isNaN(quantity)) return;
-            // Check if symbol already exists in this account
+            // Check if symbol already exists in this account (considering type and source)
             let symbolExists = false;
             if (lastAssetsData && lastAssetsData.accounts) {
                 const acc = lastAssetsData.accounts.find(a => String(a.id) === String(accountId));
                 if (acc) {
-                    acc.holdings.stocks.forEach(pos => { if ((pos.ticker || '').toUpperCase() === symbol) symbolExists = true; });
-                    acc.holdings.bonds.forEach(pos => { if ((pos.ticker || '').toUpperCase() === symbol) symbolExists = true; });
+                    const checkExists = (pos) => {
+                        const tickerMatch = (pos.ticker || '').toUpperCase() === symbol;
+                        // If type is specified, it must match. If not specified, we assume it's a match if ticker matches (legacy behavior)
+                        const typeMatch = !type || (pos.type || '').toLowerCase() === type.toLowerCase();
+                        // If source is specified, it must match.
+                        const sourceMatch = !source || (pos.source || '').toUpperCase() === source.toUpperCase();
+                        return tickerMatch && typeMatch && sourceMatch;
+                    };
+                    acc.holdings.stocks.forEach(pos => { if (checkExists(pos)) symbolExists = true; });
+                    acc.holdings.bonds.forEach(pos => { if (checkExists(pos)) symbolExists = true; });
                 }
             }
             if (symbolExists) {
@@ -1665,13 +1730,20 @@
 
         // --- Socket.IO Listeners ---
         socket.on('price_update', (data) => {
-            console.log('Price update received');
+            console.log('Price update received, keys:', Object.keys(data).slice(0, 10), '... total:', Object.keys(data).length);
             const oldPrices = { ...currentPrices };
             currentPrices = data;
 
             if (lastAssetsData) {
                 // Use in-place update for smoother animations
                 updateInvestmentGridInPlace('investment-grid', lastAssetsData.accounts.filter(a => a.category === 'investment' || !a.category), oldPrices);
+            }
+        });
+
+        socket.on('initialData', (data) => {
+            console.log('Initial data received, price keys:', Object.keys(data.prices || {}).slice(0, 10), '... total:', Object.keys(data.prices || {}).length);
+            if (data.prices) {
+                currentPrices = data.prices;
             }
         });
 
@@ -1759,11 +1831,11 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                 acc.holdings.stocks.forEach(p => {
-                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class)?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class)?.price || 0;
                     // Bonds use price/100
                     accTotal += p.quantity * (price / 100.0);
                 });
@@ -1782,19 +1854,32 @@
         function updateInvestmentGridInPlace(tableId, accounts, oldPrices) {
             if (!accounts || accounts.length === 0) return;
 
-            // Collect all unique symbols
-            const allSymbols = new Set();
+            // Collect all unique positions (ticker, type, pricing_class)
+            const allPositions = new Map();
             accounts.forEach(acc => {
-                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.ticker));
-                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.ticker));
+                acc.holdings.stocks.forEach(pos => {
+                    const key = `${pos.ticker}:${pos.type || 'NOT_SET'}:${pos.pricing_class || 'US_EQUITY'}`.toUpperCase();
+                    if (!allPositions.has(key)) {
+                        allPositions.set(key, { ticker: pos.ticker, type: pos.type, pricing_class: pos.pricing_class });
+                    }
+                });
+                acc.holdings.bonds.forEach(pos => {
+                    const key = `${pos.ticker}:${pos.type || 'NOT_SET'}:${pos.pricing_class || 'US_EQUITY'}`.toUpperCase();
+                    if (!allPositions.has(key)) {
+                        allPositions.set(key, { ticker: pos.ticker, type: pos.type, pricing_class: pos.pricing_class });
+                    }
+                });
             });
 
             let grandTotalValueChange = 0;
 
-            allSymbols.forEach(sym => {
-                const normalized = normalizeTicker(sym);
-                const oldPriceData = oldPrices[sym] || oldPrices[normalized];
-                const newPriceData = getPriceDataForSymbol(sym);
+            allPositions.forEach((posInfo, key) => {
+                const { ticker: sym, type, pricing_class } = posInfo;
+                const safeId = getPositionSafeId(sym, type, pricing_class);
+                
+                // Try to find price data using composite key first, then fall back
+                const newPriceData = getPriceDataForSymbol(sym, type, pricing_class);
+                const oldPriceData = oldPrices[key];
 
                 if (!newPriceData) return;
 
@@ -1829,7 +1914,7 @@
                 // timeStr will hold display time (HH:MM:SS); timeDatePart holds MM/DD for tooltip
                 let timeStr = '-';
                 let timeDatePart = '';
-                let sourceStr = newPriceData.source || '-';
+                let sourceStr = newPriceData.source_session || newPriceData.source || '-';
 
                 if (newPriceData.time) {
                     const d = new Date(newPriceData.time);
@@ -1869,15 +1954,24 @@
                     changePctNum = parseFloat(changePct.replace('%', '').replace(',', '')) || 0;
                 }
 
-                // Calculate totals for this symbol
+                // Calculate totals for this specific position
                 let symTotalValue = 0;
                 let symTotalValueChange = 0;
 
                 accounts.forEach(acc => {
-                    let pos = acc.holdings.stocks.find(p => p.ticker === sym);
+                    // Find exact matching position
+                    let pos = acc.holdings.stocks.find(p => 
+                        p.ticker === sym && 
+                        (p.type || 'NOT_SET').toUpperCase() === (type || 'NOT_SET').toUpperCase() && 
+                        (p.pricing_class || 'US_EQUITY').toUpperCase() === (pricing_class || 'US_EQUITY').toUpperCase()
+                    );
                     let isBond = false;
                     if (!pos) {
-                        pos = acc.holdings.bonds.find(p => p.ticker === sym);
+                        pos = acc.holdings.bonds.find(p => 
+                            p.ticker === sym && 
+                            (p.type || 'NOT_SET').toUpperCase() === (type || 'NOT_SET').toUpperCase() && 
+                            (p.pricing_class || 'US_EQUITY').toUpperCase() === (pricing_class || 'US_EQUITY').toUpperCase()
+                        );
                         if (pos) isBond = true;
                     }
 
@@ -1894,7 +1988,7 @@
                         symTotalValueChange += pos.quantity * calcChange;
 
                         // Update account cell in-place
-                        const cellId = `cell-${sym}-${acc.id}`;
+                        const cellId = `cell-${safeId}-${acc.id}`;
                         const cell = document.getElementById(cellId);
                         if (cell) {
                             const oldValue = previousValues[cellId] || 0;
@@ -1914,7 +2008,7 @@
                 grandTotalValueChange += symTotalValueChange;
 
                 // Update price cell
-                const priceCell = document.getElementById(`price-${sym}`);
+                const priceCell = document.getElementById(`price-${safeId}`);
                 if (priceCell) {
                     if (oldPriceData && oldPriceData.price !== 0 && price !== oldPriceData.price) {
                         applyFlash(priceCell, price > oldPriceData.price);
@@ -1923,14 +2017,14 @@
                 }
 
                 // Update prevClose cell
-                const prevCloseCell = document.getElementById(`prevClose-${sym}`);
+                const prevCloseCell = document.getElementById(`prevClose-${safeId}`);
                 if (prevCloseCell) {
                     // Only update the cell if the incoming data contains a valid prev close.
                     if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
                         const parsedPrev = parseFloat(newPriceData.previous_close_price);
                         if (!isNaN(parsedPrev) && parsedPrev > 0) {
                             // Build tooltip from metadata if available
-                            const sourceMeta = newPriceData.prev_close_source || newPriceData.previous_close_source || newPriceData.source || (oldPriceData && oldPriceData.prev_close_source) || '';
+                            const sourceMeta = newPriceData.prev_close_source || newPriceData.previous_close_source || newPriceData.source_session || (oldPriceData && oldPriceData.prev_close_source) || '';
                             const timeMeta = newPriceData.prev_close_time || newPriceData.previous_close_time || newPriceData.capture_time || (oldPriceData && oldPriceData.prev_close_time) || '';
                             let tooltip = '';
                             if (sourceMeta) tooltip += `Source: ${sourceMeta}`;
@@ -1939,19 +2033,12 @@
                             prevCloseCell.textContent = formatNumber(parsedPrev);
                             if (tooltip) prevCloseCell.dataset.tooltip = tooltip;
                             else delete prevCloseCell.dataset.tooltip;
-                        } else {
-                            // incoming invalid value: do not overwrite existing cell
-                        }
-                    } else {
-                        // incoming value is missing: do not overwrite existing cell
-                        if (oldPriceData && oldPriceData.previous_close_price) {
-                            console.warn(`[PrevClose] Skipping update for ${sym}, incoming prev close missing — preserving previous value ${oldPriceData.previous_close_price}`);
                         }
                     }
                 }
 
                 // Update change cell
-                const changeCell = document.getElementById(`change-${sym}`);
+                const changeCell = document.getElementById(`change-${safeId}`);
                 if (changeCell) {
                     if (oldPriceData && oldPriceData.change !== undefined && changeVal !== oldPriceData.change) {
                         applyFlash(changeCell, changeVal > oldPriceData.change);
@@ -1961,7 +2048,7 @@
                 }
 
                 // Update change% cell
-                const changePctCell = document.getElementById(`changePct-${sym}`);
+                const changePctCell = document.getElementById(`changePct-${safeId}`);
                 if (changePctCell) {
                     if (oldPriceData) {
                         const oldChangePctNum = parseFloat((oldPriceData.change_percent || '0%').replace('%', '').replace(',', '')) || 0;
@@ -1974,7 +2061,7 @@
                 }
 
                 // Update time cell (text flash)
-                const timeCell = document.getElementById(`time-${sym}`);
+                const timeCell = document.getElementById(`time-${safeId}`);
                 if (timeCell) {
                     if (oldPriceData && oldPriceData.time !== newPriceData.time) {
                         applyTextFlash(timeCell);
@@ -1985,34 +2072,36 @@
                 }
 
                 // Update source cell (text flash)
-                const sourceCell = document.getElementById(`source-${sym}`);
+                const sourceCell = document.getElementById(`source-${safeId}`);
                 if (sourceCell) {
-                    if (oldPriceData && oldPriceData.source !== newPriceData.source) {
+                    const oldSourceSession = oldPriceData && (oldPriceData.source_session || oldPriceData.source);
+                    const newSourceSession = newPriceData.source_session || newPriceData.source;
+                    if (oldSourceSession !== newSourceSession) {
                         applyTextFlash(sourceCell);
                     }
                     sourceCell.textContent = sourceStr;
                 }
 
                 // Update value change cell
-                const valueChangeCell = document.getElementById(`valueChange-${sym}`);
+                const valueChangeCell = document.getElementById(`valueChange-${safeId}`);
                 if (valueChangeCell) {
-                    const oldValueChange = previousValues[`valueChange-${sym}`] || 0;
+                    const oldValueChange = previousValues[`valueChange-${safeId}`] || 0;
                     if (oldValueChange !== 0 && symTotalValueChange !== oldValueChange) {
                         applyFlash(valueChangeCell, symTotalValueChange > oldValueChange);
                     }
-                    previousValues[`valueChange-${sym}`] = symTotalValueChange;
+                    previousValues[`valueChange-${safeId}`] = symTotalValueChange;
                     valueChangeCell.textContent = formatNumber(symTotalValueChange);
                     valueChangeCell.style.color = color;
                 }
 
                 // Update total cell
-                const totalCell = document.getElementById(`total-${sym}`);
+                const totalCell = document.getElementById(`total-${safeId}`);
                 if (totalCell) {
-                    const oldTotal = previousValues[`total-${sym}`] || 0;
+                    const oldTotal = previousValues[`total-${safeId}`] || 0;
                     if (oldTotal !== 0 && symTotalValue !== oldTotal) {
                         applyFlash(totalCell, symTotalValue > oldTotal);
                     }
-                    previousValues[`total-${sym}`] = symTotalValue;
+                    previousValues[`total-${safeId}`] = symTotalValue;
                     totalCell.textContent = formatNumber(symTotalValue, 0);
                 }
             });
@@ -2023,12 +2112,12 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                 acc.holdings.stocks.forEach(p => {
-                    const priceData = getPriceDataForSymbol(p.ticker);
+                    const priceData = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class);
                     let price = priceData?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const priceData = getPriceDataForSymbol(p.ticker);
+                    const priceData = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class);
                     let price = priceData?.price || 0;
                     // Bonds use price/100
                     accTotal += p.quantity * (price / 100.0);
@@ -2072,14 +2161,14 @@
                 // Subtract debt accounts (entered as positive balances)
                 lastAssetsData.accounts.filter(a => a.category === 'debt').forEach(acc => {
                     let accTotal = 0;
-                    if (acc.holdings.cash) accTotal += acc.holdings.cash.value;
+                    if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                     acc.holdings.stocks.forEach(p => {
-                        const priceData = getPriceDataForSymbol(p.ticker);
+                        const priceData = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class);
                         const price = priceData?.price || 0;
                         accTotal += p.quantity * price;
                     });
                     acc.holdings.bonds.forEach(p => {
-                        const priceData = getPriceDataForSymbol(p.ticker);
+                        const priceData = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class);
                         const price = priceData?.price || 0;
                         accTotal += p.quantity * (price / 100.0);
                     });
@@ -2140,15 +2229,23 @@
                 return;
             }
 
-            // Collect all unique symbols
-            // Type-driven only: do not special-case the literal ticker "CASH" here.
-            // (Cash is determined by position.type === 'cash' on the backend.)
-            const allSymbols = new Set();
+            // Collect all unique positions (ticker, type, pricing_class)
+            const allPositions = new Map();
             accounts.forEach(acc => {
-                acc.holdings.stocks.forEach(pos => allSymbols.add(pos.ticker));
-                acc.holdings.bonds.forEach(pos => allSymbols.add(pos.ticker));
+                acc.holdings.stocks.forEach(pos => {
+                    const key = `${pos.ticker}:${pos.type || 'NOT_SET'}:${pos.pricing_class || 'US_EQUITY'}`.toUpperCase();
+                    if (!allPositions.has(key)) {
+                        allPositions.set(key, { ticker: pos.ticker, type: pos.type, pricing_class: pos.pricing_class });
+                    }
+                });
+                acc.holdings.bonds.forEach(pos => {
+                    const key = `${pos.ticker}:${pos.type || 'NOT_SET'}:${pos.pricing_class || 'US_EQUITY'}`.toUpperCase();
+                    if (!allPositions.has(key)) {
+                        allPositions.set(key, { ticker: pos.ticker, type: pos.type, pricing_class: pos.pricing_class });
+                    }
+                });
             });
-            const sortedSymbols = Array.from(allSymbols).sort();
+            const sortedKeys = Array.from(allPositions.keys()).sort();
 
             // Header with sortable columns
             const sortIndicator = (col) => {
@@ -2158,6 +2255,7 @@
                 return '<span class="sort-indicator">⇅</span>';
             };
             let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Ticker${sortIndicator('symbol')}</th>`;
+            headerHtml += `<th class="sortable-header" onclick="sortInvestmentGrid('type')">Type${sortIndicator('type')}</th>`;
 
 
             if (accountsCollapsed) {
@@ -2180,8 +2278,10 @@
 
             // Build row data for sorting
             const rowData = [];
-            sortedSymbols.forEach(sym => {
-                let rowInfo = { symbol: sym, changePct: 0, valueChange: 0, total: 0, name: '', sector: '' };
+            sortedKeys.forEach(key => {
+                const { ticker: sym, type, pricing_class } = allPositions.get(key);
+                const safeId = getPositionSafeId(sym, type, pricing_class);
+                let rowInfo = { symbol: sym, type, pricing_class, key, safeId, changePct: 0, valueChange: 0, total: 0, name: '', sector: '' };
                 let price = 0;
                 let changePct = '0%';
                 let changeVal = 0;
@@ -2191,38 +2291,24 @@
                 let sourceStr = '-';
                 let color = '#e0e0e0';
 
-                const normalized = normalizeTicker(sym);
-                const newPriceData = getPriceDataForSymbol(sym);
-                const oldPricesLookup = oldPrices[sym] || oldPrices[normalized];
+                const newPriceData = getPriceDataForSymbol(sym, type, pricing_class);
+                const oldPricesLookup = oldPrices[key];
                 if (newPriceData) {
                     price = newPriceData.price;
                     // Prefer a valid previous_close_price from the currentPrices object.
-                    // NOTE: When the dashboard performs a full render (e.g. page refresh)
-                    // or is fed a fresh snapshot of `currentPrices`, some scrapers may
-                    // still provide no previous_close_price for certain tickers. To
-                    // maintain a consistent UX and avoid computing changes from a
-                    // bogus zero base, we only accept incoming prev-close values
-                    // that are valid positive numbers. When a current snapshot lacks
-                    // a valid previous_close_price, we fall back to the previously
-                    // known value (from oldPrices) — this mirrors server-side cache
-                    // behavior and prevents accidental erasure of a valid Prev Close.
                     prevClose = 0;
                     if (newPriceData.previous_close_price !== undefined && newPriceData.previous_close_price !== null && newPriceData.previous_close_price !== '') {
                         const parsedPrev = parseFloat(newPriceData.previous_close_price);
                         if (!isNaN(parsedPrev) && parsedPrev > 0) {
                             prevClose = parsedPrev;
                         } else if (oldPricesLookup && oldPricesLookup.previous_close_price) {
-                            // fallback to prev value if current data doesn't provide valid prev close
-                            prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
-                            console.warn(`[PrevClose] Current data for ${sym} missing valid prev close — falling back to previous value ${prevClose}`);
+                            prevClose = parseFloat(oldPricesLookup.previous_close_price) || 0;
                         }
                     } else if (oldPricesLookup && oldPricesLookup.previous_close_price) {
-                        // Fall back to previously known value when current has none
-                        prevClose = parseFloat(oldPrices[sym].previous_close_price) || 0;
+                        prevClose = parseFloat(oldPricesLookup.previous_close_price) || 0;
                     }
                     changeVal = price - prevClose;
                     changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(3) + '%' : '0%';
-                    console.log(`[PrevClose] ${sym}: price=${price}, prevClose=${prevClose}, changeVal=${changeVal}, changePct=${changePct}`);
 
                     // Prefer to display only HH:MM:SS and store MM/DD for tooltip
                     timeDatePart = '';
@@ -2240,17 +2326,6 @@
                             timeStr = newPriceData.time;
                             timeDatePart = '';
                         }
-                    } else if (oldPricesLookup && oldPricesLookup.time) {
-                        const d = new Date(oldPricesLookup.time);
-                        if (!isNaN(d.getTime())) {
-                            const month = d.getMonth() + 1;
-                            const day = d.getDate();
-                            const hours = d.getHours().toString().padStart(2, '0');
-                            const minutes = d.getMinutes().toString().padStart(2, '0');
-                            const seconds = d.getSeconds().toString().padStart(2, '0');
-                            timeDatePart = `${month}/${day}`;
-                            timeStr = `${hours}:${minutes}:${seconds}`;
-                        }
                     }
 
                     sourceStr = newPriceData.source || '-';
@@ -2266,7 +2341,7 @@
 
                 // Find metadata from position (if any account has valid metadata)
                 for (const acc of accounts) {
-                    const stockPos = acc.holdings.stocks.find(p => p.ticker === sym);
+                    const stockPos = acc.holdings.stocks.find(p => p.ticker === sym && p.type === type && p.pricing_class === pricing_class);
                     if (stockPos) {
                         if (stockPos.short_name) metaName = stockPos.short_name;
                         if (stockPos.sector) metaSector = stockPos.sector;
@@ -2311,9 +2386,24 @@
                 rowInfo.name = metaName;
                 rowInfo.sector = metaSector;
 
-                // Show the symbol and expose the full name as a hover tooltip on the Symbol cell
-                // Show symbol and attach tooltip text to `data-tooltip` for custom tooltip handling
-                let rowHtml = `<tr><td style="text-align: left; font-weight: bold; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" data-tooltip="${escapeHtml(metaName)}">${sym}</td>`;
+                const typeBadge = type ? `<span class="badge badge-secondary">${type}</span>` : '';
+                const pricingClassBadge = pricing_class ? `<span class="badge badge-info">${pricing_class}</span>` : '';
+
+                let rowHtml = `
+                    <tr id="row-${safeId}">
+                        <td class="ticker-cell" data-tooltip="${escapeHtml(metaName)}">
+                            <div class="ticker-container">
+                                <span class="ticker-symbol">${sym}</span>
+                                <button class="edit-btn" onclick="openEditModal('${sym}', '${type}', '${pricing_class}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                            <div class="ticker-name">${metaName || ''}</div>
+                        </td>
+                        <td class="type-cell">
+                            ${typeBadge}
+                            ${pricingClassBadge}
+                        </td>`;
 
 
                 let symTotalValue = 0;
@@ -2322,10 +2412,10 @@
 
                 accounts.forEach(acc => {
                     // Find position in stocks or bonds
-                    let pos = acc.holdings.stocks.find(p => p.ticker === sym);
+                    let pos = acc.holdings.stocks.find(p => p.ticker === sym && p.type === type && p.pricing_class === pricing_class);
                     let isBond = false;
                     if (!pos) {
-                        pos = acc.holdings.bonds.find(p => p.ticker === sym);
+                        pos = acc.holdings.bonds.find(p => p.ticker === sym && p.type === type && p.pricing_class === pricing_class);
                         if (pos) isBond = true;
                     }
 
@@ -2342,11 +2432,11 @@
                         symTotalValueChange += pos.quantity * calcChange;
                         symTotalShares += pos.quantity;
                         const posType = isBond ? 'bond' : 'stock';
-                        const posData = { id: pos.id, account_id: acc.id, symbol: pos.ticker, type: posType, quantity: pos.quantity };
+                        const posData = { id: pos.id, account_id: acc.id, symbol: pos.ticker, type: pos.type, source: pos.source, quantity: pos.quantity };
                         const posJson = escapeHtml(JSON.stringify(posData));
 
                         // Check for value changes and apply flash animations
-                        const cellId = `cell-${sym}-${acc.id}`;
+                        const cellId = `cell-${safeId}-${acc.id}`;
                         let flashClass = '';
 
                         // Check if this cell value has changed
@@ -2365,12 +2455,12 @@
                             // Display type based on what's in holdings (visual only, backend determines actual type)
                             let posType = 'stock';
                             for (const account of accounts) {
-                                if (account.holdings.bonds.find(b => b.ticker === sym)) {
+                                if (account.holdings.bonds.find(b => b.ticker === sym && b.type === type && b.pricing_class === pricing_class)) {
                                     posType = 'bond';
                                     break;
                                 }
                             }
-                            const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, quantity: 0 };
+                            const addPosData = { account_id: acc.id, account_name: acc.name, symbol: sym, type: type, pricing_class: pricing_class, quantity: 0 };
                             const addPosJson = escapeHtml(JSON.stringify(addPosData));
                             rowHtml += `<td><span class="clickable-cell" style="color: #555; text-align: center;" onclick="openPositionModal(${addPosJson})">+</span></td>`;
                         }
@@ -2383,7 +2473,7 @@
                 }
 
                 // Check for price changes and apply flash animations
-                const priceCellId = `price-${sym}`;
+                const priceCellId = `price-${safeId}`;
                 const oldPriceData = oldPricesLookup; // use either raw or normalized key
                 let priceFlashClass = '';
 
@@ -2413,14 +2503,14 @@
                     if (prevCloseTime) prevCloseTooltip += (prevCloseTooltip ? '\n' : '') + `Time: ${prevCloseTime}`;
                 }
                 // Render Prev Close without the separate info icon; attach tooltip text to `data-tooltip` if available
-                rowHtml += `<td id="prevClose-${sym}" ${prevCloseTooltip ? `data-tooltip="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}</td>`;
+                rowHtml += `<td id="prevClose-${safeId}" ${prevCloseTooltip ? `data-tooltip="${escapeHtml(prevCloseTooltip)}"` : ''}>${formatNumber(prevClose)}</td>`;
                 rowHtml += `<td id="${priceCellId}" class="${priceFlashClass}">${formatNumber(price)}</td>`;
                 rowHtml += `<td>${metaPE}</td>`;
                 rowHtml += `<td>${metaYield}</td>`;
 
                 // Check for change and change% column changes
-                const changeCellId = `change-${sym}`;
-                const changePctCellId = `changePct-${sym}`;
+                const changeCellId = `change-${safeId}`;
+                const changePctCellId = `changePct-${safeId}`;
                 let changeFlashClass = '';
                 let changePctFlashClass = '';
 
@@ -2446,8 +2536,8 @@
                 rowHtml += `<td id="${changePctCellId}" class="${changePctFlashClass}" style="color: ${color}">${changePctNum.toFixed(3)}%</td>`;
 
                 // Check for time and source changes (text flash)
-                const timeCellId = `time-${sym}`;
-                const sourceCellId = `source-${sym}`;
+                const timeCellId = `time-${safeId}`;
+                const sourceCellId = `source-${safeId}`;
                 let timeFlashClass = '';
                 let sourceFlashClass = '';
 
@@ -2471,8 +2561,8 @@
                 grandTotalValueChange += symTotalValueChange;
 
                 // Check for value change and total changes
-                const valueChangeCellId = `valueChange-${sym}`;
-                const totalCellId = `total-${sym}`;
+                const valueChangeCellId = `valueChange-${safeId}`;
+                const totalCellId = `total-${safeId}`;
                 let valueChangeFlashClass = '';
                 let totalFlashClass = '';
 
@@ -2544,8 +2634,8 @@
             if (accountsCollapsed) {
                 cashRowHtml += '<td style="text-align: center;">-</td>';
             }
-            // Placeholder cells for: Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source, Value Chg
-            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+            // Placeholder cells for: Type, Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source, Value Chg
+            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
 
@@ -2558,11 +2648,11 @@
                 let accTotal = 0;
                 if (acc.holdings.cash) accTotal += Math.abs(Number(acc.holdings.cash.value) || 0);
                 acc.holdings.stocks.forEach(p => {
-                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class)?.price || 0;
                     accTotal += p.quantity * price;
                 });
                 acc.holdings.bonds.forEach(p => {
-                    const price = getPriceDataForSymbol(p.ticker)?.price || 0;
+                    const price = getPriceDataForSymbol(p.ticker, p.type, p.pricing_class)?.price || 0;
                     accTotal += p.quantity * (price / 100.0);
                 });
                 grandTotal += accTotal;
@@ -2578,8 +2668,8 @@
             if (grandTotalValueChange > 0) totalChangeColor = '#4caf50';
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
-            // Placeholder cells for: Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source
-            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
+            // Placeholder cells for: Type, Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source
+            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
             totalRowHtml += `<td id="total-row-value-change" style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
             totalRowHtml += `<td id="total-row-grand-total">${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
@@ -2782,48 +2872,58 @@
         }
 
         // --- Helpers ---
-        // Normalize ticker strings to the same key format used by scrapers/price messages
-        // (underscore-sanitized form for filename compatibility)
-        function normalizeTicker(sym) {
-            if (!sym && sym !== 0) return sym;
-            try {
-                return String(sym).toUpperCase().replace(/[^A-Z0-9._-]/g, '_');
-            } catch (e) {
-                return String(sym).toUpperCase();
-            }
-        }
 
-        // Percent-encode ticker to match server-side normalized_key format
-        // (e.g., GC=F -> GC%3DF)
-        function percentEncodeTicker(sym) {
-            if (!sym && sym !== 0) return sym;
-            try {
-                return encodeURIComponent(String(sym).toUpperCase());
-            } catch (e) {
-                return String(sym).toUpperCase();
-            }
+        // Generate a safe HTML ID for a position based on ticker, type, and pricing_class
+        function getPositionSafeId(ticker, type, pricingClass) {
+            const t = type || 'NOT_SET';
+            const pc = pricingClass || 'US_EQUITY';
+            return `${ticker}_${t}_${pc}`.replace(/[^a-zA-Z0-9_-]/g, '_').toUpperCase();
         }
 
         // Safe accessor for currentPrices that falls back to normalized/encoded keys
-        // Server's priceCache uses percent-encoded keys (normalized_key), so we try:
-        // 1. Direct symbol lookup (e.g., "AAPL")
-        // 2. Percent-encoded form (e.g., "GC=F" -> "GC%3DF")
-        // 3. Underscore-sanitized form (e.g., "GC=F" -> "GC_F") for legacy compatibility
-        function getPriceDataForSymbol(sym) {
+        // Server's priceCache uses composite keys (ticker:type:pricing_class), so we try:
+        // 1. Composite key (e.g., "BTC:CRYPTO:CRYPTO_INVESTING")
+        // 2. Ticker:Type key (e.g., "BTC:CRYPTO")
+        // IMPORTANT: Never cross pricing_class boundaries - a CRYPTO_INVESTING position
+        // should only match CRYPTO_INVESTING prices, not US_EQUITY prices
+        function getPriceDataForSymbol(sym, type = null, pricingClass = null) {
             if (!sym && sym !== 0) return undefined;
-            // direct lookup
-            let data = currentPrices[sym];
-            if (data) return data;
-            // try percent-encoded form (server's normalized_key)
-            const encoded = percentEncodeTicker(sym);
-            if (encoded !== sym) {
-                data = currentPrices[encoded];
-                if (data) return data;
+
+            const effectiveType = (type || 'NOT_SET').toUpperCase();
+            const effectivePricingClass = (pricingClass || 'US_EQUITY').toUpperCase();
+
+            // 1. Try composite key (TICKER:TYPE:PRICING_CLASS)
+            const compositeKey = `${sym}:${effectiveType}:${effectivePricingClass}`.toUpperCase();
+            if (currentPrices[compositeKey]) {
+                console.log(`[getPriceData] Found ${sym} via compositeKey: ${compositeKey}`);
+                return currentPrices[compositeKey];
             }
-            // try underscore-sanitized form (legacy/filename compatibility)
-            const norm = normalizeTicker(sym);
-            if (norm !== sym && norm !== encoded) data = currentPrices[norm];
-            return data;
+
+            // 2. Try with NOT_SET type but SAME pricing_class (TICKER:NOT_SET:PRICING_CLASS)
+            // This handles scrapers that don't know the exact security type
+            const notSetKey = `${sym}:NOT_SET:${effectivePricingClass}`.toUpperCase();
+            if (currentPrices[notSetKey]) {
+                console.log(`[getPriceData] Found ${sym} via notSetKey: ${notSetKey}`);
+                return currentPrices[notSetKey];
+            }
+
+            // 3. Try ticker:type (TICKER:TYPE) - legacy fallback, but only if pricing_class matches
+            const typeKey = `${sym}:${effectiveType}`.toUpperCase();
+            if (currentPrices[typeKey]) {
+                // Check if the pricing_class matches before returning
+                const priceData = currentPrices[typeKey];
+                if (!priceData.pricing_class || priceData.pricing_class.toUpperCase() === effectivePricingClass) {
+                    console.log(`[getPriceData] Found ${sym} via typeKey: ${typeKey}`);
+                    return priceData;
+                }
+            }
+
+            // NO cross-pricing_class fallbacks - if we didn't find a match within the same
+            // pricing_class, return undefined. This prevents CRYPTO_INVESTING positions
+            // from using US_EQUITY prices and vice versa.
+            console.log(`[getPriceData] No price found for ${sym} (pricing_class: ${effectivePricingClass}). Tried: ${compositeKey}, ${notSetKey}`);
+
+            return undefined;
         }
         function formatNumber(num, decimals = 2) {
             return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
@@ -2962,6 +3062,9 @@
             document.getElementById('posAccountId').value = pos.account_id;
             document.getElementById('posQuantity').value = pos.quantity || 0;
             document.getElementById('posSymbol').value = pos.symbol || pos.ticker;
+            document.getElementById('posType').value = pos.type || '';
+            document.getElementById('posSource').value = pos.source || '';
+            document.getElementById('posPricingProvider').value = pos.pricing_provider || '';
 
             // Output-only fields (display only, backend determines actual type)
             document.getElementById('posSymbolDisplay').textContent = pos.symbol || pos.ticker;
@@ -2995,6 +3098,9 @@
                 // Backend expects ticker; keep symbol for backward compatibility.
                 ticker: symbol,
                 symbol,
+                type: document.getElementById('posType').value,
+                source: document.getElementById('posSource').value,
+                pricing_provider: document.getElementById('posPricingProvider').value,
                 quantity: parseFloat(document.getElementById('posQuantity').value),
                 currency: 'USD'
             };
@@ -4246,6 +4352,7 @@
          */
         async function lookupSymbolMetadata(id = null) {
             const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+            const type = document.getElementById('newSymbolType').value;
             const statusEl = document.getElementById('symbolLookupStatus');
             const displayEl = document.getElementById('symbolMetadataDisplay');
             const btn = document.getElementById('btnLookupSymbol');
@@ -4263,7 +4370,12 @@
                 statusEl.textContent = '🔍 Checking symbol...';
                 statusEl.style.display = 'block';
 
-                const url = id ? `/api/autocomplete/details/${symbol}?id=${id}` : `/api/autocomplete/details/${symbol}`;
+                // URL-encode the symbol to handle special characters like "/" in crypto tickers
+                const encodedSymbol = encodeURIComponent(symbol);
+                let url = id ? `/api/autocomplete/details/${encodedSymbol}?id=${id}` : `/api/autocomplete/details/${encodedSymbol}`;
+                if (type) {
+                    url += (url.includes('?') ? '&' : '?') + `type=${encodeURIComponent(type)}`;
+                }
                 const response = await fetch(url);
 
                 if (!response.ok) {
@@ -4282,15 +4394,15 @@
                 // Populate metadata display
                 document.getElementById('symbolMetadataName').textContent = data.name || '—';
                 // Show detected type (auto-determined by backend from treasury registry + Yahoo metadata)
-                const detectedType = data.detectedType || data.type || 'STOCK';
+                const detectedType = (data.detectedType || data.type || 'STOCK').toLowerCase();
                 document.getElementById('symbolMetadataType').textContent = detectedType.toUpperCase();
                 document.getElementById('symbolMetadataExchange').textContent = data.exchange || '—';
                 document.getElementById('symbolMetadataSource').textContent = data.source || '—';
                 document.getElementById('symbolMetadataPricingProvider').textContent = data.pricing_provider || '—';
                 document.getElementById('symbolMetadataVerified').textContent = data.verified ? '✅ Yes' : '⚠️ Unverified';
 
-                // Store detected type, source, and pricing_provider in hidden inputs
-                document.getElementById('newSymbolType').value = detectedType.toLowerCase();
+                // Store detected type, source, and pricing_provider
+                document.getElementById('newSymbolType').value = detectedType;
                 document.getElementById('newSymbolSource').value = data.source || '';
                 document.getElementById('newSymbolPricingProvider').value = data.pricing_provider || '';
 
