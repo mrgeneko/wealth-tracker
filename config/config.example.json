@@ -13,20 +13,12 @@
       "interval": 2700,
       "enabled": false
     },
-    "stocks_etfs": {
-      "interval": 5400,
-      "enabled": true
-    },
     "stock_positions": {
       "interval": 1800,
       "enabled": true
     },
     "bond_positions": {
       "interval": 1800,
-      "enabled": true
-    },
-    "bonds": {
-      "interval": 14400,
       "enabled": true
     },
     "us_listings": {

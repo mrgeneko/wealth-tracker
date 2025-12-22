@@ -13,11 +13,12 @@ try {
 } catch (e) { console.warn('Startup diagnostics failed: ' + (e && e.message ? e.message : e)); }
 
 const { scrapeGoogle, scrapeGoogleWithPage } = require('./scrape_google');
-const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls, normalizedKey } = require('./scraper_utils');
+const { sanitizeForFilename, getDateTimeString, getTimestampedLogPath, setDefaultLogPath, logDebug, reportMetrics, resetMetrics, getMetrics, isWeekday, isPreMarketSession, isRegularTradingSession, isAfterHoursSession, getConstructibleUrls, normalizedKey } = require('./scraper_utils');
 const { recordScraperMetrics, getMetricsCollector } = require('./metrics-integration');
 const mysql = require('mysql2/promise');
 const puppeteer = require('puppeteer');
 const debugLogPath = getTimestampedLogPath();
+setDefaultLogPath(debugLogPath);
 const path = require('path');
 const puppeteerExtra = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');

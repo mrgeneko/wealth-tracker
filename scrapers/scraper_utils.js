@@ -32,16 +32,34 @@ let cachedDateTimeString = null;
 
 function getTimestampedLogPath(prefix = 'scrape_daemon') {
     if (!cachedDateTimeString) {
-        cachedDateTimeString = getDateTimeString();
+        const timestampFile = '/usr/src/app/data/.log_timestamp';
+        try {
+            if (fs.existsSync(timestampFile)) {
+                cachedDateTimeString = fs.readFileSync(timestampFile, 'utf8').trim();
+            } else {
+                cachedDateTimeString = getDateTimeString();
+                fs.writeFileSync(timestampFile, cachedDateTimeString, 'utf8');
+            }
+        } catch (e) {
+            // Fallback to generating new
+            cachedDateTimeString = getDateTimeString();
+        }
     }
     // Use process.env.LOG_DIR if available, otherwise default to ./logs relative to CWD
     const logDir = process.env.LOG_DIR || path.join(process.cwd(), 'logs');
     return path.join(logDir, `${cachedDateTimeString}.${prefix}.log`);
 }
 
+// Default log path for logDebug calls without explicit path
+let defaultLogPath = null;
+
+function setDefaultLogPath(path) {
+    defaultLogPath = path;
+}
+
 function logDebug(msg, logPath) {
     const line = `[${new Date().toISOString()}] ${msg}\n`;
-    const targetPath = logPath || getTimestampedLogPath();
+    const targetPath = logPath || defaultLogPath || getTimestampedLogPath();
     try {
         // Ensure directory exists for the target path
         try {
@@ -711,6 +729,7 @@ module.exports = {
     sanitizeForFilename,
     getDateTimeString,
     getTimestampedLogPath,
+    setDefaultLogPath,
     logDebug,
     gotoWithRetries,
     attachRequestFailureCounters,

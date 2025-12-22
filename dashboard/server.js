@@ -597,7 +597,7 @@ async function fetchAssetsFromDB() {
                 const displayType = pos.type; // Default to stored type
 
                 // Compute pricing_class for price lookups
-                const { getPricingClassFromSource, getPricingClass } = require('../services/pricing-utils');
+                const { getPricingClassFromSource, getPricingClass } = require('./services/pricing-utils');
                 let pricingClass = 'US_EQUITY';
                 if (pos.source) {
                     pricingClass = getPricingClassFromSource(pos.source);
@@ -1094,7 +1094,7 @@ app.post('/api/fetch-price', async (req, res) => {
 
     // Use PriceRouter for intelligent routing
     try {
-        const PriceRouter = require('../services/price-router');
+        const PriceRouter = require('./services/price-router');
         const priceRouter = new PriceRouter({ pool });
 
         console.log(`[FetchPrice] Fetching price for ${cleanTicker} (${securityType})...`);
@@ -1116,7 +1116,7 @@ app.post('/api/fetch-price', async (req, res) => {
         const { price, previous_close_price, currency, time, source: sourceSession, pricing_provider: usedProvider } = priceData;
 
         // For manual fetch, determine pricing_class based on security type
-        const { getPricingClass } = require('../services/pricing-utils');
+        const { getPricingClass } = require('./services/pricing-utils');
         const pricingClass = getPricingClass({ securityType });
 
         // Build cache key with security type and pricing_class to support multiple prices per ticker
