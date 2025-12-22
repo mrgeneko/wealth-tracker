@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="account-types.integration.test" tests="1" failures="0" time="1.031">
+  <testcase classname="integration" name="account-types.integration.test.js" time="1.031">
+    
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[PASS tests/integration/account-types.integration.test.js
+  Integration - account-types API
+    ✓ GET /api/account-types returns active account types (9 ms)
+    ✓ POST /api/account-types creates a new account type (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        0.337 s
+Ran all test suites matching /tests\/integration\/account-types.integration.test.js/i.
+]]></system-err>
+  </testcase>
+</testsuite>

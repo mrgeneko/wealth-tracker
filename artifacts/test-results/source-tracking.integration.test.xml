@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="source-tracking.integration.test" tests="1" failures="0" time="0.916">
+  <testcase classname="integration" name="source-tracking.integration.test.js" time="0.916">
+    
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[PASS tests/integration/source-tracking.integration.test.js
+  Source Tracking Integration
+    POST /api/positions
+      ✓ should save source and pricing_provider when adding a position (17 ms)
+      ✓ should handle missing source and pricing_provider (2 ms)
+    PUT /api/positions/:id
+      ✓ should update source and pricing_provider (1 ms)
+    GET /api/assets
+      ✓ should return source and pricing_provider for positions (6 ms)
+    Multi-type Ticker Support
+      ✓ should support same ticker with different security types (2 ms)
+    POST /api/fetch-price
+      ✓ should use pricing_provider from request if provided (2 ms)
+      ✓ should pass security_type to PriceRouter (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        0.231 s
+Ran all test suites matching /tests\/integration\/source-tracking.integration.test.js/i.
+]]></system-err>
+  </testcase>
+</testsuite>

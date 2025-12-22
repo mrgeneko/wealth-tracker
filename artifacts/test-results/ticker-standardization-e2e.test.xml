@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ticker-standardization-e2e.test" tests="1" failures="0" time="0.674">
+  <testcase classname="integration" name="ticker-standardization-e2e.test.js" time="0.674">
+    
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[PASS tests/integration/ticker-standardization-e2e.test.js
+  Ticker Standardization - End-to-End Workflow
+    ✓ should complete full workflow: create position with ticker → retrieve → update (1 ms)
+    ✓ should handle backward compatibility throughout workflow
+    ✓ should validate data consistency between symbol and ticker throughout workflow (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        0.109 s
+Ran all test suites matching /tests\/integration\/ticker-standardization-e2e.test.js/i.
+]]></system-err>
+  </testcase>
+</testsuite>

@@ -1,26 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ttm_eps_adjusted.test" tests="1" failures="0" time="0.240">
-  <testcase classname="integration" name="ttm_eps_adjusted.test.js" time="0.240">
-    
-    <system-out><![CDATA[
-[TEST] Running backfill_adjusted_eps.js --symbol=TTM_EPS_ADJ --apply
-[APPLY] Backfill adjusted_eps
-Found 4 earnings rows to process
-Updated id=73 adjusted_eps=0.500000
-Updated id=74 adjusted_eps=0.550000
-Updated id=75 adjusted_eps=0.600000
-Updated id=76 adjusted_eps=0.600000
-Backfill adjusted EPS complete.
+<testsuite name="ttm_eps_adjusted.test" tests="1" failures="1" time="0.043">
+  <testcase classname="integration" name="ttm_eps_adjusted.test.js" time="0.043">
+    <failure message="Exit code 1"><![CDATA[/Users/gene/wealth-tracker/tests/integration/ttm_eps_adjusted.test.js:12
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+                                             ^
 
-[TEST] Running recompute_ttm.js --symbol=TTM_EPS_ADJ --apply
-Updated TTM_EPS_ADJ: ttm_dividend_amount=null ttm_eps=2.25
-TTM recompute complete.
-[OK] Adjusted EPS TTM validated for TTM_EPS_ADJ value= 2.25
+ReferenceError: describe is not defined
+    at Object.&lt;anonymous&gt; (/Users/gene/wealth-tracker/tests/integration/ttm_eps_adjusted.test.js:12:46)
+    at Module._compile (node:internal/modules/cjs/loader:1760:14)
+    at Object..js (node:internal/modules/cjs/loader:1892:10)
+    at Module.load (node:internal/modules/cjs/loader:1480:32)
+    at Module._load (node:internal/modules/cjs/loader:1299:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
 
-[TEST] Completed successfully
-]]></system-out>
-    <system-err><![CDATA[(node:97985) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
-(Use `node --trace-deprecation ...` to show where the warning was created)
+Node.js v25.2.1
+
+]]></failure>
+    <system-out><![CDATA[]]></system-out>
+    <system-err><![CDATA[/Users/gene/wealth-tracker/tests/integration/ttm_eps_adjusted.test.js:12
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+                                             ^
+
+ReferenceError: describe is not defined
+    at Object.&lt;anonymous&gt; (/Users/gene/wealth-tracker/tests/integration/ttm_eps_adjusted.test.js:12:46)
+    at Module._compile (node:internal/modules/cjs/loader:1760:14)
+    at Object..js (node:internal/modules/cjs/loader:1892:10)
+    at Module.load (node:internal/modules/cjs/loader:1480:32)
+    at Module._load (node:internal/modules/cjs/loader:1299:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+
+Node.js v25.2.1
 ]]></system-err>
   </testcase>
 </testsuite>
