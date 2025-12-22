@@ -170,12 +170,17 @@ function getMysqlPool() {
 async function fetchStockPositions() {
 	try {
 		const pool = getMysqlPool();
+		// Join with ticker_registry to get pricing_provider for pricing_class determination
 		const [rows] = await pool.query(
-			"SELECT DISTINCT p.ticker, p.type, tr.security_type AS registry_security_type FROM positions p LEFT JOIN ticker_registry tr ON tr.ticker = p.ticker WHERE p.type IN ('stock', 'etf') AND p.ticker IS NOT NULL AND p.ticker != ''"
+			"SELECT DISTINCT p.ticker, p.security_type, p.source, p.type, tr.security_type AS registry_security_type, tr.pricing_provider FROM positions p LEFT JOIN ticker_registry tr ON tr.ticker = p.ticker WHERE p.type IN ('stock', 'etf') AND p.ticker IS NOT NULL AND p.ticker != ''"
 		);
+		const { getPricingClass } = require('../services/pricing-utils');
 		return rows.map(r => ({
 			ticker: r.ticker,
 			type: r.type,
+			security_type: r.security_type || r.type || 'NOT_SET',
+			source: r.source || 'unknown',
+			pricing_class: getPricingClass({ source: r.source, pricingProvider: r.pricing_provider, securityType: r.security_type }),
 			registry_security_type: r.registry_security_type,
 			normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker)
 		}));
@@ -188,12 +193,17 @@ async function fetchStockPositions() {
 async function fetchBondPositions() {
 	try {
 		const pool = getMysqlPool();
+		// Join with ticker_registry to get pricing_provider for pricing_class determination
 		const [rows] = await pool.query(
-			"SELECT DISTINCT p.ticker, p.type, tr.security_type AS registry_security_type FROM positions p LEFT JOIN ticker_registry tr ON tr.ticker = p.ticker WHERE p.type = 'bond' AND p.ticker IS NOT NULL AND p.ticker != ''"
+			"SELECT DISTINCT p.ticker, p.security_type, p.source, p.type, tr.security_type AS registry_security_type, tr.pricing_provider FROM positions p LEFT JOIN ticker_registry tr ON tr.ticker = p.ticker WHERE p.type = 'bond' AND p.ticker IS NOT NULL AND p.ticker != ''"
 		);
+		const { getPricingClass } = require('../services/pricing-utils');
 		return rows.map(r => ({
 			ticker: r.ticker,
 			type: r.type,
+			security_type: r.security_type || r.type || 'NOT_SET',
+			source: r.source || 'unknown',
+			pricing_class: getPricingClass({ source: r.source, pricingProvider: r.pricing_provider, securityType: 'bond' }),
 			registry_security_type: r.registry_security_type,
 			normalized_key: (r && r.normalized_key) ? r.normalized_key : normalizedKey(r.ticker)
 		}));
@@ -919,9 +929,12 @@ async function runCycle(browser, outputDir) {
 						if (effectiveType === 'bond' || (sourceConfig.has_stock_prices !== false && isValidSession)) {
 							try {
 								// Create a security object with the URL
+								// Include security_type and pricing_class for Kafka message routing
 								const security = {
 									key: ticker,
 									type: (effectiveType === 'bond') ? 'bond' : 'stock',
+									security_type: position.security_type || type || 'NOT_SET',
+									pricing_class: position.pricing_class || 'US_EQUITY',
 									[sourceName]: urlInfo.url
 								};
 								if (ROUTING_DEBUG || effectiveType === 'bond') {
@@ -1023,9 +1036,12 @@ async function runCycle(browser, outputDir) {
 						
 						try {
 							// Create a security object with the URL
+							// Include security_type and pricing_class for Kafka message routing
 							const security = {
 								key: ticker,
 								type: 'bond',
+								security_type: bondPosition.security_type || 'bond',
+								pricing_class: bondPosition.pricing_class || 'US_TREASURY',
 								[sourceName]: urlInfo.url
 							};
 							logDebug(`Scraping bond ${ticker} with ${sourceName}: ${urlInfo.url}`);

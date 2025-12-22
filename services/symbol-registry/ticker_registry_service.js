@@ -215,7 +215,7 @@ class SymbolRegistryService {
           sm.ttm_dividend_amount,
           sm.ttm_eps
          FROM ticker_registry sr
-         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker COLLATE utf8mb4_0900_ai_ci
+         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker
          WHERE sr.ticker = ?`;
 
       const params = [symbol];
@@ -267,7 +267,7 @@ class SymbolRegistryService {
           sm.dividend_yield,
           sm.trailing_pe
          FROM ticker_registry sr
-         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker COLLATE utf8mb4_0900_ai_ci
+         LEFT JOIN securities_metadata sm ON sr.ticker = sm.ticker
          WHERE
           sr.ticker LIKE ?
           OR sr.name LIKE ?

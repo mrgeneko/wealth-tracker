@@ -323,6 +323,30 @@ app.use(express.static(path.join(__dirname, 'public'), {
 const priceCache = {};
 let assetsCache = null;
 
+// Map ticker to list of position types/sources for price routing
+// Format: { "BTC": [{ type: "etf", source: "OTHER_LISTED_FILE" }, { type: "crypto", source: "CRYPTO_INVESTING_FILE" }] }
+let positionTypeMap = {};
+
+// Refresh the position type map from database
+async function refreshPositionTypeMap() {
+    try {
+        const [rows] = await pool.query('SELECT DISTINCT ticker, security_type, source FROM positions WHERE ticker IS NOT NULL');
+        const newMap = {};
+        for (const row of rows) {
+            const ticker = row.ticker.toUpperCase();
+            if (!newMap[ticker]) newMap[ticker] = [];
+            newMap[ticker].push({
+                type: row.security_type || 'NOT_SET',
+                source: row.source || 'unknown'
+            });
+        }
+        positionTypeMap = newMap;
+        console.log(`[PositionTypeMap] Loaded ${rows.length} position types for ${Object.keys(newMap).length} tickers`);
+    } catch (err) {
+        console.error('[PositionTypeMap] Error refreshing:', err.message);
+    }
+}
+
 async function fetchInitialPrices() {
     let retries = 5;
     while (retries > 0) {
@@ -343,17 +367,32 @@ async function fetchInitialPrices() {
                 // row.price is likely a string or number depending on driver config, ensure float
                 const priceVal = parseFloat(row.price);
                 if (!isNaN(priceVal)) {
-                    priceCache[row.ticker] = {
+                    const type = (row.security_type || 'NOT_SET').toUpperCase();
+                    const pricingClass = (row.pricing_class || 'US_EQUITY').toUpperCase();
+                    // Build composite key to support multiple prices per ticker
+                    const cacheKey = `${row.ticker}:${type}:${pricingClass}`.toUpperCase();
+
+                    priceCache[cacheKey] = {
+                        ticker: row.ticker,
+                        security_type: type,
+                        pricing_class: pricingClass,
                         price: priceVal,
                         previous_close_price: row.previous_close_price ? parseFloat(row.previous_close_price) : null,
                         // If the DB has prev-close metadata columns, use them; otherwise
                         // record null so updatePriceCache may add metadata later.
-                        prev_close_source: row.prev_close_source || row.source || null,
+                        prev_close_source: row.prev_close_source || null,
                         prev_close_time: row.prev_close_time || row.capture_time || null,
                         currency: 'USD',
                         time: row.capture_time,
-                        source: row.source
+                        normalized_key: cacheKey,
+                        source_session: row.source_session || 'database'
                     };
+
+                    // Also create TICKER:TYPE fallback key
+                    const typeKey = `${row.ticker}:${type}`.toUpperCase();
+                    if (!priceCache[typeKey]) {
+                        priceCache[typeKey] = priceCache[cacheKey];
+                    }
                 } else {
                     console.warn(`Invalid price for ${row.ticker}: ${row.price}`);
                 }
@@ -518,7 +557,6 @@ async function fetchAssetsFromDB() {
         `);
 
         // Fetch positions with metadata
-        // Use COLLATE to ensure compatibility between tables
         const [positions] = await pool.query(`
             SELECT p.*,
                    sm.short_name, sm.sector, sm.market_cap,
@@ -527,7 +565,8 @@ async function fetchAssetsFromDB() {
                    sm.quote_type, sm.exchange as meta_exchange,
                    p.security_type as type
             FROM positions p
-            LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker COLLATE utf8mb4_unicode_ci
+            LEFT JOIN securities_metadata sm ON p.ticker = sm.ticker 
+                 AND (sm.quote_type IS NULL OR LOWER(sm.quote_type) = LOWER(p.security_type))
         `);
 
         const [fixedAssets] = await pool.query('SELECT * FROM fixed_assets ORDER BY display_order');
@@ -576,15 +615,26 @@ async function fetchAssetsFromDB() {
                 // Type-driven only: cash is determined strictly by pos.type === 'cash'.
                 const displayType = pos.type; // Default to stored type
 
+                // Compute pricing_class for price lookups
+                const { getPricingClassFromSource, getPricingClass } = require('./services/pricing-utils');
+                let pricingClass = 'US_EQUITY';
+                if (pos.source) {
+                    pricingClass = getPricingClassFromSource(pos.source);
+                } else if (pos.type) {
+                    pricingClass = getPricingClass({ securityType: pos.type });
+                }
+
                 // Common position object
                 const positionData = {
                     id: pos.id,
                     ticker: pos.ticker,
+                    type: pos.type, // Include security_type for frontend checks
                     quantity: parseFloat(pos.quantity),
                     cost_basis: pos.cost_basis ? parseFloat(pos.cost_basis) : 0,
                     // Source tracking fields
                     source: pos.source || null,
                     pricing_provider: pos.pricing_provider || null,
+                    pricing_class: pricingClass, // For price cache lookups
                     // Metadata fields (from JOIN)
                     short_name: pos.short_name || null,
                     sector: pos.sector || null,
@@ -657,10 +707,17 @@ if (process.env.NODE_ENV !== 'test') {
 // Helper to update cache from price data object
 // Supports extended hours pricing (pre-market, after-hours)
 function updatePriceCache(item) {
-    // Determine a normalized key for this incoming item.
-    // Priority: item.normalized_key -> item.key -> encodeURIComponent(item.ticker)
-    const normalizedKey = item.normalized_key || item.key || (item.ticker ? encodeURIComponent(String(item.ticker)) : null);
-    if (!normalizedKey) return false;
+    // Extract the ticker from incoming data
+    const ticker = item.ticker || item.key;
+    if (!ticker) return false;
+
+    // Use security_type and pricing_class from the incoming item
+    // These come from the position database through the scraper
+    const securityType = (item.security_type || item.type || 'NOT_SET').toUpperCase();
+    const pricingClass = (item.pricing_class || 'US_EQUITY').toUpperCase();
+    
+    // Build the composite key: TICKER:SECURITY_TYPE:PRICING_CLASS
+    const normalizedKey = `${ticker}:${securityType}:${pricingClass}`.toUpperCase();
 
     // Determine the best price to use
     // Prefer extended hours prices during pre/post market
@@ -803,10 +860,17 @@ function updatePriceCache(item) {
         currency: 'USD',
         time: item.capture_time || new Date().toISOString(),
         // Keep both the original symbol and the normalized key for consumers
-        ticker: item.ticker || null,
+        ticker: ticker,
+        security_type: securityType,
+        pricing_class: pricingClass,
         normalized_key: normalizedKey,
-        source: item.source ? `${item.source} (${priceSource})` : priceSource
+        // 'source_session' indicates the scraper source (yahoo, robinhood, etc.) and price type
+        source_session: item.source ? `${item.source} (${priceSource})` : priceSource
     };
+
+    // Also create a TICKER:TYPE fallback key for matching
+    const typeKey = `${ticker}:${securityType}`.toUpperCase();
+    priceCache[typeKey] = priceCache[normalizedKey];
 
     return true;
 }
@@ -865,6 +929,20 @@ app.get('/api/assets', async (req, res) => {
     } else {
         res.status(500).json({ error: 'Failed to fetch assets' });
     }
+});
+
+// Debug endpoint to inspect price cache
+app.get('/api/debug/prices', async (req, res) => {
+    const keys = Object.keys(priceCache);
+    const sample = {};
+    keys.slice(0, 20).forEach(k => {
+        sample[k] = priceCache[k];
+    });
+    res.json({
+        totalKeys: keys.length,
+        keys: keys.slice(0, 50),
+        sample: sample
+    });
 });
 
 const LOGS_DIR = '/usr/src/app/logs';
@@ -1054,22 +1132,27 @@ app.post('/api/fetch-price', async (req, res) => {
             });
         }
 
-        const { price, previous_close_price, currency, time, source, pricing_provider: usedProvider } = priceData;
+        const { price, previous_close_price, currency, time, source: sourceSession, pricing_provider: usedProvider } = priceData;
 
-        // Build cache key with security type to support multiple prices per ticker
-        const cacheKey = `${cleanTicker}:${securityType}`;
+        // For manual fetch, determine pricing_class based on security type
+        const { getPricingClass } = require('./services/pricing-utils');
+        const pricingClass = getPricingClass({ securityType });
+
+        // Build cache key with security type and pricing_class to support multiple prices per ticker
+        const cacheKey = `${cleanTicker}:${securityType}:${pricingClass}`.toUpperCase();
 
         // Update the in-memory price cache for immediate display
         priceCache[cacheKey] = {
             ticker: cleanTicker,
             security_type: securityType,
+            pricing_class: pricingClass,
             price: price,
             previous_close_price: previous_close_price,
-            prev_close_source: source,
+            prev_close_source: sourceSession,
             prev_close_time: time,
             currency: currency || 'USD',
             time: time,
-            source: source,
+            source_session: sourceSession,
             pricing_provider: usedProvider
         };
 
@@ -1083,10 +1166,16 @@ app.post('/api/fetch-price', async (req, res) => {
 
         console.log(`[FetchPrice] Updated price cache for ${cleanTicker} (${securityType}): $${price} via ${usedProvider}`);
 
-        // Save to database with security_type
+        // Save to database with security_type and pricing_class
         let dbSaved = false;
         try {
-            await priceRouter.savePriceToDatabase(priceData);
+            await priceRouter.savePriceToDatabase({
+                ...priceData,
+                ticker: cleanTicker,
+                security_type: securityType,
+                pricing_class: pricingClass,
+                source_session: sourceSession
+            });
             dbSaved = true;
         } catch (dbErr) {
             console.error(`[FetchPrice] Database save failed:`, dbErr.message);
@@ -1108,12 +1197,13 @@ app.post('/api/fetch-price', async (req, res) => {
                 key: cleanTicker,
                 ticker: cleanTicker,
                 security_type: securityType,
+                pricing_class: pricingClass,
                 normalized_key: cleanTicker,
                 regular_price: price,
                 previous_close_price: previous_close_price,
                 currency: currency || 'USD',
                 time: time,
-                source: source,
+                source: sourceSession,
                 pricing_provider: usedProvider,
                 scraper: 'dashboard-fetch'
             };

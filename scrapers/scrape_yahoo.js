@@ -194,6 +194,9 @@ async function scrapeYahoo(browser, security, outputDir) {
     }
 
     data = mapYahooQuoteToData(quote, security.key);
+    // Add security_type and pricing_class for composite key matching in dashboard
+    data.security_type = security.security_type || security.type || 'NOT_SET';
+    data.pricing_class = security.pricing_class || 'US_EQUITY';
 
     logDebug('Yahoo Finance data: ' + JSON.stringify(data));
 
@@ -408,6 +411,9 @@ async function scrapeYahooBatch(browser, securities, outputDir, options = {}) {
           { 
             key: sanitizeForFilename(sec.key), 
             source: 'yahoo', 
+            // Include security_type and pricing_class for composite key matching in dashboard
+            security_type: sec.security_type || sec.type || 'NOT_SET',
+            pricing_class: sec.pricing_class || 'US_EQUITY',
             capture_time: new Date().toISOString() 
           }, 
           commonData
