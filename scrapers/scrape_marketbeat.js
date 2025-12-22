@@ -27,6 +27,12 @@ async function scrapeMarketBeat(browser, security, outputDir) {
         const result = parseMarketBeatHtml(html || '', { key: ticker });
         data = result;
         data.normalized_key = data.normalized_key || normalizedKey(security.key);
+
+        // Preserve routing metadata for DB composite key matching
+        data.security_type = data.security_type || security.security_type || security.type || 'NOT_SET';
+        data.pricing_class = data.pricing_class || security.pricing_class || 'US_EQUITY';
+        if (security.position_source && !data.position_source) data.position_source = security.position_source;
+
         // publish & save
         try {
             const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeMarketBeat';

@@ -50,6 +50,11 @@ async function scrapeStockAnalysis(browser, security, outputDir) {
     data = parseStockAnalysisHtml(html || await page.content(), { key: ticker });
     data.normalized_key = data.normalized_key || normalizedKey(security.key);
 
+    // Preserve routing metadata for DB composite key matching
+    data.security_type = data.security_type || security.security_type || security.type || 'NOT_SET';
+    data.pricing_class = data.pricing_class || security.pricing_class || 'US_EQUITY';
+    if (security.position_source && !data.position_source) data.position_source = security.position_source;
+
     try {
       const kafkaTopic = process.env.KAFKA_TOPIC || 'scrapeStockAnalysis';
       const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');

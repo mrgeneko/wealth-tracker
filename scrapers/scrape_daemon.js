@@ -851,7 +851,7 @@ async function runCycle(browser, outputDir) {
 				const { ticker, type } = position;
 				const registrySecurityType = position && position.registry_security_type ? String(position.registry_security_type) : null;
 				const registrySecurityTypeUpper = registrySecurityType ? registrySecurityType.toUpperCase() : null;
-				const isRegistryBond = registrySecurityTypeUpper === 'TREASURY' || registrySecurityTypeUpper === 'BOND';
+				const isRegistryBond = registrySecurityTypeUpper === 'BOND' || registrySecurityTypeUpper === 'US_TREASURY';
 				const effectiveType = isRegistryBond ? 'bond' : type;
 
 				if (isRegistryBond) {
@@ -901,7 +901,7 @@ async function runCycle(browser, outputDir) {
 							continue;
 						}
 
-						// If this ticker is a registry bond/treasury, enforce bond rules even though we're in stock_positions.
+						// If this ticker is a registry bond/us_treasury, enforce bond rules even though we're in stock_positions.
 						if (effectiveType === 'bond') {
 							if (!sourceConfig || sourceConfig.has_bond_prices !== true) {
 								logDebug(`Skipping source ${sourceName} for bond ${ticker} (has_bond_prices is not explicitly true)`);
@@ -934,6 +934,7 @@ async function runCycle(browser, outputDir) {
 								const security = {
 									key: ticker,
 									type: (effectiveType === 'bond') ? 'bond' : 'stock',
+									position_source: position.source || null,
 									security_type: position.security_type || type || 'NOT_SET',
 									pricing_class: position.pricing_class || 'US_EQUITY',
 									[sourceName]: urlInfo.url
@@ -1041,8 +1042,9 @@ async function runCycle(browser, outputDir) {
 							const security = {
 								key: ticker,
 								type: 'bond',
-								security_type: bondPosition.security_type || 'bond',
-								pricing_class: bondPosition.pricing_class || 'US_TREASURY',
+								position_source: position.source || null,
+								security_type: position.security_type || 'bond',
+								pricing_class: position.pricing_class || 'US_TREASURY',
 								[sourceName]: urlInfo.url
 							};
 							logDebug(`Scraping bond ${ticker} with ${sourceName}: ${urlInfo.url}`);

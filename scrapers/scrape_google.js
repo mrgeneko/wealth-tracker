@@ -209,6 +209,11 @@ async function scrapeGoogleCore({ browser, page, security, outputDir, closePage,
 			capture_time: new Date().toISOString()
 		};
 
+		// Preserve routing metadata for DB composite key matching
+		data.security_type = data.security_type || security.security_type || security.type || 'NOT_SET';
+		data.pricing_class = data.pricing_class || security.pricing_class || 'US_EQUITY';
+		if (security.position_source && !data.position_source) data.position_source = security.position_source;
+
 		logDebug('Google Finance data: ' + JSON.stringify(data));
 
 		// Publish the data object to Kafka

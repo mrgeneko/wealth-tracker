@@ -970,7 +970,6 @@ app.get('/api/tickers', async (req, res) => {
 });
 
 // Helper: Detect if a ticker is a bond by looking it up in the DB-backed registry
-// Returns true if the ticker exists in the treasury registry (exchange === 'TREASURY')
 async function isBondTicker(ticker) {
     if (!ticker) return false;
     const clean = ticker.trim().toUpperCase();
@@ -978,10 +977,13 @@ async function isBondTicker(ticker) {
     const allTickers = await loadAllTickers();
     const tickerObj = allTickers.find(t => t.ticker === clean);
     
-    // Treat anything in the registry with TREASURY/BOND security type as a bond.
-    // (Historically some treasury records used exchange='OTC', so exchange alone is not reliable.)
+    // Treat anything in the registry with US_TREASURY/BOND security type as a bond.
     const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
-    if (tickerObj && (tickerObj.exchange === 'TREASURY' || securityType === 'TREASURY' || securityType === 'BOND')) {
+    const securityTypeUpper = securityType ? String(securityType).toUpperCase().trim() : null;
+    if (tickerObj && (
+        securityTypeUpper === 'BOND' ||
+        securityTypeUpper === 'US_TREASURY'
+    )) {
         return true;
     }
     
@@ -1585,8 +1587,8 @@ app.post('/api/positions', async (req, res) => {
         }
 
         const [result] = await pool.execute(
-            'INSERT INTO positions (account_id, ticker, security_type, quantity, currency, source, pricing_provider) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [account_id, ticker, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null]
+            'INSERT INTO positions (account_id, ticker, type, security_type, quantity, currency, source, pricing_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [account_id, ticker, detectedType, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null]
         );
         assetsCache = null;
         if (process.env.NODE_ENV !== 'test') loadAssets();
@@ -1637,8 +1639,8 @@ app.put('/api/positions/:id', async (req, res) => {
         }
 
         await pool.execute(
-            'UPDATE positions SET ticker=?, security_type=?, quantity=?, currency=?, source=?, pricing_provider=? WHERE id=?',
-            [ticker, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null, req.params.id]
+            'UPDATE positions SET ticker=?, type=?, security_type=?, quantity=?, currency=?, source=?, pricing_provider=? WHERE id=?',
+            [ticker, detectedType, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null, req.params.id]
         );
         assetsCache = null;
         if (process.env.NODE_ENV !== 'test') loadAssets();

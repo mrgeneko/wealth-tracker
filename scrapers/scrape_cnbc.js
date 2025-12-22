@@ -58,6 +58,11 @@ async function scrapeCNBC(browser, security, outputDir) {
     // ensure we include a reversible normalized key for downstream indexing
     data.normalized_key = data.normalized_key || normalizedKey(security.key);
 
+    // Preserve routing metadata for DB composite key matching
+    data.security_type = data.security_type || security.security_type || security.type || 'NOT_SET';
+    data.pricing_class = data.pricing_class || security.pricing_class || 'US_EQUITY';
+    if (security.position_source && !data.position_source) data.position_source = security.position_source;
+
     const config = require('./config');
     const kafkaTopic = config.KAFKA_TOPIC;
     const kafkaBrokers = config.KAFKA_BROKERS;

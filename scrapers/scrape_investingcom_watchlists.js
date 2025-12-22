@@ -2,6 +2,88 @@ const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, sa
 const { publishToKafka } = require('./publish_to_kafka');
 const { DateTime } = require('luxon');
 
+let _mysqlPool = null;
+const _positionMetaCache = new Map();
+
+function getMysqlPool() {
+	if (_mysqlPool) return _mysqlPool;
+	try {
+		const mysql = require('mysql2/promise');
+		_mysqlPool = mysql.createPool({
+			host: process.env.MYSQL_HOST || 'mysql',
+			port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+			user: process.env.MYSQL_USER || 'test',
+			password: process.env.MYSQL_PASSWORD || 'test',
+			database: process.env.MYSQL_DATABASE || process.env.DB_NAME || 'wealth_tracker',
+			waitForConnections: true,
+			connectionLimit: 4,
+			queueLimit: 0
+		});
+		return _mysqlPool;
+	} catch (e) {
+		logDebug(`MySQL pool init skipped (mysql2 missing or failed): ${e && e.message ? e.message : e}`);
+		return null;
+	}
+}
+
+async function lookupUniquePositionMeta(ticker) {
+	try {
+		const key = String(ticker || '').trim();
+		if (!key) return null;
+		if (_positionMetaCache.has(key)) return _positionMetaCache.get(key);
+
+		const pool = getMysqlPool();
+		if (!pool) {
+			_positionMetaCache.set(key, null);
+			return null;
+		}
+
+		// Try richer schema first (newer DBs may include these columns)
+		let rows = [];
+		try {
+			const [r] = await pool.query(
+				`SELECT DISTINCT type, source, pricing_provider, security_type
+				 FROM positions
+				 WHERE ticker = ? AND ticker IS NOT NULL`,
+				[key]
+			);
+			rows = Array.isArray(r) ? r : [];
+		} catch (err) {
+			// Fall back to the base schema (type only)
+			if (err && err.message && String(err.message).toLowerCase().includes('unknown column')) {
+				const [r] = await pool.query(
+					`SELECT DISTINCT type
+					 FROM positions
+					 WHERE ticker = ? AND ticker IS NOT NULL`,
+					[key]
+				);
+				rows = Array.isArray(r) ? r : [];
+			} else {
+				throw err;
+			}
+		}
+
+		// Only safe if the ticker maps to exactly one type/source.
+		if (!rows || rows.length !== 1) {
+			_positionMetaCache.set(key, null);
+			return null;
+		}
+
+		const row = rows[0] || {};
+		const meta = {
+			security_type: (row.security_type || row.type || 'NOT_SET'),
+			source: row.source || null,
+			pricing_provider: row.pricing_provider || null
+		};
+		_positionMetaCache.set(key, meta);
+		return meta;
+	} catch (e) {
+		logDebug(`lookupUniquePositionMeta(${ticker}) failed: ${e && e.message ? e.message : e}`);
+		_positionMetaCache.set(String(ticker || '').trim(), null);
+		return null;
+	}
+}
+
 /**
  * Check if a ticker is within its update window based on update_rules config.
  * @param {string} ticker - The ticker symbol to check
@@ -108,6 +190,75 @@ function parseToIso(timeStr) {
   }
 }
 
+function inferPricingClass(symbol) {
+	// Backward-compatible fallback. Prefer DOM-based inference in the row parser below.
+	try {
+		const s = String(symbol || '').trim();
+		if (!s) return 'US_EQUITY';
+		// Avoid treating all slash symbols as crypto (XAU/USD, EUR/USD, etc.)
+		return 'US_EQUITY';
+	} catch (e) {
+		return 'US_EQUITY';
+	}
+}
+
+function inferSecurityMetaFromRow({ symbol, href, flagClass, exchange }) {
+	const s = String(symbol || '').trim();
+	const hrefLower = String(href || '').trim().toLowerCase();
+	const exchangeLower = String(exchange || '').trim().toLowerCase();
+	const cls = String(flagClass || '')
+		.split(/\s+/)
+		.map(c => c.trim().toLowerCase())
+		.filter(Boolean);
+
+	// ceFlags <token> where token is a country code (USA) or an icon slug (bitcoin, gold, etc.)
+	const iconToken = cls.find(c => c !== 'ceflags' && c !== 'middle' && c !== 'inlineblock') || null;
+
+	const cryptoIconTokens = new Set([
+		'bitcoin', 'tether', 'ethereum', 'solana', 'dogecoin', 'xrp', 'litecoin', 'cardano', 'binance',
+		'polkadot', 'polygon', 'avalanche', 'chainlink', 'tron', 'stellar', 'monero', 'uniswap'
+	]);
+
+	// 1) Crypto: Investing.com renders crypto pairs with crypto icon tokens (bitcoin/tether/etc.).
+	if (iconToken && cryptoIconTokens.has(iconToken)) {
+		return {
+			security_type: 'crypto',
+			pricing_class: 'CRYPTO_INVESTING',
+			position_source: 'CRYPTO_INVESTING_FILE'
+		};
+	}
+
+	// 1b) Crypto fallback: exchange column sometimes shows "Investing.com" for crypto pairs.
+	// Use this only as a secondary signal to avoid misclassifying indices.
+	if ((exchangeLower === 'investing.com' || exchangeLower === 'investing') && s.includes('/')) {
+		return {
+			security_type: 'crypto',
+			pricing_class: 'CRYPTO_INVESTING',
+			position_source: 'CRYPTO_INVESTING_FILE'
+		};
+	}
+
+	// 2) Bonds
+	if (hrefLower.startsWith('/bonds/')) {
+		return { security_type: 'bond', pricing_class: 'US_TREASURY' };
+	}
+
+	// 3) ETFs vs equities
+	if (hrefLower.startsWith('/etfs/')) {
+		return { security_type: 'etf', pricing_class: 'US_EQUITY' };
+	}
+	if (hrefLower.startsWith('/equities/')) {
+		return { security_type: 'stock', pricing_class: 'US_EQUITY' };
+	}
+
+	// 4) Currencies / other slash instruments (FX, metals, etc.)
+	if (hrefLower.startsWith('/currencies/') || (s && s.includes('/'))) {
+		return { security_type: 'other', pricing_class: 'US_EQUITY' };
+	}
+
+	return { security_type: 'NOT_SET', pricing_class: 'US_EQUITY' };
+}
+
 async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updateRules = null, updateWindowService = null) {
 	const investingUrl = watchlist.url;
 	if (!investingUrl) {
@@ -201,7 +352,9 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 		const dataObjects = [];
 
 		if (table.length) {
-			table.find('tr').each((i, row) => {
+			const { getPricingClass, normalizePricingClass } = require('../services/pricing-utils');
+			const rows = table.find('tr').toArray();
+			for (const row of rows) {
 				const rowData = {};
 				$(row).find('td').each((j, col) => {
 					const columnName = $(col).attr('data-column-name');
@@ -212,6 +365,37 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 				});
 
 				if (rowData["symbol"] && rowData["last"]) {
+					const symbolAnchor = $(row).find('td[data-column-name="symbol"] a').first();
+					const href = symbolAnchor.attr('href') || '';
+					const flagClass = $(row).find('td.flag span.ceFlags').attr('class') || '';
+					const inferred = inferSecurityMetaFromRow({
+						symbol: rowData["symbol"],
+						href,
+						flagClass,
+						exchange: rowData["exchange"]
+					});
+					let securityType = inferred.security_type || 'NOT_SET';
+					let pricingClass = inferred.pricing_class || 'US_EQUITY';
+					let positionSource = inferred.position_source || null;
+
+					// Optional MySQL-assisted fallback: if ticker is unique in positions, align keys to positions.
+					// This helps when Investing.com structure changes or when tickers overlap across types.
+					try {
+						const meta = await lookupUniquePositionMeta(rowData["symbol"]);
+						if (meta && meta.security_type) {
+							securityType = meta.security_type;
+							positionSource = meta.source || positionSource;
+							pricingClass = getPricingClass({
+								source: meta.source,
+								pricingProvider: meta.pricing_provider,
+								securityType: meta.security_type
+							});
+						}
+					} catch (e) {
+						// ignore lookup errors; keep inferred values
+					}
+
+					pricingClass = normalizePricingClass(pricingClass);
 					let qTime = parseToIso(rowData["time"]);
 					if (rowData["time_value"]) {
 						const ts = parseInt(rowData["time_value"], 10);
@@ -249,6 +433,11 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 					dataObjects.push({
 						key: rowData["symbol"],
 						normalized_key: normalizedKey(rowData["symbol"]),
+						// Persist with a deterministic composite key in latest_prices.
+						// Use DOM-based inference (flag icon + href) and optionally align to positions when unambiguous.
+						security_type: securityType,
+						pricing_class: pricingClass,
+						position_source: positionSource,
 						regular_price: rowData["last"],
 						regular_change_decimal: rowData["chg"],
 						regular_change_percent: rowData["chgpercent"],
@@ -262,7 +451,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 						capture_time: new Date().toISOString()
 					});
 				}
-			});
+			}
 			logDebug(`Total valid stock rows found: ${dataObjects.length}`);
 		} else {
 			logDebug("No table found in the HTML.");

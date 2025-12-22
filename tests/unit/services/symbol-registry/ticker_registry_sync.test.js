@@ -391,8 +391,8 @@ describe('SymbolRegistrySyncService', () => {
       const symbol = {
         ticker: '912797SE8',  // CUSIP is the ticker for treasury
         name: 'Test Treasury',
-        exchange: 'TREASURY',
-        security_type: 'TREASURY',
+        exchange: 'OTC',
+        security_type: 'US_TREASURY',
         source: 'TREASURY_FILE'
       };
 
@@ -603,8 +603,8 @@ describe('SymbolRegistrySyncService', () => {
         {
           ticker: 'US0001AB',
           name: 'US Treasury Bill',
-          exchange: 'TREASURY',
-          security_type: 'TREASURY',
+          exchange: 'OTC',
+          security_type: 'US_TREASURY',
           source: 'TREASURY_FILE',
           cusip: '912797SE8'
         }
@@ -674,7 +674,7 @@ describe('SymbolRegistrySyncService', () => {
 
       mockConnection.query.mockResolvedValue([[], []]);
       syncService.treasuryHandler.loadTreasuryData.mockResolvedValue([
-        { ticker: 'US001', name: 'Treasury', exchange: 'TREASURY', security_type: 'TREASURY', source: 'TREASURY_FILE', cusip: '123' }
+        { ticker: 'US001', name: 'Treasury', exchange: 'OTC', security_type: 'US_TREASURY', source: 'TREASURY_FILE', cusip: '123' }
       ]);
       mockSymbolService.calculateSortRank.mockReturnValue(100);
 
@@ -781,7 +781,7 @@ describe('SymbolRegistrySyncService', () => {
         .mockResolvedValueOnce([
           [
             { security_type: 'EQUITY', count: 15000 },
-            { security_type: 'TREASURY', count: 5000 }
+            { security_type: 'US_TREASURY', count: 5000 }
           ]
         ]);
 

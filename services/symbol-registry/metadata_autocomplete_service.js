@@ -205,7 +205,6 @@ class MetadataAutocompleteService {
 
             // Bonds/Treasuries
             'BOND': 'bond',
-            'TREASURY': 'bond',
             'US_TREASURY': 'bond',
 
             // Crypto
@@ -281,8 +280,8 @@ class MetadataAutocompleteService {
 
             const metadataRecord = metadata.length > 0 ? metadata[0] : null;
 
-            // Priority 1: Check if it's a bond (treasury registry)
-            if (tickerData.security_type === 'TREASURY' || tickerData.security_type === 'BOND') {
+            // Priority 1: Check if it's a bond (US treasury registry)
+            if (tickerData.security_type === 'US_TREASURY' || tickerData.security_type === 'BOND') {
                 detectedType = 'bond';
             }
             // Priority 2: Use Yahoo metadata asset type (handles crypto, ETF, stock)
