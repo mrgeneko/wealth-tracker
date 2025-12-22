@@ -20,10 +20,42 @@ Lightweight scrapers and processors for personal portfolio tracking.
 ## Features
 
 - **Multi-Source Data Collection**: Scrapes from multiple financial data providers
-- **Multi-Source Data Collection**: Scrapes from multiple financial data providers
+- **Source Tracking**: Prevents price confusion by tracking security type, data source, and pricing provider for each position
 - **Streaming Updates**: WebSocket-based dashboard for live price updates
-- **Comprehensive Coverage**: Stocks, ETFs, and US Treasury securities
+- **Comprehensive Coverage**: Stocks, ETFs, bonds, crypto, and US Treasury securities
 - **Docker-First**: Fully containerized with Docker Compose
+
+## Source Tracking
+
+The wealth-tracker implements comprehensive source tracking to prevent price confusion when the same ticker symbol represents different securities (e.g., BTC as cryptocurrency vs BTC as ETF).
+
+### How It Works
+
+Each position stores three key metadata fields:
+- **security_type**: The type of security (EQUITY, ETF, CRYPTO, BOND, US_TREASURY, etc.)
+- **source**: Where the ticker data originated (NASDAQ_FILE, CRYPTO_INVESTING_FILE, etc.)
+- **pricing_provider**: Which service provides pricing data (YAHOO, INVESTING_COM, TREASURY_GOV, etc.)
+
+### Example: BTC Disambiguation
+
+When searching for "BTC" in the autocomplete, you'll see:
+- **BTC (CRYPTO, investing.com)** - Priced via Investing.com
+- **BTC (ETF, NASDAQ)** - Priced via Yahoo Finance
+
+The dashboard displays positions as: "BTC (Crypto - investing.com)" or "BTC (ETF - nasdaq.com)"
+
+### Supported Pricing Providers
+
+- **YAHOO**: Stocks, ETFs, bonds
+- **INVESTING_COM**: Cryptocurrencies and alternative pricing
+- **TREASURY_GOV**: US Treasury securities
+
+### Benefits
+
+- ✅ No more price confusion between same-ticker securities
+- ✅ Accurate pricing from appropriate data sources
+- ✅ Clear visibility into data provenance
+- ✅ Extensible for new security types and providers
 
 ## Prerequisites
 
