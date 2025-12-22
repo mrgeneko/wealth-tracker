@@ -66,7 +66,7 @@ function parseCsvArg(name) {
     const child = spawn(
       'npx',
       ['jest', '--config=jest.config.integration.js', '--runInBand', '--testTimeout=60000', scriptPath],
-      { env: process.env }
+      { env: { ...process.env, TEST_TYPE: process.env.TEST_TYPE || 'integration' } }
     );
 
     let stdout = '';

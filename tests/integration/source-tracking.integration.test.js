@@ -2,7 +2,6 @@
 // Integration tests for source tracking flow
 
 const request = require('supertest');
-const mysql = require('mysql2/promise');
 
 // Mock mysql2/promise
 const mockExecute = jest.fn();
