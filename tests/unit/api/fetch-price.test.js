@@ -314,9 +314,9 @@ describe('Bond Symbol Detection via Treasury Registry', () => {
     const mockTickerRegistry = [
         { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
         { ticker: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
-        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'OTC', securityType: 'TREASURY' },
-        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'OTC', securityType: 'TREASURY' },
-        { ticker: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'OTC', securityType: 'TREASURY' },
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'OTC', securityType: 'US_TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'OTC', securityType: 'US_TREASURY' },
+        { ticker: '91282CPM7', name: 'Note 7-Year | Issue: 2025-12-01 | Maturity: 2032-11-30', exchange: 'OTC', securityType: 'US_TREASURY' },
         { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE ARCA' }
     ];
 
@@ -329,7 +329,8 @@ describe('Bond Symbol Detection via Treasury Registry', () => {
         const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
         
         const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
-        if (tickerObj && (tickerObj.exchange === 'TREASURY' || securityType === 'TREASURY' || securityType === 'BOND')) {
+        const securityTypeUpper = securityType ? String(securityType).toUpperCase().trim() : null;
+        if (tickerObj && (securityTypeUpper === 'US_TREASURY' || securityTypeUpper === 'BOND')) {
             return true;
         }
         
@@ -387,8 +388,8 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
     // Mock ticker registry (same as detection tests)
     const mockTickerRegistry = [
         { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'OTC', securityType: 'TREASURY' },
-        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'OTC', securityType: 'TREASURY' }
+        { ticker: '912810EX2', name: 'Bond 30-Year | Issue: 2024-11-15 | Maturity: 2054-11-15', exchange: 'OTC', securityType: 'US_TREASURY' },
+        { ticker: '912797SE8', name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06', exchange: 'OTC', securityType: 'US_TREASURY' }
     ];
 
     // Helper matching server.js implementation - treasury registry lookup only
@@ -397,7 +398,8 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
         const clean = ticker.trim().toUpperCase();
         const tickerObj = mockTickerRegistry.find(t => t.ticker === clean);
         const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
-        return !!(tickerObj && (tickerObj.exchange === 'TREASURY' || securityType === 'TREASURY' || securityType === 'BOND'));
+        const securityTypeUpper = securityType ? String(securityType).toUpperCase().trim() : null;
+        return !!(tickerObj && (securityTypeUpper === 'US_TREASURY' || securityTypeUpper === 'BOND'));
     }
 
     beforeEach(() => {
@@ -459,7 +461,7 @@ describe('Bond Price Fetch Handler (Marker File Trigger)', () => {
         });
 
         it('should detect bond by treasury registry lookup even without type', async () => {
-            // 912810EX2 is in mockTickerRegistry with exchange: 'TREASURY'
+            // 912810EX2 is in mockTickerRegistry with securityType: 'US_TREASURY'
             const res = await bondFetchHandler('912810EX2', null);
 
             expect(res.status).toBe(200);

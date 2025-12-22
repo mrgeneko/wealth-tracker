@@ -47,8 +47,8 @@ describe('Dashboard Ticker Registry (Phase 4)', () => {
             {
                 ticker: '912796YB4',
                 name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06',
-                exchange: 'TREASURY',
-                security_type: 'TREASURY',
+                exchange: 'OTC',
+                security_type: 'US_TREASURY',
                 maturity_date: '2026-01-06',
                 issue_date: '2025-12-09',
                 security_term: '4-Week',
@@ -82,8 +82,8 @@ describe('Dashboard Ticker Registry (Phase 4)', () => {
                 ticker: '912796YB4',
                 symbol: '912796YB4',
                 name: 'Bill 4-Week | Issue: 2025-12-09 | Maturity: 2026-01-06',
-                exchange: 'TREASURY',
-                securityType: 'TREASURY',
+                exchange: 'OTC',
+                securityType: 'US_TREASURY',
                 maturityDate: '2026-01-06',
                 issueDate: '2025-12-09',
                 securityTerm: '4-Week'

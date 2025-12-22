@@ -545,11 +545,10 @@ describe('MetadataAutocompleteService', () => {
             expect(service._normalizeSecurityType('CRYPTOCURRENCY')).toBe('crypto');
         });
 
-        test('should map TREASURY/BOND to bond', () => {
-            expect(service._normalizeSecurityType('TREASURY')).toBe('bond');
-            expect(service._normalizeSecurityType('BOND')).toBe('bond');
-            expect(service._normalizeSecurityType('US_TREASURY')).toBe('bond');
-        });
+            test('should map US_TREASURY/BOND to bond', () => {
+                expect(service._normalizeSecurityType('US_TREASURY')).toBe('bond');
+                expect(service._normalizeSecurityType('BOND')).toBe('bond');
+            });
 
         test('should map options/futures to other', () => {
             expect(service._normalizeSecurityType('OPTION')).toBe('other');

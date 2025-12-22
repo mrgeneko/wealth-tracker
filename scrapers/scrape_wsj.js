@@ -136,6 +136,11 @@ async function scrapeWSJ(browser, security, outputDir) {
       regular_time: regular_time || ''
     };
 
+    // Preserve routing metadata for DB composite key matching
+    data.security_type = data.security_type || security.security_type || security.type || 'NOT_SET';
+    data.pricing_class = data.pricing_class || security.pricing_class || 'US_EQUITY';
+    if (security.position_source && !data.position_source) data.position_source = security.position_source;
+
     logDebug('WSJ data: ' + JSON.stringify(data));
 
     try {

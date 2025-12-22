@@ -110,7 +110,7 @@ describe('Treasury Registry (Phase 5)', () => {
 
         const detailSql = `SELECT ticker, name, issue_date, maturity_date, security_term
        FROM ticker_registry
-       WHERE ticker = ? AND security_type = 'TREASURY'
+    WHERE ticker = ? AND security_type = 'US_TREASURY'
        LIMIT 1`;
 
         const rowsByQuery = new Map([[detailSql.trim(), []]]);
@@ -123,7 +123,7 @@ describe('Treasury Registry (Phase 5)', () => {
     test('reloadTreasuryData clears cache and reloads', async () => {
         const registry = require('../../../scrapers/treasury_registry');
 
-        const sql = "SELECT ticker FROM ticker_registry WHERE security_type = 'TREASURY'";
+        const sql = "SELECT ticker FROM ticker_registry WHERE security_type = 'US_TREASURY'";
         const conn = {
             execute: jest.fn()
                 .mockResolvedValueOnce([[{ ticker: 'AAA' }]])
