@@ -64,9 +64,10 @@ describeIf(dbAvailable)('Dashboard Integration API', () => {
             .get('/api/assets')
             .auth(process.env.BASIC_AUTH_USER || 'admin', process.env.BASIC_AUTH_PASSWORD || 'admin');
 
-        // Log error details if request failed
+        // Surface error details if request failed (Jest sometimes suppresses console output)
         if (res.statusCode !== 200) {
-            console.error('API error response:', res.statusCode, res.body);
+            const bodyText = (typeof res.text === 'string' && res.text.length) ? res.text : '<no res.text>';
+            throw new Error(`GET /api/assets failed: status=${res.statusCode}\nres.body=${JSON.stringify(res.body)}\nres.text=${bodyText}`);
         }
 
         expect(res.statusCode).toBe(200);

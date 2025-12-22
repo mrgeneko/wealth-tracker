@@ -20,6 +20,9 @@ const configBaseDir = fs.existsSync(path.join(__dirname, 'config'))
 const scriptsBaseDir = fs.existsSync(path.join(__dirname, 'scripts'))
     ? path.join(__dirname, 'scripts')
     : path.join(__dirname, '..', 'scripts');
+const servicesBaseDir = fs.existsSync(path.join(__dirname, 'services'))
+    ? path.join(__dirname, 'services')
+    : path.join(__dirname, '..', 'services');
 
 function requireApi(moduleName) {
     return require(path.join(apiBaseDir, moduleName));
@@ -37,8 +40,8 @@ const { loadAllTickers, initializeDbPool: initializeTickerRegistryDbPool } = req
 let MetricsWebSocketServer;
 let ScraperMetricsCollector;
 try {
-    MetricsWebSocketServer = require('./services/websocket-server');
-    ScraperMetricsCollector = require('./services/scraper-metrics-collector');
+    MetricsWebSocketServer = require(path.join(servicesBaseDir, 'websocket-server'));
+    ScraperMetricsCollector = require(path.join(servicesBaseDir, 'scraper-metrics-collector'));
 } catch (e) {
     // Provide lightweight stubs when services are not available (test environments)
     MetricsWebSocketServer = class { constructor(s) { this.server = s; } };
@@ -86,16 +89,21 @@ const io = socketIo(server);
 let metricsWebSocketServer;
 let metricsCollector;
 
-try {
-    // Pool will be created below and passed to the collector
-    metricsWebSocketServer = new MetricsWebSocketServer(server);
-    // Pool will be assigned after creation
-    metricsCollector = null; // Will be initialized after pool creation
-    
-    console.log('[Phase 9.2] WebSocket metrics system initialized');
-} catch (err) {
-    console.error('[Phase 9.2] Failed to initialize WebSocket metrics system:', err.message);
-    console.warn('[Phase 9.2] Continuing without real-time metrics. Metrics will not be recorded.');
+if (process.env.NODE_ENV !== 'test') {
+    try {
+        // Pool will be created below and passed to the collector
+        metricsWebSocketServer = new MetricsWebSocketServer(server);
+        // Pool will be assigned after creation
+        metricsCollector = null; // Will be initialized after pool creation
+
+        console.log('[Phase 9.2] WebSocket metrics system initialized');
+    } catch (err) {
+        console.error('[Phase 9.2] Failed to initialize WebSocket metrics system:', err.message);
+        console.warn('[Phase 9.2] Continuing without real-time metrics. Metrics will not be recorded.');
+    }
+} else {
+    metricsWebSocketServer = null;
+    metricsCollector = null;
 }
 
 const PORT = process.env.PORT || 3001;
@@ -322,6 +330,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // In-memory cache for latest prices: { "AAPL": { price: 150.00, currency: "USD", time: "..." } }
 const priceCache = {};
 let assetsCache = null;
+let lastAssetsFetchError = null;
 
 // Map ticker to list of position types/sources for price routing
 // Format: { "BTC": [{ type: "etf", source: "OTHER_LISTED_FILE" }, { type: "crypto", source: "CRYPTO_INVESTING_FILE" }] }
@@ -449,16 +458,18 @@ try {
 }
 
 // Now that pool is created, initialize the metrics collector
-try {
-    if (metricsWebSocketServer) {
-        metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer, pool);
-        // Make metricsCollector available globally for scrapers
-        global.metricsCollector = metricsCollector;
-        console.log('[Phase 9.2] Metrics collector initialized with database pool');
+if (process.env.NODE_ENV !== 'test') {
+    try {
+        if (metricsWebSocketServer) {
+            metricsCollector = new ScraperMetricsCollector(metricsWebSocketServer, pool);
+            // Make metricsCollector available globally for scrapers
+            global.metricsCollector = metricsCollector;
+            console.log('[Phase 9.2] Metrics collector initialized with database pool');
+        }
+    } catch (err) {
+        console.error('[Phase 9.2] Failed to initialize metrics collector:', err.message);
+        console.warn('[Phase 9.2] Continuing without metrics persistence.');
     }
-} catch (err) {
-    console.error('[Phase 9.2] Failed to initialize metrics collector:', err.message);
-    console.warn('[Phase 9.2] Continuing without metrics persistence.');
 }
 
 // Initialize the autocomplete API with the pool
@@ -498,7 +509,7 @@ async function initializeSymbolRegistry() {
             }
         }
 
-        const { SymbolRegistrySyncService, SymbolRegistryService } = require('./services/symbol-registry');
+        const { SymbolRegistrySyncService, SymbolRegistryService } = require(path.join(servicesBaseDir, 'symbol-registry'));
         const symbolService = new SymbolRegistryService(pool);
         const syncService = new SymbolRegistrySyncService(pool, symbolService);
 
@@ -530,6 +541,7 @@ async function initializeSymbolRegistry() {
 
 async function fetchAssetsFromDB() {
     try {
+        lastAssetsFetchError = null;
         const [accounts] = await pool.query(`
             SELECT a.*, at.display_name as account_type_display_name, at.category as account_type_category, at.` + "`key`" + ` as account_type_key
             FROM accounts a
@@ -597,7 +609,7 @@ async function fetchAssetsFromDB() {
                 const displayType = pos.type; // Default to stored type
 
                 // Compute pricing_class for price lookups
-                const { getPricingClassFromSource, getPricingClass } = require('./services/pricing-utils');
+                const { getPricingClassFromSource, getPricingClass } = require(path.join(servicesBaseDir, 'pricing-utils'));
                 let pricingClass = 'US_EQUITY';
                 if (pos.source) {
                     pricingClass = getPricingClassFromSource(pos.source);
@@ -654,6 +666,10 @@ async function fetchAssetsFromDB() {
         return result;
 
     } catch (err) {
+        lastAssetsFetchError = {
+            message: err && err.message ? err.message : String(err),
+            stack: err && err.stack ? err.stack : null,
+        };
         console.error('Error fetching assets from DB:', err);
         try {
             const fs = require('fs');
@@ -899,16 +915,30 @@ async function startKafkaConsumer() {
 
 // API to get assets
 app.get('/api/assets', async (req, res) => {
-    if (assetsCache) {
-        res.json(assetsCache);
-        return;
-    }
-    const data = await fetchAssetsFromDB();
-    if (data) {
-        assetsCache = data;
-        res.json(data);
-    } else {
-        res.status(500).json({ error: 'Failed to fetch assets' });
+    try {
+        if (assetsCache) {
+            res.json(assetsCache);
+            return;
+        }
+
+        const data = await fetchAssetsFromDB();
+        if (data) {
+            assetsCache = data;
+            res.json(data);
+            return;
+        }
+
+        const details = (process.env.NODE_ENV === 'test') ? lastAssetsFetchError : null;
+        res.status(500).json({
+            error: 'Failed to fetch assets',
+            details: details || undefined,
+        });
+    } catch (err) {
+        console.error('Unhandled error in /api/assets:', err);
+        res.status(500).json({
+            error: 'Unhandled error in /api/assets',
+            details: process.env.NODE_ENV === 'test' ? { message: err.message, stack: err.stack } : undefined,
+        });
     }
 });
 
@@ -1094,7 +1124,7 @@ app.post('/api/fetch-price', async (req, res) => {
 
     // Use PriceRouter for intelligent routing
     try {
-        const PriceRouter = require('./services/price-router');
+        const PriceRouter = require(path.join(servicesBaseDir, 'price-router'));
         const priceRouter = new PriceRouter({ pool });
 
         console.log(`[FetchPrice] Fetching price for ${cleanTicker} (${securityType})...`);
@@ -1116,7 +1146,7 @@ app.post('/api/fetch-price', async (req, res) => {
         const { price, previous_close_price, currency, time, source: sourceSession, pricing_provider: usedProvider } = priceData;
 
         // For manual fetch, determine pricing_class based on security type
-        const { getPricingClass } = require('./services/pricing-utils');
+        const { getPricingClass } = require(path.join(servicesBaseDir, 'pricing-utils'));
         const pricingClass = getPricingClass({ securityType });
 
         // Build cache key with security type and pricing_class to support multiple prices per ticker
