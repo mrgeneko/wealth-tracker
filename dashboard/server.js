@@ -1629,6 +1629,22 @@ app.delete('/api/positions/:id', async (req, res) => {
     }
 });
 
+// Delete all positions for a given ticker (case-insensitive)
+app.delete('/api/positions/ticker/:ticker', async (req, res) => {
+    const ticker = req.params.ticker;
+    if (!ticker) return res.status(400).json({ error: 'ticker is required' });
+    try {
+        // Use case-insensitive match by upper-casing
+        const [result] = await pool.execute('DELETE FROM positions WHERE UPPER(ticker)=UPPER(?)', [ticker]);
+        assetsCache = null;
+        if (process.env.NODE_ENV !== 'test') loadAssets();
+        const deleted = result && (result.affectedRows || result.affected_rows || 0);
+        res.json({ success: true, deleted: deleted });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Fixed Assets
 app.post('/api/fixed_assets', async (req, res) => {
     const { name, type, value, currency, display_order } = req.body;

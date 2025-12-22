@@ -69,6 +69,13 @@ beforeAll(() => {
     res.json({ success: true, deleted_id: req.params.id });
   });
 
+  // Mock bulk delete by ticker
+  app.delete('/api/positions/ticker/:ticker', (req, res) => {
+    const ticker = req.params.ticker;
+    // Simulate deleting 2 positions
+    res.json({ success: true, deleted: 2 });
+  });
+
   app.get('/api/metadata/:ticker', (req, res) => {
     const { ticker } = req.params;
     res.json({
@@ -136,6 +143,14 @@ describe('Dashboard Server - Ticker API', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
+  });
+
+  it('should delete positions by ticker', async () => {
+    const response = await request(app)
+      .delete('/api/positions/ticker/AAPL');
+
+    expect(response.status).toBe(200);
+    expect(response.body.deleted).toBe(2);
   });
 
   it('should retrieve metadata by ticker', async () => {
