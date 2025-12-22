@@ -106,6 +106,7 @@ jobs:
 
       - name: Run source tracking integration tests
         run: |
+          rm -rf artifacts/test-results
           mkdir -p artifacts/test-results
           node scripts/ci/run_tests_with_junit.js --outdir=artifacts/test-results --testsdir=tests/integration --include=source-tracking.integration.test.js
 
@@ -121,7 +122,7 @@ jobs:
         if: success() || failure()
         with:
           name: Source Tracking Integration Tests
-          path: artifacts/test-results/*.xml
+          path: artifacts/test-results/source-tracking*.xml
           reporter: java-junit
           fail-on-error: true
 
