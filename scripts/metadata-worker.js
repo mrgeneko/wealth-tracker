@@ -226,8 +226,8 @@ class MetadataWorker {
             // Max symbols to process per batch
             maxSymbolsPerRun: parseInt(process.env.METADATA_WORKER_MAX_PER_RUN || '500', 10),
             
-            // Wait time when no symbols found (5 minutes)
-            idleWaitMs: parseInt(process.env.METADATA_WORKER_IDLE_WAIT_MS || '300000', 10),
+            // Wait time when no symbols found (60 minutes)
+            idleWaitMs: parseInt(process.env.METADATA_WORKER_IDLE_WAIT_MS || '3600000', 10),
             
             // Enable startup processing
             processOnStartup: process.env.METADATA_WORKER_STARTUP !== 'false'
