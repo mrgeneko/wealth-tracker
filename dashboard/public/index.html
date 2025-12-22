@@ -359,6 +359,24 @@
             visibility: hidden;
         }
 
+        /* Delete icon styling (hidden until ticker hover) */
+        .delete-icon {
+            font-size: 0.9em;
+            margin-left: 8px;
+            color: #f44336; /* red */
+            display: none;
+        }
+        .ticker-container:hover .delete-icon {
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        /* Show small pencil icon on ticker hover */
+        .ticker-container:hover .edit-icon {
+            visibility: visible;
+            cursor: pointer;
+        }
+
         .clickable-cell:hover .edit-icon {
             visibility: visible;
         }
@@ -2394,9 +2412,7 @@
                         <td class="ticker-cell" data-tooltip="${escapeHtml(metaName)}">
                             <div class="ticker-container">
                                 <span class="ticker-symbol">${sym}</span>
-                                <button class="edit-btn" onclick="openEditModal('${sym}', '${type}', '${pricing_class}')">
-                                    <i class="fas fa-edit"></i>
-                                </button>
+                                <span class="delete-icon" tabindex="0" role="button" title="Delete all positions for ${sym}" onclick="confirmDeleteTicker('${sym}')">❌</span>
                             </div>
                             <div class="ticker-name">${metaName || ''}</div>
                         </td>
@@ -3088,6 +3104,48 @@
             }
             modal.style.display = 'block';
         }
+
+
+
+        // Allow keyboard activation of the small edit/delete button (Enter/Space)
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const el = document.activeElement;
+                if (el && el.classList && (el.classList.contains('edit-icon') || el.classList.contains('delete-icon'))) {
+                    el.click();
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // Confirm and delete all positions for a given ticker
+        window.confirmDeleteTicker = function(symbol) {
+            const sym = String(symbol || '').toUpperCase();
+            showConfirmModal(
+                'Delete Ticker',
+                `Delete all positions for ${sym}?\n\nThis cannot be undone.`,
+                async () => {
+                    try {
+                        const resp = await fetch(`/api/positions/ticker/${encodeURIComponent(sym)}`, { method: 'DELETE' });
+                        const data = await resp.json().catch(() => ({}));
+                        if (!resp.ok) throw new Error(data && data.error ? data.error : 'Delete failed');
+
+                        await fetchAssets();
+
+                        const deletedCount = Number(data.deleted || 0);
+                        if (typeof showAlert === 'function') {
+                            showAlert(`Deleted ${deletedCount} position(s) for ${sym}`, deletedCount > 0 ? 'success' : 'info');
+                        } else {
+                            alert(`Deleted ${deletedCount} position(s) for ${sym}`);
+                        }
+                    } catch (err) {
+                        console.error('Error deleting positions for', sym, err);
+                        if (typeof showAlert === 'function') showAlert(`Delete failed for ${sym}: ${err.message}`, 'danger');
+                        else alert(`Delete failed for ${sym}: ${err.message}`);
+                    }
+                }
+            );
+        };
 
         document.getElementById('positionForm').onsubmit = async function (e) {
             e.preventDefault();

@@ -169,6 +169,42 @@ describe('Source Tracking Integration', () => {
         });
     });
 
+    describe('DELETE /api/positions/ticker/:ticker', () => {
+        test('should delete all positions for given ticker (case-insensitive)', async () => {
+            // Simulate DELETE result from MySQL with affectedRows
+            mockExecute.mockResolvedValueOnce([{ affectedRows: 3 }]);
+
+            const res = await request(app)
+                .delete('/api/positions/ticker/AAPL')
+                .auth('admin', 'admin');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveProperty('deleted');
+            expect(res.body.deleted).toBe(3);
+
+            expect(mockExecute).toHaveBeenCalledWith(
+                expect.stringContaining('DELETE FROM positions'),
+                expect.arrayContaining(['AAPL'])
+            );
+        });
+
+        test('should return deleted=0 when no positions exist for ticker', async () => {
+            // Simulate 0 affected rows
+            mockExecute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+            const res = await request(app)
+                .delete('/api/positions/ticker/NOSUCH')
+                .auth('admin', 'admin');
+
+            expect(res.status).toBe(200);
+            expect(res.body.deleted).toBe(0);
+            expect(mockExecute).toHaveBeenCalledWith(
+                expect.stringContaining('DELETE FROM positions'),
+                expect.arrayContaining(['NOSUCH'])
+            );
+        });
+    });
+
     describe('GET /api/assets', () => {
         test('should return source and pricing_provider for positions', async () => {
             // Mock accounts
