@@ -107,33 +107,14 @@ jobs:
       - name: Run source tracking integration tests
         run: |
           mkdir -p artifacts/test-results
-          npm test -- tests/integration/source-tracking.integration.test.js --verbose --testResultsProcessor=jest-junit
-        env:
-          JEST_JUNIT_OUTPUT_DIR: artifacts/test-results
-          JEST_JUNIT_OUTPUT_NAME: source-tracking-results.xml
-
-      - name: Generate test coverage for source tracking
-        run: |
-          npm test -- tests/integration/source-tracking.integration.test.js --coverage --coverageDirectory=coverage/source-tracking
-        env:
-          JEST_JUNIT_OUTPUT_DIR: artifacts/test-results
+          node scripts/ci/run_tests_with_junit.js --outdir=artifacts/test-results --testsdir=tests/integration
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: source-tracking-test-results
-          path: |
-            artifacts/test-results/
-            coverage/source-tracking/
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        if: always()
-        with:
-          files: ./coverage/source-tracking/lcov.info
-          flags: source-tracking-integration
-          name: source-tracking-coverage
+          path: artifacts/test-results/
 
       - name: Publish test results (JUnit)
         uses: dorny/test-reporter@v1
