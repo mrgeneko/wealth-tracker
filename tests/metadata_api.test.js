@@ -13,6 +13,9 @@ const TEST_SYMBOLS = {
   future: 'GC=F'
 };
 
+const RUN_DB_TESTS = ['1', 'true', 'yes'].includes(String(process.env.RUN_DB_TESTS || '').toLowerCase());
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+
 // Initialize database schema from consolidated init script
 async function initializeSchema(conn) {
   const baseSchemaPath = path.join(__dirname, '..', 'scripts/init-db/000-base-schema.sql');
@@ -30,7 +33,7 @@ async function initializeSchema(conn) {
   }
 }
 
-describe('Metadata API Test Suite', () => {
+describeDb('Metadata API Test Suite', () => {
   let connection;
 
   beforeAll(async () => {

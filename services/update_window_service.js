@@ -9,6 +9,11 @@ class UpdateWindowService {
 	}
 
 	async isWithinUpdateWindow(ticker, providerId = null, watchlistKey = null) {
+		// Allow bypassing update windows via environment variable (for testing)
+		if (process.env.IGNORE_UPDATE_WINDOWS === 'true') {
+			return { allowed: true, reason: 'update_windows_disabled_by_env' };
+		}
+
 		const windows = await this._getWindows();
 		if (!windows || windows.length === 0) {
 			return { allowed: true, reason: 'no_windows_defined' };

@@ -7,6 +7,9 @@ const mysql = require('mysql2/promise');
 const path = require('path');
 const fs = require('fs');
 
+const RUN_DB_TESTS = ['1', 'true', 'yes'].includes(String(process.env.RUN_DB_TESTS || '').toLowerCase());
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+
 // Initialize database schema with proper tables and ticker column
 async function initializeSchema(conn) {
   // Drop existing tables to ensure fresh schema with ticker column
@@ -82,7 +85,7 @@ async function runCommandStream(cmd, args = [], opts = {}) {
 
 const TEST_SYMBOLS = ['AAPL', 'MSFT', 'INVALID_SYMBOL'];
 
-describe('Metadata Population Integration Tests', () => {
+describeDb('Metadata Population Integration Tests', () => {
   let connection;
 
   beforeAll(async () => {

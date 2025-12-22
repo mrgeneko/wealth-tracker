@@ -12,7 +12,10 @@ const fs = require('fs');
 // We'll need to set up a minimal express app with the export/import endpoints
 // For now, we'll test the database operations directly
 
-describe('Export/Import Integration Test', () => {
+const RUN_DB_TESTS = ['1', 'true', 'yes'].includes(String(process.env.RUN_DB_TESTS || '').toLowerCase());
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+
+describeDb('Export/Import Integration Test', () => {
   let connection;
 
   beforeAll(async () => {

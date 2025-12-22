@@ -24,6 +24,9 @@ services:
       # Set these in your local `.env` to enable automatic login.
       INVESTING_EMAIL: ${INVESTING_EMAIL}
       INVESTING_PASSWORD: ${INVESTING_PASSWORD}
+
+      # Testing: Set to 'true' to bypass update_windows restrictions (allows scraping on weekends/off-hours)
+      IGNORE_UPDATE_WINDOWS: ${IGNORE_UPDATE_WINDOWS:-false}
     volumes:
       - ./logs:/usr/src/app/logs
       - ./data:/usr/src/app/data

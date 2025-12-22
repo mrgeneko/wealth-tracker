@@ -8,6 +8,9 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const RUN_DB_TESTS = ['1', 'true', 'yes'].includes(String(process.env.RUN_DB_TESTS || '').toLowerCase());
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+
 async function initializeSchema(conn) {
   // Drop existing tables to ensure fresh schema with ticker column
   const tablesToDrop = [
@@ -80,7 +83,7 @@ async function isoDateDaysAgo(days) {
   return d.toISOString().slice(0, 10);
 }
 
-describe('TTM EPS Adjusted Integration Test', () => {
+describeDb('TTM EPS Adjusted Integration Test', () => {
   let connection;
 
   beforeAll(async () => {

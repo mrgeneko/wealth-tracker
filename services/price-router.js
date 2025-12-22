@@ -193,16 +193,35 @@ class PriceRouter {
 
     /**
      * Fetch price from Investing.com
-     * Note: Investing.com typically requires web scraping
+     * Note: Investing.com requires web scraping via watchlist
+     * This method signals that the ticker should be added to the watchlist
      */
     async _fetchFromInvesting(ticker, securityType, options) {
-        // Investing.com prices would need to be scraped
-        // For now, throw error indicating not yet implemented
-        throw new Error(`Investing.com provider not yet implemented (ticker: ${ticker})`);
+        // Investing.com prices are fetched asynchronously via watchlist scraper
+        // Return a placeholder response indicating the ticker needs to be added to watchlist
+        console.log(`[PriceRouter] Investing.com ticker ${ticker} requires watchlist scraping`);
+
+        // Check if we have a cached price in the database
+        if (this.pool) {
+            const cached = await this.getPriceFromDatabase(ticker, securityType);
+            if (cached) {
+                console.log(`[PriceRouter] Returning cached price for ${ticker}`);
+                return {
+                    price: cached.price,
+                    previous_close_price: cached.previous_close_price,
+                    source: 'investing_cached',
+                    time: cached.quote_time,
+                    cached: true
+                };
+            }
+        }
+
+        // No cached price available
+        throw new Error(`Investing.com ticker ${ticker} not yet in watchlist. Please add to watchlist for price updates.`);
     }
 
     /**
-     * Persist price to latest_prices table with security_type
+     * Persist price to latest_prices table with composite key (ticker, security_type, pricing_class)
      */
     async savePriceToDatabase(priceData) {
         if (!this.pool) {
@@ -212,41 +231,48 @@ class PriceRouter {
         const {
             ticker,
             security_type,
+            pricing_class,
             price,
             previous_close_price,
             prev_close_source,
             prev_close_time,
-            source,
+            source_session,
             time
         } = priceData;
 
+        // Determine pricing_class using the utility if not provided
+        const { getPricingClass } = require('./pricing-utils');
+        const finalPricingClass = pricing_class || getPricingClass({ securityType: security_type });
+
         try {
             // Use INSERT ... ON DUPLICATE KEY UPDATE for upsert behavior
+            // Composite key: (ticker, security_type, pricing_class)
             await this.pool.execute(`
                 INSERT INTO latest_prices
-                    (ticker, security_type, price, previous_close_price,
-                     prev_close_source, prev_close_time, source, quote_time, capture_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    (ticker, security_type, pricing_class, price, previous_close_price,
+                     prev_close_source, prev_close_time, source_session, quote_time, capture_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
                     price = VALUES(price),
                     previous_close_price = VALUES(previous_close_price),
                     prev_close_source = VALUES(prev_close_source),
                     prev_close_time = VALUES(prev_close_time),
-                    source = VALUES(source),
+                    source_session = VALUES(source_session),
                     quote_time = VALUES(quote_time),
                     capture_time = NOW()
             `, [
                 ticker,
                 security_type.toUpperCase(),
+                finalPricingClass.toUpperCase(),
                 price,
                 previous_close_price,
                 prev_close_source,
                 prev_close_time,
-                source,
+                source_session,
                 time
             ]);
 
-            console.log(`[PriceRouter] Saved price to database: ${ticker} (${security_type}) = ${price}`);
+            console.log(`[PriceRouter] Saved price to database: ${ticker} (${security_type}/${finalPricingClass}) = ${price}`);
             return true;
         } catch (error) {
             console.error(`[PriceRouter] Error saving price to database:`, error.message);
@@ -255,20 +281,24 @@ class PriceRouter {
     }
 
     /**
-     * Get price from database for ticker + security_type
+     * Get price from database for ticker + security_type + pricing_class
      */
-    async getPriceFromDatabase(ticker, securityType) {
+    async getPriceFromDatabase(ticker, securityType, pricingClass) {
         if (!this.pool) {
             throw new Error('Database pool not configured');
         }
+
+        // Determine pricing_class using the utility if not provided
+        const { getPricingClass } = require('./pricing-utils');
+        const finalPricingClass = pricingClass || getPricingClass({ securityType });
 
         try {
             const [rows] = await this.pool.execute(`
                 SELECT *
                 FROM latest_prices
-                WHERE ticker = ? AND security_type = ?
+                WHERE ticker = ? AND security_type = ? AND pricing_class = ?
                 LIMIT 1
-            `, [ticker.toUpperCase(), securityType.toUpperCase()]);
+            `, [ticker.toUpperCase(), securityType.toUpperCase(), finalPricingClass.toUpperCase()]);
 
             return rows.length > 0 ? rows[0] : null;
         } catch (error) {

@@ -230,9 +230,15 @@ class MetadataAutocompleteService {
      * Get detailed metadata for a single ticker
      * Used for "Add Position" modal
      */
-    async getTickerDetails(ticker) {
+    async getTickerDetails(ticker, type = null) {
         const normalizedTicker = ticker.toUpperCase();
-        return this._getDetailsByCriteria('ticker = ?', [normalizedTicker]);
+        let criteria = 'ticker = ?';
+        let params = [normalizedTicker];
+        if (type) {
+            criteria += ' AND security_type = ?';
+            params.push(type.toUpperCase());
+        }
+        return this._getDetailsByCriteria(criteria, params);
     }
 
     /**
@@ -264,16 +270,16 @@ class MetadataAutocompleteService {
 
             const tickerData = registry[0];
 
+            // Auto-detect and normalize type from registry first
+            let detectedType = this._normalizeSecurityType(tickerData.security_type);
+
             const [metadata] = await connection.execute(`
                 SELECT *
                 FROM securities_metadata
-                WHERE ticker = ?
-            `, [tickerData.ticker]);
+                WHERE ticker = ? AND (quote_type IS NULL OR LOWER(quote_type) = LOWER(?))
+            `, [tickerData.ticker, detectedType]);
 
             const metadataRecord = metadata.length > 0 ? metadata[0] : null;
-
-            // Auto-detect and normalize type from authoritative sources
-            let detectedType = this._normalizeSecurityType(tickerData.security_type);
 
             // Priority 1: Check if it's a bond (treasury registry)
             if (tickerData.security_type === 'TREASURY' || tickerData.security_type === 'BOND') {

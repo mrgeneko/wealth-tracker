@@ -54,19 +54,25 @@ async function fetchMetadataForTicker(ticker) {
  */
 router.get('/lookup/:ticker', async (req, res) => {
     const ticker = req.params.ticker.toUpperCase();
+    const type = req.query.type ? req.query.type.toLowerCase() : null;
     const connection = await getDbConnection();
 
     try {
         // Check if metadata exists
-        const [rows] = await connection.execute(
-            `SELECT 
+        let query = `SELECT 
         ticker, quote_type, type_display, short_name, long_name,
             exchange, currency, market_cap, dividend_yield, trailing_pe,
             ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE ticker = ?`,
-            [ticker]
-        );
+       WHERE ticker = ?`;
+        let params = [ticker];
+
+        if (type) {
+            query += ` AND LOWER(quote_type) = ?`;
+            params.push(type);
+        }
+
+        const [rows] = await connection.execute(query, params);
 
         if (rows.length > 0) {
             // Metadata exists - return immediately
@@ -75,6 +81,21 @@ router.get('/lookup/:ticker', async (req, res) => {
                 metadata: rows[0]
             });
         } else {
+            // If we didn't find it with type, try without type just to see if it exists at all
+            if (type) {
+                const [anyRows] = await connection.execute(
+                    `SELECT ticker FROM securities_metadata WHERE ticker = ? LIMIT 1`,
+                    [ticker]
+                );
+                if (anyRows.length > 0) {
+                    return res.json({
+                        exists: false,
+                        message: `Metadata exists for ${ticker} but not as type ${type}.`,
+                        ticker: ticker
+                    });
+                }
+            }
+
             // Metadata doesn't exist - trigger fetch in background
             res.json({
                 exists: false,
@@ -102,33 +123,42 @@ router.get('/lookup/:ticker', async (req, res) => {
  * Used for: "Add Position" modal when user selects ticker
  */
 router.post('/prefetch', async (req, res) => {
-    const { ticker } = req.body;
+    const { ticker, type } = req.body;
 
     if (!ticker) {
         return res.status(400).json({ error: 'Ticker is required' });
     }
 
     const normalizedTicker = ticker.toUpperCase();
+    const normalizedType = type ? type.toLowerCase() : null;
     const connection = await getDbConnection();
 
     try {
         // Check if already exists
-        const [existing] = await connection.execute(
-            'SELECT ticker FROM securities_metadata WHERE ticker = ?',
-            [normalizedTicker]
-        );
+        let query = 'SELECT ticker FROM securities_metadata WHERE ticker = ?';
+        let params = [normalizedTicker];
+        if (normalizedType) {
+            query += ' AND LOWER(quote_type) = ?';
+            params.push(normalizedType);
+        }
+
+        const [existing] = await connection.execute(query, params);
 
         if (existing.length > 0) {
             // Already have it
-            const [metadata] = await connection.execute(
-                `SELECT 
+            let selectQuery = `SELECT 
           ticker, quote_type, type_display, short_name, long_name,
               exchange, currency, region, market_cap, dividend_yield,
               ttm_dividend_amount, ttm_eps
          FROM securities_metadata 
-         WHERE ticker = ?`,
-                [normalizedTicker]
-            );
+         WHERE ticker = ?`;
+            let selectParams = [normalizedTicker];
+            if (normalizedType) {
+                selectQuery += ' AND LOWER(quote_type) = ?';
+                selectParams.push(normalizedType);
+            }
+
+            const [metadata] = await connection.execute(selectQuery, selectParams);
 
             return res.json({
                 cached: true,
@@ -148,15 +178,19 @@ router.post('/prefetch', async (req, res) => {
         }
 
         // Retrieve the newly inserted metadata
-        const [metadata] = await connection.execute(
-            `SELECT 
+        let finalQuery = `SELECT 
         ticker, quote_type, type_display, short_name, long_name,
         exchange, currency, region, market_cap, dividend_yield,
         ttm_dividend_amount, ttm_eps
        FROM securities_metadata 
-       WHERE ticker = ?`,
-            [normalizedTicker]
-        );
+       WHERE ticker = ?`;
+        let finalParams = [normalizedTicker];
+        if (normalizedType) {
+            finalQuery += ' AND LOWER(quote_type) = ?';
+            finalParams.push(normalizedType);
+        }
+
+        const [metadata] = await connection.execute(finalQuery, finalParams);
 
         res.json({
             cached: false,

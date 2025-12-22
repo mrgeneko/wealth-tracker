@@ -106,42 +106,45 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create latest_prices table
--- Support multiple prices per ticker using composite key (ticker, security_type, source)
+-- Support multiple prices per ticker using composite key (ticker, security_type, pricing_class)
 -- - security_type: Distinguish BTC as crypto vs ETF vs stock
--- - source: Handle crypto ticker variations (BTC.X vs BTC-USD) and multi-exchange tickers (BP on NYSE vs LSE)
+-- - pricing_class: Determines which scrapers can price this ticker (US_EQUITY, US_TREASURY, CRYPTO_INVESTING)
+--   Derived from ticker_registry.pricing_provider or source mapping
+-- - source_session: Scraper name with price type (e.g., "yahoo (after-hours)")
 CREATE TABLE IF NOT EXISTS latest_prices (
   ticker VARCHAR(50) NOT NULL,
   security_type VARCHAR(20) NOT NULL DEFAULT 'NOT_SET',
-  source VARCHAR(50) NOT NULL DEFAULT 'unknown',
+  pricing_class VARCHAR(50) NOT NULL DEFAULT 'US_EQUITY',
   price DECIMAL(18,4) DEFAULT NULL,
   previous_close_price DECIMAL(18,4) DEFAULT NULL,
   prev_close_source VARCHAR(50) DEFAULT NULL,
   prev_close_time DATETIME DEFAULT NULL,
+  source_session VARCHAR(100) DEFAULT NULL,
   quote_time DATETIME DEFAULT NULL,
   capture_time DATETIME DEFAULT NULL,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (ticker, security_type, source),
+  PRIMARY KEY (ticker, security_type, pricing_class),
   KEY idx_latest_prices_ticker (ticker)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_metadata table
 CREATE TABLE IF NOT EXISTS securities_metadata (
   id INT NOT NULL AUTO_INCREMENT,
-  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  quote_type VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  type_display VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  short_name VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  long_name VARCHAR(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  sector VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  industry VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  region VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  exchange VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  full_exchange_name VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  currency VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  timezone_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  timezone_short VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  market VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  market_state VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  ticker VARCHAR(50) NOT NULL,
+  quote_type VARCHAR(50) DEFAULT NULL,
+  type_display VARCHAR(50) DEFAULT NULL,
+  short_name VARCHAR(255) DEFAULT NULL,
+  long_name VARCHAR(500) DEFAULT NULL,
+  sector VARCHAR(100) DEFAULT NULL,
+  industry VARCHAR(100) DEFAULT NULL,
+  region VARCHAR(10) DEFAULT NULL,
+  exchange VARCHAR(50) DEFAULT NULL,
+  full_exchange_name VARCHAR(255) DEFAULT NULL,
+  currency VARCHAR(10) DEFAULT NULL,
+  timezone_name VARCHAR(100) DEFAULT NULL,
+  timezone_short VARCHAR(10) DEFAULT NULL,
+  market VARCHAR(50) DEFAULT NULL,
+  market_state VARCHAR(20) DEFAULT NULL,
   tradeable TINYINT(1) DEFAULT 1,
   net_assets DECIMAL(20,2) DEFAULT NULL,
   net_expense_ratio DECIMAL(8,4) DEFAULT NULL,
@@ -158,7 +161,7 @@ CREATE TABLE IF NOT EXISTS securities_metadata (
   fifty_two_week_low DECIMAL(18,4) DEFAULT NULL,
   fifty_two_week_high DECIMAL(18,4) DEFAULT NULL,
   first_trade_date DATETIME DEFAULT NULL,
-  data_source VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT 'yahoo',
+  data_source VARCHAR(50) DEFAULT 'yahoo',
   last_updated TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   ttm_dividend_amount DECIMAL(12,4) DEFAULT NULL,
@@ -170,26 +173,26 @@ CREATE TABLE IF NOT EXISTS securities_metadata (
   KEY idx_quote_type (quote_type),
   KEY idx_exchange (exchange),
   KEY idx_currency (currency)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_dividends table
 CREATE TABLE IF NOT EXISTS securities_dividends (
   id INT NOT NULL AUTO_INCREMENT,
-  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) NOT NULL,
   ex_dividend_date DATE NOT NULL,
   payment_date DATE DEFAULT NULL,
   record_date DATE DEFAULT NULL,
   declaration_date DATE DEFAULT NULL,
   dividend_amount DECIMAL(10,4) NOT NULL,
-  dividend_type VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  currency VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT 'USD',
+  dividend_type VARCHAR(50) DEFAULT NULL,
+  currency VARCHAR(10) DEFAULT 'USD',
   is_estimate TINYINT(1) DEFAULT 0,
-  status VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT 'confirmed',
-  data_source VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT 'yahoo',
+  status VARCHAR(20) DEFAULT 'confirmed',
+  data_source VARCHAR(50) DEFAULT 'yahoo',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  source_event_id VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  source_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  source_event_id VARCHAR(255) DEFAULT NULL,
+  source_name VARCHAR(100) DEFAULT NULL,
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   adjusted_dividend_amount DECIMAL(12,6) DEFAULT NULL,
   PRIMARY KEY (id),
@@ -199,26 +202,26 @@ CREATE TABLE IF NOT EXISTS securities_dividends (
   KEY idx_payment_date (payment_date),
   KEY idx_div_ticker_date_status (ticker,ex_dividend_date,status),
   CONSTRAINT securities_dividends_ibfk_1 FOREIGN KEY (ticker) REFERENCES securities_metadata (ticker) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_dividends_backup table
 CREATE TABLE IF NOT EXISTS securities_dividends_backup (
   id INT NOT NULL AUTO_INCREMENT,
-  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) NOT NULL,
   ex_dividend_date DATE NOT NULL,
   payment_date DATE DEFAULT NULL,
   record_date DATE DEFAULT NULL,
   declaration_date DATE DEFAULT NULL,
   dividend_amount DECIMAL(10,4) NOT NULL,
-  dividend_type VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  currency VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT 'USD',
+  dividend_type VARCHAR(50) DEFAULT NULL,
+  currency VARCHAR(10) DEFAULT 'USD',
   is_estimate TINYINT(1) DEFAULT 0,
-  status VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT 'confirmed',
-  data_source VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT 'yahoo',
+  status VARCHAR(20) DEFAULT 'confirmed',
+  data_source VARCHAR(50) DEFAULT 'yahoo',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  source_event_id VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  source_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  source_event_id VARCHAR(255) DEFAULT NULL,
+  source_name VARCHAR(100) DEFAULT NULL,
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   adjusted_dividend_amount DECIMAL(12,6) DEFAULT NULL,
   PRIMARY KEY (id),
@@ -226,12 +229,12 @@ CREATE TABLE IF NOT EXISTS securities_dividends_backup (
   KEY idx_ticker (ticker),
   KEY idx_ex_date (ex_dividend_date),
   KEY idx_payment_date (payment_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_earnings table
 CREATE TABLE IF NOT EXISTS securities_earnings (
   id INT NOT NULL AUTO_INCREMENT,
-  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) NOT NULL,
   earnings_date DATETIME NOT NULL,
   earnings_date_end DATETIME DEFAULT NULL,
   is_estimate TINYINT(1) DEFAULT 1,
@@ -239,13 +242,13 @@ CREATE TABLE IF NOT EXISTS securities_earnings (
   eps_estimate DECIMAL(10,4) DEFAULT NULL,
   revenue_actual BIGINT DEFAULT NULL,
   revenue_estimate BIGINT DEFAULT NULL,
-  fiscal_quarter VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  fiscal_quarter VARCHAR(10) DEFAULT NULL,
   fiscal_year INT DEFAULT NULL,
-  data_source VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT 'yahoo',
+  data_source VARCHAR(50) DEFAULT 'yahoo',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  source_event_id VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  source_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  source_event_id VARCHAR(255) DEFAULT NULL,
+  source_name VARCHAR(100) DEFAULT NULL,
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   adjusted_eps DECIMAL(12,6) DEFAULT NULL,
   PRIMARY KEY (id),
@@ -254,12 +257,12 @@ CREATE TABLE IF NOT EXISTS securities_earnings (
   KEY idx_earnings_date (earnings_date),
   KEY idx_earn_ticker_date_eps (ticker,earnings_date,eps_actual),
   CONSTRAINT securities_earnings_ibfk_1 FOREIGN KEY (ticker) REFERENCES securities_metadata (ticker) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create securities_earnings_backup table
 CREATE TABLE IF NOT EXISTS securities_earnings_backup (
   id INT NOT NULL AUTO_INCREMENT,
-  ticker VARCHAR(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  ticker VARCHAR(50) NOT NULL,
   earnings_date DATETIME NOT NULL,
   earnings_date_end DATETIME DEFAULT NULL,
   is_estimate TINYINT(1) DEFAULT 1,
@@ -267,19 +270,19 @@ CREATE TABLE IF NOT EXISTS securities_earnings_backup (
   eps_estimate DECIMAL(10,4) DEFAULT NULL,
   revenue_actual BIGINT DEFAULT NULL,
   revenue_estimate BIGINT DEFAULT NULL,
-  fiscal_quarter VARCHAR(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  fiscal_quarter VARCHAR(10) DEFAULT NULL,
   fiscal_year INT DEFAULT NULL,
-  data_source VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT 'yahoo',
+  data_source VARCHAR(50) DEFAULT 'yahoo',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  source_event_id VARCHAR(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  source_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  source_event_id VARCHAR(255) DEFAULT NULL,
+  source_name VARCHAR(100) DEFAULT NULL,
   ingested_at TIMESTAMP NULL DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY unique_earnings (ticker,earnings_date,fiscal_quarter,fiscal_year),
   KEY idx_ticker (ticker),
   KEY idx_earnings_date (earnings_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Create security_splits table
 CREATE TABLE IF NOT EXISTS security_splits (

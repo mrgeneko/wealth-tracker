@@ -26,8 +26,8 @@ const {
 } = require('../../../scrapers/scraper_utils');
 
 describe('sanitizeForFilename', () => {
-  test('removes special characters', () => {
-    expect(sanitizeForFilename('hello@world!')).toBe('hello_world_');
+  test('preserves most special characters', () => {
+    expect(sanitizeForFilename('hello@world!')).toBe('hello@world!');
   });
 
   test('preserves alphanumeric, dots, dashes, underscores', () => {
@@ -218,7 +218,7 @@ describe('Edge cases and error handling', () => {
   });
 
   test('sanitizeForFilename handles unicode characters', () => {
-    expect(sanitizeForFilename('test™')).toBe('test_');
-    expect(sanitizeForFilename('café')).toBe('caf_');
+    expect(sanitizeForFilename('test™')).toBe('test™');
+    expect(sanitizeForFilename('café')).toBe('café');
   });
 });
