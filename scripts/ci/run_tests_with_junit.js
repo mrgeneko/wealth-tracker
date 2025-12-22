@@ -40,16 +40,13 @@ function parseArg(name, defaultValue) {
     console.log(`Running ${scriptPath} ...`);
 
     const start = Date.now();
-    // Some tests are written for Jest (use describe/test/expect). Detect those and run via jest.
-    // Look for Jest-style top-level describe() or test() calls, not method definitions
-    const content = fs.readFileSync(scriptPath, 'utf8');
-    // More precise detection: look for `describe('` or `test('` or `it('` at statement level
-    // Also check for require('supertest') which is a good Jest test indicator
-    const usesJest = /^describe\s*\(|^test\s*\(|^it\s*\(/m.test(content) ||
-                     /require\s*\(\s*['"]supertest['"]\s*\)/.test(content);
-    const child = usesJest
-      ? spawn('npx', ['jest', '--config=jest.config.integration.js', '--runInBand', '--testTimeout=60000', scriptPath], { env: process.env })
-      : spawn('node', [scriptPath], { env: process.env });
+    // All files in tests/integration are Jest tests. Always run through Jest so globals
+    // like describe/test/expect are available (some tests alias describe, e.g. describeDb).
+    const child = spawn(
+      'npx',
+      ['jest', '--config=jest.config.integration.js', '--runInBand', '--testTimeout=60000', scriptPath],
+      { env: process.env }
+    );
 
     let stdout = '';
     let stderr = '';
