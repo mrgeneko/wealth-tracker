@@ -22,7 +22,16 @@ if (!process.env.VERBOSE_TESTS) {
 }
 
 // Set reasonable timeouts for async operations
-jest.setTimeout(5000);
+const testType = String(process.env.TEST_TYPE || '').toLowerCase();
+if (testType === 'integration') {
+  jest.setTimeout(60000);
+} else if (testType === 'all') {
+  jest.setTimeout(120000);
+} else if (testType === 'migration') {
+  jest.setTimeout(120000);
+} else {
+  jest.setTimeout(5000);
+}
 
 // Add custom matchers if needed
 expect.extend({

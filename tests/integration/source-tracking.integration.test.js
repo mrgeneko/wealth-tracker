@@ -2,25 +2,33 @@
 // Integration tests for source tracking flow
 
 const request = require('supertest');
-const mysql = require('mysql2/promise');
 
-// Mock mysql2/promise
-const mockExecute = jest.fn();
-const mockQuery = jest.fn();
-
-jest.mock('mysql2/promise', () => ({
-    createPool: jest.fn(() => ({
+jest.mock('mysql2/promise', () => {
+    const mockExecute = jest.fn();
+    const mockQuery = jest.fn();
+    const mockRelease = jest.fn();
+    const mockGetConnection = jest.fn().mockResolvedValue({
         execute: mockExecute,
         query: mockQuery,
-        getConnection: jest.fn().mockResolvedValue({
+        release: mockRelease
+    });
+
+    return {
+        createPool: jest.fn(() => ({
             execute: mockExecute,
             query: mockQuery,
-            release: jest.fn()
-        }),
-        on: jest.fn(),
-        end: jest.fn().mockResolvedValue()
-    }))
-}));
+            getConnection: mockGetConnection,
+            on: jest.fn(),
+            end: jest.fn().mockResolvedValue()
+        })),
+        __mock: {
+            mockExecute,
+            mockQuery,
+            mockRelease,
+            mockGetConnection
+        }
+    };
+});
 
 // Mock PriceRouter to avoid real API calls
 jest.mock('../../services/price-router', () => {
@@ -56,7 +64,21 @@ jest.mock('kafkajs', () => ({
     }))
 }));
 
-const { app, server, pool, assetsPollingInterval } = require('../../dashboard/server');
+let app;
+let server;
+let pool;
+let assetsPollingInterval;
+let mockExecute;
+let mockQuery;
+
+beforeAll(() => {
+    // Ensure we load the server after mocks are registered.
+    jest.resetModules();
+    ({ app, server, pool, assetsPollingInterval } = require('../../dashboard/server'));
+    const mysql = require('mysql2/promise');
+    mockExecute = mysql.__mock.mockExecute;
+    mockQuery = mysql.__mock.mockQuery;
+});
 
 describe('Source Tracking Integration', () => {
     beforeEach(() => {
