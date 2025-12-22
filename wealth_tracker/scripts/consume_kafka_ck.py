@@ -60,24 +60,25 @@ def get_db_connection():
                 password=MYSQL_PASSWORD,
                 database=MYSQL_DATABASE
             )
-            # Ensure table exists with security_type and source support
-            # Composite PRIMARY KEY (ticker, security_type, source) to handle:
-            # - Crypto ticker variations across sources (BTC.X vs BTC-USD)
-            # - Same ticker on multiple exchanges (BP on NYSE vs LSE)
+            # Ensure table exists with composite key (ticker, security_type, pricing_class)
+            # - security_type: Distinguish BTC as crypto vs ETF vs stock
+            # - pricing_class: Determines which scrapers can price this ticker (US_EQUITY, US_TREASURY, CRYPTO_INVESTING)
+            # - source_session: Scraper name with price type (e.g., "yahoo (after-hours)")
             cursor = db_conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS latest_prices (
                     ticker VARCHAR(50) NOT NULL,
                     security_type VARCHAR(20) NOT NULL DEFAULT 'NOT_SET',
-                    source VARCHAR(50) NOT NULL DEFAULT 'unknown',
+                    pricing_class VARCHAR(50) NOT NULL DEFAULT 'US_EQUITY',
                     price DECIMAL(18, 4),
                     previous_close_price DECIMAL(18, 4),
                     prev_close_source VARCHAR(50),
                     prev_close_time DATETIME,
+                    source_session VARCHAR(100),
                     quote_time DATETIME,
                     capture_time DATETIME,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (ticker, security_type, source)
+                    PRIMARY KEY (ticker, security_type, pricing_class)
                 )
             """)
             db_conn.commit()
@@ -87,6 +88,43 @@ def get_db_connection():
         logging.error(f"Database connection error: {e}")
         db_conn = None
     return db_conn
+
+# Mapping from source (data provenance) to pricing_class (pricing capability)
+SOURCE_TO_PRICING_CLASS = {
+    'NASDAQ_FILE': 'US_EQUITY',
+    'NYSE_FILE': 'US_EQUITY',
+    'OTHER_LISTED_FILE': 'US_EQUITY',
+    'TREASURY_FILE': 'US_TREASURY',
+    'TREASURY_HISTORICAL': 'US_TREASURY',
+    'US_TREASURY_AUCTIONS': 'US_TREASURY',
+    'CRYPTO_INVESTING_FILE': 'CRYPTO_INVESTING',
+    'INVESTING': 'CRYPTO_INVESTING',  # Investing.com watchlist scraper (crypto)
+    'YAHOO': 'US_EQUITY',
+    'USER_ADDED': 'US_EQUITY',
+    'MANUAL_FETCH': 'US_EQUITY'
+}
+
+def get_pricing_class(source=None, pricing_class=None, security_type=None):
+    """Get pricing_class from source, explicit pricing_class, or security_type"""
+    # If explicit pricing_class provided, use it
+    if pricing_class and isinstance(pricing_class, str) and pricing_class.upper() in ('US_EQUITY', 'US_TREASURY', 'CRYPTO_INVESTING'):
+        return pricing_class.upper()
+    
+    # Map from source
+    if source and isinstance(source, str):
+        mapped = SOURCE_TO_PRICING_CLASS.get(source.upper())
+        if mapped:
+            return mapped
+    
+    # Default based on security type
+    if security_type and isinstance(security_type, str):
+        st = security_type.lower()
+        if st in ('bond', 'us_treasury'):
+            return 'US_TREASURY'
+        if st == 'crypto':
+            return 'CRYPTO_INVESTING'
+    
+    return 'US_EQUITY'
 
 def process_message(data):
     logging.info(f"Processing message: {data}")
@@ -103,12 +141,18 @@ def process_message(data):
     else:
         security_type = 'NOT_SET'
 
-    # Extract source for composite key (ticker, security_type, source)
-    # This handles crypto ticker variations (BTC.X vs BTC-USD) and
-    # multi-exchange tickers (BP on NYSE vs LSE)
+    # Extract base_source (scraper name like "yahoo") for source_session
     base_source = data.get('source', 'unknown')
     if not base_source or not isinstance(base_source, str):
         base_source = 'unknown'
+    
+    # pricing_class determines which scrapers can price this ticker
+    # Can be provided directly or derived from source/security_type
+    pricing_class = get_pricing_class(
+        source=data.get('position_source') or data.get('source'),  # Check both position_source and source fields
+        pricing_class=data.get('pricing_class'),  # New field - pricing capability
+        security_type=security_type
+    )
 
     # Helper to clean price strings
     def clean_val(v):
@@ -185,8 +229,8 @@ def process_message(data):
         except ValueError:
             quote_time = None
 
-    # Construct final_source with price_source detail
-    final_source = f"{base_source} ({price_source})"
+    # Construct source_session with price_source detail (e.g., "yahoo (after-hours)")
+    source_session = f"{base_source} ({price_source})"
 
     # Determine prev_close metadata
     prev_close_source = data.get('previous_close_source') or base_source if previous_close_price > 0 else None
@@ -196,15 +240,12 @@ def process_message(data):
     if conn:
         try:
             cursor = conn.cursor()
-            # Use source-priority merge for previous_close_price:
-            # Only update prev_close fields if incoming has a valid value AND
-            # (no existing value OR incoming source has higher/equal priority)
-            # Composite PRIMARY KEY: (ticker, security_type, source)
-            # - source distinguishes crypto ticker variations (BTC.X vs BTC-USD)
-            # - source distinguishes multi-exchange tickers (BP on NYSE vs LSE)
+            # Composite PRIMARY KEY: (ticker, security_type, pricing_class)
+            # - pricing_class determines which scrapers can price this ticker (US_EQUITY, US_TREASURY, CRYPTO_INVESTING)
+            # - source_session stores the scraper name with price type (e.g., "yahoo (after-hours)")
             sql = """
-                INSERT INTO latest_prices (ticker, security_type, source, price, previous_close_price, prev_close_source, prev_close_time, quote_time, capture_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO latest_prices (ticker, security_type, pricing_class, price, previous_close_price, prev_close_source, prev_close_time, quote_time, capture_time, source_session)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     price = VALUES(price),
                     previous_close_price = CASE
@@ -220,23 +261,25 @@ def process_message(data):
                         ELSE prev_close_time
                     END,
                     quote_time = VALUES(quote_time),
-                    capture_time = VALUES(capture_time)
+                    capture_time = VALUES(capture_time),
+                    source_session = VALUES(source_session)
             """
             vals = (
                 ticker,
                 security_type,
-                base_source,
+                pricing_class,
                 price_val,
                 previous_close_price if previous_close_price > 0 else None,
                 prev_close_source,
                 prev_close_time,
                 quote_time,
-                capture_time
+                capture_time,
+                source_session  # scraper name with price type (e.g., "yahoo (after-hours)")
             )
             cursor.execute(sql, vals)
             conn.commit()
             cursor.close()
-            logging.info(f"Upserted {ticker} ({security_type}) to DB: {price_val} ({final_source}), prev_close={previous_close_price if previous_close_price > 0 else 'preserved'}")
+            logging.info(f"Upserted {ticker} ({security_type}) to DB: {price_val} ({source_session}), prev_close={previous_close_price if previous_close_price > 0 else 'preserved'}")
             logging.debug(f"prev_close_source={prev_close_source}, prev_close_time={prev_close_time}")
         except Exception as e:
             logging.error(f"Error writing to DB: {e}")
