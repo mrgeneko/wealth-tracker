@@ -528,25 +528,6 @@ async function initializeSymbolRegistry() {
     }
 }
 
-// Self-healing: Ensure new columns exist
-async function ensureSchema() {
-    try {
-        console.log('[Schema] Checking for sector/industry columns...');
-        await pool.query("ALTER TABLE securities_metadata ADD COLUMN sector VARCHAR(100) AFTER long_name");
-        console.log('[Schema] Added sector column');
-    } catch (e) {
-        // Ignore duplicate column error
-        if (e.code !== 'ER_DUP_FIELDNAME') console.warn('[Schema] Sector column check:', e.message);
-    }
-
-    try {
-        await pool.query("ALTER TABLE securities_metadata ADD COLUMN industry VARCHAR(100) AFTER sector");
-        console.log('[Schema] Added industry column');
-    } catch (e) {
-        if (e.code !== 'ER_DUP_FIELDNAME') console.warn('[Schema] Industry column check:', e.message);
-    }
-}
-
 async function fetchAssetsFromDB() {
     try {
         const [accounts] = await pool.query(`
@@ -616,7 +597,7 @@ async function fetchAssetsFromDB() {
                 const displayType = pos.type; // Default to stored type
 
                 // Compute pricing_class for price lookups
-                const { getPricingClassFromSource, getPricingClass } = require('./services/pricing-utils');
+                const { getPricingClassFromSource, getPricingClass } = require('../services/pricing-utils');
                 let pricingClass = 'US_EQUITY';
                 if (pos.source) {
                     pricingClass = getPricingClassFromSource(pos.source);
@@ -1135,7 +1116,7 @@ app.post('/api/fetch-price', async (req, res) => {
         const { price, previous_close_price, currency, time, source: sourceSession, pricing_provider: usedProvider } = priceData;
 
         // For manual fetch, determine pricing_class based on security type
-        const { getPricingClass } = require('./services/pricing-utils');
+        const { getPricingClass } = require('../services/pricing-utils');
         const pricingClass = getPricingClass({ securityType });
 
         // Build cache key with security type and pricing_class to support multiple prices per ticker
@@ -1444,7 +1425,7 @@ app.post('/api/accounts', async (req, res) => {
             [name, accountTypeId, currency || 'USD', display_order || 0]
         );
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ id: result.insertId, name, account_type_id: accountTypeId, currency: currency || 'USD', display_order: display_order || 0 });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1475,7 +1456,7 @@ app.put('/api/accounts/:id', async (req, res) => {
             params
         );
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1533,7 +1514,7 @@ app.delete('/api/accounts/:id', async (req, res) => {
         await pool.execute('DELETE FROM positions WHERE account_id=?', [req.params.id]);
         await pool.execute('DELETE FROM accounts WHERE id=?', [req.params.id]);
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1578,7 +1559,7 @@ app.post('/api/positions', async (req, res) => {
             [account_id, ticker, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null]
         );
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({
             id: result.insertId,
             account_id,
@@ -1630,7 +1611,7 @@ app.put('/api/positions/:id', async (req, res) => {
             [ticker, detectedType, quantity, currency || 'USD', source || null, pricing_provider || null, req.params.id]
         );
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1641,7 +1622,7 @@ app.delete('/api/positions/:id', async (req, res) => {
     try {
         await pool.execute('DELETE FROM positions WHERE id=?', [req.params.id]);
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1657,7 +1638,7 @@ app.post('/api/fixed_assets', async (req, res) => {
             [name, type, value, currency || 'USD', display_order || 0]
         );
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ id: result.insertId, ...req.body });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1672,7 +1653,7 @@ app.put('/api/fixed_assets/:id', async (req, res) => {
             [name, type, value, currency, display_order, req.params.id]
         );
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1683,7 +1664,7 @@ app.delete('/api/fixed_assets/:id', async (req, res) => {
     try {
         await pool.execute('DELETE FROM fixed_assets WHERE id=?', [req.params.id]);
         assetsCache = null;
-        loadAssets();
+        if (process.env.NODE_ENV !== 'test') loadAssets();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1716,7 +1697,6 @@ if (isMainModule || !isTestEnv) {
     (async () => {
         try {
             await runDatabaseMigrations();
-            await ensureSchema();
             await initializeSymbolRegistry();
             server.listen(PORT, async () => {
                 console.log(`Dashboard server running on ${protocol}://localhost:${PORT}`);

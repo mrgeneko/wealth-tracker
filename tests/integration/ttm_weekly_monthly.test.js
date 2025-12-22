@@ -8,6 +8,9 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const RUN_DB_TESTS = ['1', 'true', 'yes'].includes(String(process.env.RUN_DB_TESTS || '').toLowerCase());
+const describeDb = RUN_DB_TESTS ? describe : describe.skip;
+
 async function initializeSchema(conn) {
   // Drop existing tables to ensure fresh schema with ticker column
   const tablesToDrop = [
@@ -99,7 +102,7 @@ async function cleanupSymbol(conn, symbol) {
   await conn.execute('DELETE FROM securities_metadata WHERE ticker = ?', [symbol]).catch(() => {});
 }
 
-describe('TTM Weekly/Monthly Dividend Integration Tests', () => {
+describeDb('TTM Weekly/Monthly Dividend Integration Tests', () => {
   let connection;
 
   beforeAll(async () => {
