@@ -169,7 +169,7 @@ describe('Autocomplete API Endpoints', () => {
             await request(app)
                 .get('/api/autocomplete/details/aapl');
 
-            expect(mockService.getTickerDetails).toHaveBeenCalledWith('AAPL');
+            expect(mockService.getTickerDetails).toHaveBeenCalledWith('AAPL', undefined);
         });
 
         it('should return 404 for unknown ticker', async () => {

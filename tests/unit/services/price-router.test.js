@@ -347,7 +347,7 @@ describe('PriceRouter', () => {
 
             expect(mockPool.execute).toHaveBeenCalledWith(
                 expect.stringMatching(/SELECT\s+\*\s+FROM\s+latest_prices/i),
-                ['AAPL', 'STOCK']
+                ['AAPL', 'STOCK', 'US_EQUITY']
             );
         });
 
