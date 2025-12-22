@@ -25,6 +25,9 @@ coverage/
 .nyc_output/
 *.lcov
 
+# CI test result artifacts (JUnit XML)
+artifacts/test-results/
+
 # Ignore SSL certificates and private keys
 *.pem
 *.key
