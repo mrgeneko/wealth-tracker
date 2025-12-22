@@ -337,6 +337,11 @@
             max-width: 350px;
         }
 
+        /* Investment grid: show security name in tooltip only (not under the ticker) */
+        #investment-grid .ticker-name {
+            display: none;
+        }
+
         /* Clickable Cells */
         .clickable-cell {
             cursor: pointer;
@@ -682,6 +687,12 @@
         .type-cell {
             text-align: left !important;
             white-space: nowrap;
+        }
+
+        /* Hide the Type column in the Investment Accounts table (Type info is shown via tooltips instead) */
+        #investment-grid th.col-type,
+        #investment-grid td.type-cell {
+            display: none;
         }
     </style>
 </head>
@@ -2273,7 +2284,7 @@
                 return '<span class="sort-indicator">⇅</span>';
             };
             let headerHtml = `<tr><th class="sortable-header" style="text-align: left" onclick="sortInvestmentGrid('symbol')">Ticker${sortIndicator('symbol')}</th>`;
-            headerHtml += `<th class="sortable-header" onclick="sortInvestmentGrid('type')">Type${sortIndicator('type')}</th>`;
+            headerHtml += `<th class="sortable-header col-type" onclick="sortInvestmentGrid('type')">Type${sortIndicator('type')}</th>`;
 
 
             if (accountsCollapsed) {
@@ -2407,14 +2418,22 @@
                 const typeBadge = type ? `<span class="badge badge-secondary">${type}</span>` : '';
                 const pricingClassBadge = pricing_class ? `<span class="badge badge-info">${pricing_class}</span>` : '';
 
+                // Reuse the same custom tooltip mechanism as Prev Close (data-tooltip)
+                // to surface the hidden Type column content.
+                let typeTooltip = '';
+                if (type) typeTooltip += `Type: ${type}`;
+                if (pricing_class) typeTooltip += (typeTooltip ? '\n' : '') + `Pricing: ${pricing_class}`;
+                let tickerTooltip = '';
+                if (metaName) tickerTooltip += metaName;
+                if (typeTooltip) tickerTooltip += (tickerTooltip ? '\n' : '') + typeTooltip;
+
                 let rowHtml = `
                     <tr id="row-${safeId}">
-                        <td class="ticker-cell" data-tooltip="${escapeHtml(metaName)}">
+                        <td class="ticker-cell" ${tickerTooltip ? `data-tooltip="${escapeHtml(tickerTooltip)}"` : ''}>
                             <div class="ticker-container">
                                 <span class="ticker-symbol">${sym}</span>
                                 <span class="delete-icon" tabindex="0" role="button" title="Delete all positions for ${sym}" onclick="confirmDeleteTicker('${sym}')">❌</span>
                             </div>
-                            <div class="ticker-name">${metaName || ''}</div>
                         </td>
                         <td class="type-cell">
                             ${typeBadge}
@@ -2651,7 +2670,7 @@
                 cashRowHtml += '<td style="text-align: center;">-</td>';
             }
             // Placeholder cells for: Type, Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source, Value Chg
-            cashRowHtml += '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+            cashRowHtml += '<td class="type-cell">-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
             cashRowHtml += `<td class="row-total">${formatNumber(totalCash, 0)}</td></tr>`;
             bodyHtml += cashRowHtml;
 
@@ -2685,7 +2704,7 @@
             if (grandTotalValueChange < 0) totalChangeColor = '#f44336';
 
             // Placeholder cells for: Type, Prev Close, Price, P/E, Yield, Chg, Chg %, Time, Source
-            totalRowHtml += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
+            totalRowHtml += '<td class="type-cell"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
             totalRowHtml += `<td id="total-row-value-change" style="color: ${totalChangeColor}">${formatNumber(grandTotalValueChange)}</td>`;
             totalRowHtml += `<td id="total-row-grand-total">${formatNumber(grandTotal, 0)}</td></tr>`;
             bodyHtml += totalRowHtml;
