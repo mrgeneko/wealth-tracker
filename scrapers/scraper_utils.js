@@ -5,7 +5,13 @@ const { DateTime } = require('luxon');
 const { getExchange } = require('./exchange_registry');
 
 function sanitizeForFilename(str) {
-    return String(str).replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Only replace characters that are truly problematic for filenames
+    // Preserve ticker symbols with: / - . = ! @ $ # : ;
+    // Only sanitize: \ (Windows path separator), null bytes, and control characters
+    return String(str)
+        .replace(/\\/g, '_')     // backslash (Windows path separator)
+        .replace(/\0/g, '_')     // null bytes
+        .replace(/[\x00-\x1f\x7f]/g, '_');  // control characters
 }
 
 function getDateTimeString() {
