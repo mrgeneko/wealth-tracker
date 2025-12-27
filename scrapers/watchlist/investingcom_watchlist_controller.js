@@ -125,6 +125,7 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 			providerId: 'investingcom',
 			displayName: 'Investing.com',
 			supportedAssetTypes: [AssetType.STOCK, AssetType.ETF],
+			supportedAssetTypes: [AssetType.STOCK, AssetType.ETF],
 			supportsMultipleWatchlists: true,
 			requiresLogin: true,
 			maxTickersPerWatchlist: 100,
@@ -311,21 +312,29 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 			}
 		}
 
-		const tickers = await this.page.$$eval(
+		const tickerData = await this.page.$$eval(
 			this.config.selectors.tickerRow,
-			(rows, symbolSelector) => {
-				const out = [];
-				for (const row of rows) {
-					const symbolCell = row.querySelector(symbolSelector);
-					if (!symbolCell) continue;
-					const raw = (symbolCell.textContent || '').trim();
-					if (!raw) continue;
-					out.push(raw.toUpperCase());
-				}
-				return out;
-			},
-			this.config.selectors.tickerSymbol
+			(rows) => {
+				return rows.map(row => {
+					const symbolCell = row.querySelector('td[data-column-name="symbol"]');
+					const nameCell = row.querySelector('td[data-column-name="name"]');
+					return {
+						symbolText: symbolCell ? symbolCell.textContent.trim() : null,
+						nameText: nameCell ? nameCell.textContent.trim() : null
+					};
+				});
+			}
 		);
+
+		const tickers = [];
+		for (const d of tickerData) {
+			let raw = d.symbolText || d.nameText;
+			if (raw) {
+				// Strip extra text (like "Create Alert") if it exists
+				const clean = raw.split('\n')[0].trim().toUpperCase();
+				if (clean) tickers.push(clean);
+			}
+		}
 
 		logDebug(`[InvestingCom] Found ${tickers.length} tickers on ${watchlist || this.currentWatchlist || 'current tab'}`);
 		return tickers;
@@ -487,10 +496,16 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 				let targetRow = null;
 
 				for (const row of rows) {
-					const symbolCell = await row.$(this.config.selectors.tickerSymbol);
-					if (!symbolCell) continue;
-					const text = await this.page.evaluate(el => el.textContent, symbolCell);
-					if (text && text.trim().toUpperCase() === String(ticker).toUpperCase()) {
+					// Use updated logic for deletion matching as well
+					const foundMatch = await this.page.evaluate((r, t) => {
+						const symbolCell = r.querySelector('td[data-column-name="symbol"]');
+						const nameCell = r.querySelector('td[data-column-name="name"]');
+						let raw = (symbolCell && symbolCell.textContent && symbolCell.textContent.trim()) || (nameCell && nameCell.textContent && nameCell.textContent.trim()) || '';
+						const clean = raw.split('\n')[0].trim().toUpperCase();
+						return clean === String(t).toUpperCase();
+					}, row, ticker);
+
+					if (foundMatch) {
 						targetRow = row;
 						break;
 					}

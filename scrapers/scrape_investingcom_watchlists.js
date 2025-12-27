@@ -16,7 +16,7 @@ function getMysqlPool() {
 			port: parseInt(process.env.MYSQL_PORT || '3306', 10),
 			user: process.env.MYSQL_USER || 'test',
 			password: process.env.MYSQL_PASSWORD || 'test',
-			database: process.env.MYSQL_DATABASE || process.env.DB_NAME || 'wealth_tracker',
+			database: process.env.MYSQL_DATABASE || process.env.DB_NAME || 'testdb',
 			waitForConnections: true,
 			connectionLimit: 4,
 			queueLimit: 0
