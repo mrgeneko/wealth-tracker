@@ -684,8 +684,10 @@ async function runCycle(browser, outputDir) {
 
 	// ======== INVESTING.COM WATCHLISTS ===========
 	// ======== INVESTING.COM WATCHLISTS ===========
-	const investingWatchlistsName = 'investing_watchlists';
-	const investingGroupSettings = getScrapeGroupSettings(investingWatchlistsName, 180); // seconds
+	// ======== INVESTING.COM WATCHLISTS ===========
+	// ======== INVESTING.COM WATCHLISTS ===========
+	// Note: We no longer check 'investing_watchlists.enabled' from config.json.
+	// We rely on the presence of valid, enabled watchlist URLs in the database.
 	const loader = watchlistConfigLoader || new WatchlistConfigLoader(getMysqlPool());
 	let investingProvider = null;
 	try {
@@ -710,15 +712,16 @@ async function runCycle(browser, outputDir) {
 		}
 	} catch (e) { logDebug('Error checking trigger file: ' + e.message); }
 
-	// Get update_rules from the legacy 'investing' config section (fallback only)
+	// Get update_rules from the legacy 'investing' config section (fallback only for rules)
 	const investingConfig = getConfig('investing');
 	const updateRules = investingConfig && investingConfig.update_rules ? investingConfig.update_rules : null;
 	logDebug(`investing updateRules: ${updateRules ? JSON.stringify(updateRules.map(r => r.key)) : 'null'}`);
 
 	if (investingProvider && investingProvider.enabled && Array.isArray(investingProvider.watchlists) && investingProvider.watchlists.length > 0) {
 		for (const wl of investingProvider.watchlists.filter(w => w && w.enabled !== false)) {
-			const intervalSeconds = wl.intervalSeconds || investingProvider.defaultIntervalSeconds || investingGroupSettings.interval;
-			const perWatchlistSettings = { enabled: investingGroupSettings.enabled, interval: Math.max(1, intervalSeconds) };
+			// Priority: Specific Instance -> Provider Default -> 300s Hardcoded Default
+			const intervalSeconds = wl.intervalSeconds || investingProvider.defaultIntervalSeconds || 300;
+			const perWatchlistSettings = { enabled: true, interval: Math.max(1, intervalSeconds) };
 
 			const markerPath = path.join('/usr/src/app/logs', `last.watchlist.investingcom.${sanitizeForFilename(wl.key)}.txt`);
 			if (!forceSync && !isTaskDue(perWatchlistSettings, markerPath)) {
@@ -749,32 +752,7 @@ async function runCycle(browser, outputDir) {
 			}
 		}
 	} else {
-		// Legacy config.json fallback (single URL + list of watchlist keys)
-		const attrs = getConfig(investingWatchlistsName);
-		if (attrs && attrs.watchlists && Array.isArray(attrs.watchlists) && attrs.url) {
-			for (const item of attrs.watchlists) {
-				const intervalSeconds = typeof item.interval === 'number' ? item.interval : investingGroupSettings.interval;
-				const perWatchlistSettings = { enabled: investingGroupSettings.enabled, interval: intervalSeconds };
-				const markerPath = path.join('/usr/src/app/logs', `last.watchlist.investingcom.${sanitizeForFilename(item.key)}.txt`);
-				if (!isTaskDue(perWatchlistSettings, markerPath)) {
-					logDebugThrottled(`skip:watchlist:investingcom:${item.key}`, `Skipping investing.com watchlist ${item.key} (interval not reached)`);
-					continue;
-				}
-
-				const record = { key: item.key, interval: intervalSeconds, url: attrs.url };
-				logDebug(`Begin investing.com watchlist scrape (legacy config): ${record.key} ${record.url}`);
-				if (record.url && record.url.startsWith('http')) {
-					await recordScraperMetrics('investing', async () => {
-						return await scrapeInvestingComWatchlists(browser, record, outputDir, updateRules, getUpdateWindowService());
-					}, { url: record.url });
-					markTaskRan(markerPath);
-				} else {
-					logDebug(`Skipping record with missing or invalid investing URL: ${JSON.stringify(record)}`);
-				}
-			}
-		} else {
-			logDebug('No investing watchlists configured; skipping investing.com scrape');
-		}
+		logDebugThrottled('investing_watchlists_none', 'No enabled investing.com watchlists found in database; scraper effectively disabled.');
 	}
 
 	// ======== WEBULL WATCHLISTS ===========

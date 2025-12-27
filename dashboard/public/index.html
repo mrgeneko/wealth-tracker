@@ -187,9 +187,12 @@
 
         /* Awesomplete Autocomplete Styles (Dark Theme) */
         .awesomplete>ul {
-            position: absolute; /* remove from document flow so it doesn't expand modal */
-            z-index: 2000; /* sit above modal content & symbol info */
-            left: 0; /* align with the input container */
+            position: absolute;
+            /* remove from document flow so it doesn't expand modal */
+            z-index: 2000;
+            /* sit above modal content & symbol info */
+            left: 0;
+            /* align with the input container */
             box-sizing: border-box;
             background: #2d2d2d;
             border: 1px solid #555;
@@ -233,13 +236,16 @@
         #symbolMetadataDisplay {
             max-width: 100%;
             box-sizing: border-box;
-            overflow: hidden; /* prevent accidental overflow */
+            overflow: hidden;
+            /* prevent accidental overflow */
         }
 
         #symbolMetadataDisplay table {
             width: 100%;
-            min-width: 0; /* override global min-width */
-            table-layout: fixed; /* prevent long content from expanding table */
+            min-width: 0;
+            /* override global min-width */
+            table-layout: fixed;
+            /* prevent long content from expanding table */
             border-collapse: collapse;
         }
 
@@ -368,9 +374,11 @@
         .delete-icon {
             font-size: 0.9em;
             margin-left: 8px;
-            color: #f44336; /* red */
+            color: #f44336;
+            /* red */
             display: none;
         }
+
         .ticker-container:hover .delete-icon {
             display: inline-block;
             cursor: pointer;
@@ -804,35 +812,11 @@
         </div>
 
         <div id="Watchlists" class="tab-content">
-            <div class="section-header">
-                <h2>Watchlist Management</h2>
-                <button class="btn btn-primary" onclick="refreshWatchlistUI()">Refresh</button>
+            <div style="display:none;">
+                <select id="watchlistProvider" onchange="onWatchlistProviderChanged()"></select>
             </div>
 
             <div id="watchlistStatus" style="margin-bottom: 12px; color: #aaa; font-size: 0.9em;"></div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px;">
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label for="watchlistProvider">Provider</label>
-                        <select id="watchlistProvider" onchange="onWatchlistProviderChanged()"></select>
-                    </div>
-                    <div id="watchlistProviderCaps" style="color: #cfcfcf; font-size: 0.9em; line-height: 1.5;"></div>
-                </div>
-
-                <div style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px;">
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label for="watchlistTab">Watchlist Name</label>
-                        <select id="watchlistTab"></select>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn" style="background-color: #555; color: white;"
-                            onclick="switchWatchlistTab()">Switch Tab</button>
-                        <button class="btn" style="background-color: #555; color: white;"
-                            onclick="loadWatchlistTickers()">Load Tickers</button>
-                    </div>
-                </div>
-            </div>
 
             <div
                 style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
@@ -880,36 +864,6 @@
                     </div>
                 </div>
             </div>
-
-            <div
-                style="background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                <h3 style="margin-top: 0;">Add Ticker</h3>
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: end;">
-                    <div class="form-group" style="margin: 0;">
-                        <label for="watchlistAddTicker">Ticker</label>
-                        <input id="watchlistAddTicker" type="text" placeholder="e.g., AAPL" />
-                    </div>
-                    <div class="form-group" style="margin: 0;">
-                        <label for="watchlistAddAssetType">Asset Type</label>
-                        <select id="watchlistAddAssetType"></select>
-                    </div>
-                    <button class="btn btn-primary" onclick="addWatchlistTicker()">Add</button>
-                </div>
-            </div>
-
-            <div class="section-header" style="margin-top: 0;">
-                <h3 style="margin: 0;">Tickers</h3>
-                <div style="color: #aaa; font-size: 0.9em;" id="watchlistTickersMeta"></div>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="text-align:left;">Ticker</th>
-                        <th style="text-align:center;">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="watchlistTickersBody"></tbody>
-            </table>
         </div>
     </div>
 
@@ -1413,11 +1367,13 @@
                             </tr>
                             <tr style="border-bottom: 1px solid #444;">
                                 <td style="padding: 4px 0; color: #aaa;">Source:</td>
-                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataSource">—</span></td>
+                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataSource">—</span>
+                                </td>
                             </tr>
                             <tr style="border-bottom: 1px solid #444;">
                                 <td style="padding: 4px 0; color: #aaa;">Price Provider:</td>
-                                <td style="text-align: right; padding: 4px 0;"><span id="symbolMetadataPricingProvider">—</span></td>
+                                <td style="text-align: right; padding: 4px 0;"><span
+                                        id="symbolMetadataPricingProvider">—</span></td>
                             </tr>
                             <tr>
                                 <td style="padding: 4px 0; color: #aaa;">Verified:</td>
@@ -1905,7 +1861,7 @@
             allPositions.forEach((posInfo, key) => {
                 const { ticker: sym, type, pricing_class } = posInfo;
                 const safeId = getPositionSafeId(sym, type, pricing_class);
-                
+
                 // Try to find price data using composite key first, then fall back
                 const newPriceData = getPriceDataForSymbol(sym, type, pricing_class);
                 const oldPriceData = oldPrices[key];
@@ -1989,16 +1945,16 @@
 
                 accounts.forEach(acc => {
                     // Find exact matching position
-                    let pos = acc.holdings.stocks.find(p => 
-                        p.ticker === sym && 
-                        (p.type || 'NOT_SET').toUpperCase() === (type || 'NOT_SET').toUpperCase() && 
+                    let pos = acc.holdings.stocks.find(p =>
+                        p.ticker === sym &&
+                        (p.type || 'NOT_SET').toUpperCase() === (type || 'NOT_SET').toUpperCase() &&
                         (p.pricing_class || 'US_EQUITY').toUpperCase() === (pricing_class || 'US_EQUITY').toUpperCase()
                     );
                     let isBond = false;
                     if (!pos) {
-                        pos = acc.holdings.bonds.find(p => 
-                            p.ticker === sym && 
-                            (p.type || 'NOT_SET').toUpperCase() === (type || 'NOT_SET').toUpperCase() && 
+                        pos = acc.holdings.bonds.find(p =>
+                            p.ticker === sym &&
+                            (p.type || 'NOT_SET').toUpperCase() === (type || 'NOT_SET').toUpperCase() &&
                             (p.pricing_class || 'US_EQUITY').toUpperCase() === (pricing_class || 'US_EQUITY').toUpperCase()
                         );
                         if (pos) isBond = true;
@@ -3138,7 +3094,7 @@
         });
 
         // Confirm and delete all positions for a given ticker
-        window.confirmDeleteTicker = function(symbol) {
+        window.confirmDeleteTicker = function (symbol) {
             const sym = String(symbol || '').toUpperCase();
             showConfirmModal(
                 'Delete Ticker',
@@ -3752,7 +3708,7 @@
                     if (tab) {
                         try { await switchWatchlistTab(); } catch (e) { }
                     }
-                    await loadWatchlistTickers();
+                    // await loadWatchlistTickers(); // Tickers UI removed
                 }
             } catch (e) {
                 setWatchlistStatus(e.message || 'Failed to refresh watchlists', true);
