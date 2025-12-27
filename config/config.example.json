@@ -1,10 +1,6 @@
 {
   "single_security_mode": "round_robin",
   "scrape_groups": {
-    "investing_watchlists": {
-      "interval": 180,
-      "enabled": true
-    },
     "yahoo_batch": {
       "interval": 3600,
       "enabled": true

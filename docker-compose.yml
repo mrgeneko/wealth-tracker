@@ -27,6 +27,11 @@ services:
 
       # Testing: Set to 'true' to bypass update_windows restrictions (allows scraping on weekends/off-hours)
       IGNORE_UPDATE_WINDOWS: ${IGNORE_UPDATE_WINDOWS:-false}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     volumes:
       - ./logs:/usr/src/app/logs
       - ./data:/usr/src/app/data

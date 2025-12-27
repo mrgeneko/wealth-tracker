@@ -293,6 +293,17 @@ class SymbolRegistrySyncService {
       } else if (fileType === 'TREASURY') {
         records = await this.treasuryHandler.loadTreasuryData();
       } else if (fileType === 'CRYPTO_INVESTING') {
+        const hasInvesting = await this.hasEnabledInvestingWatchlists();
+        if (!hasInvesting) {
+          console.log('[SymbolRegistrySync] No enabled Investing.com watchlists found. Clearing crypto registry entries from this source.');
+          const deleteStats = await this.clearCryptoRegistryEntries();
+          console.log(`[SymbolRegistrySync] Cleared ${deleteStats.deleted} crypto entries.`);
+
+          stats.end_time = new Date();
+          stats.duration_ms = stats.end_time - stats.start_time;
+          return stats;
+        }
+
         records = await this.loadCsvFile(this.constructor.CONFIG.CRYPTO_INVESTING_FILE);
         records = this.parseCryptoSymbols(records);
       }
@@ -633,6 +644,47 @@ class SymbolRegistrySyncService {
         by_source: bySources,
         by_security_type: byTypes
       };
+    } finally {
+      conn.release();
+    }
+  }
+
+  /**
+   * Clear all registry entries from the CRYPTO_INVESTING source.
+   */
+  async clearCryptoRegistryEntries() {
+    const conn = await this.dbPool.getConnection();
+    try {
+      const sql = "DELETE FROM ticker_registry WHERE source = 'CRYPTO_INVESTING_FILE'";
+      const [result] = await conn.execute(sql);
+      return { deleted: result.affectedRows || 0 };
+    } catch (err) {
+      console.error('[SymbolRegistrySync] Error clearing crypto registry entries:', err.message);
+      return { deleted: 0 };
+    } finally {
+      conn.release();
+    }
+  }
+
+  /**
+   * Check if there is at least one enabled Investing.com watchlist instance in the database.
+   */
+  async hasEnabledInvestingWatchlists() {
+    const conn = await this.dbPool.getConnection();
+    try {
+      // provider_id 'investingcom' matches the key used in watchlist_providers table
+      const sql = `
+        SELECT COUNT(*) as count 
+        FROM watchlist_instances wi
+        JOIN watchlist_providers wp ON wi.provider_id = wp.id
+        WHERE wp.provider_id = 'investingcom' AND wi.enabled = 1 AND wp.enabled = 1
+        LIMIT 1
+      `;
+      const results = await conn.query(sql);
+      return results[0] && results[0][0] && results[0][0].count > 0;
+    } catch (err) {
+      console.error('[SymbolRegistrySync] Error checking for enabled investing watchlists:', err.message);
+      return false;
     } finally {
       conn.release();
     }
