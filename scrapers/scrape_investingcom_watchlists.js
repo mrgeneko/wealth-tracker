@@ -1,6 +1,8 @@
 const { sanitizeForFilename, getDateTimeString, logDebug, createPreparedPage, savePageSnapshot, isProtocolTimeoutError, normalizedKey } = require('./scraper_utils');
 const { publishToKafka } = require('./publish_to_kafka');
 const { DateTime } = require('luxon');
+const { InvestingComWatchlistController } = require('./watchlist/investingcom_watchlist_controller');
+const WatchlistSyncService = require('../services/watchlist_sync_service');
 
 let _mysqlPool = null;
 const _positionMetaCache = new Map();
@@ -157,37 +159,37 @@ function isSuppressedPageError(err) {
 }
 
 function parseToIso(timeStr) {
-  if (!timeStr) return '';
-  try {
-    // Investing.com formats:
-    // 1. "16:00:00" (time only, assume today)
-    // 2. "21/11" (date only, assume current year)
-    // 3. "21/11/2025" (full date)
-    
-    // Try time only (HH:mm:ss)
-    if (/^\d{1,2}:\d{2}:\d{2}$/.test(timeStr)) {
-        const dt = DateTime.fromFormat(timeStr, "H:mm:ss", { zone: 'America/New_York', locale: 'en-US' });
-        if (dt.isValid) return dt.toISO();
-    }
+	if (!timeStr) return '';
+	try {
+		// Investing.com formats:
+		// 1. "16:00:00" (time only, assume today)
+		// 2. "21/11" (date only, assume current year)
+		// 3. "21/11/2025" (full date)
 
-    // Try date only (dd/MM)
-    if (/^\d{1,2}\/\d{1,2}$/.test(timeStr)) {
-        // Append current year
-        const year = new Date().getFullYear();
-        const dt = DateTime.fromFormat(`${timeStr}/${year}`, "d/M/yyyy", { zone: 'America/New_York', locale: 'en-US' });
-        if (dt.isValid) return dt.toISO();
-    }
+		// Try time only (HH:mm:ss)
+		if (/^\d{1,2}:\d{2}:\d{2}$/.test(timeStr)) {
+			const dt = DateTime.fromFormat(timeStr, "H:mm:ss", { zone: 'America/New_York', locale: 'en-US' });
+			if (dt.isValid) return dt.toISO();
+		}
 
-    // Try full date (dd/MM/yyyy)
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(timeStr)) {
-        const dt = DateTime.fromFormat(timeStr, "d/M/yyyy", { zone: 'America/New_York', locale: 'en-US' });
-        if (dt.isValid) return dt.toISO();
-    }
+		// Try date only (dd/MM)
+		if (/^\d{1,2}\/\d{1,2}$/.test(timeStr)) {
+			// Append current year
+			const year = new Date().getFullYear();
+			const dt = DateTime.fromFormat(`${timeStr}/${year}`, "d/M/yyyy", { zone: 'America/New_York', locale: 'en-US' });
+			if (dt.isValid) return dt.toISO();
+		}
 
-    return timeStr;
-  } catch (e) {
-    return timeStr;
-  }
+		// Try full date (dd/MM/yyyy)
+		if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(timeStr)) {
+			const dt = DateTime.fromFormat(timeStr, "d/M/yyyy", { zone: 'America/New_York', locale: 'en-US' });
+			if (dt.isValid) return dt.toISO();
+		}
+
+		return timeStr;
+	} catch (e) {
+		return timeStr;
+	}
 }
 
 function inferPricingClass(symbol) {
@@ -273,72 +275,35 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 
 	try {
 		logDebug('Using createPreparedPage (reuse investing tab if present)');
-		page = await createPreparedPage(browser, {
-			reuseIfUrlMatches: /investing\.com/,
-			url: investingUrl,
-			downloadPath: outputDir,
-			waitUntil: 'domcontentloaded',
-			timeout: 15000,
-			attachCounters: true,
-			gotoRetries: 3,
-			reloadExisting: false
-		});
 
+		// Initialize Controller
+		const controller = new InvestingComWatchlistController(browser);
+
+		// Initialize (Login + Navigate)
+		await controller.initialize(investingUrl);
+		page = controller.page; // Use the controller's page for consistency
+
+		// Perform Sync
 		try {
-			page.on('pageerror', (err) => {
-				if (!isSuppressedPageError(err)) {
-					logDebug(`[BROWSER PAGE ERROR] ${err && err.stack ? err.stack : err}`);
-				}
-			});
-			page.on('error', (err) => {
-				logDebug(`[BROWSER ERROR] ${err && err.stack ? err.stack : err}`);
-			});
-		} catch (e) { /* ignore */ }
-
-		await page.bringToFront();
-
-		let needsLogin = false;
-		try {
-			logDebug('Checking for login form...');
-			await page.waitForSelector('#loginFormUser_email', { timeout: 5000 });
-			needsLogin = true;
-			logDebug('Login form detected.');
-		} catch (e) {
-			logDebug('No login form detected, likely already logged in.');
+			logDebug('[Sync] Starting Watchlist Sync...');
+			const pool = getMysqlPool();
+			if (pool) {
+				const syncService = new WatchlistSyncService(pool);
+				await syncService.sync(controller);
+			} else {
+				logDebug('[Sync] MySQL pool not available, skipping sync.');
+			}
+		} catch (syncErr) {
+			logDebug('[Sync] Error during sync: ' + (syncErr && syncErr.message ? syncErr.message : syncErr));
+			// Continue with scraping even if sync fails
 		}
 
-		if (needsLogin) {
-			logDebug('Typing email and password...');
-			await page.type('#loginFormUser_email', investingEmail, { delay: 50 });
-			await page.type('#loginForm_password', investingPassword, { delay: 50 });
-			await page.keyboard.press('Enter');
-			logDebug('Waiting for My Watchlist heading or Summary tab after login...');
-			await Promise.race([
-				page.waitForSelector('h1::-p-text("My Watchlist")', { timeout: 10000 }),
-				page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
-			]);
-			logDebug('Login successful.');
+		// Proceed with scraping logic (page is already at the watchlist URL or close to it)
+		// Ensure we are on the correct tab
+		if (watchlist.key) {
+			await controller.switchToTab(watchlist.key);
 		}
 
-		logDebug('Waiting for My Watchlist heading or Summary tab...');
-		await Promise.race([
-			page.waitForSelector('h1::-p-text("My Watchlist")', { timeout: 10000 }),
-			page.waitForSelector('a[name^="tab1_"][tab="overview"]', { timeout: 10000 })
-		]);
-		logDebug('On watchlist page.');
-
-		try {
-			const tabSelector = `li[title="${watchlist.key}"]`;
-			await page.waitForSelector(tabSelector, { visible: true, timeout: 5000 });
-			await page.click(tabSelector);
-			logDebug(`Clicked the tab with title="${watchlist.key}".`);
-			await new Promise(resolve => setTimeout(resolve, 5000));
-		} catch (e) {
-			logDebug(`Tab with title="${watchlist.key}" not found or not clickable: ` + e.message);
-		}
-
-		logDebug('Waiting for watchlist table to load...');
-		await page.waitForSelector('[id^="tbody_overview_"]', { timeout: 7000 });
 		logDebug('Watchlist table loaded.');
 
 		const snapshotBase = require('path').join(outputDir, `${dateTimeString}.investingcom_watchlist.${safeWatchlistKey}`);
@@ -347,7 +312,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 
 		const cheerio = require('cheerio');
 		const $ = cheerio.load(fullPageHtml);
-		const requiredColumns = ["symbol", "exchange", "last", "bid", "ask", "extended_hours", "extended_hours_percent", "open", "prev", "high", "low", "chg", "chgpercent", "vol", "next_earning", "time"];
+		const requiredColumns = ["symbol", "name", "exchange", "last", "bid", "ask", "extended_hours", "extended_hours_percent", "open", "prev", "high", "low", "chg", "chgpercent", "vol", "next_earning", "time"];
 		const table = $('[id^="tbody_overview_"]').first();
 		const dataObjects = [];
 
@@ -364,12 +329,20 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 					}
 				});
 
-				if (rowData["symbol"] && rowData["last"]) {
-					const symbolAnchor = $(row).find('td[data-column-name="symbol"] a').first();
+				if (rowData["symbol"] || rowData["name"]) {
+					// Fallback for Crypto tables where "symbol" column is empty but "name" has the pair (e.g. ETH/USD)
+					const rawSymbol = rowData["symbol"] || rowData["name"];
+
+					// Re-select proper anchor if original symbol column was empty
+					let symbolAnchor = $(row).find('td[data-column-name="symbol"] a').first();
+					if (!symbolAnchor.length || !symbolAnchor.attr('href')) {
+						symbolAnchor = $(row).find('td[data-column-name="name"] a').first();
+					}
+
 					const href = symbolAnchor.attr('href') || '';
 					const flagClass = $(row).find('td.flag span.ceFlags').attr('class') || '';
 					const inferred = inferSecurityMetaFromRow({
-						symbol: rowData["symbol"],
+						symbol: rawSymbol,
 						href,
 						flagClass,
 						exchange: rowData["exchange"]
@@ -381,7 +354,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 					// Optional MySQL-assisted fallback: if ticker is unique in positions, align keys to positions.
 					// This helps when Investing.com structure changes or when tickers overlap across types.
 					try {
-						const meta = await lookupUniquePositionMeta(rowData["symbol"]);
+						const meta = await lookupUniquePositionMeta(rawSymbol);
 						if (meta && meta.security_type) {
 							securityType = meta.security_type;
 							positionSource = meta.source || positionSource;
@@ -431,8 +404,8 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 					}
 
 					dataObjects.push({
-						key: rowData["symbol"],
-						normalized_key: normalizedKey(rowData["symbol"]),
+						key: rawSymbol,
+						normalized_key: normalizedKey(rawSymbol),
 						// Persist with a deterministic composite key in latest_prices.
 						// Use DOM-based inference (flag icon + href) and optionally align to positions when unambiguous.
 						security_type: securityType,
@@ -463,7 +436,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 
 		const kafkaTopic = process.env.KAFKA_TOPIC || 'investingcom_watchlist';
 		const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9094').split(',');
-		
+
 		// Filter tickers based on DB-backed update windows (preferred) or legacy update_rules before publishing to Kafka
 		let publishCount = 0;
 		let skippedCount = 0;
@@ -504,7 +477,7 @@ async function scrapeInvestingComWatchlists(browser, watchlist, outputDir, updat
 		} catch (snapErr) {
 			logDebug('Failed to write diagnostic snapshot: ' + snapErr.message);
 		}
-		
+
 		// Re-throw protocol timeout errors so the main daemon can trigger browser restart
 		if (isProtocolTimeoutError(err)) {
 			throw err;

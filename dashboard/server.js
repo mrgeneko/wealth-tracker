@@ -427,7 +427,7 @@ async function runDatabaseMigrations() {
         console.log('\n🔄 Running database migrations...');
         const { runAllMigrations } = require(path.join(scriptsBaseDir, 'run-migrations'));
         const success = await runAllMigrations();
-        
+
         if (!success) {
             console.warn('⚠️  Some migrations failed, but continuing startup');
         } else {
@@ -525,11 +525,11 @@ async function initializeSymbolRegistry() {
             // If table is missing or query fails, proceed to sync attempt below (migrations may create it).
             console.warn('[Symbol Registry] Could not check ticker_registry count before sync:', e.message);
         }
-        
+
         console.log('[Symbol Registry] Starting initial sync of CSV files...');
         const stats = await syncService.syncAll();
         console.log('[Symbol Registry] Full sync results:', JSON.stringify(stats, null, 2));
-        
+
         // Verify data was inserted
         const [checkResult] = await pool.query('SELECT COUNT(*) as count FROM ticker_registry');
         console.log('[Symbol Registry] Verification - records in database:', checkResult[0].count);
@@ -712,7 +712,7 @@ function updatePriceCache(item) {
     // These come from the position database through the scraper
     const securityType = (item.security_type || item.type || 'NOT_SET').toUpperCase();
     const pricingClass = (item.pricing_class || 'US_EQUITY').toUpperCase();
-    
+
     // Build the composite key: TICKER:SECURITY_TYPE:PRICING_CLASS
     const normalizedKey = `${ticker}:${securityType}:${pricingClass}`.toUpperCase();
 
@@ -976,7 +976,7 @@ async function isBondTicker(ticker) {
 
     const allTickers = await loadAllTickers();
     const tickerObj = allTickers.find(t => t.ticker === clean);
-    
+
     // Treat anything in the registry with US_TREASURY/BOND security type as a bond.
     const securityType = tickerObj ? (tickerObj.securityType || tickerObj.security_type) : null;
     const securityTypeUpper = securityType ? String(securityType).toUpperCase().trim() : null;
@@ -986,7 +986,7 @@ async function isBondTicker(ticker) {
     )) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -1031,22 +1031,22 @@ async function resolveAccountTypeId(accountInput) {
     if (accountInput.type) {
         const t = String(accountInput.type).toLowerCase();
         const heuristics = [
-            {re: /\b(roth)\b.*401/, key: 'roth_401k'},
-            {re: /\b(roth).*ira|\broth\s*ira\b/, key: 'roth_ira'},
-            {re: /\b401\s*\(?k\)?\b/, key: 'traditional_401k'},
-            {re: /solo\s*401/, key: 'solo_401k'},
-            {re: /simple\s*ira/, key: 'simple_ira'},
-            {re: /traditional\s*ira|\bira\b/, key: 'traditional_ira'},
-            {re: /529/, key: '529_plan'},
-            {re: /savings?/, key: 'savings'},
-            {re: /checking|checkings?/, key: 'checking'},
-            {re: /hsa\b/, key: 'hsa'},
-            {re: /cd\b/, key: 'cd'},
-            {re: /money\s*market/, key: 'money_market'},
-            {re: /ugma|utma/, key: 'ugma_utma'},
-            {re: /sep\s*ira/, key: 'sep_ira'},
-            {re: /credit\s*card|cc\b/, key: 'credit_card'},
-            {re: /mortgage|loan/, key: 'loan'}
+            { re: /\b(roth)\b.*401/, key: 'roth_401k' },
+            { re: /\b(roth).*ira|\broth\s*ira\b/, key: 'roth_ira' },
+            { re: /\b401\s*\(?k\)?\b/, key: 'traditional_401k' },
+            { re: /solo\s*401/, key: 'solo_401k' },
+            { re: /simple\s*ira/, key: 'simple_ira' },
+            { re: /traditional\s*ira|\bira\b/, key: 'traditional_ira' },
+            { re: /529/, key: '529_plan' },
+            { re: /savings?/, key: 'savings' },
+            { re: /checking|checkings?/, key: 'checking' },
+            { re: /hsa\b/, key: 'hsa' },
+            { re: /cd\b/, key: 'cd' },
+            { re: /money\s*market/, key: 'money_market' },
+            { re: /ugma|utma/, key: 'ugma_utma' },
+            { re: /sep\s*ira/, key: 'sep_ira' },
+            { re: /credit\s*card|cc\b/, key: 'credit_card' },
+            { re: /mortgage|loan/, key: 'loan' }
         ];
         for (const h of heuristics) {
             try {
@@ -1083,6 +1083,28 @@ function triggerBondScrape() {
         return true;
     } catch (err) {
         console.error(`[FetchPrice] Failed to touch bond marker file: ${err.message}`);
+        return false;
+    }
+}
+
+// Helper: Trigger investing.com watchlist sync by touching a marker file
+// This forces the scrape daemon to bypass the 3-minute interval check
+function triggerWatchlistSync() {
+    // Detect environment: Docker vs Local
+    const dockerLogs = '/usr/src/app/logs';
+    const localLogs = path.join(__dirname, '../logs');
+    const logsDir = fs.existsSync(dockerLogs) ? dockerLogs : localLogs;
+    const markerPath = path.join(logsDir, 'trigger.watchlist_sync.txt');
+
+    try {
+        if (!fs.existsSync(logsDir)) {
+            try { fs.mkdirSync(logsDir, { recursive: true }); } catch (e) { }
+        }
+        fs.writeFileSync(markerPath, Date.now().toString());
+        console.log(`[WatchlistSync] Triggered sync via ${markerPath}`);
+        return true;
+    } catch (err) {
+        console.error(`[WatchlistSync] Failed to trigger sync: ${err.message}`);
         return false;
     }
 }
@@ -1592,6 +1614,10 @@ app.post('/api/positions', async (req, res) => {
         );
         assetsCache = null;
         if (process.env.NODE_ENV !== 'test') loadAssets();
+
+        // Trigger watchlist sync
+        triggerWatchlistSync();
+
         res.json({
             id: result.insertId,
             account_id,
@@ -1644,6 +1670,10 @@ app.put('/api/positions/:id', async (req, res) => {
         );
         assetsCache = null;
         if (process.env.NODE_ENV !== 'test') loadAssets();
+
+        // Trigger watchlist sync
+        triggerWatchlistSync();
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1655,6 +1685,10 @@ app.delete('/api/positions/:id', async (req, res) => {
         await pool.execute('DELETE FROM positions WHERE id=?', [req.params.id]);
         assetsCache = null;
         if (process.env.NODE_ENV !== 'test') loadAssets();
+
+        // Trigger watchlist sync
+        triggerWatchlistSync();
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1670,6 +1704,10 @@ app.delete('/api/positions/ticker/:ticker', async (req, res) => {
         const [result] = await pool.execute('DELETE FROM positions WHERE UPPER(ticker)=UPPER(?)', [ticker]);
         assetsCache = null;
         if (process.env.NODE_ENV !== 'test') loadAssets();
+
+        // Trigger watchlist sync
+        triggerWatchlistSync();
+
         const deleted = result && (result.affectedRows || result.affected_rows || 0);
         res.json({ success: true, deleted: deleted });
     } catch (err) {

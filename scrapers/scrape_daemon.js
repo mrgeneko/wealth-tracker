@@ -123,7 +123,7 @@ function loadScraperAttributes() {
 		const parsed = JSON.parse(txt);
 		_cachedAttrs = parsed || {};
 		_cachedMtime = mtime;
-		try { logDebug('Loaded/updated scraper attributes (mtime=' + _cachedMtime + ')'); } catch (e) {}
+		try { logDebug('Loaded/updated scraper attributes (mtime=' + _cachedMtime + ')'); } catch (e) { }
 		return _cachedAttrs;
 	} catch (e) {
 		try { logDebug('Failed to read/parse scraper attributes: ' + (e && e.message ? e.message : e)); } catch (e2) { console.error('Failed to read/parse scraper attributes', e); }
@@ -158,15 +158,15 @@ function getMysqlPool() {
 	}
 	return mysqlPool;
 }
- 
- // Phase 3: exchange registry now reads from DB; initialize it using the daemon pool.
- try {
- 	const { initializeDbPool } = require('./exchange_registry');
- 	initializeDbPool(getMysqlPool());
- } catch (e) {
- 	// Daemon can continue even if initialization fails; lookups will error when used.
- 	try { console.warn('Failed to init exchange registry DB pool: ' + (e && e.message ? e.message : e)); } catch (e2) {}
- }
+
+// Phase 3: exchange registry now reads from DB; initialize it using the daemon pool.
+try {
+	const { initializeDbPool } = require('./exchange_registry');
+	initializeDbPool(getMysqlPool());
+} catch (e) {
+	// Daemon can continue even if initialization fails; lookups will error when used.
+	try { console.warn('Failed to init exchange registry DB pool: ' + (e && e.message ? e.message : e)); } catch (e2) { }
+}
 
 async function fetchStockPositions() {
 	try {
@@ -219,20 +219,20 @@ function getScrapeGroupSettings(groupName, defaultIntervalSeconds = 300) {
 	const attrs = loadScraperAttributes();
 	const groups = attrs && attrs.scrape_groups ? attrs.scrape_groups : {};
 	let interval = defaultIntervalSeconds;
-    // Default to false. Only set to true if explicitly enabled in config.
-    let enabled = false;
+	// Default to false. Only set to true if explicitly enabled in config.
+	let enabled = false;
 
 	if (groups && groups[groupName]) {
-        const val = groups[groupName];
-        if (typeof val === 'object' && val !== null) {
-            if (val.interval !== undefined) {
-                const v = Number(val.interval);
-                if (!Number.isNaN(v) && isFinite(v)) interval = v;
-            }
-            if (val.enabled !== undefined) {
-                enabled = val.enabled === true;
-            }
-        }
+		const val = groups[groupName];
+		if (typeof val === 'object' && val !== null) {
+			if (val.interval !== undefined) {
+				const v = Number(val.interval);
+				if (!Number.isNaN(v) && isFinite(v)) interval = v;
+			}
+			if (val.enabled !== undefined) {
+				enabled = val.enabled === true;
+			}
+		}
 	}
 	return { interval, enabled };
 }
@@ -288,7 +288,7 @@ function readJsonBody(req, { maxBytes = 1024 * 1024 } = {}) {
 			body += chunk;
 			if (body.length > maxBytes) {
 				reject(new Error('Request body too large'));
-				try { req.destroy(); } catch (e) {}
+				try { req.destroy(); } catch (e) { }
 			}
 		});
 		req.on('end', () => {
@@ -303,11 +303,11 @@ function readJsonBody(req, { maxBytes = 1024 * 1024 } = {}) {
 
 async function shutdownScraperInfrastructure() {
 	if (pagePool) {
-		try { await pagePool.shutdown(); } catch (e) {}
+		try { await pagePool.shutdown(); } catch (e) { }
 		pagePool = null;
 	}
 	if (persistentPages) {
-		try { await persistentPages.closeAll(); } catch (e) {}
+		try { await persistentPages.closeAll(); } catch (e) { }
 		persistentPages = null;
 	}
 	pagePoolBrowser = null;
@@ -337,7 +337,7 @@ async function initializeScraperInfrastructure(browser) {
 		pagePoolBrowser = browser;
 	} catch (e) {
 		// Daemon can continue without the page pool; Phase 8 will require it.
-		try { logDebug('[PagePool] Failed to initialize: ' + (e && e.message ? e.message : e)); } catch (e2) {}
+		try { logDebug('[PagePool] Failed to initialize: ' + (e && e.message ? e.message : e)); } catch (e2) { }
 		pagePool = null;
 		pagePoolBrowser = null;
 	}
@@ -420,7 +420,7 @@ function resetProtocolTimeoutCounter() {
 // Restart the browser
 async function restartBrowser() {
 	logDebug('Attempting browser restart...');
-	try { await shutdownScraperInfrastructure(); } catch (e) {}
+	try { await shutdownScraperInfrastructure(); } catch (e) { }
 	try {
 		if (globalBrowser) {
 			try {
@@ -433,19 +433,19 @@ async function restartBrowser() {
 	} catch (e) {
 		logDebug('Error during browser close attempt: ' + (e && e.message ? e.message : e));
 	}
-	
+
 	// Reset state
 	globalBrowser = null;
 	browserNeedsRestart = false;
 	consecutiveProtocolTimeouts = 0;
-	
+
 	// Wait a moment for Chrome to fully exit
 	await new Promise(r => setTimeout(r, 2000));
-	
+
 	// Launch new browser
 	const newBrowser = await ensureBrowser();
 	globalBrowser = newBrowser;
-	try { await initializeScraperInfrastructure(newBrowser); } catch (e) {}
+	try { await initializeScraperInfrastructure(newBrowser); } catch (e) { }
 	logDebug('Browser restarted successfully');
 	return newBrowser;
 }
@@ -461,7 +461,7 @@ const onDemandScrapeApi = new OnDemandScrapeApi({
 });
 
 function shouldRunTask(settings, markerPath) {
-    if (!settings.enabled) return false;
+	if (!settings.enabled) return false;
 	const intervalSeconds = settings.interval;
 
 	let lastRun = 0;
@@ -518,7 +518,7 @@ async function ensureBrowser() {
 		logDebug('Trying to connect to existing Chrome instance...');
 		const debugUrl = process.env.CHROME_DEBUG_URL || 'http://localhost:9222';
 		const versionUrl = debugUrl.replace(/\/+$/, '') + '/json/version';
-		
+
 		const wsEndpoint = await new Promise((resolve, reject) => {
 			const url = new URL(versionUrl);
 			const req = http.get({
@@ -545,7 +545,7 @@ async function ensureBrowser() {
 			req.on('error', reject);
 			req.on('timeout', () => { req.destroy(); reject(new Error('Timeout connecting to Chrome')); });
 		});
-		browser = await puppeteerExtra.connect({ 
+		browser = await puppeteerExtra.connect({
 			browserWSEndpoint: wsEndpoint,
 			protocolTimeout: 180000 // 3 minute timeout for CDP protocol calls
 		});
@@ -569,7 +569,7 @@ async function ensureBrowser() {
 					let exists = false;
 					try {
 						if (fs.existsSync(p) || fs.lstatSync(p)) exists = true;
-					} catch (e) {}
+					} catch (e) { }
 
 					if (exists) {
 						logDebug('Removing stale Chrome profile lock file: ' + p);
@@ -653,7 +653,7 @@ async function ensureBrowser() {
 			browser.on('disconnected', () => {
 				logDebug('[BROWSER EVENT] browser disconnected');
 				// Clear globalBrowser so callers know it's no longer usable
-				try { globalBrowser = null; } catch (e) {}
+				try { globalBrowser = null; } catch (e) { }
 			});
 			browser.on('targetdestroyed', (target) => {
 				try {
@@ -664,7 +664,7 @@ async function ensureBrowser() {
 				}
 			});
 			browser.on('targetcreated', (target) => {
-				try { logDebug('[BROWSER EVENT] target created: ' + (target.url ? target.url() : '<unknown>')); } catch (e) {}
+				try { logDebug('[BROWSER EVENT] target created: ' + (target.url ? target.url() : '<unknown>')); } catch (e) { }
 			});
 		}
 	} catch (e) {
@@ -676,12 +676,13 @@ async function ensureBrowser() {
 async function runCycle(browser, outputDir) {
 	//if (!isBusinessHours()) {
 	//	logDebug('Outside business hours, skipping cycle.');
-//		return;
-//	}
+	//		return;
+	//	}
 
 	// Phase 6: Listing updates have been moved out of the scrape daemon.
 	// The daemon is now focused solely on price scraping.
 
+	// ======== INVESTING.COM WATCHLISTS ===========
 	// ======== INVESTING.COM WATCHLISTS ===========
 	const investingWatchlistsName = 'investing_watchlists';
 	const investingGroupSettings = getScrapeGroupSettings(investingWatchlistsName, 180); // seconds
@@ -692,6 +693,22 @@ async function runCycle(browser, outputDir) {
 	} catch (e) {
 		logDebug('[watchlist] Failed to load investingcom provider config: ' + (e && e.message ? e.message : e));
 	}
+
+	// CHECK FOR TRIGGER FILE
+	// Detect environment: Docker vs Local
+	const dockerLogs = '/usr/src/app/logs';
+	const localLogs = path.join(__dirname, '../logs');
+	const logsDir = fs.existsSync(dockerLogs) ? dockerLogs : localLogs;
+	const triggerPath = path.join(logsDir, 'trigger.watchlist_sync.txt');
+
+	let forceSync = false;
+	try {
+		if (fs.existsSync(triggerPath)) {
+			logDebug(`Found watchlist sync trigger file at ${triggerPath}. Forcing sync.`);
+			fs.unlinkSync(triggerPath);
+			forceSync = true;
+		}
+	} catch (e) { logDebug('Error checking trigger file: ' + e.message); }
 
 	// Get update_rules from the legacy 'investing' config section (fallback only)
 	const investingConfig = getConfig('investing');
@@ -704,7 +721,7 @@ async function runCycle(browser, outputDir) {
 			const perWatchlistSettings = { enabled: investingGroupSettings.enabled, interval: Math.max(1, intervalSeconds) };
 
 			const markerPath = path.join('/usr/src/app/logs', `last.watchlist.investingcom.${sanitizeForFilename(wl.key)}.txt`);
-			if (!isTaskDue(perWatchlistSettings, markerPath)) {
+			if (!forceSync && !isTaskDue(perWatchlistSettings, markerPath)) {
 				logDebugThrottled(`skip:watchlist:investingcom:${wl.key}`, `Skipping investing.com watchlist ${wl.key} (interval not reached)`);
 				continue;
 			}
@@ -840,11 +857,11 @@ async function runCycle(browser, outputDir) {
 	const stockPositionsSettings = getScrapeGroupSettings(stockPositionsName, 1800); // default 30 min
 	if (shouldRunTask(stockPositionsSettings, stockPositionsMarker)) {
 		logDebug('Begin stock_positions scrape');
-		
+
 		// Query MySQL for list of stock/etf positions
 		const positions = await fetchStockPositions();
 		logDebug(`Found ${positions.length} stock/etf positions in database: ${positions.map(p => p.ticker).join(', ')}`);
-		
+
 		if (positions.length > 0) {
 			// Use round robin through constructible URLs for each position
 			for (const position of positions) {
@@ -879,21 +896,21 @@ async function runCycle(browser, outputDir) {
 						sources: constructibleUrls.map(u => u.source)
 					});
 				}
-				
+
 				// Pick a random starting index for round robin
 				let currentIndex = Math.floor(Math.random() * constructibleUrls.length);
 				// constructibleUrls.length might be different for each position
 				let scraped = false;
 				const startIndex = currentIndex;
-				
+
 				do {
 					const urlInfo = constructibleUrls[currentIndex];
 					const sourceName = urlInfo.source;
 					const scraperFunc = scraperMap[sourceName];
-					
+
 					if (scraperFunc) {
 						const sourceConfig = getConfig(sourceName);
-						
+
 						// Skip source if explicitly disabled
 						if (sourceConfig && sourceConfig.enabled === false) {
 							logDebug(`Skipping disabled source: ${sourceName}`);
@@ -914,18 +931,18 @@ async function runCycle(browser, outputDir) {
 								continue;
 							}
 						}
-						
+
 						// Check session validity
 						const isPre = isPreMarketSession();
 						const isReg = isRegularTradingSession();
 						const isPost = isAfterHoursSession();
 						const isWkday = isWeekday();
-						
-						const isValidSession = 
+
+						const isValidSession =
 							(isPre && sourceConfig.has_pre_market) ||
 							(isPost && sourceConfig.has_after_hours) ||
 							(isReg || !isWkday);
-						
+
 						// Check if source supports stock prices
 						if (effectiveType === 'bond' || (sourceConfig.has_stock_prices !== false && isValidSession)) {
 							try {
@@ -965,14 +982,14 @@ async function runCycle(browser, outputDir) {
 							}
 						}
 					}
-					
+
 					currentIndex = (currentIndex + 1) % constructibleUrls.length;
 				} while (currentIndex !== startIndex && !scraped);
-				
+
 				if (!scraped) {
 					logDebug(`Could not scrape ${ticker} with any available source`);
 				}
-				
+
 				await new Promise(r => setTimeout(r, 1000));
 			}
 		}
@@ -986,11 +1003,11 @@ async function runCycle(browser, outputDir) {
 	const bondPositionsSettings = getScrapeGroupSettings(bondPositionsName, 1800); // default 30 min
 	if (shouldRunTask(bondPositionsSettings, bondPositionsMarker)) {
 		logDebug('Begin bond_positions scrape');
-		
+
 		// Query MySQL for list of bond positions
 		const bondPositions = await fetchBondPositions();
 		logDebug(`Found ${bondPositions.length} bond positions in database: ${bondPositions.map(p => p.ticker).join(', ')}`);
-		
+
 		if (bondPositions.length > 0) {
 			// Use round robin through constructible URLs for each bond position
 			for (const position of bondPositions) {
@@ -1001,41 +1018,41 @@ async function runCycle(browser, outputDir) {
 					logDebug(`No constructible URLs for bond ${ticker}, skipping`);
 					continue;
 				}
-				
+
 				// Pick a random starting index for round robin
 				let currentIndex = Math.floor(Math.random() * constructibleUrls.length);
 				let scraped = false;
 				const startIndex = currentIndex;
-				
+
 				do {
 					const urlInfo = constructibleUrls[currentIndex];
 					const sourceName = urlInfo.source;
 					const scraperFunc = scraperMap[sourceName];
-					
+
 					if (scraperFunc) {
 						const sourceConfig = getConfig(sourceName);
-						
+
 						// Skip source if explicitly disabled
 						if (sourceConfig && sourceConfig.enabled === false) {
 							logDebug(`Skipping disabled source: ${sourceName}`);
 							currentIndex = (currentIndex + 1) % constructibleUrls.length;
 							continue;
 						}
-						
+
 						// For bonds, ONLY allow sources that explicitly support bond prices (has_bond_prices === true)
 						if (sourceConfig && sourceConfig.has_bond_prices !== true) {
 							logDebug(`Skipping source ${sourceName} for bond ${ticker} (has_bond_prices is not explicitly true)`);
 							currentIndex = (currentIndex + 1) % constructibleUrls.length;
 							continue;
 						}
-						
+
 						// Explicit webull-only enforcement for bonds as a safety net
 						if (sourceName !== 'webull') {
 							logDebug(`Skipping non-webull source ${sourceName} for bond ${ticker} (bonds must use webull)`);
 							currentIndex = (currentIndex + 1) % constructibleUrls.length;
 							continue;
 						}
-						
+
 						try {
 							// Create a security object with the URL
 							// Include security_type and pricing_class for Kafka message routing
@@ -1061,14 +1078,14 @@ async function runCycle(browser, outputDir) {
 							logDebug(`Error scraping bond ${ticker} with ${sourceName}: ${e.message}`);
 						}
 					}
-					
+
 					currentIndex = (currentIndex + 1) % constructibleUrls.length;
 				} while (currentIndex !== startIndex && !scraped);
-				
+
 				if (!scraped) {
 					logDebug(`Could not scrape bond ${ticker} with any available source`);
 				}
-				
+
 				await new Promise(r => setTimeout(r, 1000));
 			}
 		}
@@ -1080,74 +1097,74 @@ async function runCycle(browser, outputDir) {
 }
 
 function getDynamicCycleInterval(attrs) {
-    const now = new Date();
+	const now = new Date();
 
-    // Use New York time for market hours
-    const nyTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
-    const day = nyTime.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const hour = nyTime.getHours();
-    const minute = nyTime.getMinutes();
-    const timeInMinutes = hour * 60 + minute;
+	// Use New York time for market hours
+	const nyTime = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+	const day = nyTime.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+	const hour = nyTime.getHours();
+	const minute = nyTime.getMinutes();
+	const timeInMinutes = hour * 60 + minute;
 
-    // Defaults based on user request
-    const defaults = {
-        regular_trading_seconds: 15,
-        pre_market_seconds: 60,
-        after_hours_seconds: 60,
-        overnight_weekday_seconds: 20 * 60,
-        weekend_seconds: 30 * 60
-    };
+	// Defaults based on user request
+	const defaults = {
+		regular_trading_seconds: 15,
+		pre_market_seconds: 60,
+		after_hours_seconds: 60,
+		overnight_weekday_seconds: 20 * 60,
+		weekend_seconds: 30 * 60
+	};
 
-    const settings = (attrs && attrs.cycle_intervals) ? attrs.cycle_intervals : {};
-    const regularSec = settings.regular_trading_seconds || defaults.regular_trading_seconds;
-    const preMarketSec = settings.pre_market_seconds || defaults.pre_market_seconds;
-    const afterHoursSec = settings.after_hours_seconds || defaults.after_hours_seconds;
-    const overnightSec = settings.overnight_weekday_seconds || defaults.overnight_weekday_seconds;
-    const weekendSec = settings.weekend_seconds || defaults.weekend_seconds;
+	const settings = (attrs && attrs.cycle_intervals) ? attrs.cycle_intervals : {};
+	const regularSec = settings.regular_trading_seconds || defaults.regular_trading_seconds;
+	const preMarketSec = settings.pre_market_seconds || defaults.pre_market_seconds;
+	const afterHoursSec = settings.after_hours_seconds || defaults.after_hours_seconds;
+	const overnightSec = settings.overnight_weekday_seconds || defaults.overnight_weekday_seconds;
+	const weekendSec = settings.weekend_seconds || defaults.weekend_seconds;
 
-    // Helper for ranges
-    const isTueFri = day >= 2 && day <= 5;
-    const isMonThu = day >= 1 && day <= 4;
+	// Helper for ranges
+	const isTueFri = day >= 2 && day <= 5;
+	const isMonThu = day >= 1 && day <= 4;
 
-    // Weekend Rule: Fri 20:30 to Mon 04:00
-    if (day === 6 || day === 0) return weekendSec * 1000; // Sat, Sun
-    if (day === 5 && timeInMinutes >= (20 * 60 + 30)) return weekendSec * 1000; // Fri >= 20:30
-    if (day === 1 && timeInMinutes < 4 * 60) return weekendSec * 1000; // Mon < 04:00
+	// Weekend Rule: Fri 20:30 to Mon 04:00
+	if (day === 6 || day === 0) return weekendSec * 1000; // Sat, Sun
+	if (day === 5 && timeInMinutes >= (20 * 60 + 30)) return weekendSec * 1000; // Fri >= 20:30
+	if (day === 1 && timeInMinutes < 4 * 60) return weekendSec * 1000; // Mon < 04:00
 
-    // Weekday Logic (Mon 04:00 to Fri 20:30)
-    
-    // Pre-market: Mon-Fri 04:00 - 09:30
-    if (timeInMinutes >= 4 * 60 && timeInMinutes < 9 * 60 + 30) {
-        return preMarketSec * 1000;
-    }
+	// Weekday Logic (Mon 04:00 to Fri 20:30)
 
-    // Regular: Mon-Fri 09:30 - 16:00
-    if (timeInMinutes >= 9 * 60 + 30 && timeInMinutes < 16 * 60) {
-        return regularSec * 1000;
-    }
+	// Pre-market: Mon-Fri 04:00 - 09:30
+	if (timeInMinutes >= 4 * 60 && timeInMinutes < 9 * 60 + 30) {
+		return preMarketSec * 1000;
+	}
 
-    // After-hours: Mon-Fri 16:00 - 20:00
-    if (timeInMinutes >= 16 * 60 && timeInMinutes < 20 * 60) {
-        return afterHoursSec * 1000;
-    }
+	// Regular: Mon-Fri 09:30 - 16:00
+	if (timeInMinutes >= 9 * 60 + 30 && timeInMinutes < 16 * 60) {
+		return regularSec * 1000;
+	}
 
-    // Overnight Weekdays: 8:00pm to 4:00AM (Mon night to Fri morning)
-    // Tue-Fri < 04:00
-    if (isTueFri && timeInMinutes < 4 * 60) {
-        return overnightSec * 1000;
-    }
-    // Mon-Thu >= 20:00
-    if (isMonThu && timeInMinutes >= 20 * 60) {
-        return overnightSec * 1000;
-    }
-    
-    // Gap check: Fri 20:00 - 20:30 (Treat as overnight/after-hours gap)
-    if (day === 5 && timeInMinutes >= 20 * 60 && timeInMinutes < 20 * 60 + 30) {
-        return overnightSec * 1000;
-    }
+	// After-hours: Mon-Fri 16:00 - 20:00
+	if (timeInMinutes >= 16 * 60 && timeInMinutes < 20 * 60) {
+		return afterHoursSec * 1000;
+	}
 
-    // Fallback
-    return 60000;
+	// Overnight Weekdays: 8:00pm to 4:00AM (Mon night to Fri morning)
+	// Tue-Fri < 04:00
+	if (isTueFri && timeInMinutes < 4 * 60) {
+		return overnightSec * 1000;
+	}
+	// Mon-Thu >= 20:00
+	if (isMonThu && timeInMinutes >= 20 * 60) {
+		return overnightSec * 1000;
+	}
+
+	// Gap check: Fri 20:00 - 20:30 (Treat as overnight/after-hours gap)
+	if (day === 5 && timeInMinutes >= 20 * 60 && timeInMinutes < 20 * 60 + 30) {
+		return overnightSec * 1000;
+	}
+
+	// Fallback
+	return 60000;
 }
 
 async function daemon() {
@@ -1184,9 +1201,9 @@ async function daemon() {
 	// expose browser for graceful shutdown
 	globalBrowser = browser;
 	// Phase 7: initialize page pool / persistent page registry
-	try { await initializeScraperInfrastructure(browser); } catch (e) {}
+	try { await initializeScraperInfrastructure(browser); } catch (e) { }
 	// Phase 11: initialize watchlist providers (best-effort)
-	try { await initializeWatchlistProviders(browser); } catch (e) {}
+	try { await initializeWatchlistProviders(browser); } catch (e) { }
 
 	// Heartbeat configuration: emit periodic heartbeat messages to logs/stdout
 	const HEARTBEAT_INTERVAL_SECONDS = parseInt(process.env.HEARTBEAT_INTERVAL_SECONDS || '300', 10);
@@ -1680,11 +1697,11 @@ async function daemon() {
 					continue;
 				}
 			}
-			
+
 			lastCycleStatus = 'running';
 			lastCycleError = null;
 			// reset per-cycle metrics so each cycle reports its own counts
-			try { resetMetrics(); } catch (e) {}
+			try { resetMetrics(); } catch (e) { }
 			cycleStart = Date.now();
 			await runCycle(browser, outputDir);
 			lastCycleAt = Date.now();
@@ -1704,12 +1721,12 @@ async function daemon() {
 			// set duration even on error
 			try { lastCycleDurationMs = Date.now() - (typeof cycleStart === 'number' ? cycleStart : Date.now()); } catch (err) { lastCycleDurationMs = null; }
 			logDebug('Fatal error in cycle: ' + e);
-			
+
 			// Check if this was a protocol timeout error
 			if (isProtocolTimeoutError(lastCycleError)) {
 				recordProtocolTimeout();
 			}
-			
+
 			try {
 				const thresholds = { navFail: parseInt(process.env.NAV_FAIL_THRESHOLD || '5', 10), reqFail: parseInt(process.env.REQ_FAIL_THRESHOLD || '10', 10) };
 				reportMetrics(thresholds, debugLogPath);
@@ -1721,29 +1738,29 @@ async function daemon() {
 			if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_SECONDS * 1000) {
 				const hb = `[${new Date().toISOString()}] HEARTBEAT: daemon alive\n`;
 				logDebug('HEARTBEAT: daemon alive');
-				try { require('fs').writeSync(1, hb); } catch (e) {}
+				try { require('fs').writeSync(1, hb); } catch (e) { }
 				lastHeartbeat = now;
 			}
 		} catch (e) {
 			// ignore heartbeat errors
 		}
-        
-        // Calculate dynamic sleep interval
-        let sleepMs = 60000;
-        try {
-            const attrs = loadScraperAttributes();
-            sleepMs = getDynamicCycleInterval(attrs);
+
+		// Calculate dynamic sleep interval
+		let sleepMs = 60000;
+		try {
+			const attrs = loadScraperAttributes();
+			sleepMs = getDynamicCycleInterval(attrs);
 			// FOR TESTING 
 			sleepMs = 500;
 			const now = Date.now();
 			if (lastCycleIntervalLoggedMs !== sleepMs || (now - lastCycleIntervalLoggedAt) >= 60000) {
-				logDebug(`Dynamic cycle interval: ${sleepMs/1000}s`);
+				logDebug(`Dynamic cycle interval: ${sleepMs / 1000}s`);
 				lastCycleIntervalLoggedMs = sleepMs;
 				lastCycleIntervalLoggedAt = now;
 			}
-        } catch (e) {
-            logDebug('Error calculating dynamic interval: ' + e);
-        }
+		} catch (e) {
+			logDebug('Error calculating dynamic interval: ' + e);
+		}
 		await new Promise(r => setTimeout(r, sleepMs)); // sleep dynamic interval between cycles
 	}
 }
@@ -1768,12 +1785,12 @@ async function gracefulShutdown(signal) {
 	try {
 		const msg = 'Received ' + signal + ', shutting down...';
 		logDebug(msg);
-		try { require('fs').writeSync(1, `[${new Date().toISOString()}] ${msg}\n`); } catch (e) {}
-		try { await shutdownScraperInfrastructure(); } catch (e) {}
+		try { require('fs').writeSync(1, `[${new Date().toISOString()}] ${msg}\n`); } catch (e) { }
+		try { await shutdownScraperInfrastructure(); } catch (e) { }
 		if (globalBrowser) {
 			await globalBrowser.close();
 			logDebug('Browser closed.');
-			try { require('fs').writeSync(1, `[${new Date().toISOString()}] Browser closed.\n`); } catch (e) {}
+			try { require('fs').writeSync(1, `[${new Date().toISOString()}] Browser closed.\n`); } catch (e) { }
 		}
 		// close health server if running
 		try {
@@ -1785,7 +1802,7 @@ async function gracefulShutdown(signal) {
 		}
 	} catch (e) {
 		logDebug('Error during shutdown: ' + e);
-		try { require('fs').writeSync(2, `[${new Date().toISOString()}] Error during shutdown: ${e}\n`); } catch (e2) {}
+		try { require('fs').writeSync(2, `[${new Date().toISOString()}] Error during shutdown: ${e}\n`); } catch (e2) { }
 	} finally {
 		// give a moment for logs to flush
 		await new Promise(r => setTimeout(r, 250));
