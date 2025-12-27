@@ -21,7 +21,11 @@ const DEFAULT_CONFIG = {
 		watchlistTable: '[id^="tbody_overview_"]',
 		tickerRow: 'tbody[id^="tbody_overview_"] > tr, [id^="tbody_overview_"] > tr',
 		tickerSymbol: 'td[data-column-name="symbol"]',
-		modalClose: '.js-modal-close, [data-test="modal-close"], button.close'
+		modalClose: '.js-modal-close, [data-test="modal-close"], button.close',
+		// Create Portfolio Selectors
+		createPortfolioBtn: '.js-add-portfolio, .plusIcon, .plusTab, span[data-tooltip="Create a New Portfolio"]',
+		createPortfolioInput: '#portfolioName, #newPortfolioText, input[data-test="portfolio-name-input"]',
+		createPortfolioSubmit: '#createPortfolioBtn, #createPortfolio, button[data-test="create-portfolio-submit"]'
 	}
 };
 
@@ -181,6 +185,26 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 		return tabs;
 	}
 
+	async getWatchlistMap() {
+		if (!this.isInitialized) {
+			throw new Error('Controller not initialized');
+		}
+
+		// Returns { "TabName": "portfolioID" }
+		const map = await this.page.$$eval('li.portfolioTab[title][data-portfolio-id]', elements => {
+			const m = {};
+			for (const el of elements) {
+				const title = el.getAttribute('title');
+				const id = el.getAttribute('data-portfolio-id');
+				if (title && id) {
+					m[title] = id;
+				}
+			}
+			return m;
+		});
+		return map;
+	}
+
 	async switchToTab(tabName) {
 		if (!this.isInitialized) {
 			throw new Error('Controller not initialized');
@@ -202,6 +226,71 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 			return true;
 		} catch (e) {
 			logDebug(`[InvestingCom] Failed to switch to tab ${tabName}: ${e.message}`);
+			return false;
+		}
+	}
+
+	async createWatchlistTab(tabName) {
+		if (!this.isInitialized) {
+			throw new Error('Controller not initialized');
+		}
+
+		logDebug(`[InvestingCom] Creating new watchlist tab: ${tabName}`);
+
+		// Check if it already exists
+		const existingTabs = await this.getWatchlistTabs();
+		if (existingTabs.includes(tabName)) {
+			logDebug(`[InvestingCom] Tab ${tabName} already exists.`);
+			return true;
+		}
+
+		try {
+			// Click the + button
+			await this.page.waitForSelector(this.config.selectors.createPortfolioBtn, {
+				visible: true,
+				timeout: this.config.selectorTimeout
+			});
+			await this.page.click(this.config.selectors.createPortfolioBtn);
+
+			// Wait for input
+			await this.page.waitForSelector(this.config.selectors.createPortfolioInput, {
+				visible: true,
+				timeout: this.config.selectorTimeout
+			});
+
+			// Type name
+			await this.page.type(this.config.selectors.createPortfolioInput, tabName, { delay: 50 });
+
+			// Submit
+			await this.page.click(this.config.selectors.createPortfolioSubmit);
+
+			// Wait for it to be created and appear in the list
+			await new Promise(r => setTimeout(r, 1000));
+			await this.page.waitForFunction(
+				(name) => {
+					const tabs = Array.from(document.querySelectorAll('li[title]')).map(el => el.getAttribute('title'));
+					return tabs.includes(name);
+				},
+				{ timeout: this.config.selectorTimeout },
+				tabName
+			);
+
+			logDebug(`[InvestingCom] Created tab: ${tabName}`);
+			return true;
+		} catch (e) {
+			try {
+				const base = require('path').join(
+					process.env.LOG_DIR || '/usr/src/app/logs',
+					`${getDateTimeString()}.investingcom_watchlist_create_tab_failure.${sanitizeForFilename(tabName)}`
+				);
+				await savePageSnapshot(this.page, base);
+				logDebug('[InvestingCom] Wrote create-tab failure snapshot to ' + base + '.*');
+			} catch (snapErr) {
+				logDebug('[InvestingCom] Failed to write create-tab failure snapshot: ' + (snapErr && snapErr.message ? snapErr.message : snapErr));
+			}
+			logDebug(`[InvestingCom] Failed to create tab ${tabName}: ${e.message}`);
+			// Try to close modal if it's stuck open
+			try { await this.page.click(this.config.selectors.modalClose); } catch (ignore) { }
 			return false;
 		}
 	}
@@ -413,7 +502,7 @@ class InvestingComWatchlistController extends BaseWatchlistController {
 
 				let deleteBtn = await targetRow.$(this.config.selectors.deleteButton);
 				if (!deleteBtn) {
-					try { await targetRow.hover(); } catch (e) {}
+					try { await targetRow.hover(); } catch (e) { }
 					await new Promise(r => setTimeout(r, 500));
 					deleteBtn = await targetRow.$(this.config.selectors.deleteButton);
 				}
